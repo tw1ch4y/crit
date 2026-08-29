@@ -230,6 +230,11 @@ function toast(msg, type = "info") {
     // kad veza pukne. Plutajuca oznaka preko ekrana prijave je bila visak.
     updateServerStatus(connected);
     if (!connected && !$("#setupScreen").classList.contains("active")) {
+      // Točak koji čeka odgovor se otpušta odmah: preko puknute veze ishod
+      // ionako više ne može da stigne, a dok "vrtnja traje" launcher odbacuje
+      // svako novo stanje kredita - pa bi HUD ostao zamrznut i posle povratka
+      // veze, dok naplata teče dalje.
+      otpustiTocak("Veza je pukla usred vrtnje. Spin nije potrošen.");
       // server pauzira naplatu dok nema veze - zaustavi i odbrojavanje,
       // inače bi tajmer lažno otišao u crveno dok stojimo na "Povezivanje..."
       stopTimer();
@@ -491,15 +496,15 @@ function handleMsg(m) {
       if (S.tab === "account" && !S.tocakVrti) renderContent();
       break;
     case "tocak_rezultat":
+      // Odgovor je stigao - rok za čekanje više ne treba.
+      clearTimeout(tocakRokTajmer); tocakRokTajmer = null;
       // Stanje se osvežava zasebnom "balance" porukom; ovde samo pokrećemo
       // animaciju koja na kraju pokaže nagradu i novo stanje.
       animirajTocak(m.index, m.nagrada, m.sledeciSpin);
       break;
     case "tocak_err":
-      S.tocakVrti = false;
       S.tocak = m.tocak || S.tocak;
-      toast(m.message, "error");
-      if (S.tab === "account") renderContent();
+      otpustiTocak(m.message);
       break;
     case "locked":
       stopTimer(); S.player = null; document.body.classList.remove("desktop-active");
@@ -1831,11 +1836,53 @@ function odbrojavanjeDana(ts) {
   return sati + (sati === 1 ? " sat" : sati < 5 ? " sata" : " sati");
 }
 
+// ZAGLAVLJENA VRTNJA MORA DA SE SAMA OTPUSTI.
+//
+// Klik odmah upali "vrtnja traje", a ishod se ČEKA SA SERVERA. Dok vrtnja traje,
+// prikazano stanje kredita se NAMERNO ne dira: server nagradu doda odmah, a
+// točak se vrti pet sekundi, pa bi se brojka promenila pre nego što igrač sazna
+// šta je dobio.
+//
+// Ako odgovor nikad ne stigne - veza pukne baš u tih pet sekundi, server se
+// restartuje, ruter se resetuje - vrtnja ostaje "u toku" ZAUVEK. Od tog trenutka
+// se svako novo stanje odbacuje: HUD stoji zamrznut dok naplata teče dalje.
+// Igrač gleda "1000 din, ostalo 8:20" dok mu vreme stvarno curi, i računar se
+// zaključa bez ijednog upozorenja. Dopuna na kasi se takođe ne vidi, pa radnik
+// dopunjuje drugi put.
+//
+// Zato dve mreže: rok u kom odgovor mora da stigne, i otpuštanje čim veza padne
+// (preko te veze odgovor ionako više ne može da dođe).
+const TOCAK_ROK = 12000; // koliko se čeka odgovor servera
+let tocakRokTajmer = null;
+
+function otpustiTocak(razlog) {
+  if (!S.tocakVrti) return;
+  S.tocakVrti = false;
+  clearTimeout(tocakRokTajmer); tocakRokTajmer = null;
+  clearInterval(_tikTajmer); _tikTajmer = null;
+  document.querySelector(".tocak-obl")?.classList.remove("vrti");
+  // Stanje zadržano tokom vrtnje se sada upisuje - inače bi ostalo zarobljeno.
+  if (S.tocakStanje) {
+    S.balance = S.tocakStanje.balance;
+    S.remaining = S.tocakStanje.remaining;
+    S.tocakStanje = null;
+  }
+  updateHud();
+  const btn = $("#tocakSpin");
+  if (btn) { btn.disabled = false; btn.textContent = "Zavrti"; }
+  if (razlog) toast(razlog, "error");
+  if (S.tab === "account") renderContent();
+}
+
 function zavrtiTocakKlik() {
   if (S.tocakVrti || !S.tocak?.moze) return;
   S.tocakVrti = true;
   const btn = $("#tocakSpin");
   if (btn) { btn.disabled = true; btn.textContent = "..."; }
+  clearTimeout(tocakRokTajmer);
+  tocakRokTajmer = setTimeout(
+    () => otpustiTocak("Server se nije javio. Spin nije potrošen - probaj ponovo."),
+    TOCAK_ROK);
   window.crit.toServer({ t: "tocak_spin" });
 }
 
@@ -1904,6 +1951,7 @@ function animirajTocak(index, nagrada, sledeciSpin) {
 function zavrsiSpin(nagrada, sledeciSpin) {
   if (!S.tocakVrti) return;
   S.tocakVrti = false;
+  clearTimeout(tocakRokTajmer); tocakRokTajmer = null;
   clearInterval(_tikTajmer); _tikTajmer = null;
   const obl = document.querySelector(".tocak-obl");
   obl?.classList.remove("vrti");
