@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2560" height="1440" viewBox="0 0 2560 1440">
+  <rect width="2560" height="1440" fill="#0f1116"/>
+  <line x1="853.2" y1="0" x2="853.2" y2="1440" stroke="#2a2f3a" stroke-width="2.9" stroke-opacity="0.7"/><line x1="0" y1="480" x2="2560" y2="480" stroke="#2a2f3a" stroke-width="2.9" stroke-opacity="0.7"/><line x1="1706.5" y1="0" x2="1706.5" y2="1440" stroke="#2a2f3a" stroke-width="2.9" stroke-opacity="0.7"/><line x1="0" y1="959.9" x2="2560" y2="959.9" stroke="#2a2f3a" stroke-width="2.9" stroke-opacity="0.7"/>
+  <rect x="2.9" y="2.9" width="2554.2" height="1434.2" fill="none" stroke="#2a2f3a" stroke-width="5.8"/>
+
+  <g>
+    <rect x="1018.9" y="273.6" width="519.7" height="892.8"
+      fill="#e23b34" fill-opacity="0.14" stroke="#e23b34" stroke-opacity="0.55"
+      stroke-width="5.8" stroke-dasharray="28.8 20.2"/>
+    <text x="1059.2" y="348.5" fill="#e23b34" font-family="Segoe UI, sans-serif"
+      font-size="49" font-weight="700" letter-spacing="2.9">LOGO I FORMA ZA PRIJAVU - DRZI MIRNO</text>
+  </g>
+  <g>
+    <rect x="0" y="0" width="563.2" height="86.4"
+      fill="#8b91a0" fill-opacity="0.07" stroke="#8b91a0" stroke-opacity="0.55"
+      stroke-width="5.8" stroke-dasharray="28.8 20.2"/>
+    <text x="40.3" y="74.9" fill="#8b91a0" font-family="Segoe UI, sans-serif"
+      font-size="49" font-weight="700" letter-spacing="2.9">OZNAKA RAČUNARA</text>
+  </g>
+  <g>
+    <rect x="1996.8" y="0" width="563.2" height="86.4"
+      fill="#8b91a0" fill-opacity="0.07" stroke="#8b91a0" stroke-opacity="0.55"
+      stroke-width="5.8" stroke-dasharray="28.8 20.2"/>
+    <text x="2037.1" y="74.9" fill="#8b91a0" font-family="Segoe UI, sans-serif"
+      font-size="49" font-weight="700" letter-spacing="2.9">STATUS VEZE</text>
+  </g>
+  <g>
+    <rect x="0" y="0" width="2560" height="276.5" fill="#05060a" fill-opacity="0.93"/>
+    <text x="80.6" y="115.2" fill="#e8eaf0" font-family="Segoe UI, sans-serif" font-size="72" font-weight="800" letter-spacing="2.9">POZADINA - EKRAN ZA PRIJAVU</text>
+    <text x="80.6" y="207.4" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="49">Stoji ceo dan dok je računar slobodan. Ovo gost prvo vidi.</text>
+    <text x="2479.4" y="132.5" fill="#e8eaf0" text-anchor="end" font-family="Segoe UI, sans-serif" font-size="80.6" font-weight="800">2560 x 1440 px</text>
+
+    <rect x="0" y="1261.4" width="2560" height="178.6" fill="#05060a" fill-opacity="0.93"/>
+    <text x="80.6" y="1336.3000000000002" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="46.1">Preko slike ide srednje tamni sloj. Sredina se zatamnjuje jače (tu je forma), ivice ostaju svetlije.</text>
+    <text x="80.6" y="1405.4" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="43.2">crvena zona = sadrzaj launchera stoji preko slike   ·   zelena zona = tu stavi ono sto mora da se vidi</text>
+  </g>
+</svg>

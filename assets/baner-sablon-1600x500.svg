@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="500" viewBox="0 0 1600 500" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#20242c"/>
+      <stop offset="1" stop-color="#0e1014"/>
+    </linearGradient>
+    <!-- ovako launcher zatamni sliku: jako sa leve i sa dna -->
+    <linearGradient id="scrimL" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#07070a" stop-opacity="0.96"/>
+      <stop offset="0.42" stop-color="#07070a" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#07070a" stop-opacity="0.12"/>
+    </linearGradient>
+    <linearGradient id="scrimB" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#07070a" stop-opacity="0.9"/>
+      <stop offset="0.55" stop-color="#07070a" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- podloga = tvoja slika ide ovde -->
+  <rect width="1600" height="500" fill="url(#bg)"/>
+  <text x="800" y="250" fill="#3a4150" font-size="34" font-weight="700" text-anchor="middle" letter-spacing="2">◄  OVDE IDE TVOJA SLIKA / ART IGRE  ►</text>
+  <text x="800" y="292" fill="#2f3540" font-size="18" text-anchor="middle" letter-spacing="1">popuni ceo pravougaonik 1600 × 500</text>
+
+  <!-- prikaz launcher zatamnjenja -->
+  <rect width="1600" height="500" fill="url(#scrimL)"/>
+  <rect width="1600" height="500" fill="url(#scrimB)"/>
+
+  <!-- ZONA: naslov + dugme POKRENI (launcher crta ovde) -->
+  <rect x="48" y="150" width="700" height="300" rx="10" fill="none" stroke="#ff2b2b" stroke-width="2.5" stroke-dasharray="10 8"/>
+  <text x="66" y="140" fill="#ff5a54" font-size="20" font-weight="800" letter-spacing="1">ZONA: NASLOV + DUGME „POKRENI"</text>
+  <!-- maketa naslova -->
+  <text x="66" y="330" fill="#ffffff" font-size="58" font-weight="900" letter-spacing="1">NAZIV IGRE</text>
+  <text x="66" y="364" fill="#aab0c0" font-size="20" font-weight="700" letter-spacing="2">KATEGORIJA</text>
+  <!-- maketa dugmeta -->
+  <g>
+    <rect x="66" y="388" width="210" height="52" rx="8" fill="#e2312b"/>
+    <path d="M96 402 v22 l18 -11 Z" fill="#fff"/>
+    <text x="126" y="420" fill="#fff" font-size="18" font-weight="800" letter-spacing="1">POKRENI</text>
+  </g>
+  <text x="66" y="470" fill="#7d8492" font-size="15">ostavi ovaj deo tamniji / bez bitnih detalja — tekst i dugme se crtaju preko</text>
+
+  <!-- ZONA: tajmer + pozdrav (gore desno) -->
+  <rect x="1180" y="40" width="372" height="150" rx="10" fill="none" stroke="#ffb527" stroke-width="2.5" stroke-dasharray="10 8"/>
+  <text x="1536" y="30" fill="#ffcf6b" font-size="20" font-weight="800" letter-spacing="1" text-anchor="end">ZONA: TIMER + POZDRAV</text>
+  <text x="1536" y="86" fill="#aab0c0" font-size="20" text-anchor="end">Zdravo, IGRAČ</text>
+  <text x="1536" y="150" fill="#ffffff" font-size="52" font-weight="900" text-anchor="end" letter-spacing="1">4:09:57</text>
+  <text x="1536" y="176" fill="#7d8492" font-size="15" text-anchor="end">ostavi gornji desni ugao slobodan</text>
+
+  <!-- okvir celog platna -->
+  <rect x="1" y="1" width="1598" height="498" fill="none" stroke="#454b57" stroke-width="2"/>
+  <text x="800" y="486" fill="#5b6270" font-size="15" text-anchor="middle" letter-spacing="1">CRIT — šablon banera igre · 1600 × 500 px · JPG ili PNG · do 5 MB · izbriši ove oznake u finalnoj verziji</text>
+</svg>

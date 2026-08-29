@@ -1,0 +1,12 @@
+#!/bin/sh
+# Ceo test paket pre nego sto izmena napusti ovaj racunar.
+#
+# Ovde je pravo mesto za dugu proveru: push je redak, a od tog trenutka izmenu
+# vise ne drzis samo ti.
+#
+# Ako stvarno mora da prodje bez provere:  git push --no-verify
+set -e
+KOREN=$(git rev-parse --show-toplevel)
+cd "$KOREN/testovi"
+echo "  Provera sistema pre push-a (traje nekoliko minuta)..."
+node pokreni-sve.mjs

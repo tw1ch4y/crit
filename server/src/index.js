@@ -1,0 +1,186 @@
+import "./prewarn.js"; // mora prvo (gasi SQLite experimental warning)
+import express from "express";
+import http from "node:http";
+import path from "node:path";
+import os from "node:os";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
+import { db, checkpoint } from "./db.js";
+import { backupDb, odrzavanje } from "./odrzavanje.js";
+import { getAdmin } from "./auth.js";
+import { router } from "./routes.js";
+import { initWs, setHandlers, broadcastPanels } from "./hub.js";
+import * as svc from "./service.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PORT = process.env.PORT || 8095;
+const PUBLIC = path.join(__dirname, "..", "public");
+// Verzija ide u adrese style.css i app.js. Bez toga pregledac posle nadogradnje
+// i dalje pokazuje staru, kesirawanu stranu - vlasnik zameni fajlove i zakune
+// se da se "nista nije promenilo". Sa ovim se pri svakoj novoj verziji povuku
+// svezi fajlovi, a stari se i dalje kesiraju dok verzija stoji.
+let VERZIJA = "0";
+try { VERZIJA = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")).version || "0"; } catch {}
+
+const app = express();
+// Slike stizu kao base64, sto naduva sadrzaj za oko trecinu - limit mora da
+// bude iznad najvece dozvoljene slike (8 MB pozadina) da bi korisnik dobio
+// razumljivu poruku umesto grube greske iz parsera.
+app.use(express.json({ limit: "12mb" }));
+app.use((err, req, res, next) => {
+  if (err?.type === "entity.too.large") {
+    return res.status(413).json({ error: "Fajl je prevelik. Najveća dozvoljena slika je 8 MB." });
+  }
+  if (err) return res.status(400).json({ error: "Neispravan zahtev" });
+  next();
+});
+
+// API
+app.use("/api", router);
+// Nepoznata adresa pod /api vraca JSON, ne Express-ovu HTML stranicu. Panel sve
+// odgovore cita kao JSON, pa bi na HTML javio nerazumljivu gresku umesto jasnog
+// "ta adresa ne postoji" - a to se desi kad panel i server nisu iste verzije.
+app.use("/api", (req, res) => res.status(404).json({ error: `Nepoznata adresa: ${req.method} /api${req.path}` }));
+
+// index.html se sklapa u hodu: verzija se ubaci u adrese CSS-a i JS-a, pa
+// pregledac za svaku novu verziju povuce sveze fajlove. Sama strana se ne
+// kesira - uvek se trazi ponovo, a ona onda referise verzionirane fajlove.
+const posaljiPanel = (req, res) => {
+  fs.readFile(path.join(PUBLIC, "index.html"), "utf8", (e, html) => {
+    if (e) return res.status(500).send("Panel nije nađen");
+    res.set("Cache-Control", "no-cache");
+    res.type("html").send(html.replaceAll("__VERZIJA__", VERZIJA));
+  });
+};
+app.get("/", posaljiPanel);
+app.get("/index.html", posaljiPanel);
+
+// Staticki panel. express.static sam salje ETag, pa pregledac na svaki fajl
+// pita "je li se promenio" i dobija 304 ako nije - jeftino, a nikad ne servira
+// staru verziju. Uz verziju u adresi (?v=) to znaci: nova verzija = svez fajl,
+// ista verzija = brza provera.
+app.use(express.static(PUBLIC));
+
+// Zastitna mreza: nijedna ruta ne sme da posalje stack trace klijentu.
+// Express podrazumevano na neuhvacenu gresku vrati HTML sa celim stack trace-om
+// i apsolutnim putanjama fajlova - panel to prikaze kao nerazumljivu bujicu
+// teksta, a i nema razloga da iko spolja vidi kako je server sastavljen.
+// Greska i dalje ide u log servera, gde joj je mesto.
+app.use((err, req, res, next) => {
+  console.error(`[greska] ${req.method} ${req.originalUrl}:`, err?.stack || err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: "Greška na serveru. Pokušaj ponovo, a ako se ponovi pogledaj prozor servera." });
+});
+
+const server = http.createServer(app);
+
+// ---- WebSocket ----
+initWs(server, {
+  authComputer: (token) => (token ? db.prepare("SELECT * FROM computers WHERE token = ?").get(token) : null),
+  authAdmin: (token) => getAdmin(token),
+});
+
+setHandlers({
+  onClientOpen: (comp, ws, ip, verzija) => svc.onClientOpen(comp, ip, verzija),
+  onClientClose: (id) => svc.onClientClose(id),
+  onClientMessage: (id, msg) => svc.handleClientMessage(id, msg),
+  onPanelOpen: (ws) => {
+    // posalji pun snapshot novom panelu
+    ws.send(JSON.stringify(svc.fullSnapshot()));
+  },
+});
+
+// ---- Naplata svakih 5s ----
+setInterval(() => {
+  try { svc.billingTick(); } catch (e) { console.error("billing:", e); }
+}, 5000);
+
+// ---- Zaštita: WAL checkpoint (2 min) + backup baze (15 min + na startu) ----
+setInterval(() => checkpoint(), 2 * 60 * 1000);
+setInterval(() => backupDb(), 15 * 60 * 1000);
+backupDb();
+
+// ---- Održavanje: na startu i jednom dnevno ----
+//
+// Seče logove po starosti i po broju, proređuje rezervne kopije i pazi na
+// slobodan prostor. Objašnjenje granica i izmerene brojke su u odrzavanje.js.
+function odrzavanjeSada(razlog) {
+  const r = odrzavanje(svc.getActiveShift()?.id ?? null);
+  const obrisano = r.logovi.poStarosti + r.logovi.poBroju + r.pokretanja + r.kopije.obrisano;
+  if (obrisano) {
+    console.log(`održavanje (${razlog}): logovi -${r.logovi.poStarosti + r.logovi.poBroju}, ` +
+      `pokretanja igara -${r.pokretanja}, kopije -${r.kopije.obrisano} ` +
+      `(ostalo ${r.kopije.zadrzano} kopija, ${r.kopije.ukupnoMB} MB)`);
+  }
+  if (r.stanje.maloMesta) {
+    console.error(`PAŽNJA: na disku je ostalo samo ${r.stanje.slobodnoMB} MB. ` +
+      `Kad disk stane, server ne može da piše i igraonica staje.`);
+    svc.logEvent({ category: "sistem", action: "disk_malo", actor: "sistem",
+      detail: `Malo mesta na disku: ${r.stanje.slobodnoMB} MB slobodno` });
+  }
+  // KOPIJA VAN RAČUNARA - jedina zaštita od otkaza diska.
+  //
+  // Neuspeh mora da se čuje. USB se iščupa, mrežni disk se odjavi, a kopija
+  // tiho prestane da izlazi napolje - i to se otkrije tek onog dana kad zatreba.
+  // Zato zapis ide u Logove, gde vlasnik gleda, a ne samo u konzolu koju niko
+  // ne otvara.
+  const van = r.vanRacunara;
+  if (van?.ok) {
+    console.log(`kopija van računara: ${van.fajl} -> ${van.cilj}`);
+  } else if (van?.error) {
+    console.error(`PAŽNJA: kopija van računara nije uspela (${van.error}) - odredište ${van.cilj}`);
+    svc.logEvent({ category: "sistem", action: "kopija_van_pala", actor: "sistem",
+      detail: `Kopija van računara nije uspela: ${van.error}. Odredište: ${van.cilj}. ` +
+        `Dok ovo stoji, baza postoji samo na jednom disku.` });
+  }
+  return r;
+}
+setInterval(() => odrzavanjeSada("dnevno"), 24 * 60 * 60 * 1000);
+odrzavanjeSada("start");
+
+// ---- Start ----
+server.listen(PORT, () => {
+  const ips = localIps();
+  console.log(`\nCrit server radi na portu ${PORT}`);
+  console.log(`  ovaj racunar:  http://localhost:${PORT}`);
+  for (const ip of ips) console.log(`  mreza/telefon: http://${ip}:${PORT}`);
+  console.log("");
+});
+
+// Server radi na racunaru u igraonici, bez nadzora. Jedan neuhvacen previd ne
+// sme da ugasi proces usred smene i ostavi 13 racunara bez naplate - greska se
+// zapise, a server nastavlja da radi.
+//
+// Zapis ide i u LOGOVE, ne samo u konzolu. Prozor sa serverom niko ne gleda i
+// cesto je minimizovan; ako nesto pukne u devet uvece, vlasnik to sutra vidi u
+// panelu (Logovi > Sistem) umesto da nagadja zasto se nesto cudno ponasalo.
+const skoroZapisano = new Map(); // poruka -> ts
+function zapisiPad(vrsta, e) {
+  const tekst = String(e?.stack || e || "").slice(0, 400);
+  console.error(vrsta + ":", tekst);
+  // Ista greska ume da se ponavlja u petlji; log ne sme da se zatrpa.
+  const kljuc = tekst.slice(0, 120);
+  const sada = Date.now();
+  if (sada - (skoroZapisano.get(kljuc) || 0) < 60000) return;
+  skoroZapisano.set(kljuc, sada);
+  // Ako je i sam upis u bazu uzrok pada, logEvent to guta i nista se ne desava.
+  try {
+    svc.logEvent({
+      category: "sistem", action: "greska", actor: "server",
+      detail: `${vrsta}: ${tekst.split("\n")[0].slice(0, 200)}`,
+    });
+  } catch {}
+}
+process.on("uncaughtException", (e) => zapisiPad("neuhvacena greska", e));
+process.on("unhandledRejection", (e) => zapisiPad("neobradjeno odbijanje", e));
+
+function localIps() {
+  const out = [];
+  const ifaces = os.networkInterfaces();
+  for (const name of Object.keys(ifaces)) {
+    for (const i of ifaces[name] || []) {
+      if (i.family === "IPv4" && !i.internal) out.push(i.address);
+    }
+  }
+  return out;
+}

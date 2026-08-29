@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2560" height="1440" viewBox="0 0 2560 1440">
+  <rect width="2560" height="1440" fill="#0f1116"/>
+  <line x1="853.2" y1="0" x2="853.2" y2="1440" stroke="#2a2f3a" stroke-width="2.9" stroke-opacity="0.7"/><line x1="0" y1="480" x2="2560" y2="480" stroke="#2a2f3a" stroke-width="2.9" stroke-opacity="0.7"/><line x1="1706.5" y1="0" x2="1706.5" y2="1440" stroke="#2a2f3a" stroke-width="2.9" stroke-opacity="0.7"/><line x1="0" y1="959.9" x2="2560" y2="959.9" stroke="#2a2f3a" stroke-width="2.9" stroke-opacity="0.7"/>
+  <rect x="2.9" y="2.9" width="2554.2" height="1434.2" fill="none" stroke="#2a2f3a" stroke-width="5.8"/>
+
+  <g>
+    <rect x="993.3" y="578.9" width="576" height="288"
+      fill="#e23b34" fill-opacity="0.14" stroke="#e23b34" stroke-opacity="0.55"
+      stroke-width="5.8" stroke-dasharray="28.8 20.2"/>
+    <text x="1033.6" y="653.8" fill="#e23b34" font-family="Segoe UI, sans-serif"
+      font-size="49" font-weight="700" letter-spacing="2.9">KATANAC I PORUKA - DRZI MIRNO</text>
+  </g>
+  <g>
+    <rect x="1144.3" y="1362.2" width="273.9" height="43.2"
+      fill="#8b91a0" fill-opacity="0.07" stroke="#8b91a0" stroke-opacity="0.55"
+      stroke-width="5.8" stroke-dasharray="28.8 20.2"/>
+    <text x="1184.6" y="1437.1000000000001" fill="#8b91a0" font-family="Segoe UI, sans-serif"
+      font-size="49" font-weight="700" letter-spacing="2.9">NAPOMENA ZA OSOBLJE</text>
+  </g>
+  <g>
+    <rect x="0" y="0" width="2560" height="276.5" fill="#05060a" fill-opacity="0.93"/>
+    <text x="80.6" y="115.2" fill="#e8eaf0" font-family="Segoe UI, sans-serif" font-size="72" font-weight="800" letter-spacing="2.9">POZADINA - ZAKLJUČAN EKRAN</text>
+    <text x="80.6" y="207.4" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="49">Kad igraču istekne vreme ili osoblje zaključa računar.</text>
+    <text x="2479.4" y="132.5" fill="#e8eaf0" text-anchor="end" font-family="Segoe UI, sans-serif" font-size="80.6" font-weight="800">2560 x 1440 px</text>
+
+    <rect x="0" y="1261.4" width="2560" height="178.6" fill="#05060a" fill-opacity="0.93"/>
+    <text x="80.6" y="1336.3000000000002" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="46.1">Ovde igrač čita poruku. Najmirnija i najtamnija od svih pozadina.</text>
+    <text x="80.6" y="1405.4" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="43.2">crvena zona = sadrzaj launchera stoji preko slike   ·   zelena zona = tu stavi ono sto mora da se vidi</text>
+  </g>
+</svg>

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800">
+  <rect width="600" height="800" fill="#0f1116"/>
+  <line x1="200" y1="0" x2="200" y2="800" stroke="#2a2f3a" stroke-width="1.2" stroke-opacity="0.7"/><line x1="0" y1="266.6" x2="600" y2="266.6" stroke="#2a2f3a" stroke-width="1.2" stroke-opacity="0.7"/><line x1="400" y1="0" x2="400" y2="800" stroke="#2a2f3a" stroke-width="1.2" stroke-opacity="0.7"/><line x1="0" y1="533.3" x2="600" y2="533.3" stroke="#2a2f3a" stroke-width="1.2" stroke-opacity="0.7"/>
+  <rect x="1.2" y="1.2" width="597.6" height="797.6" fill="none" stroke="#2a2f3a" stroke-width="2.4"/>
+
+  <g>
+    <rect x="0" y="608" width="600" height="192"
+      fill="#e23b34" fill-opacity="0.14" stroke="#e23b34" stroke-opacity="0.55"
+      stroke-width="2.4" stroke-dasharray="12 8.4"/>
+    <text x="16.8" y="639.2" fill="#e23b34" font-family="Segoe UI, sans-serif"
+      font-size="20.4" font-weight="700" letter-spacing="1.2">IME IGRE PREKO SLIKE</text>
+  </g>
+  <g>
+    <rect x="18" y="16" width="204" height="56"
+      fill="#8b91a0" fill-opacity="0.07" stroke="#8b91a0" stroke-opacity="0.55"
+      stroke-width="2.4" stroke-dasharray="12 8.4"/>
+    <text x="34.8" y="47.2" fill="#8b91a0" font-family="Segoe UI, sans-serif"
+      font-size="20.4" font-weight="700" letter-spacing="1.2">OZNAKA KATEGORIJE</text>
+  </g>
+  <g>
+    <rect x="0" y="0" width="600" height="115.2" fill="#05060a" fill-opacity="0.93"/>
+    <text x="33.6" y="48" fill="#e8eaf0" font-family="Segoe UI, sans-serif" font-size="30" font-weight="800" letter-spacing="1.2">OMOT IGRE - kartica u polici</text>
+    <text x="33.6" y="86.4" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="20.4">Uspravan poster, odnos 3:4.</text>
+    <text x="566.4" y="55.2" fill="#e8eaf0" text-anchor="end" font-family="Segoe UI, sans-serif" font-size="33.6" font-weight="800">600 x 800 px</text>
+
+    <rect x="0" y="725.6" width="600" height="74.4" fill="#05060a" fill-opacity="0.93"/>
+    <text x="33.6" y="756.8000000000001" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="19.2">Dno kartice prekriva tamna traka sa imenom igre. Lice igre drži u gornje dve trećine.</text>
+    <text x="33.6" y="785.6" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="18">crvena zona = sadrzaj launchera stoji preko slike   ·   zelena zona = tu stavi ono sto mora da se vidi</text>
+  </g>
+</svg>

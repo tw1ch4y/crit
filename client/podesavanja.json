@@ -1,0 +1,18 @@
+{
+  "_opis": "Podesavanja launchera. Vazi za sve racunare igraca na kojima je instaliran.",
+
+  "_host": "Adresa servera koja se sama nudi pri podesavanju. Promeni ako glavni racunar dobije drugu IP adresu.",
+  "host": "http://192.168.1.100:8095",
+
+  "_servisniPin": "PIN koji osoblje kuca da udje u podesavanja launchera i da izadje iz njega kad server NE RADI. Proverava se lokalno, bez servera. OBAVEZNO promeni pre otvaranja - bez toga igrac koji iscupa mrezni kabl moze da preusmeri racunar na svoj server.",
+  "servisniPin": "1234",
+
+  "_ciscenjeSesije": "Kad igrac zavrsi, brise prijave na pregledace i Steam/Epic/Riot/Battle.net, temp fajlove i skorasnje dokumente.",
+  "ciscenjeSesije": true,
+
+  "_ciscenjeLicnihFascikli": "Da li da brise i Desktop i Preuzimanja. Podrazumevano ISKLJUCENO - na racunarima sa OneDrive-om te fascikle se sinhronizuju sa oblakom pa bi se brisanje prenelo na nalog.",
+  "ciscenjeLicnihFascikli": false,
+
+  "_blokirajPreuzeteProgram": "Gasi programe koje igrac skine kroz pregledac i pokrene iz Preuzimanja, Temp ili sa radne povrsine. Igre i Steam rade normalno.",
+  "blokirajPreuzeteProgram": true
+}

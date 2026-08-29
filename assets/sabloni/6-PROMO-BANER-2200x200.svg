@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="200" viewBox="0 0 2200 200">
+  <rect width="2200" height="200" fill="#0f1116"/>
+  <line x1="733.3" y1="0" x2="733.3" y2="200" stroke="#2a2f3a" stroke-width="0.4" stroke-opacity="0.7"/><line x1="0" y1="66.7" x2="2200" y2="66.7" stroke="#2a2f3a" stroke-width="0.4" stroke-opacity="0.7"/><line x1="1466.5" y1="0" x2="1466.5" y2="200" stroke="#2a2f3a" stroke-width="0.4" stroke-opacity="0.7"/><line x1="0" y1="133.3" x2="2200" y2="133.3" stroke="#2a2f3a" stroke-width="0.4" stroke-opacity="0.7"/>
+  <rect x="0.4" y="0.4" width="2199.2" height="199.2" fill="none" stroke="#2a2f3a" stroke-width="0.8"/>
+
+  <g>
+    <rect x="1848" y="124" width="352" height="76"
+      fill="#8b91a0" fill-opacity="0.07" stroke="#8b91a0" stroke-opacity="0.55"
+      stroke-width="0.8" stroke-dasharray="4 2.8"/>
+    <text x="1853.6" y="134.4" fill="#8b91a0" font-family="Segoe UI, sans-serif"
+      font-size="6.8" font-weight="700" letter-spacing="0.4">TAČKICE ZA SMENU BANERA</text>
+  </g>
+  <g>
+    <rect x="66" y="16" width="2068" height="168"
+      fill="#3dc97e" fill-opacity="0.06" stroke="#3dc97e" stroke-opacity="0.6"
+      stroke-width="0.8" stroke-dasharray="4 2.8"/>
+    <text x="71.6" y="26.4" fill="#3dc97e" font-family="Segoe UI, sans-serif"
+      font-size="6.8" font-weight="700" letter-spacing="0.4">SIGURNA ZONA - OVDE STAVI LOGO I TEKST</text>
+  </g>
+  <g>
+    <rect x="0" y="0" width="2200" height="38.4" fill="#05060a" fill-opacity="0.93"/>
+    <text x="11.2" y="16" fill="#e8eaf0" font-family="Segoe UI, sans-serif" font-size="10" font-weight="800" letter-spacing="0.4">PROMO BANER - traka na vrhu početne</text>
+    <text x="11.2" y="28.8" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="6.8">Odnos 11:1. Stoji levo od nagradnog točka; više banera se smenjuje samo.</text>
+    <text x="2188.8" y="18.4" fill="#e8eaf0" text-anchor="end" font-family="Segoe UI, sans-serif" font-size="11.2" font-weight="800">2200 x 200 px</text>
+
+    <rect x="0" y="175.2" width="2200" height="24.8" fill="#05060a" fill-opacity="0.93"/>
+    <text x="11.2" y="185.6" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="6.4">Preko banera NE ide tekst iz launchera, sve piše na samoj slici. Baner se uklapa u traku i nikad se ne seče - drugi odnos radi, samo ostanu tamne ivice.</text>
+    <text x="11.2" y="195.2" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="6">crvena zona = sadrzaj launchera stoji preko slike   ·   zelena zona = tu stavi ono sto mora da se vidi</text>
+  </g>
+</svg>

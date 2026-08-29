@@ -1,0 +1,27 @@
+# zavisnosti
+node_modules/
+
+# build izlaz (electron-builder instaler, 500MB+)
+dist/
+
+# prava baza i njene kopije - runtime podaci, ne izvorni kod
+server/data/crit.db
+server/data/crit.db-shm
+server/data/crit.db-wal
+server/data/backups/
+
+# scratch baza i snimci ekrana koje prave alati u testovi/ (pregled-*.mjs i slicni)
+testovi/_radno/
+testovi/.slike*/
+
+# OS smece
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# editor
+.vscode/
+*.swp
+
+# radni fajlovi provere (hook i CI prave svoje)
+testovi/.radno/

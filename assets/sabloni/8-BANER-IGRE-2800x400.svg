@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2800" height="400" viewBox="0 0 2800 400">
+  <rect width="2800" height="400" fill="#0f1116"/>
+  <line x1="933.2" y1="0" x2="933.2" y2="400" stroke="#2a2f3a" stroke-width="0.8" stroke-opacity="0.7"/><line x1="0" y1="133.3" x2="2800" y2="133.3" stroke="#2a2f3a" stroke-width="0.8" stroke-opacity="0.7"/><line x1="1866.5" y1="0" x2="1866.5" y2="400" stroke="#2a2f3a" stroke-width="0.8" stroke-opacity="0.7"/><line x1="0" y1="266.6" x2="2800" y2="266.6" stroke="#2a2f3a" stroke-width="0.8" stroke-opacity="0.7"/>
+  <rect x="0.8" y="0.8" width="2798.4" height="398.4" fill="none" stroke="#2a2f3a" stroke-width="1.6"/>
+
+  <g>
+    <rect x="952" y="120" width="896" height="220"
+      fill="#8b91a0" fill-opacity="0.07" stroke="#8b91a0" stroke-opacity="0.55"
+      stroke-width="1.6" stroke-dasharray="8 5.6"/>
+    <text x="963.2" y="140.8" fill="#8b91a0" font-family="Segoe UI, sans-serif"
+      font-size="13.6" font-weight="700" letter-spacing="0.8">FORMA ZA PRIJAVU PREKO SLIKE</text>
+  </g>
+  <g>
+    <rect x="1344" y="40" width="1344" height="320"
+      fill="#3dc97e" fill-opacity="0.06" stroke="#3dc97e" stroke-opacity="0.6"
+      stroke-width="1.6" stroke-dasharray="8 5.6"/>
+    <text x="1355.2" y="60.8" fill="#3dc97e" font-family="Segoe UI, sans-serif"
+      font-size="13.6" font-weight="700" letter-spacing="0.8">SLOBODNO ZA UMETNOST</text>
+  </g>
+  <g>
+    <rect x="0" y="0" width="2800" height="76.8" fill="#05060a" fill-opacity="0.93"/>
+    <text x="22.4" y="32" fill="#e8eaf0" font-family="Segoe UI, sans-serif" font-size="20" font-weight="800" letter-spacing="0.8">BANER IGRE - pozadina ekrana prijave</text>
+    <text x="22.4" y="57.6" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="13.6">Široka slika koja stoji iza forme za prijavu, ako nije okačena posebna pozadina prijave.</text>
+    <text x="2777.6" y="36.8" fill="#e8eaf0" text-anchor="end" font-family="Segoe UI, sans-serif" font-size="22.4" font-weight="800">2800 x 400 px</text>
+
+    <rect x="0" y="350.4" width="2800" height="49.6" fill="#05060a" fill-opacity="0.93"/>
+    <text x="22.4" y="371.2" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="12.8">Slika je zamućena i utišana ispod forme, pa sitni detalji ne igraju - važi opšti utisak i boja.</text>
+    <text x="22.4" y="390.4" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="12">crvena zona = sadrzaj launchera stoji preko slike   ·   zelena zona = tu stavi ono sto mora da se vidi</text>
+  </g>
+</svg>

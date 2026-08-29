@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "crit-server",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:\\Users\\tw1ch\\OneDrive\\Desktop\\crit\\server\\src\\index.js"],
+      "port": 8095
+    }
+  ]
+}

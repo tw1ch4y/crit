@@ -1,0 +1,197 @@
+# CRIT - Plan razvoja
+
+Živi dokument. Radimo fazu po fazu, redom. Kad se nešto završi, štiklira se ovde.
+
+---
+
+## Urađeno
+
+- [x] **Server + baza** (Node + `node:sqlite`, port 8095) - nalozi, sesije, naplata po sekundi, auto-lock
+- [x] **Panel** (desktop + telefon preko LAN-a) - kontrolna tabla, igrači, porudžbine, shop, igre, računari, podešavanja
+- [x] **Launcher** (Electron kiosk) - login, HUD sa vremenom, igre, internet, shop, otključavanje PIN-om
+- [x] **Uloge** vlasnik/radnik (zaključane opcije radniku, provera na serveru)
+- [x] **Daljinska kontrola** računara - poruka, zaključaj/otključaj, odjavi, ugasi/restart/logoff, grupne akcije
+- [x] **Daljinski spisak procesa** - glavni računar vidi šta je pokrenuto na izabranoj mašini i gasi program odatle (sistemski procesi se odbijaju). Zamenilo je staru opciju koja je pokušavala da otvori Task Manager *na računaru igrača*, gde igrač ionako nema pristup
+- [x] **Statusi** Online / Standby / Zaključan / Offline
+- [x] **Redizajn panela iz korena** - profesionalna paleta, SVG ikone, custom kontrole, bez "lampica"
+- [x] **Kasa (POS)** - radnik ručno kuca porudžbinu (keš ili sa naloga)
+- [x] **Logovi / audit** - evidencija svih događaja sa filterima
+- [x] **Shop kartice** - profesionalne kartice sa slikom (bez bordera), u panelu i launcheru
+- [x] **Daljinska instalacija** programa/igara preko URL-a (biblioteka + status uživo)
+- [x] **Redizajn panela 2.0** - flat minimalistički dizajn sistem, animacije, stilizovane potvrde umesto browser dijaloga, grupisana navigacija, centriran logo
+- [x] **Panel dopune** - Kasa u navigaciji, istorija porudžbina, IP adresa + poslednji put online po računaru, izmena/brisanje naloga igrača (sa napomenom), brzo sakrivanje shop artikla, "Otključaj sve", restart launchera iz panela, server info + ručni backup u Podešavanjima, baner kad panel izgubi vezu, zvučna obaveštenja za isteklo vreme
+- [x] **Dorada slabijih stranica** - Logovi (grupisanje po danima, mirne kategorije, filter Sistem), Instalacije (dvokolonski raspored, instalacija sa linka kroz modal, čišćenje statusa), Podešavanja (red-po-podešavanje sa opisima, PIN sakriven sa prikazom na klik), Igre (kartice po kategorijama)
+- [x] **Prijava na panel preživljava restart servera** (tokeni u bazi, važe 30 dana; reset lozinke odjavljuje taj nalog svuda)
+- [x] **Logovi kao feed** - ikone po kategoriji, grupisanje Danas/Juče, 15 po strani; **Porudžbine** kao račun-kartice (cene po stavci, status, "pre X min", centrirano prazno stanje); **naplata sa naloga preko pretrage** (kucanjem imena, bez liste svih igrača; keš nema polje naloga)
+
+---
+
+## Faze koje radimo (redom)
+
+### Faza 1 - Brend i logo (završeno)
+- [x] Transparentna verzija logoa (bela pozadina uklonjena, bela kontura zadržana) > `assets/crit-logo.png`
+- [x] Favicon (`server/public/img/favicon.png`)
+- [x] Logo u **panel** (login, sidebar, mobilni topbar)
+- [x] Logo u **launcher** (login, setup, gornja traka)
+- [x] Akcenat panela > crvena iz logoa (`--accent #e23b34`)
+- [x] Uklonjena senka sa logoa; logo smanjen (suptilniji) u panelu i launcheru
+- [x] Dizajn-audit svih ekrana (tabla, Igrači, Shop, Kasa, modali) - sređeno; Offline kartice dobile čisto "Detalji" dugme
+
+### Faza 2 - Optimizacija računara (launcher) - "bezbedna + srednja"
+- [x] Plan napajanja na **High Performance** pri pokretanju - launcher prelazi na njega i gasi uspavljivanje/gašenje ekrana (`planNapajanja`); pri admin izlazu vraća Balanced
+- [x] **Čišćenje nepotrebnih fajlova** na kraju sesije: temp, keš i profili pregledača, prijave na Steam/Epic/Riot/Battle.net/EA/Ubisoft, skorašnji dokumenti, korpa za otpatke, DirectX/NVIDIA/AMD keš šejdera (`ciscenje.js`). Lične fascikle se NE diraju osim na izričit zahtev - na računarima sa OneDrive-om brisanje bi otišlo i u oblak
+- [~] Gašenje **pozadinskih procesa** - radi se samo za ono što je igrač sam pokrenuo tokom sesije (`ugasiNoveProcese`), uz zaštitu Windows fascikle i spiska sistemskih. Šire gašenje bloatware-a NIJE urađeno namerno: spisak se razlikuje od mašine do mašine i lako obori nešto što igrama treba
+- [ ] Gašenje **startup aplikacija** i vizuelnih efekata - NIJE urađeno. Teško je vratiti u prvobitno stanje, a dobitak je mali u odnosu na rizik
+- [ ] **Odlaganje Windows Update** - NIJE urađeno. Rešava se u samom Windows-u (Active hours / pauza ažuriranja), ne iz launchera; upisano u DEPLOY.md
+- [x] Sve reverzibilno - politike i plan napajanja se vraćaju pri admin izlazu; `POPRAVI-RACUNAR.bat` vraća sve i kad launcher ne može da se pokrene
+
+### Faza 3 - Igre da rade perfektno na svakom računaru
+- [x] Pouzdano pokretanje igara - podrška za `steam://`/`epic://` protokole (`shell.openExternal`), interni kiosk browser za http(s), hvatanje asinhronih grešaka pri pokretanju (`child.on("error")` > poruka igraču), zaštita od duplog klika (3s po putanji + "Pokrećem..." stanje na pločici)
+- [x] Povratak u launcher pametniji - po izlasku procesa se preko `tasklist` proveri da li igra i dalje radi (slučaj kad je .exe samo pokretač), pa se fokus ne otima pokrenutoj igri
+- [x] Kill na lock/odjavu - pored `child.kill()` i `taskkill /IM /F /T` za sam proces igre
+- [x] Provera da je igra instalirana; jasna poruka ako nedostaje ("... nije instalirana na ovom računaru. Pozovite osoblje.")
+- [x] **Lov na bagove u klijentu (5 nađenih i ispravljenih)**
+  - Korpa je dodavala više komada po kliku (`refreshCart` je ponovo kačio listenere na sve artikle) > prelazak na delegaciju klikova
+  - Dupli klik na "Poruči" slao dve porudžbine i naplaćivao dvaput > dugme zaključano do odgovora servera
+  - Dupla prijava pravila **dve aktivne sesije** na istom računaru (dvostruka naplata) > zaštita na serveru (`clientLogin`) + zaključano dugme na klijentu
+  - Zastareo katalog kod igrača > server šalje `catalog` svim launcherima na svaku izmenu shopa/igara, korpa se čisti od nedostupnog
+  - Alarm za isteklo vreme kasnio sekundu (`startTimer` je gasio klasu koju je `updateHud` upravo upalio)
+  - Uz to: količina ograničena na 20 po artiklu (usklađeno sa serverom), tajmer staje kad nema veze, Escape zatvara prozore
+- [x] Čišćenje shader/DirectX keša - deo čišćenja sesije (D3DSCache, NVIDIA DXCache/GLCache, AMD DxCache)
+- [ ] (opciono) Optimizacioni profil po igri - NIJE urađeno i ne planira se: traži održavanje po svakoj igri posebno
+
+### Faza 4 - Paljenje i gašenje preko LAN (Wake-on-LAN)
+- [x] Klijent automatski javlja svoje **mrežne kartice** (IP+MAC) serveru pri povezivanju; server bira MAC LAN kartice (poklapanje sa IP-om koji vidi, tako da ne uzme VPN/VirtualBox karticu) i čuva ga (`computers.mac`)
+- [x] Server šalje **magic packet** (`node:dgram`, bez zavisnosti; broadcast na portove 9 i 7) - dugme **"Upali"** na svakoj offline kartici + u modalu "Detalji", plus grupno **"Upali sve (N)"** na kontrolnoj tabli; sve upisano u logove
+- [x] Gašenje/restart već rade
+- [x] Uputstvo za BIOS/mrežnu karticu (WoL mora biti uključen hardverski) - DEPLOY.md §8 (Ethernet, BIOS "Wake on LAN", Windows Power Management/Advanced, isključen Fast Startup)
+
+### Faza 5 - Dodatni meniji i opcije u panelu *(izabrano)*
+- [x] **Izveštaji i statistika** - grafikon prometa (po satu/danu), KPI (promet/sesije/shop/dopune), najaktivniji igrači, zarada po računaru, period Danas/7/30 dana
+- [x] **Smene i pazar** - tabela `shifts`, logovi (NOVAC/SHOP) vezani za `shift_id`, obavezni modal "Otvaranje smene" za radnika, zatvaranje sa obračunom prometa i usklađivanjem kase (razlika višak/manjak)
+- [ ] **Rezervacije računara** - JEDINA veća funkcija koja nije urađena. Nije potrebna za otvaranje; radi se kad se ukaže potreba
+- [x] **Vremenski paketi** - ipak urađeni: unapred plaćeno vreme jeftinije od cene na sat (fabrički 5h za 500), prodaju se jednim klikom pri dopuni kredita
+
+### Faza 6 - Launcher (program za igrače) - UI polish
+- [x] Uskladiti sa novim brendom (isti dizajn sistem kao panel: flat površine, crveni akcenat, Segoe UI Variable, SVG ikone umesto emojija u navigaciji)
+- [x] Lepše igre (cover kartice 3:4 sa play-overlay-em na hover, grupisane po kategorijama, emoji fallback; cover se dodaje u panelu > Igre)
+- [x] Doterati login, HUD (čipovi Igrač/Kredit/Preostalo), poruke i dijaloge (stilizovan overlay umesto browser confirm), zaključan ekran (ikona + crvena varijanta za isteklo vreme), toast sa ikonama
+- [x] Server: cover slike za igre (`games.image`, upload/brisanje, ista logika kao shop slike)
+- [x] **Gaming redizajn launchera** - agresivan arkadni stil (neon crvena + zlatna energija, iskošeni "cut" uglovi, glow, animirana pozadina sa mrežom i energy-sweep-om, ugaoni bracketi na cover-ima, skewovan display font). Launcher ≠ panel: panel ostaje miran/profesionalan za osoblje, launcher je maksimalno gaming za igrače
+- [x] **Immersive sloj (v2)** - CRT skenline + vinjeta preko svega, ugaoni HUD okvir tokom gameplay-a, ambijentalne varnice, "library-style" cover kartice (ime na slici + kategorija badge + "POKRENI" reveal sa shine-om), stagger ulazne animacije, pun crveni edge-alarm kad vreme padne < 60s
+- [x] **Feedback sloj (v3)** - zvučni feedback (WebAudio sintetizovan, bez fajlova: hover/klik/uspeh/greška/alarm/boot), boot "Dobrodošao, {ime}" sekvenca pri prijavi (logo slam + loading bar), animirano odbrojavanje kredita sa "bump" efektom pri promeni, prelaz sadržaja pri promeni taba
+- [x] **Doživljaj sloj (v4)** - coin-burst (zlatni/crveni žetoni) na uspešnu porudžbinu, scan-pass linija pri promeni taba, idle attract na login ekranu (logo lebdi + zlatni CTA trepće nakon 40s praznog hoda, gasi se na prvu aktivnost)
+- [x] **BUGFIX: prazan katalog u launcheru** - `welcome` (igre + shop + podešavanja) je stizao pre nego što se renderer učita i bio bi izgubljen. Rešeno dvostruko: main proces bafferuje poruke do `renderer-ready`, a renderer po učitavanju šalje `hello` na koji server ponovo pošalje pun katalog i trenutno stanje
+
+### Faza 7 - Pakovanje i zaključavanje sistema
+- [x] `electron-builder` > jedan **.exe instaler** za launcher (`npm run build` u client/), pakuje se sa `napravi-paket.mjs`; paket odbija da nastane ako se verzija instalera ne poklopi sa projektom
+- [x] Autostart servera (`Podesi autostart.bat`) i launchera (instaler ga upisuje u pokretanje)
+- [x] Kiosk hardening - bez AutoHotkey-a i zamene shell-a: Electron kiosk prozor koji odbija zatvaranje, presretnute prečice (Ctrl+Shift+Esc, Ctrl+Esc, Alt+Esc, Win+R/E/D/L..., F11), HKCU politike (Task Manager, Win tasteri, odjava, gašenje, zaključavanje stanice), zastor preko desktopa, gašenje programa pokrenutih iz Preuzimanja/Temp. Alt+Tab je namerno ostavljen - launcher je ispod svega, pa ne vodi nikuda
+
+### Faza 8 - Pouzdanost
+- [x] Automatski **backup baze** (snapshot na start + na 15 min) + WAL checkpoint (2 min)
+- [x] **Otpornost na prekid** - naplata se pauzira kad klijent izgubi vezu; sesije se nastavljaju; downtime se ne naplaćuje; auto-restart servera (`start-server.bat` petlja); LAN radi bez interneta (vidi DEPLOY.md §7)
+- [x] Rotacija logova (čuva 365 dana, dnevno + na startu; otvorena smena zaštićena)
+- [x] **Jedan posao, jedan upis** - porudžbina, račun na kasi i nagradni točak se upisuju kao celina (SAVEPOINT, radi i ugnežđeno). Bez toga nestanak struje između skidanja zalihe i naplate ostavlja piće skinuto a kredit nenaplaćen, i vidi se tek kao neobjašnjiv manjak pri obračunu smene
+- [x] **Prostor na disku se održava sam** - logovi se seku po starosti *i po broju* (briše se najstariji da bi novi imao mesto); rezervne kopije se proređuju (gusto blizu, retko daleko: isti broj fajlova pokriva 46 dana umesto 7.5 sati) uz granicu ukupne veličine; pre svake kopije se gleda slobodan prostor. Stanje i granice su u *Podešavanja > Prostor na disku*. Izmereno na napunjenoj bazi: posle 5 godina rada baza 48 MB, kopije 1.4 GB, tvrda granica 2 GB
+- [x] **Računar kome je iščupan kabl** - server pinguje svaku vezu na 15 s i gasi onu koja ne odgovori. Bez toga TCP veza ostaje otvorena satima: panel pokazuje računar kao zauzet pa radnik tamo ne posadi nikoga, a naplata teče za praznu stolicu. Zaštita "pauziraj naplatu van mreže" je postojala od ranije, ali se nikad nije ni aktivirala jer server nije imao kako da sazna
+- [x] **Otpuštanje radnika** - nalog se gasi a ne briše (smene i dopune moraju da ostanu potpisane); prijava prestaje odmah, postojeći token prestaje da važi, otvoren panel se sam zatvara. Ranije je brisanje pucalo na stranom ključu čim je radnik jednom otvorio smenu, pa mu se pristup nije mogao oduzeti
+- [x] **Servisni PIN preživljava nadogradnju** - instaler prepisuje `podesavanja.json` fabričkim, pa se PIN tiho vraćao na `1234` na svakoj mašini pri svakoj novoj verziji
+- [x] **Poklonjen kredit se vidi** - nagradni točak i popust na paket stoje u Izveštajima kao trošak, a i dalje ne ulaze u pazar (inače radnik ima manjak koji ne ume da objasni)
+- [x] **Uputstvo za nadogradnju** (DEPLOY.md §5.1), uključujući zašto se launcher ne može nadograditi sa panela (instaler traži administratora, a nalog igrača je standardni)
+- [x] **Revizija obračuna novca (5 nalaza)** - pazar više ne duplira kupovine sa naloga, otkazane porudžbine se poništavaju u obračunu i ne ulaze u očekivanu kasu, naplata ne prelazi raspoloživi kredit, stanja se čuvaju zaokružena na 2 decimale, zatvorene smene čuvaju konačne brojke (ne preračunavaju se iz logova)
+- [x] Kočnica protiv pogađanja PIN-a (5 promašaja > 30 s po računaru)
+- [x] **Launcher "home" redizajn** - sve na jednom ekranu sa horizontalnim sliderima (police): igre grupisane po kategorijama + Internet polica; strelice + drag-to-scroll; tabovi svedeni na Početna / Shop / Nalog; brutalne cover kartice za igre i šarene brend-kartice za sajtove
+- [x] **Ugrađeni internet pregledač (rešava bag "nema izlaza")** - webview unutar launchera sa punom trakom (nazad/napred/osveži/početna/URL sa lock indikatorom/preostalo vreme/**Izađi**); Escape zatvara; automatski se gasi na lock/odjavu; popup/target=_blank ostaje u istom prozoru; blokada preuzimanja fajlova (kiosk)
+- [x] **Hero baner** na Početnoj - izdvojena igra sa cover pozadinom, "POKRENI" dugmetom i pozdravom + preostalim vremenom (uživo); "welcome" varijanta kad nema igara
+- [x] **Brendirane internet kartice** - svaka u bojama i sa pravim (inline SVG) logom svoje aplikacije: Steam, Epic Games, Battle.net, Discord, TeamSpeak, YouTube, Twitch, Google, Instagram, Facebook (uklonjeni TikTok/Reddit/Spotify)
+- [x] **Fiksni "home" bez skrola** - sve staje na jedan ekran: hero + jedna polica igara sa 7-8 vidljivih većih kartica (klizni slajd sa strelicama, drag) + internet red; igra bez cover slike dobija živopisnu gradijent pozadinu
+- [x] **Internet 8 brendiranih kartica** (uklonjeni FB/Instagram/Twitch, dodat Spotify): Steam, Epic Games, Battle.net, YouTube, Discord, TeamSpeak, Google, Spotify - krupnije
+- [x] **Internet pregledač = ZASEBAN prozor** (alwaysOnTop, resizable, minimizable) - umanjivanje se odnosi samo na taj prozor, launcher i dalje pokriva desktop (nema bypass-a kioska); vidljiv i preko igre (YouTube + igra istovremeno); nova traka u browser.html/browser.js/browserPreload.js
+- [x] **Brutalne shop kartice** - transparentne slike pića na obojenom radijalnom sjaju (boja iz imena), uppercase naziv, veliki cena, crveno "+" dugme, hover lift + rotacija slike
+- [x] **Shop kartice prate boju limenke** - dominantna boja se izvlači sa slike (canvas + `img.decode()`), sjaj/okvir/hover u toj boji; veće jasne limenke; shop fiksno bez skrola (centrirano, popunjava prostor)
+- [x] **Zalihe pića** - `shop_items.stock` (NULL=∞); porudžbina proverava i skida zalihu, "Rasprodato" u launcheru (bez dugmeta), panel prikazuje stanje + "Dopuni" (dodaje na trenutno)
+- [x] **Sakrivanje igre iz launchera** - `games.available`, checkbox u modalu + brzo oko-dugme na kartici; launcher dobija samo dostupne igre
+- [x] **Footer centriran + gaming stil** - svi podaci u sredini sa razdelnicima i crveno-zlatnom akcentnom linijom; ikone za svaki podatak
+- [x] Sve stranice launchera bez skrola (`overflow:hidden`, fiksni raspored)
+- [x] **Donja statusna traka** - naziv PC-a, sat, status servera i interneta, CPU %, RAM %, temperatura CPU-a (best-effort preko WMI)
+- [x] **Nalog ekran redizajniran** - profil hero (avatar, ime, kredit/vreme/cena), panel "Kako to radi" + promena lozinke (bez praznog prostora)
+- [x] **Baner po igri** za vrh launchera - poseban wide upload u panelu (`games.banner`), hero ga koristi (fallback na cover pa boju); šablon `assets/baner-sablon-1600x500.svg` sa označenim zonama za dugme i tajmer
+- [x] **Internet alati potpuno kroz panel** - nova tabela `tools` (Sajt ili Program), meni "Internet alati" u panelu: dodavanje/izmena/brisanje/sakrivanje + upload cover slike (isto kao igre). "Sajt" traži http(s) URL, "Program" putanju do `.exe` ili protokol (npr. `steam://`, `steam.exe`, TS3...) uz argumente. Launcher dobija samo dostupne alate preko `catalog`; kartica prati sliku > brend-logo > slovo. Seed: Steam/YouTube/Discord/Google/Twitch
+- [x] **Alati kao pravi programi + realni pregledač** - "Program" alati se pokreću lokalno (`launchGame`, isti put kao igre); "Sajt" alati otvaraju **sistemski pregledač (Chrome)** preko `shell.openExternal` umesto ugrađenog webview-a, tako da igrač koristi **Alt+Tab** između igre i pretraživača. Uklonjen zaseban browser prozor (`browser.html/js`, `browserPreload.js`) i webview iz launchera
+- [x] **QA prolaz (celokupan pregled) - 2 ispravke**
+  - **KRITIČNO: Shop stranica u panelu je bila potpuno pokvarena** - `renderShop` je koristio promenljivu `i` van dosega (`stockHtml` je bio ispred `card` funkcije), pa je bacao `ReferenceError` pri svakom otvaranju i osoblje nije moglo da dodaje/menja/dopunjava pića iz panela. Ispravljeno (dokazano: 8 kartica + stanje + "Dopuni" se prikazuju, 0 grešaka)
+  - **Kredit u launcheru mogao da ostane zastareo dok je prozor minimizovan** (npr. tokom igre) - `countTo` animacija koristi `requestAnimationFrame` koji je pauziran kad je stranica sakrivena; dodat `document.hidden` fallback koji odmah upiše konačnu vrednost
+  - Provereno bez grešaka: svih 14 stranica panela, ceo launcher (HUD, tabovi, pokretanje igara/alata, korpa, prazna stanja), naplata/porudžbine/zalihe na serveru, bezbednost SQL-a i owner/staff prava
+- [ ] (preporuka) UPS na server + mrežnu opremu
+
+### Faza 9 - Temelji i revizija novca *(strateški plan je u [PROIZVOD.md](PROIZVOD.md))*
+
+- [x] **KEŠ PORUDŽBINA IZ LAUNCHERA KVARILA OBRAČUN SHOPA** - obračun smene
+  računa "Shop ukupno" iz logova, "od toga keš" iz tabele porudžbina, a "sa
+  naloga" izvodi kao razliku. Keš porudžbina iz launchera jedina nije upisivala
+  iznos u log, pa je gost koji kolu od 130 plati kešom radniku u obračun upisivao
+  *Shop ukupno 0, sa naloga −130*. Posle otkazivanja je i ukupno postajalo −130.
+  Pazar je pri tom bio tačan, pa se greška videla samo u podeli - baš tamo gde
+  radnik proverava sebe pred prebrojavanje kase. Kasa je iznos oduvek upisivala;
+  launcher je bio izuzetak bez razloga
+- [x] **Jedan posao, jedan upis - dopunjeno na sve putanje novca.** Ranije su
+  bile pokrivene tri (porudžbina, kasa, točak), a četiri su radile u dva-tri
+  odvojena upisa: **dopuna kredita** (kroz nju prolazi svaki dinar preko pulta),
+  **prodaja paketa** (najveći pojedinačni iznos, četiri upisa), **otkazivanje
+  porudžbine** i **kraj sesije**. Kod kraja sesije je posledica bila najgora:
+  sesija zatvorena a računar i dalje nosi igrača, pa panel pokazuje zauzeto,
+  radnik nikoga ne posadi, a novi gost ne može ni da se prijavi
+- [x] **Zapis u logu je sada deo posla sa novcem.** Obračun smene se ne računa iz
+  tabele transakcija nego iz logova, pa log nije beleška o dopuni - on JESTE
+  dopuna, koliko se kase tiče. Upis (`upisiLog`) je odvojen od javljanja
+  panelima (`javiLog`): upis ulazi u posao i može da ga obori, javljanje ide tek
+  po potvrdi - inače radnik u feedu vidi dopunu koje u bazi nema
+- [x] **KOPIJA VAN RAČUNARA** - baza i svih trideset kopija su bile na istom
+  disku, pa je otkaz tog diska brisao sve odjednom. Server sad jednom dnevno
+  odnese najsvežiju kopiju na USB/mrežni folder i drži poslednjih sedam. Panel
+  stoji crveno dok nije podešeno i kad kopiranje prestane da radi. Nepostojeće
+  odredište je **greška, ne posao**: sa `mkdir -p` bi se napravio nov prazan
+  folder na sistemskom disku, kopija bi tiho završila u njemu i vlasnik bi
+  mesecima gledao zeleno stanje sa jednim jedinim primerkom baze
+- [x] **Launcher pravio dve veze pri promeni podešavanja** - `connectWs` nije
+  gasio staru. Server za jedan računar drži samo jednu i zatvori stariju, a njen
+  `close` javi rendereru da veze nema (iako nova radi) i zakaže još jedno
+  povezivanje. Traka gore je treperila "povezivanje" dok je sve u redu - i to
+  baš pri postavljanju mašine, kad radnik i gleda da li se povezalo
+- [x] **Verzija na jednom mestu** (`node verzija.mjs 2.45.0`) - dotad se ručno
+  usklađivala u `server/` i `client/`, a promašaj se video tek kad paket odbije
+  da nastane, posle celog build-a
+- [x] **Provera se pušta sama** - `pre-commit` (sintaksa + verzija, trenutno),
+  `pre-push` (ceo paket), GitHub Actions na svaku izmenu. Preko 1400 provera je
+  dotad zavisilo od toga da se neko seti da otkuca komandu
+- [x] **Git** - projekat do tada nije imao nijedan commit. Meseci rada su živeli
+  u jednom folderu na OneDrive-u, bez istorije i bez načina da se nađe kad je
+  greška ušla
+- [x] Uklonjen mrtav kod iz `auth.js` (tokeni igrača koje niko nije pozivao);
+  `.claude/launch.json` je pokazivao na port 8090, server radi na 8095
+- [ ] **Servisni PIN mora da prestane da bude `1234`** - sledeće na redu.
+  Zaštita koja zavisi od toga da se neko seti ručnog koraka nije zaštita
+- [ ] **Auto-update launchera** preko sopstvenog servera (`electron-updater`) -
+  13 mašina × ručna prijava na admin nalog po verziji
+
+---
+
+## Šta ostaje pred otvaranje
+
+Ovo su jedine stvari koje se **ne mogu proveriti sa razvojnog računara**. Sve
+ostalo je pokriveno testovima (`testovi/README.md`).
+
+- **Proba na mašini sa instaliranim Steam-om.** Ovde nema Steam-a, pa se ne vidi
+  kako se ponaša njegov ugrađeni pregledač ni dijalozi za fajlove unutar kioska.
+- **Vizuelni pregled panela sa pravog telefona.** Emulacija pokazuje raspored,
+  ali ne i kako izgleda na staklu u ruci.
+- **UPS na server i mrežnu opremu** (preporuka, nije softver).
+
+Nije urađeno namerno, sa razlogom zapisanim uz svaku stavku: rezervacije
+računara (Faza 5), gašenje bloatware-a i odlaganje Windows Update-a (DEPLOY.md
+§3.2), profili optimizacije po igri.
+
+## Napomene
+- Vizuelni izgled se potvrđuje na tvom ekranu/telefonu (u razvojnom okruženju ne vidim piksele).
+- Redosled faza je predlog - možemo da menjamo prioritete u hodu.

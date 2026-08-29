@@ -1,0 +1,44 @@
+#!/bin/sh
+# Brza provera pre svakog commit-a.
+#
+# NAMERNO NE PUSTA CEO TEST PAKET. Suite traju nekoliko minuta; hook koji toliko
+# ceka se posle treceg puta zaobilazi sa --no-verify, i onda ne radi nista.
+# Ovde stoji samo ono sto traje manje od sekunde, a hvata greske koje se inace
+# otkriju tek kad server odbije da se digne usred smene.
+#
+# Ceo paket ide na `git push` (pre-push) i na CI.
+set -e
+
+KOREN=$(git rev-parse --show-toplevel)
+cd "$KOREN"
+
+# 1) Sintaksa svakog JS fajla koji ulazi u commit.
+#    Zarez viska u service.js znaci da se server ne pokrece - a to se vidi tek
+#    pri sledecem paljenju glavnog racunara.
+IZMENJENI=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(js|mjs)$' | grep -v node_modules || true)
+if [ -n "$IZMENJENI" ]; then
+  for f in $IZMENJENI; do
+    [ -f "$f" ] || continue
+    if ! node --check "$f" 2>/dev/null; then
+      echo ""
+      echo "  Sintaksna greska: $f"
+      node --check "$f" || true
+      echo ""
+      exit 1
+    fi
+  done
+fi
+
+# 2) Verzija se poklapa na svim mestima.
+#    Kad se ne poklapa, paket odbija da nastane - ali tek posle celog build-a.
+if ! node verzija.mjs > /dev/null 2>&1; then
+  echo ""
+  echo "  Verzija se ne poklapa izmedju server/ i client/."
+  node verzija.mjs || true
+  exit 1
+fi
+
+# 3) Podsetnik, ne prepreka.
+if [ -n "$IZMENJENI" ]; then
+  echo "  (menjan kod - pusti 'node testovi/pokreni-sve.mjs' pre nego sto ovo ode u igraonicu)"
+fi

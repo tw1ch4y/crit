@@ -1,0 +1,17 @@
+# Git hook skripte MORAJU da imaju LF krajeve redova.
+#
+# Na Windows-u git podrazumevano pretvara LF u CRLF pri odjavi fajlova. Za .sh
+# skripte to znaci da prvi red postaje "#!/bin/sh\r", pa Git Bash trazi program
+# imena "/bin/sh\r" i javi "bad interpreter". Provera bi tada tiho prestala da
+# radi na sveze kloniranom projektu - a to je najgori trenutak, jer izgleda kao
+# da hook prolazi.
+alati/git-hooks/* text eol=lf
+
+# Binarni fajlovi se ne diraju (git ih uglavnom sam prepozna, ali ovde se ne pogadja)
+*.png binary
+*.jpeg binary
+*.jpg binary
+*.webp binary
+*.ico binary
+*.woff2 binary
+*.db binary

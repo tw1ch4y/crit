@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Crit Launcher</title>
+  <link rel="stylesheet" href="css/font.css" />
+  <link rel="stylesheet" href="css/launcher.css" />
+</head>
+<body>
+  <div class="pozadina" id="pozadina" aria-hidden="true"></div>
+  <div class="fx-scan" aria-hidden="true"></div>
+  <div class="fx-lowtime" aria-hidden="true"></div>
+  <div class="fx-layer" id="fxLayer" aria-hidden="true"></div>
+
+  <!-- SETUP -->
+  <div class="screen center" id="setupScreen">
+    <div class="card card-narrow">
+      <div style="text-align:center;margin-bottom:24px"><img class="brand-logo sm" src="img/crit-logo.png" alt="Crit" /><div class="brand-tag">Podešavanje računara</div></div>
+      <div class="field"><label>Adresa servera (IP glavnog računara)</label><input id="cfgHost" placeholder="192.168.0.10  ili  http://192.168.0.10:8095" /></div>
+      <div class="field"><label>Token računara</label><input id="cfgToken" placeholder="pc1-xxxxxxxx" /></div>
+      <div class="err" id="cfgErr"></div>
+      <button class="btn btn-primary btn-block btn-lg" id="cfgSave">Sačuvaj i poveži</button>
+      <div class="login-hint">Adresu i token nađeš u panelu, u delovima <b>Podešavanja</b> i <b>Računari</b>.</div>
+    </div>
+  </div>
+
+  <!-- CONNECTING -->
+  <div class="screen center" id="connScreen">
+    <img class="brand-logo sm" src="img/crit-logo.png" alt="Crit" style="margin-bottom:34px" />
+    <div class="spinner"></div>
+    <div style="margin-top:24px;color:var(--text-2);font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.14em" id="connText">Povezivanje sa serverom...</div>
+    <!-- Igracu kome veza pukne usred igranja nestane ceo ekran. Bez ovoga ne
+         zna da li mu se vreme i dalje trosi, pa zove osoblje. Server naplatu
+         pauzira dok racunar nije na vezi, tako da je ovo tacno. -->
+    <div id="connSesija" class="hidden conn-sesija">
+      <span class="cs-tacka"></span>
+      <div>
+        <b>Vreme ti se ne troši dok nema veze.</b>
+        <span>Sesija te čeka i nastavlja se čim se veza vrati.</span>
+      </div>
+    </div>
+    <div id="connHelp" class="hidden" style="margin-top:26px;text-align:center;max-width:420px">
+      <div style="color:var(--text-3);font-size:13px;line-height:1.6">
+        Server se ne javlja. Proveri da li je pokrenut na glavnom računaru
+        i da li je adresa tačno uneta.
+      </div>
+      <button class="btn" id="connSetup" style="margin-top:14px">Promeni adresu servera</button>
+    </div>
+  </div>
+
+  <!-- LOGIN -->
+  <div class="screen center" id="loginScreen">
+    <div class="login-fon" id="loginFon" aria-hidden="true"></div>
+    <!-- Prazan racunar stoji na ovom ekranu satima i to je izlog igraonice.
+         Zato levo stoji znak kuce sa podacima koje gost sa ulice stvarno trazi
+         (cena po satu, koji je ovo racunar), a desno forma. Ranije je preko
+         celog ekrana stajala samo mala kartica u sredini. -->
+    <div class="login-sadrzaj">
+      <div class="login-brend">
+        <img class="lb-logo" src="img/crit-logo.png" alt="Crit" />
+        <div class="lb-ime" id="loginKuca">Crit</div>
+        <div class="lb-pod">Gaming centar</div>
+        <div class="lb-cinjenice">
+          <div class="lb-c"><span class="lb-c-l">Cena po satu</span><span class="lb-c-v" id="loginCena">-</span></div>
+          <div class="lb-c"><span class="lb-c-l">Računar</span><span class="lb-c-v" id="loginPc">-</span></div>
+        </div>
+      </div>
+      <form class="login-box" id="loginForm">
+        <div class="lo-naslov">Prijava</div>
+        <div class="field"><label>Korisničko ime</label><input id="pUser" autocomplete="off" /></div>
+        <div class="field"><label>Lozinka</label><input id="pPass" type="password" autocomplete="off" /></div>
+        <div class="err" id="loginErr"></div>
+        <button class="btn btn-primary btn-block btn-lg" type="submit">Prijavi se</button>
+        <div class="login-hint">Nalog i dopunu kredita radiš na kasi, kod osoblja.</div>
+      </form>
+    </div>
+  </div>
+
+  <!-- DESKTOP -->
+  <div class="screen" id="desktopScreen">
+    <div class="topbar">
+      <img class="topbar-logo" src="img/crit-logo.png" alt="Crit" />
+      <div class="tabs">
+        <button class="tab active" data-tab="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg> Početna</button>
+        <button class="tab" data-tab="shop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 4 6v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6l-2-4Z"/><path d="M4 6h16M9 10a3 3 0 0 0 6 0"/></svg> Shop</button>
+        <button class="tab" data-tab="account"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Nalog</button>
+      </div>
+      <div class="spacer"></div>
+      <div class="hud">
+        <div class="hud-chip who"><span class="hc-l">Igrač</span><span class="hc-v" id="hudName">-</span></div>
+        <div class="hud-chip bal"><span class="hc-l">Kredit</span><span class="hc-v" id="hudBal">-</span></div>
+        <div class="hud-chip timer" id="timerBox"><span class="hc-l">Preostalo</span><span class="hc-v t" id="hudTimer">--:--</span></div>
+        <button class="btn btn-ghost logout" id="logoutBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg> Odjava</button>
+      </div>
+    </div>
+    <div class="content" id="content"></div>
+    <div class="statusbar" id="statusBar">
+      <span class="sb-item" id="sbPc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span class="sb-txt">PC</span></span>
+      <span class="sb-item" id="sbClock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="sb-txt">--:--</span></span>
+      <span class="sb-item ok" id="sbNet"><span class="sb-dot"></span><span class="sb-txt">Server</span></span>
+      <span class="sb-item" id="sbInet"><span class="sb-dot"></span><span class="sb-txt">Internet</span></span>
+      <span class="sb-item" id="sbCpu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></svg><span class="sb-txt">CPU -</span></span>
+      <span class="sb-item" id="sbRam"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="10" rx="1.5"/><path d="M6 17v3M10 17v3M14 17v3M18 17v3"/></svg><span class="sb-txt">RAM -</span></span>
+      <span class="sb-item" id="sbTemp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.8V4a2 2 0 0 0-4 0v10.8a4 4 0 1 0 4 0Z"/></svg><span class="sb-txt">temp -</span></span>
+      <!-- Verzija stoji desno, odvojena. Kad se jedan racunar ponasa drugacije
+           od ostalih, ovo je prvo sto treba pogledati - a bez toga se nigde
+           nije videlo koji je launcher gde instaliran. -->
+      <span class="sb-item sb-verzija" id="sbVerzija"><span class="sb-txt"></span></span>
+    </div>
+  </div>
+
+  <!-- LOCKED -->
+  <div class="screen center" id="lockedScreen">
+    <div class="lock-icon" id="lockIcon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+    <div class="lock-title" id="lockTitle">Računar je zaključan</div>
+    <div class="lock-sub" id="lockSub">Pozovite osoblje da otključa računar.</div>
+    <div class="lock-pin hidden" id="lockPinBox">
+      <div class="field" style="margin-top:10px"><input id="lockPin" type="password" placeholder="PIN osoblja" /></div>
+      <div class="err" id="lockErr" style="text-align:center"></div>
+      <button class="btn btn-primary btn-block" id="lockUnlock">Otključaj</button>
+    </div>
+    <button class="lock-foot" id="lockStaff">Osoblje: Ctrl + Alt + U</button>
+  </div>
+
+  <!-- PORUKA OSOBLJA -->
+  <div class="overlay" id="msgOverlay">
+    <div class="dialog">
+      <div class="dlg-ic accent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></svg></div>
+      <div class="dlg-t">Poruka osoblja</div>
+      <div class="dlg-s" id="msgText"></div>
+      <div class="dlg-row"><button class="btn btn-primary" id="msgOk">U redu</button></div>
+    </div>
+  </div>
+
+  <!-- POTVRDA ODJAVE -->
+  <div class="overlay" id="confirmOverlay">
+    <div class="dialog">
+      <div class="dlg-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg></div>
+      <div class="dlg-t">Odjava sa računara</div>
+      <div class="dlg-s">Sesija se završava, a preostali kredit ostaje na nalogu za sledeći put.</div>
+      <div class="dlg-row"><button class="btn" id="cfNo">Otkaži</button><button class="btn btn-primary" id="cfYes">Odjavi me</button></div>
+    </div>
+  </div>
+
+  <!-- PIN (admin izlaz) -->
+  <div class="overlay" id="pinOverlay">
+    <div class="dialog">
+      <div class="dlg-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.5 12.5 8-8M18 4l3 3M15 7l3 3"/></svg></div>
+      <div class="dlg-t" id="pinTitle">Unesite PIN</div>
+      <div class="field"><input id="pinInput" type="password" /></div>
+      <div class="err" id="pinErr" style="text-align:center"></div>
+      <div class="dlg-row"><button class="btn" id="pinCancel">Otkaži</button><button class="btn btn-primary" id="pinOk">Potvrdi</button></div>
+    </div>
+  </div>
+
+  <!-- NAGRADNI TOČAK (otvara se klikom na widget u baneru) -->
+  <div class="overlay" id="tocakOverlay">
+    <div class="dialog tocak-dlg">
+      <button class="dlg-x" id="tocakX" aria-label="Zatvori"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      <div class="dlg-t">Nagradni točak</div>
+      <div id="tocakTelo"></div>
+    </div>
+  </div>
+
+  <!-- BOOT / WELCOME -->
+  <div class="boot hidden" id="bootOverlay">
+    <div class="boot-inner">
+      <img class="brand-logo" src="img/crit-logo.png" alt="Crit" />
+      <div class="boot-line" id="bootLine">Sistem spreman</div>
+      <div class="boot-bar"><span></span></div>
+    </div>
+  </div>
+
+  <div class="toasts" id="toasts"></div>
+  <script src="js/launcher.js"></script>
+</body>
+</html>

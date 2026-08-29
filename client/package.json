@@ -1,0 +1,82 @@
+{
+  "name": "crit-launcher",
+  "version": "2.44.0",
+  "description": "Crit igraonica - launcher za racunare igraca",
+  "main": "main.js",
+  "author": "Crit",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "build": {
+    "appId": "rs.crit.launcher",
+    "productName": "Crit Launcher",
+    "directories": {
+      "output": "../dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "backdrop-preload.js",
+      "overlay-preload.js",
+      "ciscenje.js",
+      "procesi.js",
+      "windows-podesavanja.js",
+      "renderer/**/*",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "zastita-ukljuci.bat",
+        "to": "zastita-ukljuci.bat"
+      },
+      {
+        "from": "zastita-iskljuci.bat",
+        "to": "zastita-iskljuci.bat"
+      },
+      {
+        "from": "resetuj-launcher.bat",
+        "to": "resetuj-launcher.bat"
+      },
+      {
+        "from": "POPRAVI-RACUNAR.bat",
+        "to": "POPRAVI-RACUNAR.bat"
+      },
+      {
+        "from": "podesavanja.json",
+        "to": "podesavanja.json"
+      },
+      {
+        "from": "DEINSTALIRAJ-LAUNCHER.bat",
+        "to": "DEINSTALIRAJ-LAUNCHER.bat"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build-icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Crit Launcher"
+    }
+  }
+}

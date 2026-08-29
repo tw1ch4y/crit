@@ -1,0 +1,1760 @@
+/* CRIT LAUNCHER - GAMING EDITION */
+
+/* Font se ucitava iz css/font.css - deli ga i prozor obavestenja
+   koji iskace preko igre (overlay.html), pa ne sme da stoji samo ovde. */
+
+
+:root {
+  --bg: #07070a;
+  --bg-2: #0c0c11;
+  --panel: #101017;
+  --panel-2: #16161f;
+  --panel-3: #1d1d29;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-2: rgba(255, 255, 255, 0.15);
+  --text: #f3f4f8;
+  --text-2: #a2a5ba;
+  --text-3: #5e6176;
+
+  --red: #ff2b2b;
+  --red-deep: #d81f24;
+  --red-soft: rgba(255, 43, 43, 0.14);
+  --red-glow: rgba(255, 43, 43, 0.6);
+  --gold: #ffb527;
+  --gold-glow: rgba(255, 181, 39, 0.55);
+  --green: #33e284;
+  --green-glow: rgba(51, 226, 132, 0.5);
+  --amber: #ffb527;
+  --red-status: #ff3b3b;
+
+  --cut: 13px;
+  --cut-lg: 18px;
+  --tr: 0.16s cubic-bezier(0.22, 0.8, 0.3, 1);
+  /* Chakra Petch ide na naslove, brojke i sve po cemu se klikce (tabovi,
+     dugmad, polja za unos) - tu se vidi karakter. Duza objasnjenja i uputstva
+     ostaju u sistemskom fontu, koji je citljiviji u sitnom.
+     Chakra Petch ima najvise debljinu 700; gde je ranije stajalo 900, sada
+     stoji 700 - inace bi pregledac sam "zadebljao" vec masna slova i ona bi
+     izgledala razlivena. */
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  --font-display: "Chakra Petch", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --font-ui: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+  cursor: default;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Pozadina: svetlo pada odozgo, dno je tamnije - sadrzaj tako ima na cemu da
+   stoji umesto da lebdi na ravnoj crnoj. Bez sara i bez animacija. */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -3; pointer-events: none;
+  background:
+    radial-gradient(1100px 420px at 50% -6%, rgba(255, 255, 255, 0.055), transparent 70%),
+    radial-gradient(820px 560px at 8% -10%, rgba(216, 31, 36, 0.14), transparent 62%),
+    radial-gradient(880px 620px at 96% 108%, rgba(255, 181, 39, 0.07), transparent 58%),
+    linear-gradient(180deg, #0c0c12 0%, var(--bg) 46%, #050508 100%);
+}
+
+/* TEKSTURA POZADINE
+   Sitna sara koja se ponavlja preko celog ekrana. Crta se ovde, ne kaci se kao
+   slika - ostra je na svakoj rezoluciji i ne opterecuje mrezu. Stoji IZNAD
+   okacene pozadine, pa se vidi i kad je slika postavljena i kad nije; tako cela
+   pozadina dobije izgled stampanog stripa, isto kao logotip.
+   Bira se u panelu, sara i jacina odvojeno. Podrazumevano je iskljucena.
+   Sama sara stize sa servera (jedna definicija, u service.js), pa se pregled u
+   panelu i ono sto igrac vidi ne mogu razici. Ovde stoji samo kako se crta.
+
+   Sloj je namerno veci od ekrana (inset: -60px): kod "dubine" se pomera za
+   pokretom misa, pa bez te rezerve ivice ekrana ostanu prazne.
+   Sve animacije rade nad POZICIJOM pozadine, maskom i transformacijom - to su
+   poslovi kompozitora, ne procesora, pa ne smetaju igri u prvom planu. */
+body::after {
+  content: ""; position: fixed; inset: -60px; z-index: -1; pointer-events: none;
+  background-image: var(--tekstura, none);
+  background-repeat: repeat; background-position: 0 0;
+  opacity: var(--tekstura-vid, 0); transition: opacity 0.35s ease;
+  transform: translate3d(var(--par-x, 0px), var(--par-y, 0px), 0);
+}
+/* Na ekranu prijave i zakljucanom ekranu preko sare nema sadrzaja koji je
+   prekriva, pa se ponavljanje vidi kao vodeni zig preko celog ekrana. Tu ide
+   znatno tise - posao nosi pozadinska slika, sara je samo tekstura ispod. */
+body.tiha-sara::after { opacity: calc(var(--tekstura-vid, 0) * 0.34); }
+
+/* KLIZANJE - sara polako putuje po dijagonali.
+   Pomera se za TACNO jednu plocicu, pa se petlja zatvara bez vidljivog skoka. */
+body[data-kretanje="klizanje"]::after {
+  animation: tekstura-klizi var(--tekstura-sekundi, 0s) linear infinite;
+  will-change: background-position;
+}
+@keyframes tekstura-klizi {
+  to { background-position: var(--tekstura-korak, 0px) var(--tekstura-korak, 0px); }
+}
+
+/* TALAS - sara stoji, ali preko nje polako prelazi pojas svetla, kao odsjaj.
+   Radi se maskom: sara se u pojasu vidi punom jacinom, van njega prigusenije.
+   Mirnije je od klizanja jer se nista ne pomera, samo "dise" u prolazu. */
+body[data-kretanje="talas"]::after {
+  -webkit-mask-image: linear-gradient(112deg, rgba(0, 0, 0, 0.38) 12%, #000 26%, rgba(0, 0, 0, 0.38) 42%);
+  mask-image: linear-gradient(112deg, rgba(0, 0, 0, 0.38) 12%, #000 26%, rgba(0, 0, 0, 0.38) 42%);
+  -webkit-mask-size: 260% 260%; mask-size: 260% 260%;
+  -webkit-mask-repeat: repeat; mask-repeat: repeat;
+  animation: tekstura-talas var(--tekstura-sekundi, 0s) linear infinite;
+  will-change: mask-position;
+}
+@keyframes tekstura-talas {
+  from { -webkit-mask-position: 0% 0%; mask-position: 0% 0%; }
+  to   { -webkit-mask-position: 260% 260%; mask-position: 260% 260%; }
+}
+
+/* DUBINA - dva sloja iste sare, zadnji krupniji i sporiji.
+   Blizi sloj prati pokret misa (--par-x/--par-y postavlja launcher), pa se
+   pozadina pomera KAD IGRAC POMERI MIS, umesto da se vrti sama od sebe.
+   To je jedini nacin kretanja koji reaguje na coveka za racunarom. */
+body[data-kretanje="dubina"]::after {
+  background-image: var(--tekstura, none), var(--tekstura, none);
+  background-size: auto, calc(var(--tekstura-korak, 64px) * 2.1);
+  animation: tekstura-dubina var(--tekstura-sekundi, 0s) linear infinite;
+  transition: opacity 0.35s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: background-position, transform;
+}
+@keyframes tekstura-dubina {
+  to {
+    background-position:
+      var(--tekstura-korak, 0px) var(--tekstura-korak, 0px),
+      calc(var(--tekstura-korak, 0px) * -1) calc(var(--tekstura-korak, 0px) * -0.5);
+  }
+}
+
+/* ISKRE - pojedine figure u mrezi zasvetle u boji kuce pa se ugase.
+   Svaka iskra je jedna plocica mreze: ista sara, samo crvena, polozena tacno
+   preko bele ispod nje. Zato izgleda kao da je bas TA figura zasvetlela, a ne
+   kao da je neko nalepio crveni kvadrat.
+   Sloj stoji odmah iznad teksture i ispod celog sadrzaja. */
+.iskre-sloj {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;
+}
+.iskra {
+  position: absolute; display: block;
+  background-image: var(--tekstura-iskra, none);
+  background-repeat: no-repeat; background-position: 0 0;
+  opacity: 0;
+  /* Sjaj oko figure - bez njega crvena samo "stoji", sa njim izgleda upaljeno. */
+  filter: drop-shadow(0 0 7px rgba(255, 43, 43, 0.55));
+  animation-name: iskra-zasvetli;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-fill-mode: forwards;
+}
+/* Pali se brzo, gori kratko, gasi se polako - tako se primeti a ne trepce. */
+@keyframes iskra-zasvetli {
+  0%   { opacity: 0; }
+  18%  { opacity: 1; }
+  46%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Racunar koji trazi manje kretanja na sistemskom nivou ga ovde i ne dobija. */
+/* Sara i iskre se NE gase na prefers-reduced-motion - vidi objasnjenje uz
+   drugi blok istog upita, na dnu fajla. Prekidac je u panelu (kretanje
+   "Mirno"), i vlasnik ga bira svesno. */
+
+/* Pozadina koju osoblje kaci kroz panel, po ekranu. Stoji ispod celog sadrzaja
+   i uvek ide sa tamnim slojem preko - inace tekst ne bi bio citljiv ni na
+   jednoj slici. Zato slika sme da bude bilo koja, dizajn i dalje drzi. */
+.pozadina {
+  position: fixed; inset: 0; z-index: -2; pointer-events: none; opacity: 0;
+  background-size: cover; background-position: center center;
+  transition: opacity 0.45s ease;
+}
+.pozadina.ima { opacity: 1; }
+/* Zastor preko okacene slike. Drzi tekst citljivim, ali ne sme da pojede sliku:
+   pozadine koje pravi server vec nose svoju vinjetu, pa je ovde dovoljan blag
+   prelaz odozgo i odozdo. Ranije je ovde bio jos jedan taman krug u SREDINI -
+   tacno tamo gde stoji sadrzaj - pa je svetlo iz slike nestajalo i svaki ekran
+   je izgledao kao ravna crna ploha. */
+.pozadina::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(7, 7, 10, 0.74) 0%, rgba(7, 7, 10, 0.5) 42%, rgba(7, 7, 10, 0.82) 100%);
+}
+/* Na praznim ekranima (prijava, zakljucan) slika sme najjace da se vidi -
+   tamo preko nje ide samo jedna kartica. */
+body.pozadina-prazna .pozadina::after {
+  background: linear-gradient(180deg, rgba(7, 7, 10, 0.42) 0%, rgba(7, 7, 10, 0.16) 45%, rgba(7, 7, 10, 0.55) 100%);
+}
+
+/* Poruka na ekranu "povezivanje", samo kad je veza pukla USRED igranja.
+   Igrac tada ostane bez ekrana i prvo pomisli da mu vreme curi. */
+.conn-sesija {
+  display: flex; align-items: flex-start; gap: 11px; margin-top: 26px;
+  max-width: 430px; padding: 14px 18px; text-align: left;
+  background: rgba(61, 201, 126, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(61, 201, 126, 0.28);
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+}
+.conn-sesija .cs-tacka {
+  width: 9px; height: 9px; margin-top: 5px; flex: 0 0 auto; border-radius: 50%;
+  background: var(--green, #3dc97e); box-shadow: 0 0 10px 1px rgba(61, 201, 126, 0.7);
+}
+.conn-sesija b { display: block; color: #d7f5e5; font-size: 13.5px; font-weight: 800; }
+.conn-sesija span { display: block; margin-top: 3px; color: var(--text-3); font-size: 12.5px; line-height: 1.5; }
+
+/* Vinjeta: ivice ekrana tamnije da sadržaj u sredini dobije težinu. */
+.fx-scan {
+  position: fixed; inset: 0; z-index: 500; pointer-events: none;
+  background: radial-gradient(140% 130% at 50% 45%, transparent 62%, rgba(2, 2, 5, 0.42));
+}
+
+/* pun crveni edge-alarm kad vreme ističe (< 60s) */
+.fx-lowtime {
+  position: fixed; inset: 0; z-index: 480; pointer-events: none; opacity: 0;
+  box-shadow: inset 0 0 150px 24px rgba(255, 43, 43, 0.5);
+  transition: opacity 0.3s ease;
+}
+body.time-critical .fx-lowtime { opacity: 1; animation: lowtime 1s ease-in-out infinite; }
+@keyframes lowtime { 50% { opacity: 0.4; } }
+
+input { user-select: text; }
+button { cursor: pointer; font-family: inherit; border: none; background: none; color: inherit; font-size: inherit; }
+.hidden { display: none !important; }
+svg { display: block; }
+
+* { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.16) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(255, 43, 43, 0.3); border-radius: 0; border: 3px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 43, 43, 0.55); background-clip: padding-box; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+
+/* Ekrani */
+.screen { position: fixed; inset: 0; display: none; }
+.screen.active { display: flex; animation: screen-in 0.35s var(--tr); }
+@keyframes screen-in { from { opacity: 0; transform: scale(0.99); } }
+.center { align-items: center; justify-content: center; flex-direction: column; }
+
+/* Brend / status */
+.brand-logo { width: 250px; max-width: 58vw; height: auto; display: block; margin: 0 auto; filter: drop-shadow(0 8px 30px rgba(255, 43, 43, 0.35)); }
+@keyframes logo-pulse { 50% { filter: drop-shadow(0 8px 40px rgba(255, 43, 43, 0.55)); } }
+.brand-logo.sm { width: 150px; }
+.brand-tag {
+  text-align: center; color: var(--gold); font-size: 12px; margin-top: 14px;
+  font-weight: 700; font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.35em; padding-left: 0.35em;
+  text-shadow: 0 0 18px var(--gold-glow);
+}
+.topbar-logo { height: 34px; width: auto; display: block; filter: drop-shadow(0 3px 12px rgba(255, 43, 43, 0.4)); }
+
+@keyframes dot-blink { 50% { opacity: 0.25; } }
+
+/* Kartica (setup/login) */
+.card {
+  position: relative;
+  background: linear-gradient(160deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--line-2);
+  clip-path: polygon(0 0, calc(100% - var(--cut-lg)) 0, 100% var(--cut-lg), 100% 100%, var(--cut-lg) 100%, 0 calc(100% - var(--cut-lg)));
+  animation: card-in 0.4s var(--tr);
+}
+.card::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 43, 43, 0.06), transparent 30%);
+}
+@keyframes card-in { from { opacity: 0; transform: translateY(14px); } }
+.card-narrow { width: 410px; max-width: 92vw; padding: 40px 36px 32px; }
+
+/* Polja */
+.field { text-align: left; margin-bottom: 16px; }
+.field label {
+  display: block; font-size: 11px; color: var(--text-3); margin-bottom: 8px;
+  font-family: var(--font-ui); font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;
+}
+input {
+  width: 100%; background: rgba(6, 6, 10, 0.7); border: 1px solid var(--line-2);
+  border-left: 2px solid var(--line-2);
+  border-radius: 0; padding: 13px 15px; font-size: 15.5px; color: var(--text); outline: none;
+  font-family: var(--font-ui); font-weight: 500; letter-spacing: 0.02em;
+  transition: border-color var(--tr), box-shadow var(--tr), background var(--tr);
+}
+/* Lozinka: tacke su u gaming fontu preuske i stapaju se, pa im treba vazduha. */
+input[type="password"] { letter-spacing: 0.16em; }
+input::placeholder { color: var(--text-3); }
+input:hover { border-color: var(--line-2); border-left-color: var(--text-3); }
+input:focus { border-color: var(--red); border-left-color: var(--red); box-shadow: 0 0 0 3px var(--red-soft), 0 0 26px -6px var(--red-glow); background: rgba(6, 6, 10, 0.9); }
+
+/* Dugmad (iskošena, glow) */
+.btn {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  padding: 13px 22px; font-family: var(--font-ui); font-weight: 700; font-size: 14.5px; letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--panel-3); color: var(--text);
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  transition: filter var(--tr), transform 0.08s ease, background var(--tr), color var(--tr);
+}
+.btn::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  clip-path: inherit;
+}
+.btn:hover { background: #24242f; }
+.btn:active { transform: scale(0.97); }
+.btn svg { width: 17px; height: 17px; }
+.btn-primary {
+  background: linear-gradient(135deg, var(--red) 0%, var(--red-deep) 100%); color: #fff;
+  filter: drop-shadow(0 4px 16px var(--red-glow));
+}
+.btn-primary::after { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3); }
+.btn-primary:hover { background: linear-gradient(135deg, #ff4040, #e42328); filter: drop-shadow(0 6px 24px var(--red-glow)); }
+.btn-ghost { background: transparent; color: var(--text-2); }
+.btn-ghost::after { box-shadow: none; }
+.btn-ghost:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+.btn-lg { padding: 15px 26px; font-size: 15px; }
+.btn-block { width: 100%; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
+.btn:disabled:hover { background: linear-gradient(135deg, var(--red) 0%, var(--red-deep) 100%); }
+.err { color: var(--red-status); font-size: 13.5px; min-height: 20px; margin-bottom: 4px; font-weight: 600; }
+
+/* Setup / login */
+.login-hint { margin-top: 20px; color: var(--text-3); font-size: 12px; text-align: center; line-height: 1.6; letter-spacing: 0.02em; }
+.login-hint b { color: var(--gold); font-weight: 700; }
+
+/* Baner izdvojene igre iza forme: mutan i taman, samo da ekran ima dubinu. */
+.login-fon {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0;
+  background-size: cover; background-position: center 35%;
+  filter: blur(30px) saturate(1.3) brightness(0.85);
+  transform: scale(1.12);
+  transition: opacity 0.6s ease;
+}
+.login-fon.ima { opacity: 0.75; }
+/* Tamni krug pod formom da tekst ostane citljiv, ivice ekrana zive. */
+/* Zastor je SIROK, ne krug u sredini: sadrzaj sada stoji u dve kolone preko
+   skoro cele sirine, pa bi uzak krug ostavio ivice svetlije od teksta. */
+.login-fon::after {
+  content: ""; position: absolute; inset: 0;
+  background:
+    radial-gradient(86% 70% at 50% 52%, rgba(7, 7, 10, 0.86), rgba(7, 7, 10, 0.5) 74%, rgba(7, 7, 10, 0.72)),
+    linear-gradient(180deg, rgba(7, 7, 10, 0.35), transparent 30%, transparent 72%, rgba(7, 7, 10, 0.45));
+}
+/* Ekran prijave: znak kuce levo, forma desno, tanka nit izmedju. Prazan
+   racunar ovako izgleda kao izlog, a ne kao mala kartica na crnom ekranu. */
+.login-sadrzaj {
+  position: relative; z-index: 1;
+  display: grid; grid-template-columns: auto 1px auto; align-items: center;
+  gap: clamp(38px, 6vw, 84px); padding: 0 24px;
+}
+/* Sve tri celije dobijaju SVOJE mesto. Bez toga pseudo-element (koji je prvi u
+   redosledu) zauzme prvu kolonu, znak kuce odleti u trecu, a forma se prelomi
+   u novi red - ekran je izgledao razbijen. */
+.login-sadrzaj::before {
+  content: ""; grid-column: 2; grid-row: 1; align-self: stretch; margin: 12px 0;
+  background: linear-gradient(180deg, transparent, var(--line-2) 18%, var(--line-2) 82%, transparent);
+}
+
+.login-brend { grid-column: 1; grid-row: 1; text-align: left; animation: card-in 0.5s var(--tr); }
+.lb-logo {
+  width: clamp(190px, 17vw, 268px); height: auto; display: block; margin: 0 0 22px;
+  filter: drop-shadow(0 10px 34px rgba(255, 43, 43, 0.38));
+}
+.lb-ime {
+  font-family: var(--font-display); font-weight: 700; font-size: clamp(30px, 3.2vw, 46px);
+  line-height: 1; letter-spacing: 0.02em; text-transform: uppercase; color: var(--text);
+}
+.lb-pod {
+  margin-top: 10px; font-family: var(--font-ui); font-weight: 700;
+  font-size: clamp(10px, 0.8vw, 12px); letter-spacing: 0.36em;
+  text-transform: uppercase; color: var(--text-3);
+}
+/* Dva podatka koja gost sa ulice stvarno pita. Cena je krupna, jer je to prvo
+   pitanje; oznaka racunara mu treba tek kad zove osoblje. */
+.lb-cinjenice { display: flex; gap: 34px; margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
+.lb-c { display: flex; flex-direction: column; gap: 6px; }
+.lb-c-l {
+  font-family: var(--font-ui); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-3);
+}
+.lb-c-v {
+  font-family: var(--font-display); font-size: clamp(17px, 1.5vw, 22px); font-weight: 700;
+  color: var(--text); font-variant-numeric: tabular-nums; line-height: 1;
+}
+
+.login-box {
+  grid-column: 3; grid-row: 1;
+  width: clamp(330px, 27vw, 400px); max-width: 92vw; padding: 32px 32px 28px;
+  background: linear-gradient(160deg, rgba(22, 22, 31, 0.92), rgba(16, 16, 23, 0.92));
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  clip-path: polygon(0 0, calc(100% - var(--cut-lg)) 0, 100% var(--cut-lg), 100% 100%, var(--cut-lg) 100%, 0 calc(100% - var(--cut-lg)));
+  box-shadow: inset 0 0 0 1px var(--line-2), 0 30px 70px -30px rgba(0, 0, 0, 0.95);
+  animation: card-in 0.45s var(--tr);
+}
+.lo-naslov {
+  margin-bottom: 22px; font-family: var(--font-ui); font-weight: 700; font-size: 13px;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-2);
+}
+
+/* Uži ekrani: sve u jednu kolonu, nit se sklanja. */
+@media (max-width: 1100px) {
+  .login-sadrzaj { grid-template-columns: auto; gap: 26px; justify-items: center; text-align: center; }
+  .login-sadrzaj::before { display: none; }
+  .login-brend { grid-column: 1; grid-row: 1; text-align: center; }
+  .login-box { grid-column: 1; grid-row: 2; }
+  .lb-logo { margin-inline: auto; width: clamp(150px, 26vw, 200px); }
+  .lb-cinjenice { justify-content: center; gap: 28px; margin-top: 20px; padding-top: 16px; }
+  .lb-c { align-items: center; }
+}
+
+.spinner {
+  width: 48px; height: 48px; border-radius: 50%;
+  border: 3px solid rgba(255, 43, 43, 0.15); border-top-color: var(--red);
+  box-shadow: 0 0 24px -4px var(--red-glow);
+  animation: spin 0.75s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Desktop / topbar */
+#desktopScreen { flex-direction: column; }
+.topbar {
+  position: relative;
+  display: flex; align-items: center; gap: 22px;
+  padding: 13px 26px; background: rgba(9, 9, 13, 0.85);
+  border-bottom: 1px solid var(--line);
+}
+.topbar::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--red) 20%, var(--gold) 50%, var(--red) 80%, transparent);
+  opacity: 0.6;
+}
+.tabs { display: flex; gap: 4px; margin-left: 10px; }
+.tab {
+  position: relative;
+  padding: 10px 18px; font-family: var(--font-ui); font-weight: 700; color: var(--text-2); font-size: 14px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  display: flex; align-items: center; gap: 9px;
+  clip-path: polygon(9px 0, 100% 0, 100% 100%, 0 100%, 0 9px);
+  transition: background var(--tr), color var(--tr);
+}
+.tab svg { width: 18px; height: 18px; stroke-width: 2; color: var(--text-3); transition: color var(--tr); }
+.tab:hover { background: rgba(255, 255, 255, 0.05); color: var(--text); }
+.tab:hover svg { color: var(--text-2); }
+.tab.active { background: var(--red-soft); color: #fff; }
+.tab.active svg { color: var(--red); }
+.tab.active::after {
+  content: ""; position: absolute; left: 10px; right: 6px; bottom: 0; height: 2px;
+  background: var(--red); box-shadow: 0 0 12px 1px var(--red-glow);
+}
+.spacer { flex: 1; }
+
+/* Hud */
+.hud { display: flex; align-items: center; gap: 9px; }
+.hud-chip {
+  position: relative;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 7px 15px 8px; min-width: 92px;
+  background: rgba(16, 16, 23, 0.9);
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+}
+.hud-chip::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 0 1px var(--line); clip-path: inherit; pointer-events: none; }
+.hud-chip .hc-l { font-size: 9px; color: var(--text-3); font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.14em; font-weight: 700; }
+.hud-chip .hc-v { font-size: 15px; font-weight: 800; line-height: 1.15; white-space: nowrap; }
+.hud-chip.bal .hc-v { color: var(--green); font-variant-numeric: tabular-nums; text-shadow: 0 0 14px var(--green-glow); }
+.hud-chip.timer { padding-right: 17px; }
+.hud-chip.timer .hc-v { font-variant-numeric: tabular-nums; font-size: 18px; letter-spacing: 0.01em; }
+.hud-chip.timer.low { background: var(--red-soft); }
+.hud-chip.timer.low::after { box-shadow: inset 0 0 0 1px var(--red); }
+.hud-chip.timer.low .hc-v { color: var(--red-status); text-shadow: 0 0 16px var(--red-glow); animation: timer-low 1.1s ease-in-out infinite; }
+@keyframes timer-low { 50% { opacity: 0.5; } }
+.hud-chip.bump { animation: chip-bump 0.42s var(--tr); }
+@keyframes chip-bump { 0% { transform: scale(1); } 32% { transform: scale(1.09); } 100% { transform: scale(1); } }
+.hud .logout { margin-left: 5px; padding: 11px 15px; }
+
+/* Sadržaj */
+.content { flex: 1; min-height: 0; overflow: hidden; padding: 24px 30px; position: relative; }
+.content.swap { animation: content-swap 0.28s var(--tr); }
+@keyframes content-swap { from { opacity: 0; transform: translateY(10px); } }
+/* scan-pass linija pri promeni taba */
+#content.swap::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 42%; pointer-events: none; z-index: 5;
+  background: linear-gradient(180deg, transparent, rgba(255, 43, 43, 0.08), transparent);
+  animation: scanpass 0.42s ease forwards;
+}
+@keyframes scanpass { from { transform: translateY(-42%); opacity: 0.9; } to { transform: translateY(255%); opacity: 0; } }
+.section-title {
+  position: relative;
+  font-family: var(--font-display);
+  font-size: 15px; font-weight: 700; color: var(--text);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin: 30px 0 16px; padding-left: 15px;
+  transform: skewX(-7deg);
+}
+.section-title::before {
+  content: ""; position: absolute; left: 0; top: 2px; bottom: 2px; width: 4px;
+  background: linear-gradient(180deg, var(--red), var(--red-deep));
+  box-shadow: 0 0 12px var(--red-glow);
+}
+.section-title:first-child { margin-top: 4px; }
+.content .section-title { animation: sec-in 0.42s var(--tr) both; }
+@keyframes sec-in { from { opacity: 0; transform: translateX(-14px) skewX(-7deg); } to { opacity: 1; transform: skewX(-7deg); } }
+
+.empty-view { min-height: 52vh; display: grid; place-items: center; }
+.empty-view .ev-in { text-align: center; display: grid; justify-items: center; gap: 6px; max-width: 400px; }
+.empty-view svg { width: 60px; height: 60px; color: var(--red); opacity: 0.35; stroke-width: 1.4; margin-bottom: 10px; filter: drop-shadow(0 0 18px var(--red-glow)); }
+.empty-view .ev-t { font-family: var(--font-display); font-weight: 700; font-size: 18px; text-transform: uppercase; letter-spacing: 0.04em; }
+.empty-view .ev-s { font-size: 13.5px; color: var(--text-3); }
+
+/* IGRE - library cover kartice */
+.tile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(190px, 100%), 1fr)); gap: 18px; }
+.tile { cursor: pointer; animation: tile-in 0.42s var(--tr) both; animation-delay: calc(min(var(--i, 0), 14) * 34ms); }
+@keyframes tile-in { from { opacity: 0; transform: translateY(18px) scale(0.98); } }
+.tile-media {
+  position: relative; aspect-ratio: 3 / 4; overflow: hidden;
+  background: linear-gradient(160deg, var(--panel-2), var(--panel));
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%);
+  display: grid; place-items: center;
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  transition: box-shadow var(--tr), filter var(--tr);
+}
+.tile-media img {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  transition: transform 0.35s var(--tr);
+}
+.tile-emoji { font-size: 64px; line-height: 1; opacity: 0.8; filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.5)); }
+/* Oznaka kategorije. Stoji DOLE levo, iznad imena - korice gotovo uvek nose
+   naziv igre pri vrhu, pa bi oznaka gore sekla logo. */
+.tile-badge {
+  position: absolute; bottom: 46px; left: 9px; z-index: 5;
+  font-size: 9.5px; font-weight: 700; font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--gold); background: rgba(7, 7, 10, 0.72); padding: 4px 8px;
+  clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
+  backdrop-filter: blur(4px);
+}
+/* ime na dnu preko slike (scrim) */
+.tile-scrim { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; padding: 34px 13px 13px; background: linear-gradient(transparent, rgba(5, 5, 9, 0.94) 60%); transition: background var(--tr); }
+.tile-name { font-weight: 700; font-size: 15px; font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.02em; line-height: 1.2; }
+/* Dugme za pokretanje izlazi IZNAD imena, ime ostaje na svom mestu.
+   Igrac na hover mora i dalje da vidi koju igru pokrece. */
+.tile-hover {
+  position: absolute; left: 0; right: 0; top: 0; bottom: 62px; z-index: 3;
+  display: grid; place-content: center; justify-items: center;
+  background: linear-gradient(180deg, rgba(7, 7, 10, 0.1), rgba(7, 7, 10, 0.4));
+  opacity: 0; transition: opacity 0.2s ease; pointer-events: none;
+}
+.tile-hover .play-btn {
+  width: 58px; height: 58px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--red), var(--red-deep)); color: #fff;
+  display: grid; place-items: center;
+  box-shadow: 0 0 30px -2px var(--red-glow), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transform: scale(0.82) translateY(6px); transition: transform 0.22s var(--tr);
+}
+.tile-hover .play-btn svg { width: 24px; height: 24px; margin-left: 3px; }
+.tile-hover .play-label {
+  font-size: 11px; font-weight: 700; font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.2em; color: #fff;
+  text-shadow: 0 0 12px var(--red-glow); opacity: 0; transform: translateY(6px); transition: 0.22s var(--tr);
+}
+/* Omot lezi na podlozi (senka), a na hover se podigne ka igracu. Pokret ide
+   na dodir misa, ne sam od sebe - to je razlika izmedju osecaja i ukrasa. */
+.tile { transition: transform 0.18s var(--tr); }
+.tile-media { box-shadow: inset 0 0 0 1px var(--line-2), 0 12px 26px -14px rgba(0, 0, 0, 0.9); }
+.tile:hover { transform: translateY(-6px); }
+.tile:active { transform: translateY(-2px); }
+.tile:hover .tile-media { box-shadow: inset 0 0 0 1.5px var(--red), 0 22px 42px -16px rgba(0, 0, 0, 0.95), 0 0 34px -10px var(--red-glow); }
+.tile:hover .tile-media img { transform: scale(1.07); }
+.tile:hover .tile-scrim { background: linear-gradient(transparent, rgba(5, 5, 9, 0.97) 55%); }
+.tile:hover .tile-hover { opacity: 1; }
+.tile:hover .tile-hover .play-btn { transform: scale(1) translateY(0); }
+.tile:hover .tile-hover .play-label { opacity: 1; transform: none; }
+.tile:active .tile-hover .play-btn { transform: scale(0.92); }
+/* pločica dok se igra pokreće */
+.tile.launching { pointer-events: none; }
+.tile.launching .tile-media { box-shadow: inset 0 0 0 1px var(--gold); filter: drop-shadow(0 10px 26px var(--gold-glow)); }
+.tile.launching .tile-hover { opacity: 1; background: rgba(7, 7, 10, 0.78); }
+.tile.launching .tile-hover .play-btn {
+  transform: scale(1); background: transparent; box-shadow: none;
+  border: 3px solid rgba(255, 181, 39, 0.25); border-top-color: var(--gold);
+  animation: spin 0.75s linear infinite;
+}
+.tile.launching .tile-hover .play-btn svg { display: none; }
+.tile.launching .tile-hover .play-label { opacity: 1; transform: none; color: var(--gold); text-shadow: 0 0 12px var(--gold-glow); }
+
+/* POČETNA: hero baner */
+/* Svetlo iza cele strane dolazi od izdvojene igre: mutna, utisana kopija
+   njenog banera. Dubina iz sadrzaja, ne iz sara. */
+/* VRH POČETNE
+   Traka nosi dve stvari: znak kuće (ili okačene promo banere) levo, i stanje
+   nagradnog točka desno. Visina je fiksna i mirna - ranije je traka bila
+   "izdvojena igra" na odnosu 9.4:1 sa praznom sredinom. */
+.hero {
+  position: relative; z-index: 1; flex: 0 0 auto; overflow: hidden;
+  display: flex; align-items: stretch; gap: 0;
+  height: clamp(126px, 12.5vh, 168px);
+  background:
+    radial-gradient(120% 180% at 12% 50%, rgba(255, 43, 43, 0.14), transparent 62%),
+    linear-gradient(100deg, #16121a 0%, #0d0d13 46%, #0a0a0f 100%);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%);
+  box-shadow: inset 0 0 0 1px var(--line-2), 0 26px 60px -34px rgba(0, 0, 0, 0.95);
+  animation: hero-in 0.5s var(--ease-out) both;
+}
+@keyframes hero-in { from { opacity: 0; transform: translateY(12px); } }
+/* tanka crvena nit uz donju ivicu, jedini ukras */
+.hero::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; pointer-events: none;
+  background: linear-gradient(90deg, var(--red), rgba(255, 43, 43, 0.05) 72%, transparent);
+}
+/* Sredina banera je izmedju znaka kuce i tocka ostajala prazna ploha. Ranije su
+   tu stajale kose niti - videle su se kao sitne linije i izgledale kao greska u
+   slici. Sada dubinu daje samo MEKO SVETLO: siroki odsjaj u boji kuce iza
+   znaka, i tiha svetlost odozgo. Nema nijedne ivice koja se moze primetiti. */
+.hero::before {
+  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent 64%);
+}
+/* Preko okačenog promo banera ne ide ništa - ni šara ni crvena nit. */
+.hero.promo::before, .hero.promo::after { display: none; }
+
+/* --- levo: znak kuće --- */
+.hero-brend { position: relative; z-index: 1; flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 26px; padding: 0 34px; }
+
+/* "Nastavi gde si stao" - poslednje igre ovog igrača, na jedan klik.
+   Stoji tamo gde je ranije bio logo koji igrač već vidi gore levo. */
+.hero-nastavi {
+  position: relative; z-index: 1; flex: 1 1 auto; min-width: 0;
+  display: flex; flex-direction: column; justify-content: center; gap: 11px; padding: 0 30px;
+}
+.hn-naslov {
+  font-family: var(--font-ui); font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3);
+}
+.hn-igre { display: flex; gap: 10px; min-width: 0; }
+.hn-igra {
+  display: flex; align-items: center; gap: 11px; padding: 9px 14px 9px 9px;
+  background: rgba(255, 255, 255, 0.05); border: 0; cursor: pointer; min-width: 0;
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+  transition: background var(--t-brzo), transform var(--t-brzo);
+}
+.hn-igra:hover { background: rgba(255, 255, 255, 0.1); transform: translateY(-2px); }
+.hn-znak {
+  width: 34px; height: 34px; flex-shrink: 0; display: grid; place-items: center;
+  font-family: var(--font-display); font-weight: 700; font-size: 14px; color: #fff;
+  background: linear-gradient(140deg, hsl(var(--h) 58% 34%), hsl(var(--h) 60% 18%));
+}
+.hn-ime {
+  font-family: var(--font-ui); font-size: 13.5px; font-weight: 600; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 168px;
+}
+.hn-play { color: var(--text-3); flex-shrink: 0; }
+.hn-igra:hover .hn-play { color: var(--red); }
+.hb-logo { height: 76%; max-height: 116px; width: auto; display: block; filter: drop-shadow(0 8px 26px rgba(255, 43, 43, 0.45)); }
+.hb-ime {
+  font-family: var(--font-display); font-weight: 700; font-size: clamp(28px, 3vw, 44px);
+  text-transform: uppercase; line-height: 1; letter-spacing: 0.02em; color: var(--text);
+}
+.hb-pod {
+  margin-top: 9px; font-family: var(--font-ui); font-weight: 700; font-size: clamp(10px, 0.85vw, 13px);
+  text-transform: uppercase; letter-spacing: 0.34em; color: var(--text-3);
+}
+@media (max-width: 1100px) { .hb-tekst { display: none; } }
+
+/* --- levo: okačeni promo baneri (ako ih osoblje ima) --- */
+.hero-promo { position: relative; flex: 1 1 auto; min-width: 0; }
+/* Baner koji je osoblje okačilo vidi se CEO. Šablon u panelu je 2800x400
+   (7:1), a mesto u vrhu je šire i niže od toga jer desno stoji točak - sa
+   "cover" bi se slici odsecao vrh i dno. Sa "contain" ništa se ne gubi. */
+.promo-slajd {
+  position: absolute; inset: 0; background-size: contain; background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0; transition: opacity 0.8s ease;
+}
+.promo-slajd.vidljiv { opacity: 1; }
+.promo-tacke { position: absolute; right: 18px; bottom: 14px; z-index: 3; display: flex; gap: 7px; }
+.promo-tacka {
+  width: 8px; height: 8px; border-radius: 50%; padding: 0;
+  background: rgba(255, 255, 255, 0.35); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  transition: background var(--tr), width var(--tr);
+}
+.promo-tacka:hover { background: rgba(255, 255, 255, 0.65); }
+.promo-tacka.aktivna { width: 24px; border-radius: 999px; background: var(--red); }
+
+/* --- desno: widget nagradnog točka --- */
+.hero-tocak {
+  position: relative; z-index: 1;
+  flex: 0 0 auto; width: clamp(300px, 27vw, 388px);
+  display: flex; align-items: center; gap: 18px; padding: 0 30px 0 26px;
+  text-align: left; color: inherit; font: inherit; cursor: pointer;
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.05));
+  border-left: 1px solid var(--line-2);
+  transition: background var(--tr);
+}
+.hero-tocak:hover { background: linear-gradient(100deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.08)); }
+.hero-tocak:active .hw-tocak { transform: scale(0.95); }
+/* Kazaljka iznad tocka je ono sto oko prepozna kao "tocak srece". Bez nje je
+   sest isecaka na 84px izgledalo kao znak opasnosti. */
+.hw-tocak { position: relative; flex: 0 0 auto; width: 84px; height: 84px; display: block; }
+/* Kazaljka je BELA: na zlatnom prstenu (stanje "spreman") zlatna se gubila. */
+.hw-kaz {
+  position: absolute; top: -7px; left: 50%; transform: translateX(-50%); z-index: 3;
+  width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent;
+  border-top: 14px solid #fff; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.85));
+}
+.hw-krug {
+  width: 100%; height: 100%; display: block; border-radius: 50%;
+  box-shadow: 0 0 0 3px #0a0a0f, 0 0 0 4px rgba(255, 43, 43, 0.5), 0 8px 22px -8px rgba(0, 0, 0, 0.9);
+}
+.hw-krug .tocak-svg { width: 100%; height: 100%; display: block; border-radius: 50%; }
+/* Kad je spin spreman, prsten pulsira. Tocak se NE vrti u mestu - na 84px se
+   vrtnja pretvara u mrlju i oblik prestaje da lici na tocak. */
+.hero-tocak.spreman .hw-krug {
+  box-shadow: 0 0 0 3px #0a0a0f, 0 0 0 4px var(--gold), 0 0 24px -4px var(--gold-glow);
+  animation: hw-puls 2.4s ease-in-out infinite;
+}
+@keyframes hw-puls {
+  50% { box-shadow: 0 0 0 3px #0a0a0f, 0 0 0 4px var(--gold), 0 0 38px 0 var(--gold-glow); }
+}
+.hero-tocak.iskoriscen .hw-krug { filter: saturate(0.4) brightness(0.75); }
+.hero-tocak.iskoriscen .hw-kaz { border-top-color: var(--text-3); }
+.hw-desno { flex: 1 1 auto; min-width: 0; display: block; }
+.hw-vrh { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.hw-naslov {
+  font-family: var(--font-ui); font-weight: 700; font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.16em; color: var(--text-2);
+}
+.hw-nagrada {
+  font-family: var(--font-display); font-weight: 700; font-size: 13px;
+  color: var(--gold); white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.hw-traka {
+  display: block; height: 7px; margin: 11px 0 9px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08); overflow: hidden;
+}
+.hw-traka i {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--red-deep), var(--red));
+  transition: width 0.5s var(--ease-out);
+}
+.hero-tocak.spreman .hw-traka i { background: linear-gradient(90deg, var(--gold), #ffd97a); }
+.hw-ispod { display: block; font-size: 12px; color: var(--text-3); line-height: 1.4; }
+.hw-ispod b { color: var(--text-2); font-variant-numeric: tabular-nums; }
+.hw-jak { color: var(--gold); font-weight: 700; }
+@media (max-width: 900px) { .hero-tocak { display: none; } }
+
+/* POČETNA: police (slajderi) */
+.shelf { margin-bottom: 0; }
+.shelf-head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 12px; }
+.shelf-title {
+  position: relative; font-family: var(--font-display); font-size: 17px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em; padding-left: 16px;
+}
+.shelf-title::before {
+  content: ""; position: absolute; left: 0; top: 1px; bottom: 1px; width: 4px;
+  background: linear-gradient(180deg, var(--red), var(--red-deep));
+}
+/* Naslov police i strelice razdvaja prazan prostor, ne ukrasna linija.
+   Duga linija koja bledi u prazno je ukras bez funkcije. */
+.shelf-head .razmak { flex: 1; }
+.shelf-head .shelf-arrows { order: 3; }
+.shelf-arrows { display: flex; gap: 7px; }
+.shelf-arr {
+  width: 34px; height: 34px; display: grid; place-items: center; color: var(--text-2);
+  background: rgba(255, 255, 255, 0.05);
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+  transition: background var(--tr), color var(--tr);
+}
+.shelf-arr:hover { background: var(--red-soft); color: var(--red); }
+.shelf-arr[data-arr="prev"] svg { transform: rotate(180deg); }
+.shelf-track {
+  display: flex; gap: 16px; overflow-x: auto; overflow-y: hidden; scroll-behavior: smooth;
+  padding: 6px 2px 14px; cursor: grab; scrollbar-width: none;
+}
+.shelf-track::-webkit-scrollbar { height: 0; display: none; }
+.shelf-track.grabbing { cursor: grabbing; scroll-behavior: auto; }
+.shelf-track > * { flex: 0 0 auto; }
+.shelf-track img { -webkit-user-drag: none; user-drag: none; }
+.shelf-arr:disabled { opacity: 0.3; cursor: default; }
+
+/* POČETNA: fiksni raspored (bez skrola) */
+.content.home-mode { overflow: hidden; padding: 22px 30px; }
+.home { position: relative; height: 100%; display: flex; flex-direction: column; gap: 18px; min-height: 0; }
+.home > .shelf { position: relative; z-index: 1; }
+
+/* polica IGARA - tačno 8 vidljivih, veće kartice, klizni prelaz */
+.games-shelf { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 12px; min-height: 0; }
+/* Visinu diktira slobodan prostor police, a sirina se racuna iz odnosa strana.
+   Tako se omot nikad ne prelomi i ime igre ostane vidljivo i na 768 piksela. */
+.games-shelf .shelf-track {
+  --gap: 18px; gap: var(--gap); scroll-snap-type: x proximity; padding: 6px 2px 8px;
+  /* Traka mora da ima svoju visinu iz police, inace bi je uzimala od kartica
+     a kartice od nje - i sve bi ispalo nula. */
+  flex: 1 1 auto; min-height: 0; align-items: stretch;
+}
+/* Plocica se rasteze do visine police. Granica postoji da na velikom ekranu
+   korica ne naraste preko svake mere, ali je podignuta sa 336 na 430 - na
+   1080p je ranije ostajalo 127 px mrtvog prostora izmedju imena igara i reda
+   sa alatima, a taj prostor je bolje dati samim koricama.
+   Granica je sa 430 podignuta na 505: na 1080p je i dalje ostajalo 163 px
+   praznine ispod korica. Na 505 se u red i dalje vidi pet igara. */
+.games-shelf .tile { flex: 0 0 auto; align-self: stretch; max-height: 505px; scroll-snap-align: start; }
+.games-shelf .tile-media { height: 100%; width: auto; }
+.games-shelf .tile-name { font-size: clamp(13px, 1vw, 16px); }
+.games-shelf .tile-badge { font-size: clamp(9px, 0.72vw, 11px); }
+
+/* fallback pozadina za igru bez cover slike - svoja boja iz imena */
+/* PLOCICA BEZ KORICA
+   Dok osoblje ne okaci poster, plocica mora da bude MIRNA. Ranije je bila jak
+   obojen blok sa dva slova preko pola visine - u polici od sedam igara to je
+   vikalo glasnije nego prava korica i police su izgledale kao gomila sarenih
+   kutija. Sad je tamna, boja iz imena se vidi samo kao tiho svetlo pri vrhu,
+   pa igre sa pravim posterom odmah iskacu iz reda. */
+.tile-fallback {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  background:
+    radial-gradient(130% 78% at 50% 0%, hsl(var(--h) 58% 34% / 0.34), transparent 66%),
+    linear-gradient(160deg, #16161d, #0b0b10 72%);
+}
+.tile-fallback::after {
+  content: ""; position: absolute; inset: 0;
+  background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.022) 0 2px, transparent 2px 15px);
+}
+/* Dva slova samo kad ni ikone nema (igra preko steam://). Sitna i prigusena -
+   to je oznaka da slika fali, ne ukras. */
+.tile-fallback .tile-emoji {
+  position: relative; font-family: var(--font-display);
+  font-size: clamp(20px, 2vw, 30px); font-weight: 700; letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.24);
+}
+/* Prava ikona igre, izvucena iz njenog .exe fajla. Ikona je 48 px pa se ne
+   razvlaci preko cele plocice - stoji na svojoj ploci, kao znak. */
+.tile-fallback.ikona .tile-ikona {
+  /* Izvor je 48 px. Preko toga se ikona muti, pa se ne razvlaci - umesto toga
+     se povecava PLOCA ispod nje, da kompozicija ne pliva u praznoj plocici. */
+  position: relative; width: 48px; height: 48px; object-fit: contain;
+  padding: clamp(18px, 2.2vw, 32px); box-sizing: content-box; border-radius: 20px;
+  margin-bottom: 26px; /* opticka sredina prostora iznad imena */
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.015));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.075), 0 12px 28px -14px rgba(0, 0, 0, 0.9);
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.55));
+}
+/* Dva slova stoje na istom mestu kao ikona, da red ne poskakuje kad neka igra
+   ima ikonu a neka nema. */
+.tile-fallback .tile-emoji { margin-bottom: 26px; }
+
+/* INTERNET - sve kartice u jednom redu (8), krupnije, bez slajdera */
+.net-shelf { flex: 0 0 auto; }
+.net-row { display: flex; gap: 14px; }
+
+/* DONJA TRAKA (info o računaru - centrirano, gaming) */
+.statusbar {
+  position: relative; flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+  padding: 0 20px; height: 38px;
+  background: rgba(9, 9, 13, 0.94);
+  font-family: var(--font-ui); font-size: 12.5px; color: var(--text-3); font-weight: 500; letter-spacing: 0.03em;
+}
+.statusbar::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--red) 24%, var(--gold) 50%, var(--red) 76%, transparent);
+  opacity: 0.5;
+}
+.sb-item { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; font-variant-numeric: tabular-nums; padding: 0 clamp(12px, 1.4vw, 22px); }
+.sb-item + .sb-item { box-shadow: -1px 0 0 var(--line); }
+/* Verzija se ne gleda svaki dan, pa stoji tise od ostalog u traci. */
+.sb-verzija { color: var(--text-3); opacity: 0.7; font-size: 0.92em; letter-spacing: 0.04em; }
+.sb-verzija:empty, .sb-verzija .sb-txt:empty { display: none; }
+.sb-item svg { width: 14px; height: 14px; color: var(--text-3); }
+.sb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); flex-shrink: 0; }
+.sb-item.ok { color: var(--text-2); }
+.sb-item.ok .sb-dot { background: var(--green); box-shadow: 0 0 7px var(--green-glow); }
+#sbNet:not(.ok) .sb-dot, #sbInet:not(.ok) .sb-dot { background: var(--red-status); box-shadow: 0 0 7px var(--red-glow); }
+#sbClock .sb-txt, #sbPc .sb-txt { color: var(--text-2); }
+.sb-item.hot { color: var(--red-status); }
+.sb-item.hot .sb-txt, .sb-item.hot svg { color: var(--red-status); }
+
+/* NALOG (redizajn) */
+/* Sadrzaj krece od vrha, ne iz sredine ekrana. Centriran po visini je plutao
+   u sredini sa velikom prazninom iznad i ispod, a kad igrac ima porudzbine
+   strana bi poskakivala jer bi se sredina pomerala. Sirina je veca da dve
+   kartice ispune red umesto da stoje u uskoj koloni. */
+/* Nalog stoji u DVE kolone: levo ono što se čita (podaci, porudžbine, lozinka),
+   desno izbor pozadine koji je visok. Ranije je sve bilo u jednoj uskoj traci
+   pa je strana morala da se skroluje, a sa strane je zjapilo po 300 px praznine
+   na svakoj ivici. */
+/* NALOG: zaglavlje, pa meni levo i jedan odeljak desno.
+   Ranije su svi paneli stajali jedan pored drugog u mreži - sve se videlo
+   odjednom, ništa nije imalo prednost, a strana je rasla sa svakom novom
+   stvari. Sada igrač bira šta gleda i odeljak dobija ceo prostor. */
+.account {
+  height: 100%; max-width: 1560px; margin: 0 auto; padding-top: 8px;
+  display: flex; flex-direction: column; gap: 18px; min-height: 0;
+}
+.acc-telo {
+  flex: 1; min-height: 0;
+  display: grid; grid-template-columns: 216px minmax(0, 1fr); gap: 18px;
+}
+.acc-meni { display: flex; flex-direction: column; gap: 4px; }
+.acc-mi {
+  display: flex; align-items: center; gap: 11px; padding: 13px 15px;
+  background: transparent; border: 0; cursor: pointer; text-align: left;
+  color: var(--text-2); font-family: var(--font-ui); font-size: 14.5px; font-weight: 600;
+  clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 0 100%);
+  transition: background var(--t-brzo), color var(--t-brzo);
+}
+.acc-mi svg { flex-shrink: 0; color: var(--text-3); transition: color var(--t-brzo); }
+.acc-mi:hover { background: rgba(255, 255, 255, 0.04); color: var(--text); }
+.acc-mi.aktivna { background: linear-gradient(100deg, var(--panel-2), var(--panel)); color: var(--text); box-shadow: inset 2px 0 0 var(--red); }
+.acc-mi.aktivna svg { color: var(--red); }
+/* Broj porudžbina koje se spremaju - igrač ne mora da ulazi da bi video. */
+.acc-mi-broj {
+  margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px;
+  display: grid; place-items: center; border-radius: 10px;
+  background: var(--gold); color: #111; font-size: 11.5px; font-weight: 700; font-style: normal;
+}
+.acc-sadrzaj {
+  min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  background: linear-gradient(150deg, var(--panel-2), var(--panel)); box-shadow: inset 0 0 0 1px var(--line);
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  padding: 24px 26px;
+}
+.acc-sek { animation: acc-ulaz 0.22s var(--ease-out); }
+@keyframes acc-ulaz { from { opacity: 0; transform: translateY(6px); } }
+.acc-sek-h { margin-bottom: 18px; }
+.acc-sek-h h3 {
+  font-family: var(--font-display); font-weight: 700; font-size: 17px;
+  text-transform: uppercase; letter-spacing: 0.05em; color: var(--gold); margin: 0;
+}
+.acc-sek-h p { margin: 5px 0 0; color: var(--text-3); font-size: 13px; }
+/* Prazan odeljak govori šta da se uradi, ne samo da je prazno. */
+.acc-prazno { text-align: center; padding: 38px 16px; color: var(--text-3); }
+.acc-prazno svg { color: var(--text-3); opacity: 0.5; }
+.acc-prazno .ap-t { font-family: var(--font-display); font-weight: 700; font-size: 15px; color: var(--text-2); margin-top: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+.acc-prazno .ap-o { font-size: 13px; margin-top: 6px; }
+
+@media (max-width: 1100px) {
+  .acc-telo { grid-template-columns: minmax(0, 1fr); }
+  .acc-meni { flex-direction: row; overflow-x: auto; scrollbar-width: none; }
+  .acc-meni::-webkit-scrollbar { display: none; }
+  .acc-mi { flex: 1 0 auto; justify-content: center; }
+  .acc-mi.aktivna { box-shadow: inset 0 -2px 0 var(--red); }
+}
+.acc-hero {
+  display: flex; align-items: center; gap: 22px; padding: 24px 30px;
+  background: linear-gradient(150deg, var(--panel-2), var(--panel));
+  clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.acc-avatar {
+  width: 82px; height: 82px; flex-shrink: 0; display: grid; place-items: center;
+  font-family: var(--font-display); font-weight: 700; font-size: 36px; color: #fff;
+  background: linear-gradient(135deg, var(--red), var(--red-deep));
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
+  box-shadow: 0 0 30px -6px var(--red-glow);
+}
+.acc-id { min-width: 0; }
+.acc-name { font-family: var(--font-display); font-size: 26px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; }
+.acc-user { color: var(--text-3); font-size: 14px; margin-top: 3px; }
+.acc-stats { margin-left: auto; display: flex; gap: 34px; }
+.acc-stat { text-align: right; }
+.as-l { font-size: 10px; font-weight: 700; font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3); }
+.as-v { font-family: var(--font-display); font-weight: 700; font-size: 24px; font-variant-numeric: tabular-nums; margin-top: 5px; }
+.as-v.pos { color: var(--green); text-shadow: 0 0 16px var(--green-glow); }
+
+/* Moje porudzbine */
+.por-lista { display: grid; gap: 8px; }
+.por-red {
+  display: flex; align-items: center; gap: 14px;
+  padding: 11px 14px; background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 0 0 1px var(--line);
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+}
+.por-levo { flex: 1; min-width: 0; }
+.por-desno { flex-shrink: 0; display: flex; align-items: center; gap: 14px; }
+/* Stavke stoje kao pojedinačni komadi, ne kao jedan red teksta razdvojen
+   zarezima: "2x Coca-Cola" se pročita odjednom, a spisak od tri pića se ne
+   slije u rečenicu. */
+.por-stavke { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; line-height: 1.3; }
+.por-st { color: var(--text); }
+.por-st b { color: var(--gold); font-weight: 700; margin-right: 2px; }
+.por-meta { display: flex; align-items: center; gap: 9px; color: var(--text-3); font-size: 11.5px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.por-tacka { width: 3px; height: 3px; border-radius: 50%; background: var(--text-3); opacity: 0.6; }
+.por-cena { font-family: var(--font-display); font-size: 15px; font-weight: 700; }
+.por-cena i { font-style: normal; font-size: 10px; margin-left: 3px; color: var(--text-3); }
+/* Razdelnik između onoga što stiže i onoga što je već doneto. */
+.por-razdeo {
+  margin: 14px 0 6px; font-family: var(--font-ui); font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3);
+}
+/* Porudžbina koja je u toku diše, da se od donetih razlikuje na prvi pogled. */
+.por-red.u-toku { background: rgba(255, 181, 39, 0.05); }
+.por-red.u-toku .por-status { animation: por-disi 2.2s ease-in-out infinite; }
+@keyframes por-disi { 50% { opacity: 0.55; } }
+.por-status {
+  flex-shrink: 0; font-size: 11px; font-weight: 700; font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.08em;
+  padding: 6px 12px; color: var(--text-2); background: rgba(255, 255, 255, 0.05);
+}
+.por-red.ceka { box-shadow: inset 0 0 0 1px rgba(255, 181, 39, 0.3); }
+.por-red.ceka .por-status { color: var(--gold); background: rgba(255, 181, 39, 0.13); }
+/* "Sprema se" je zlatno, ne crveno. Crveno na ekranu znaci da nesto ne valja;
+   porudzbina koja se sprema je dobra vest i ne sme da lici na upozorenje. */
+.por-red.sprema { box-shadow: inset 0 0 0 1px rgba(255, 181, 39, 0.34); }
+.por-red.sprema .por-status { color: var(--gold); background: rgba(255, 181, 39, 0.13); }
+.por-red.gotovo { opacity: 0.6; }
+.por-red.gotovo .por-status { color: var(--green); background: rgba(51, 226, 132, 0.12); }
+.por-red.otkazano { opacity: 0.55; }
+.por-red.otkazano .por-stavke { text-decoration: line-through; color: var(--text-3); }
+
+/* ---- Miš i zvuk ----
+   Ono što igrač sme da menja: sve po korisniku, sve povratno, sve se vraća na
+   zatečeno kad se odjavi. */
+.pod-grupa { margin-bottom: 16px; }
+.pod-nas {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+  font-family: var(--font-ui); font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3);
+}
+.pod-nas svg { color: var(--gold); }
+.pod-red {
+  display: flex; align-items: center; gap: 22px; padding: 11px 16px;
+  background: rgba(255, 255, 255, 0.035); box-shadow: inset 0 0 0 1px var(--line);
+}
+.pod-red + .pod-red { margin-top: 6px; }
+.pod-levo { flex: 1; min-width: 0; }
+.pod-levo b { display: block; font-size: 14px; font-weight: 700; }
+.pod-levo span { display: block; margin-top: 4px; font-size: 12px; color: var(--text-3); line-height: 1.5; }
+
+.pod-klizac { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.pod-klizac input[type="range"] {
+  width: 190px; height: 4px; -webkit-appearance: none; appearance: none;
+  background: rgba(255, 255, 255, 0.12); outline: none; cursor: pointer;
+}
+.pod-klizac input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 18px; height: 18px;
+  background: var(--red); cursor: pointer;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%);
+  box-shadow: 0 0 12px -2px var(--red-glow);
+}
+.pk-vred {
+  min-width: 44px; text-align: right; font-family: var(--font-display);
+  font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; color: var(--gold);
+}
+
+/* Prekidač: ugašen je siv i kugla je levo, upaljen je crven i kugla desno.
+   Bez pomeraja kugle boja sama ne kaže dovoljno na tamnoj pozadini. */
+.prekidac {
+  position: relative; flex-shrink: 0; width: 50px; height: 27px; padding: 0; cursor: pointer;
+  background: var(--red); border: 0; border-radius: 14px;
+  transition: background var(--t-brzo);
+}
+.prekidac.ugasen { background: rgba(255, 255, 255, 0.14); }
+.pr-kugla {
+  position: absolute; top: 3px; left: 26px; width: 21px; height: 21px; border-radius: 50%;
+  background: #fff; transition: left var(--t-brzo);
+}
+.prekidac.ugasen .pr-kugla { left: 3px; }
+
+.pod-dno { display: flex; align-items: center; gap: 14px; margin-top: 4px; }
+.pod-poruka { font-size: 12.5px; color: var(--red-status); }
+
+/* Igrač koji je ugasio animacije ne dobija nijednu - ni šaru, ni prelaze. */
+body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after {
+  animation-duration: 0.001ms !important; animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+/* ---- Nagrade ----
+   Točak je ranije postojao samo kao widget u baneru na početnoj. Ko ga tamo ne
+   primeti, nije ni znao da postoji ni koliko mu fali do spina. */
+.nag-spreman, .nag-ceka, .nag-napredak {
+  padding: 20px 22px; background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 0 0 1px var(--line);
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+}
+.nag-spreman { background: rgba(255, 181, 39, 0.07); box-shadow: inset 0 0 0 1px rgba(255, 181, 39, 0.3); display: flex; align-items: center; gap: 20px; }
+.nag-spreman .ns-t { flex: 1; font-family: var(--font-display); font-weight: 700; font-size: 18px; color: var(--gold); text-transform: uppercase; letter-spacing: 0.04em; }
+.ns-t { font-weight: 700; font-size: 15px; }
+.ns-o { margin-top: 7px; color: var(--text-3); font-size: 12.5px; }
+.nag-traka { height: 7px; margin-top: 12px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
+.nag-traka i { display: block; height: 100%; background: linear-gradient(90deg, var(--red), var(--gold)); transition: width 0.5s var(--ease-out); }
+.nag-spisak-h {
+  margin: 22px 0 10px; font-family: var(--font-ui); font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3);
+}
+.nag-spisak { display: flex; flex-wrap: wrap; gap: 8px; }
+.nag-stavka {
+  display: flex; align-items: center; gap: 8px; padding: 9px 14px; font-size: 13px; font-weight: 600;
+  background: rgba(255, 255, 255, 0.035); box-shadow: inset 0 0 0 1px var(--line);
+}
+.nag-stavka svg { color: var(--gold); }
+.nag-stavka.prazna { opacity: 0.5; }
+.nag-stavka.prazna svg { color: var(--text-3); }
+
+/* Broj porudzbina koje jos nisu donete, na tabu "Nalog".
+   Znacka je PRAVI element, ne ::after - aktivan tab vec koristi ::after za
+   crvenu liniju ispod sebe. Kad su bili isti, dva pravila su se stopila u
+   crveni blok koji je progutao ceo tab i rec "NALOG" se nije videla.
+   Stoji desno od natpisa, u svom prostoru, pa nista ne prekriva. */
+.tab-znacka {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  background: var(--red); color: #fff; font-size: 11px; font-weight: 800; line-height: 1;
+  display: grid; place-items: center; flex: 0 0 auto;
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.8);
+}
+/* MOJA POZADINA (na nalogu igraca)
+   Uzorak se crta istom sarom i istom prozirnoscu kao na ekranu, da izbor ne
+   laze o rezultatu. Klik odmah menja ekran - nema dugmeta "sacuvaj", jer se
+   rezultat vidi iza samog panela. */
+
+/* NAGRADNI TOČAK - pop-up
+   Ranije je stajao razvucen na strani Nalog i gusio je. Sada se otvara klikom
+   na widget u baneru, u svom prozoru, gde ima mesta za vrtnju. */
+.tocak-dlg { width: 440px; padding: 26px 30px 24px; }
+.dlg-x {
+  position: absolute; top: 14px; right: 14px; width: 32px; height: 32px;
+  display: grid; place-items: center; color: var(--text-3); cursor: pointer;
+  background: rgba(255, 255, 255, 0.05); transition: color var(--tr), background var(--tr);
+}
+.dlg-x:hover { color: var(--text); background: rgba(255, 255, 255, 0.1); }
+.dlg-x svg { width: 16px; height: 16px; }
+.tocak-obl { position: relative; width: 260px; height: 260px; margin: 22px auto 20px; }
+/* Sjaj iza tocka koji ozivi dok se vrti i ostane posle dobitka. */
+.tocak-sjaj {
+  position: absolute; inset: -18%; z-index: -1; border-radius: 50%; opacity: 0;
+  background: radial-gradient(circle, var(--red-glow), transparent 68%);
+  transition: opacity 0.5s ease;
+}
+.tocak-obl.vrti .tocak-sjaj { opacity: 0.85; }
+.tocak-obl.dobitak .tocak-sjaj { opacity: 1; background: radial-gradient(circle, var(--gold-glow), transparent 68%); }
+.tocak-obl.dobitak .tocak-krug { animation: tocak-pobeda 0.55s var(--ease-out) 2; }
+@keyframes tocak-pobeda { 50% { transform: scale(1.035); } }
+.tocak-zatvori { margin-top: 16px; }
+/* kazaljka na vrhu pokazuje dole u točak */
+.tocak-kazaljka {
+  position: absolute; top: -4px; left: 50%; transform: translateX(-50%); z-index: 2;
+  width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent;
+  border-top: 20px solid var(--gold); filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
+  transform-origin: 50% 2px;
+}
+/* Kazaljka odskoči na svaki zubac. Bez toga stoji ukočena dok se ispod nje sve
+   vrti, pa ceo pokret izgleda kao slika koja se okreće, a ne kao točak. */
+.tocak-kazaljka.kuc { animation: kaz-kuc 130ms var(--ease-out); }
+@keyframes kaz-kuc {
+  40% { transform: translateX(-50%) rotate(11deg); }
+  100% { transform: translateX(-50%) rotate(0deg); }
+}
+
+/* Osvojeni iznos odleti sa točka na kredit u HUD-u i tamo se "zalepi". Bez toga
+   igrač vidi dve nepovezane stvari: poruku o nagradi i brojku koja se u
+   međuvremenu promenila. */
+.leti-kredit {
+  position: fixed; z-index: 90; pointer-events: none;
+  font-family: var(--font-naslov); font-weight: 700; font-size: 26px;
+  color: var(--gold); text-shadow: 0 2px 10px rgba(0,0,0,0.6);
+  transform: translate(-50%, -50%);
+  animation: leti-kredit 1100ms cubic-bezier(.4,.02,.2,1) forwards;
+}
+@keyframes leti-kredit {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  18%  { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+  30%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.45); }
+}
+/* Kredit u HUD-u primi iznos: kratak zlatni bljesak tačno kad iznos stigne. */
+.hud-chip.primio { animation: hud-primio 700ms var(--ease-out); }
+@keyframes hud-primio {
+  0%, 100% { box-shadow: none; }
+  35% { box-shadow: 0 0 0 2px var(--gold), 0 0 22px var(--gold-glow); }
+}
+.tocak-krug {
+  width: 100%; height: 100%; border-radius: 50%;
+  box-shadow: 0 0 0 6px #05060a, 0 0 0 8px var(--red), 0 10px 34px rgba(0,0,0,0.55);
+  will-change: transform;
+}
+.tocak-svg { width: 100%; height: 100%; display: block; }
+.tocak-akcija { text-align: center; }
+.tocak-spin {
+  font-family: var(--font-display); font-weight: 700; font-size: 17px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: #fff; padding: 14px 52px; cursor: pointer;
+  background: linear-gradient(135deg, var(--red), var(--red-deep));
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+  filter: drop-shadow(0 6px 22px var(--red-glow));
+  transition: transform 0.08s ease, filter var(--tr);
+}
+.tocak-spin:hover { filter: drop-shadow(0 8px 28px var(--red-glow)) brightness(1.08); }
+.tocak-spin:active { transform: scale(0.97); }
+.tocak-spin:disabled { opacity: 0.55; cursor: default; filter: none; }
+.tocak-nota { color: var(--text-3); font-size: 13px; line-height: 1.55; margin-top: 14px; }
+.tocak-nota b { color: var(--text); }
+.tocak-napredak { margin: 4px 0 0; }
+.tocak-napredak .tn-bar { height: 9px; border-radius: 999px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
+.tocak-napredak .tn-fill { height: 100%; background: linear-gradient(90deg, var(--red-deep), var(--red)); border-radius: 999px; transition: width 0.5s var(--ease-out); }
+.tocak-napredak .tn-tekst { font-size: 12.5px; color: var(--text-2); margin-top: 10px; }
+.tocak-dobitak { font-family: var(--font-display); font-weight: 700; font-size: 19px; color: var(--text-2); display: flex; align-items: center; justify-content: center; gap: 10px; }
+.tocak-dobitak.win { color: var(--gold); text-shadow: 0 0 20px var(--gold-glow); }
+.tocak-dobitak svg { width: 21px; height: 21px; }
+.poz-uzorci { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(124px, 100%), 1fr)); gap: 11px; }
+.poz-uzorak {
+  display: flex; flex-direction: column; gap: 0; padding: 0 0 9px; cursor: pointer; overflow: hidden;
+  background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line); color: inherit; font: inherit;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+  transition: transform 0.14s var(--ease-out), box-shadow var(--tr);
+}
+.poz-uzorak:hover { transform: translateY(-3px); box-shadow: inset 0 0 0 1px var(--line-2); }
+.poz-uzorak.izabran { box-shadow: inset 0 0 0 1.5px var(--red), 0 12px 26px -14px var(--red-glow); }
+.pu-slika {
+  display: block; height: 62px; margin-bottom: 8px;
+  background-color: #101018; background-repeat: repeat; border-bottom: 1px solid var(--line);
+}
+.pu-ime {
+  padding: 0 10px; font-size: 11.5px; font-weight: 700; text-align: left; color: var(--text-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.poz-uzorak.izabran .pu-ime { color: var(--text); }
+.poz-podesavanja { display: flex; flex-wrap: wrap; gap: 22px; margin-top: 16px; }
+.pp-l { display: block; margin-bottom: 7px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; font-family: var(--font-ui); text-transform: uppercase; color: var(--text-3); }
+.pp-dugmad { display: flex; gap: 6px; }
+
+/* Promena lozinke: dva polja i dugme u jednom redu. Panel je iste sirine kao
+   ostali na Nalogu, a sadrzaj se ne razvlaci preko celog ekrana. */
+.acc-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; max-width: 660px; }
+.acc-form .field { flex: 1 1 190px; min-width: 0; }
+.acc-form .btn { flex: 0 0 auto; height: 42px; padding: 0 22px; }
+@media (max-width: 900px) {
+  .acc-stats { gap: 22px; }
+  .acc-form .btn { flex: 1 1 100%; }
+}
+
+/* brendirane internet kartice - svaka u bojama svoje aplikacije */
+/* KARTICA ALATA (Internet i alati)
+   Stoji polozeno i nize od polica igara - igre su glavna stvar na ekranu, ovo
+   je red alatki. Logo levo na svojoj ploci, ime desno kao potpis.
+   Boja brenda ne farba celu karticu nego radi tri tiha posla: drzi ivicu levo,
+   obasja logo iza ploce i pali senku na prelazu misem. Tako ceo red izgleda
+   kao jedna celina, a svaka kartica i dalje nosi svoj brend. Pun brendirani
+   blok bi u nizu od osam bio sarena traka koja tuce igre iznad.
+   Postoji samo ovaj oblik kartice - alati se nigde drugde ne crtaju. */
+.site-card {
+  position: relative; flex: 1 1 0; min-width: 0; height: clamp(72px, 8.6vh, 92px);
+  padding: 0 12px 0 13px; overflow: hidden; cursor: pointer;
+  display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 11px;
+  background: linear-gradient(120deg, #17171f, #0c0c11 68%); color: var(--text); text-align: left;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 13px), calc(100% - 13px) 100%, 0 100%);
+  box-shadow: inset 0 0 0 1px var(--line), 0 10px 22px -14px rgba(0, 0, 0, 0.9);
+  transition: transform 0.14s var(--ease-out), box-shadow var(--tr);
+}
+/* Ivica u boji brenda uz levu stranu - potpis koji drzi red ujednacenim. */
+.site-card .site-traka {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 3px; z-index: 2;
+  background: var(--glow, var(--red));
+  transition: box-shadow var(--tr);
+}
+/* Svetlo brenda ostaje PLITKO i skupljeno uz levu ivicu.
+   Prvo je bilo jako i razliveno preko cele kartice, ali ikone programa su
+   svakakvih boja - zuta fascikla je karticu farbala u blatnjavo zuto. Ovako
+   boja i dalje kaze koji je alat, a osam kartica u nizu ostaje jedan miran red
+   umesto sarene trake koja tuce igre iznad. */
+.site-card::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.3;
+  background: linear-gradient(90deg, var(--glow, var(--red)), transparent 46%);
+  transition: opacity var(--tr);
+}
+.site-card:hover {
+  transform: translateY(-4px);
+  box-shadow: inset 0 0 0 1px var(--line-2), 0 18px 34px -14px rgba(0, 0, 0, 0.95), 0 0 28px -10px var(--glow);
+}
+.site-card:hover::after { opacity: 0.55; }
+.site-card:hover .site-traka { box-shadow: 0 0 12px 1px var(--glow); }
+.site-card:hover .site-logo { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), 0 8px 20px -8px var(--glow); }
+.site-card:active { transform: translateY(-1px); }
+
+/* Logo stoji na svojoj ploci - ikone izvucene iz .exe fajlova imaju svakakve
+   pozadine i oblike, pa im zajednicka podloga daje red koji sami nemaju. */
+.site-logo {
+  position: relative; z-index: 1; flex: 0 0 auto;
+  width: clamp(38px, 3.1vw, 54px); height: clamp(38px, 3.1vw, 54px);
+  display: grid; place-items: center; border-radius: 13px;
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.02));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 6px 14px -8px rgba(0, 0, 0, 0.85);
+}
+.site-logo svg { width: 58%; height: 58%; overflow: visible; }
+
+/* Poznat brend: beo znak na ploci u BOJI BRENDA. Steam i Epic su zvanicno crni,
+   pa bi crn znak na tamnoj kartici prosto nestao - ovako je svaki citljiv, a
+   ploca odmah kaze o kom je alatu rec. */
+.site-card.brend .site-logo {
+  background: var(--glow);
+  background-image: linear-gradient(155deg, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0.28));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), 0 6px 16px -8px rgba(0, 0, 0, 0.9);
+}
+.site-card.brend .site-logo svg { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35)); }
+/* Ikona iz .exe je 48 px - drzi se ispod te velicine da ostane ostra. */
+.exe-ikona {
+  width: 62%; height: 62%; max-width: 44px; max-height: 44px; object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
+}
+
+.site-name {
+  position: relative; z-index: 1; min-width: 0;
+  font-weight: 700; font-size: clamp(11px, 0.88vw, 13.5px);
+  font-family: var(--font-ui);
+  text-transform: uppercase; letter-spacing: 0.04em; color: #eceef4;
+  line-height: 1.22;
+  /* Ime sme da predje u DVA reda. Na 1366x768 osam precica deli 1306px, pa je
+     na ime ostajalo oko 64px - "TEAM SPEAK", "BATTLENET" i "EPIC GAMES" su se
+     secli na "TEAM S...". Dva reda stanu pored logotipa, a "..." ostaje samo za
+     imena koja ni tada ne mogu da stanu.
+     Prelom ide SAMO na razmaku: sa "break-word" se "BATTLENET" na 1280 lomio
+     nasred reci u "BATTLENE / T". Bolje je da jedna duga rec bude skracena sa
+     "..." nego preseceva na pola. */
+  overflow: hidden; overflow-wrap: normal; word-break: normal;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+}
+
+/* Alat sa slikom koju je osoblje okacilo: slika popunjava mesto logotipa, da
+   red ostane ujednacen umesto da jedna kartica ispadne iz stroja. */
+.site-card.cover .site-cover {
+  position: relative; z-index: 1; flex: 0 0 auto; overflow: hidden; border-radius: 13px;
+  width: clamp(38px, 3.1vw, 54px); height: clamp(38px, 3.1vw, 54px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 6px 14px -8px rgba(0, 0, 0, 0.85);
+}
+.site-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Alat bez ijedne slike i bez poznatog brenda - prvo slovo imena na ploci u
+   boji, da kartica izgleda namerno a ne kao propust. */
+.site-card.letter .site-logo { background: linear-gradient(150deg, var(--glow), rgba(0, 0, 0, 0.45)); }
+.site-card.letter .tool-letter {
+  font-family: var(--font-display); font-weight: 700; font-size: clamp(19px, 1.5vw, 25px);
+  color: #fff; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+/* Google je izuzetak: njihov "G" se po pravilima ne preboji, pa ide u svoje
+   cetiri boje - a to trazi belu plocu ispod. */
+.site-card.light .site-logo {
+  background: #fff; background-image: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.14), 0 6px 14px -8px rgba(0, 0, 0, 0.85);
+}
+.site-card.light .site-logo svg { filter: none; width: 62%; height: 62%; }
+
+/* (Ugrađeni pregledač uklonjen - sajt-alati sada otvaraju sistemski Chrome preko shell.openExternal.) */
+
+/* ===== SHOP =====
+   Jelovnik, ne izlog. Fotografija pića stoji na mirnoj podlozi koja uzima
+   boju SA SAME LIMENKE (colorizeShop je upisuje u --cr), ispod nje ime i cena
+   u jednom redu i jedno malo okruglo dugme. Ranije je svaka kartica imala punu
+   crvenu traku "Dodaj", pa je sedam crvenih pravougaonika bilo prvo što se
+   vidi na ekranu; sada crveno postoji samo na dugmetu "Poruči" i pod mišem. */
+.content.shop-mode { overflow: hidden; padding: 22px 30px 18px; }
+.shop { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 26px; min-height: 0; }
+
+.shop-products {
+  min-width: 0; overflow-y: auto; overflow-x: hidden; padding-right: 8px;
+  display: flex; flex-direction: column;
+}
+.shop-products .empty-view { flex: 1; }
+
+/* Traka kategorija stoji iznad jednog jedinog spiska. Ranije je svaka
+   kategorija imala svoj red kartica, pa je sa sedam artikala svaki red bio
+   popunjen do pola i pola ekrana je zjapilo prazno. */
+.shop-filter {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding-bottom: 15px; margin-bottom: 17px; border-bottom: 1px solid var(--line);
+}
+.shop-cip {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 32px; padding: 0 14px; border-radius: 999px;
+  font-family: var(--font-ui); font-size: 11.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-2);
+  background: rgba(255, 255, 255, 0.03); box-shadow: inset 0 0 0 1px var(--line);
+  transition: background var(--tr), color var(--tr), box-shadow var(--tr);
+}
+.shop-cip span {
+  font-size: 10.5px; letter-spacing: 0; color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.shop-cip:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+.shop-cip.aktivan { color: #fff; background: rgba(255, 255, 255, 0.07); box-shadow: inset 0 0 0 1px var(--line-2); }
+.shop-cip.aktivan span { color: var(--gold); }
+
+.shop-grid {
+  display: grid; gap: 16px; align-content: start;
+  grid-template-columns: repeat(auto-fill, minmax(min(196px, 100%), 1fr));
+}
+
+.pice {
+  --cr: 255, 255, 255;
+  position: relative; display: flex; flex-direction: column; overflow: hidden;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0) 42%), var(--panel);
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: transform 0.22s cubic-bezier(0.22, 0.8, 0.3, 1), box-shadow var(--tr);
+}
+.pice:hover { transform: translateY(-3px); box-shadow: inset 0 0 0 1px var(--line-2); }
+.pice.izabrano { box-shadow: inset 0 0 0 1px rgba(255, 181, 39, 0.55); }
+
+/* Slika: fiksna visina i contain, da se visoka limenka i niska flašica
+   poravnaju u istom redu bez izobličenja. */
+.pice-slika {
+  /* Visina prati ekran: na 1366x768 dva reda kartica moraju da stanu bez
+     skrolovanja, a na 1080p slika sme da bude krupna. */
+  position: relative; height: clamp(132px, 21vh, 250px); overflow: hidden;
+  background:
+    radial-gradient(120% 78% at 50% 6%, rgba(var(--cr), 0.13), transparent 68%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(0, 0, 0, 0.16));
+}
+/* Apsolutno u odnosu na okvir: procenat visine se tako uvek računa, pa visoka
+   limenka i niska flašica staju u isti okvir i nijedna ga ne probija. */
+.pice-slika img {
+  position: absolute; inset: 14px 14px 11px; z-index: 1;
+  width: 100%; height: 100%; margin: auto; object-fit: contain;
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.55));
+  transition: transform 0.3s cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+.pice:hover .pice-slika img { transform: translateY(-4px) scale(1.05); }
+.pice-mono {
+  position: absolute; inset: 0; z-index: 1; display: grid; place-items: center;
+  font-family: var(--font-display); font-size: 34px; font-weight: 700;
+  letter-spacing: 0.04em; color: rgba(255, 255, 255, 0.16);
+}
+
+.pice-malo {
+  position: absolute; top: 10px; left: 10px; z-index: 2;
+  padding: 3px 7px; border-radius: 2px;
+  font-family: var(--font-ui); font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--amber);
+  background: rgba(10, 10, 14, 0.62); box-shadow: inset 0 0 0 1px rgba(255, 181, 39, 0.28);
+}
+.pice-nema {
+  position: absolute; inset: auto 0 0; z-index: 2; text-align: center; padding: 7px 4px;
+  font-family: var(--font-ui); font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text-2);
+  background: linear-gradient(transparent, rgba(6, 6, 10, 0.94) 55%);
+}
+.pice.nema { opacity: 0.5; }
+.pice.nema .pice-slika img { opacity: 0.4; filter: grayscale(1); }
+.pice.nema:hover { transform: none; box-shadow: inset 0 0 0 1px var(--line); }
+
+.pice-dno { flex: 1; display: flex; flex-direction: column; gap: 9px; padding: 11px 13px 12px; }
+/* Ime ide malim slovima. VELIKA SLOVA na svakoj kartici su činila da ceo
+   spisak viče, a i brend se čita tačnije: "Coca-Cola Zero", ne "COCA-COLA ZERO". */
+.pice-ime {
+  font-family: var(--font-ui); font-size: 12.5px; font-weight: 600; line-height: 1.32;
+  letter-spacing: 0.01em; color: var(--text);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  min-height: 2.64em;
+}
+.pice-red { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; }
+
+/* Cena: broj nosi, oznaka valute je sitna uz njega. */
+.pice-cena, .cr-cena, .ct-cena { display: inline-flex; align-items: baseline; gap: 3px; font-variant-numeric: tabular-nums; }
+.pice-cena b { font-family: var(--font-display); font-weight: 700; font-size: 16px; line-height: 1; color: #fff; }
+.pice-cena i {
+  font-style: normal; font-family: var(--font-ui); font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3);
+}
+
+.pice-plus {
+  width: 32px; height: 32px; flex-shrink: 0; display: grid; place-items: center;
+  border-radius: 50%; color: var(--text-2);
+  background: rgba(255, 255, 255, 0.05); box-shadow: inset 0 0 0 1px var(--line-2);
+  transition: background var(--tr), color var(--tr), box-shadow var(--tr), transform 0.12s ease;
+}
+.pice-plus:hover { background: var(--red); color: #fff; box-shadow: inset 0 0 0 1px var(--red); }
+.pice-plus:active { transform: scale(0.92); }
+
+.pice-step {
+  display: flex; align-items: center; gap: 2px; flex-shrink: 0;
+  height: 32px; padding: 0 3px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05); box-shadow: inset 0 0 0 1px rgba(255, 181, 39, 0.3);
+}
+.pice-step button {
+  width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%;
+  font-size: 15px; font-weight: 700; line-height: 1; color: var(--text-2);
+  transition: background var(--tr), color var(--tr);
+}
+.pice-step button:hover { background: rgba(255, 255, 255, 0.09); color: #fff; }
+.pice-step b {
+  min-width: 16px; text-align: center; font-family: var(--font-display);
+  font-weight: 700; font-size: 14px; color: var(--gold); font-variant-numeric: tabular-nums;
+}
+
+/* ---- Traka o porudzbini koja stize ----
+   Ceo spisak porudzbina je ranije stajao i ovde i na nalogu, sa dva razlicita
+   markupa. Igracu u Shop-u treba samo odgovor na to da li stize, pa je ostala
+   jedna linija koja vodi na nalog, gde je istorija. */
+.shop-traka {
+  width: 100%; margin-bottom: 14px; padding: 13px 16px; cursor: pointer;
+  display: flex; align-items: center; gap: 12px; text-align: left;
+  background: rgba(255, 181, 39, 0.07); border: 0;
+  box-shadow: inset 0 0 0 1px rgba(255, 181, 39, 0.28);
+  clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 11px 100%, 0 calc(100% - 11px));
+  transition: background var(--t-brzo);
+}
+.shop-traka:hover { background: rgba(255, 181, 39, 0.12); }
+.st-tacka {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex-shrink: 0;
+  box-shadow: 0 0 0 4px rgba(255, 181, 39, 0.16); animation: st-kuc 1.8s ease-in-out infinite;
+}
+@keyframes st-kuc { 50% { box-shadow: 0 0 0 8px rgba(255, 181, 39, 0.05); } }
+.st-t { font-weight: 700; font-size: 13.5px; color: var(--gold); }
+.st-o { font-size: 12px; color: var(--text-3); }
+.st-vise { margin-left: auto; display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text-2); }
+.st-vise svg { color: var(--text-3); }
+
+/* ---- Korpa ---- */
+.cart {
+  position: relative; overflow: hidden; display: flex; flex-direction: column;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0) 22%), var(--panel);
+  clip-path: polygon(0 0, calc(100% - var(--cut-lg)) 0, 100% var(--cut-lg), 100% 100%, 0 100%);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.cart-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 17px 19px 14px; border-bottom: 1px solid var(--line);
+}
+.cart h3 {
+  font-family: var(--font-ui); font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.16em;
+}
+.cart-broj { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.cart-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 19px; }
+.cart-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.cart-row:last-child { border-bottom: none; }
+.cr-slika {
+  width: 40px; height: 48px; flex-shrink: 0; display: grid; place-items: center; border-radius: 3px;
+  background: rgba(255, 255, 255, 0.035); font-weight: 700; font-size: 12px; color: var(--text-3);
+}
+.cr-slika img { max-width: 80%; max-height: 84%; object-fit: contain; }
+.cr-tekst { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
+.cr-ime {
+  max-width: 100%; font-size: 12.5px; font-weight: 600; line-height: 1.25;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cr-cena b { font-family: var(--font-display); font-weight: 700; font-size: 14px; color: #fff; }
+.cr-cena i {
+  font-style: normal; font-family: var(--font-ui); font-size: 9px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3);
+}
+
+.cart-qty { display: flex; align-items: center; gap: 1px; }
+.qbtn {
+  width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%;
+  font-size: 13px; font-weight: 700; line-height: 1; color: var(--text-3);
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: background var(--tr), color var(--tr);
+}
+.qbtn:hover { background: rgba(255, 255, 255, 0.09); color: #fff; }
+.cart-qty b {
+  min-width: 22px; text-align: center; font-size: 12px; font-weight: 700;
+  color: var(--text-2); font-variant-numeric: tabular-nums;
+}
+
+.cart-empty {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 5px; padding: 20px; text-align: center;
+}
+.ce-t { font-family: var(--font-ui); font-size: 13px; font-weight: 700; color: var(--text-2); }
+.ce-s { font-size: 11.5px; color: var(--text-3); }
+
+.cart-foot { padding: 15px 19px 17px; border-top: 1px solid var(--line); }
+/* Izbor plaćanja: dve jednake ponude, ne padajući meni - igrač bira jednim
+   klikom. Izabrano je zlatno, ne crveno: crveno ostaje samo dugmetu "Poruči"
+   da se na ekranu uvek zna šta je jedan glavni potez. */
+.placanje { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.nacin {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 10px 11px; text-align: left; border-radius: 3px; color: var(--text-2);
+  background: rgba(255, 255, 255, 0.03); box-shadow: inset 0 0 0 1px var(--line);
+  transition: background var(--tr), color var(--tr), box-shadow var(--tr);
+}
+.nacin svg { color: var(--text-3); margin-bottom: 3px; transition: color var(--tr); }
+.nacin:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+.nacin.aktivan { background: rgba(255, 255, 255, 0.06); color: #fff; box-shadow: inset 0 0 0 1px rgba(255, 181, 39, 0.5); }
+.nacin.aktivan svg { color: var(--gold); }
+.nacin .n-ime {
+  font-family: var(--font-ui); font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.nacin .n-opis { font-size: 10.5px; color: var(--text-3); line-height: 1.3; }
+.nacin.aktivan .n-opis { color: var(--text-2); }
+.nacin.nemoguc, .nacin:disabled { opacity: 0.4; cursor: not-allowed; }
+.nacin.nemoguc .n-opis { color: var(--red-status); }
+
+.cart-total {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  margin: 16px 0 12px; padding-top: 14px; border-top: 1px solid var(--line);
+}
+.cart-total > span {
+  font-family: var(--font-ui); font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.14em; color: var(--text-3);
+}
+.ct-cena b { font-family: var(--font-display); font-weight: 700; font-size: 24px; line-height: 1; color: var(--gold); }
+.ct-cena i {
+  font-style: normal; font-family: var(--font-ui); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3);
+}
+.cart-note { margin-top: 11px; text-align: center; color: var(--text-3); font-size: 11px; line-height: 1.5; }
+
+/* Uži ekrani: korpa se stanji, kartice se smanje */
+@media (max-width: 1280px) {
+  .content.shop-mode { padding: 18px 20px 14px; }
+  .shop { grid-template-columns: minmax(0, 1fr) 296px; gap: 18px; }
+  .shop-grid { grid-template-columns: repeat(auto-fill, minmax(min(172px, 100%), 1fr)); gap: 13px; }
+}
+
+/* Nalog */
+.account-card {
+  max-width: 470px; overflow: hidden;
+  background: linear-gradient(160deg, var(--panel-2), var(--panel));
+  clip-path: polygon(0 0, calc(100% - var(--cut-lg)) 0, 100% var(--cut-lg), 100% 100%, var(--cut-lg) 100%, 0 calc(100% - var(--cut-lg)));
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+/* Zaključan ekran */
+/* Zakljucan ekran ima SVOJU pozadinu (duboko crveno svetlo). Ranije je preko
+   svega isao jos i backdrop-filter: blur - a iza nema sta da se muti, jer je
+   desktop sakriven; jedini efekat je bio da se pozadina razmaze u mrlju. */
+#lockedScreen { background: rgba(7, 7, 10, 0.28); }
+.lock-icon {
+  width: 96px; height: 96px; margin-bottom: 28px;
+  background: rgba(255, 181, 39, 0.1); color: var(--gold);
+  display: grid; place-items: center;
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+  box-shadow: 0 0 40px -8px var(--gold-glow), inset 0 0 0 1px rgba(255, 181, 39, 0.35);
+  animation: lock-in 0.4s var(--tr);
+}
+@keyframes lock-in { from { opacity: 0; transform: scale(0.85); } }
+.lock-icon svg { width: 42px; height: 42px; stroke-width: 1.7; }
+.lock-icon.time { background: var(--red-soft); color: var(--red-status); box-shadow: 0 0 44px -6px var(--red-glow), inset 0 0 0 1px rgba(255, 59, 59, 0.4); }
+.lock-title { font-family: var(--font-display); font-size: 34px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
+.lock-sub { color: var(--text-2); font-size: 15.5px; margin-top: 12px; text-align: center; max-width: 460px; line-height: 1.6; }
+.lock-pin { margin-top: 34px; width: 280px; }
+.lock-pin input { text-align: center; letter-spacing: 8px; font-size: 19px; font-weight: 800; }
+.lock-foot {
+  position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%);
+  padding: 8px 16px; color: var(--text-3); font-size: 12px; font-weight: 700;
+  letter-spacing: 0.1em; font-family: var(--font-ui); text-transform: uppercase;
+  transition: color var(--tr);
+}
+.lock-foot:hover { color: var(--text-2); }
+
+/* Overlay / dijalozi */
+.overlay {
+  position: fixed; inset: 0; z-index: 300; display: none;
+  align-items: center; justify-content: center;
+  background: rgba(4, 4, 7, 0.78); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.overlay.active { display: flex; animation: screen-in 0.2s ease; }
+.dialog {
+  position: relative; width: 430px; max-width: 92vw;
+  background: linear-gradient(160deg, var(--panel-2), var(--panel));
+  clip-path: polygon(0 0, calc(100% - var(--cut-lg)) 0, 100% var(--cut-lg), 100% 100%, var(--cut-lg) 100%, 0 calc(100% - var(--cut-lg)));
+  box-shadow: inset 0 0 0 1px var(--line-2), 0 30px 80px -20px rgba(0, 0, 0, 0.8);
+  padding: 32px 30px 26px; text-align: center;
+  animation: dlg-in 0.24s var(--tr);
+}
+@keyframes dlg-in { from { opacity: 0; transform: translateY(14px) scale(0.97); } }
+.dlg-ic {
+  width: 56px; height: 56px; margin: 0 auto 18px;
+  display: grid; place-items: center;
+  background: rgba(255, 255, 255, 0.06); color: var(--text-2);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+}
+.dlg-ic svg { width: 26px; height: 26px; stroke-width: 1.7; }
+.dlg-ic.accent { background: var(--red-soft); color: var(--red); box-shadow: 0 0 26px -6px var(--red-glow); }
+.dlg-t { font-family: var(--font-display); font-size: 19px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+.dlg-s { font-size: 14px; color: var(--text-2); margin-top: 8px; line-height: 1.55; }
+.dlg-row { display: flex; gap: 10px; margin-top: 24px; }
+.dlg-row .btn { flex: 1; }
+.dialog .field { margin: 20px 0 0; }
+.dialog .err { margin: 6px 0 0; min-height: 0; }
+.dialog .field input { text-align: center; letter-spacing: 6px; font-weight: 800; }
+
+/* Toast */
+/* Poruke stoje IZNAD donje trake, ne preko nje. Traka je 38 px, pa 38+18
+   ostavlja jasan razmak i poruka se cita bez smetnje. */
+.toasts { position: fixed; bottom: 56px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 10px; z-index: 400; align-items: center; max-width: min(760px, 88vw); }
+.toast {
+  display: flex; align-items: center; gap: 11px;
+  background: rgba(16, 16, 23, 0.96); backdrop-filter: blur(12px);
+  border-left: 3px solid var(--red);
+  padding: 13px 20px; font-size: 14px; font-weight: 700;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+  box-shadow: inset 0 0 0 1px var(--line), 0 12px 30px -8px rgba(0, 0, 0, 0.7);
+  animation: toast-in 0.3s var(--tr); transition: opacity 0.25s ease, transform 0.25s ease;
+}
+@keyframes toast-in { from { opacity: 0; transform: translateY(14px); } }
+.toast.out { opacity: 0; transform: translateY(8px); }
+.toast .t-ic { flex-shrink: 0; color: var(--text-2); display: grid; place-items: center; }
+.toast .t-ic svg { width: 17px; height: 17px; }
+.toast.success { border-left-color: var(--green); }
+.toast.success .t-ic { color: var(--green); }
+.toast.error {
+  border-left-color: var(--red-status); border-left-width: 4px;
+  background: rgba(38, 14, 16, 0.97);
+  box-shadow: inset 0 0 0 1px rgba(255, 59, 59, 0.35), 0 16px 40px -10px rgba(0, 0, 0, 0.85), 0 0 30px -14px var(--red-glow);
+}
+.toast.error .t-ic { color: var(--red-status); }
+
+/* Coin burst (nagrada na porudžbinu) */
+.fx-layer { position: fixed; inset: 0; z-index: 450; pointer-events: none; }
+.coin {
+  position: absolute; width: 11px; height: 11px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffe6a0, var(--gold));
+  box-shadow: 0 0 10px var(--gold-glow);
+  animation: coin-fly 0.9s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+.coin.red { background: radial-gradient(circle at 35% 30%, #ff9a9a, var(--red)); box-shadow: 0 0 10px var(--red-glow); }
+@keyframes coin-fly {
+  0% { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
+  15% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy) + 60px)) scale(0.5); opacity: 0; }
+}
+
+/* Idle attract (login stoji prazan) */
+body.attract #loginScreen .brand-logo { animation: logo-pulse 4s ease-in-out infinite, attract-float 3.2s ease-in-out infinite; }
+body.attract #loginScreen .brand-tag,
+body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-out infinite; color: var(--gold); }
+@keyframes attract-float { 50% { transform: translateY(-9px); } }
+@keyframes attract-blink { 50% { opacity: 0.4; } }
+
+/* Boot / welcome sekvenca */
+.boot {
+  position: fixed; inset: 0; z-index: 600; display: none;
+  align-items: center; justify-content: center; background: var(--bg);
+}
+.boot::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(680px 480px at 50% 45%, rgba(255, 43, 43, 0.14), transparent 65%);
+}
+.boot.active { display: flex; }
+.boot.out { animation: boot-out 0.42s ease forwards; }
+@keyframes boot-out { to { opacity: 0; } }
+.boot-inner { position: relative; text-align: center; }
+.boot .brand-logo { width: 260px; max-width: 60vw; animation: boot-logo 0.6s var(--tr) both; }
+@keyframes boot-logo { 0% { opacity: 0; transform: scale(1.3); } 55% { opacity: 1; transform: scale(0.95); } 100% { transform: scale(1); } }
+.boot-line {
+  margin-top: 22px; font-family: var(--font-display); font-weight: 700; font-size: 16px;
+  text-transform: uppercase; letter-spacing: 0.3em; color: var(--gold);
+  text-shadow: 0 0 18px var(--gold-glow); opacity: 0; animation: boot-line 0.4s ease 0.35s both;
+}
+@keyframes boot-line { from { opacity: 0; letter-spacing: 0.55em; } to { opacity: 1; letter-spacing: 0.3em; } }
+.boot-bar {
+  width: 230px; height: 4px; margin: 28px auto 0; background: rgba(255, 255, 255, 0.08); overflow: hidden;
+  clip-path: polygon(3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%, 0 3px);
+}
+.boot-bar span {
+  display: block; height: 100%; width: 0;
+  background: linear-gradient(90deg, var(--red), var(--gold));
+  box-shadow: 0 0 12px var(--red-glow); animation: boot-bar 1.25s ease 0.3s forwards;
+}
+@keyframes boot-bar { to { width: 100%; } }
+
+/* SMANJEN MOTION - pazljivo, ne preko svega
+   Windows sa iskljucenim animacijama ("Adjust for best performance", Ease of
+   Access, ili bilo koja "debloat" skripta) javlja prefers-reduced-motion:
+   reduce - a to je na racunarima u igraonici skoro pravilo, jer se bas tako
+   podesavaju za igre.
+   Ovde je ranije stajalo pravilo koje je sa !important gasilo SVE animacije na
+   strani. Posledica: na tim racunarima sara u pozadini je stajala mrtva i
+   nagradni tocak se nije vrteo, iako je vlasnik oboje izricito upalio u panelu.
+   Kretanje sare ima svoj pravi prekidac - Izgled launchera > Mirno. Zato ovde
+   ostaju samo ulazne animacije kartica, koje nista ne znace ako izostanu. */
+@media (prefers-reduced-motion: reduce) {
+  .tile, .pice, .hero { animation: none !important; }
+}

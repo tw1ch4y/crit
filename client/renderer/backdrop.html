@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Crit</title>
+  <!-- Isti font kao u launcheru: i ovaj ekran igrac vidi, kad se igra pokrene. -->
+  <link rel="stylesheet" href="css/font.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+    html, body { height: 100%; overflow: hidden; cursor: default; }
+    body {
+      background:
+        radial-gradient(900px 600px at 50% 42%, rgba(255, 43, 43, 0.10), transparent 62%),
+        #07070a;
+      display: grid; place-items: center;
+      font-family: "Chakra Petch", "Segoe UI", system-ui, sans-serif; color: #6a6d80;
+    }
+    .box { text-align: center; opacity: 0.85; }
+    img { width: 190px; height: auto; opacity: 0.5; margin-bottom: 26px; }
+    .t { font-size: 15px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #8a8ea3; }
+    .s { font-size: 13px; margin-top: 12px; color: #565a6d; }
+    kbd {
+      background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 5px; padding: 2px 7px; font-family: inherit; font-size: 12px; color: #a8acbf;
+    }
+    .pulse { animation: p 3s ease-in-out infinite; }
+    @keyframes p { 50% { opacity: 0.55; } }
+  </style>
+</head>
+<body>
+  <div class="box pulse">
+    <img src="img/crit-logo.png" alt="Crit" />
+    <div class="t">Igra je pokrenuta</div>
+    <div class="s">Klikni bilo gde ili pritisni <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Home</kbd> za povratak</div>
+  </div>
+  <script>
+    // klik na zastor vraća launcher u prvi plan
+    document.addEventListener("click", () => window.critBackdrop && window.critBackdrop.focusLauncher());
+  </script>
+</body>
+</html>
