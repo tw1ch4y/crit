@@ -41,6 +41,7 @@ const ALATI = [
   { ime: "proba-pokretanje-igre", args: [], opis: "klik na igru stiže do baze, izveštaja i logova", sam: true },
   { ime: "proba-tocka", args: [], opis: "nagrada sa točka stiže na kredit tek kad se objavi", sam: true },
   { ime: "proba-tocak-zaglavljen", args: [], opis: "veza pukne usred vrtnje - launcher se sam izvuče, kredit se ne zamrzava", sam: true },
+  { ime: "proba-admin-izlaz", args: [], opis: "otkljucavanje ne gasi launcher, a admin izlaz i dalje radi", sam: true },
   { ime: "proba-podesavanja", args: [], opis: "miš i zvuk se menjaju i vraćaju na zatečeno pri odjavi", sam: true },
   { ime: "proba-obavestenja", args: [], opis: "upozorenje o vremenu i poruka osoblja stižu preko igre", sam: true },
 ];

@@ -518,7 +518,23 @@ function handleMsg(m) {
       show("lockedScreen");
       break;
     case "unlock_ok":
-      if (S.pendingExit) { window.crit.adminExit(); return; }
+      // OTKLJUCAVANJE OTKLJUCAVA, NE GASI LAUNCHER.
+      //
+      // Ovde je ranije stajalo `if (S.pendingExit) adminExit()`. Ostatak iz
+      // vremena kad je admin izlaz isao kroz istu poruku kao otkljucavanje;
+      // danas ide svojim putem (verify_pin -> pin_ok -> pinPrihvacen).
+      //
+      // Posledica: cim se otvori prozor za admin izlaz (Ctrl+Alt+Shift+Q),
+      // launcher upamti "izlazim" - i onda ga je BILO KAKVO otkljucavanje
+      // gasilo: radnik sa panela, "Otkljucaj sve", ili sam igrac PIN-om na
+      // zakljucanom ekranu. Masina ostaje bez launchera do sledeceg paljenja.
+      //
+      // A splet okolnosti nije redak nego svakodnevni: na zakljucanom ekranu
+      // stoje dva polja za PIN, radnik ukuca u ono koje mu je blize.
+      //
+      // Prozor za PIN se pri tom zatvara: racunar je otkljucan, nema sta vise
+      // da se potvrdjuje.
+      if (S.pendingExit || S.pinSvrha) odustaniOdPina();
       toast("Otključano", "success");
       break;
     case "unlock_err":
