@@ -1146,8 +1146,16 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
   background: var(--danger-soft); border: 1px solid rgba(255, 77, 79, 0.35);
 }
 .upozorenje-fabricko svg { width: 20px; height: 20px; flex-shrink: 0; color: var(--danger); margin-top: 1px; }
-.upozorenje-fabricko b { display: block; font-size: 14px; color: var(--text); margin-bottom: 3px; }
-.upozorenje-fabricko span { font-size: 12.5px; color: var(--text-2); line-height: 1.55; display: block; }
+/* SAMO NEPOSREDNA DECA, ne svaki potomak.
+   Naslov i objasnjenje su blokovi jer stoje jedno ispod drugog. Dok je pravilo
+   hvatalo SVAKI span unutra, svaki <span class="mono"> u recenici je postajao
+   svoj red - pa se uputstvo "u podfolderu resources, fajl podesavanja.json"
+   lomilo na pet redova i prestajalo da lici na recenicu. */
+.upozorenje-fabricko > div > b { display: block; font-size: 14px; color: var(--text); margin-bottom: 3px; }
+.upozorenje-fabricko > div > span { font-size: 12.5px; color: var(--text-2); line-height: 1.55; display: block; }
+/* Naziv fajla ili putanja usred recenice - ostaje u redu i ne prelama se na pola. */
+.upozorenje-fabricko .mono { color: var(--text); background: rgba(255, 255, 255, 0.06);
+  padding: 1px 5px; border-radius: 4px; white-space: nowrap; }
 /* Dugme vodi pravo na promenu lozinke. Ranije je tu pisalo "klikni na svoje ime
    dole levo" - a na telefonu profil stoji gore desno, pa je uputstvo vodilo na
    pogresnu stranu ekrana. */
