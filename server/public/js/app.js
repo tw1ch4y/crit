@@ -165,6 +165,33 @@ function toast(msg, type = "info") {
   setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 280); }, 3200);
 }
 
+// DUGME KOJE MENJA NOVAC SE ZAKLJUČAVA DOK SERVER NE ODGOVORI.
+//
+// Radnik na kasi radi u žurbi i pred gostom. Dupli klik na "Naplati" je slao
+// DVA računa i naplaćivao dvaput; dupli klik na "Dodaj" je kredit dopunjavao
+// dvaput. Oba puta se otkrije tek na kraju smene, kao razlika u kasi koju niko
+// ne ume da objasni - a razlika u kasi mora da ima ime.
+//
+// U launcheru je ta zaštita postojala od ranije ("Poruči" se zaključava do
+// odgovora servera); u panelu je nije bilo, a baš se on koristi u gužvi.
+//
+// Dugme se vraća u prvobitno stanje BEZ OBZIRA na ishod, pa neuspeo zahtev ne
+// ostavlja radnika sa zaključanim dugmetom.
+async function jednomKlik(btn, posao, tekstDok = "Šaljem...") {
+  if (!btn || btn.disabled) return;
+  const stari = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = tekstDok;
+  try {
+    return await posao();
+  } finally {
+    // Posao je mogao da zatvori modal, pa je dugme već van strane - tada ovo
+    // ništa ne menja i to je u redu.
+    btn.disabled = false;
+    btn.textContent = stari;
+  }
+}
+
 // Modal
 function modal(title, bodyHtml, onMount, wide = false, locked = false) {
   const root = $("#modalRoot");
@@ -334,7 +361,7 @@ function openShiftModal(mandatory) {
     <button class="btn btn-primary btn-block" id="osOpen">Otvori smenu</button>
     ${mandatory ? `<button class="btn btn-ghost btn-block" id="osLogout" style="margin-top:6px">Odjava</button>` : ""}`,
     (root, close) => {
-      $("#osOpen", root).addEventListener("click", async () => {
+      $("#osOpen", root).addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
         try {
           const r = await api("/shift/open", "POST", { openingCash: $("#osCash", root).value });
           // Kontrolna tabla mora odmah iznova: na njoj stoji upozorenje "smena
@@ -343,7 +370,7 @@ function openShiftModal(mandatory) {
           state.shift = r.shift; updateShiftBar(); refreshView(["dashboard"]);
           toast("Smena je otvorena", "success"); close();
         } catch (e) { $("#osErr", root).textContent = e.message; }
-      });
+      }, "Otvaram..."));
       const lo = $("#osLogout", root); if (lo) lo.addEventListener("click", doLogout);
     }, false, !!mandatory);
 }
@@ -360,12 +387,12 @@ function closeShiftModal() {
     <div class="err-msg" id="csErr"></div>
     <button class="btn btn-primary btn-block" id="csClose">Zatvori i obračunaj</button>`,
     (root, close) => {
-      $("#csClose", root).addEventListener("click", async () => {
+      $("#csClose", root).addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
         try {
           const r = await api("/shift/close", "POST", { closingCash: $("#csCash", root).value });
           state.shift = null; updateShiftBar(); refreshView(["dashboard"]); close(); showShiftSummary(r.summary);
         } catch (e) { $("#csErr", root).textContent = e.message; }
-      });
+      }, "Obračunavam..."));
     });
 }
 function shiftBreakdownHtml(s) {
@@ -1388,10 +1415,10 @@ function playerModal() {
     <div class="field"><label>Napomena (vidi samo osoblje)</label><input id="npNote" placeholder="npr. broj telefona, ko je doveo..." /></div>
     <div class="err-msg" id="npErr"></div>
     <button class="btn btn-primary btn-block" id="npSave">Kreiraj nalog</button>`, (root, close) => {
-    $("#npSave", root).addEventListener("click", async () => {
+    $("#npSave", root).addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
       try { await api("/players", "POST", { username: $("#npUser", root).value, password: $("#npPass", root).value, displayName: $("#npName", root).value, balance: $("#npBal", root).value, note: $("#npNote", root).value }); toast("Nalog je kreiran", "success"); close(); renderPlayers(); }
       catch (err) { $("#npErr", root).textContent = err.message; }
-    });
+    }, "Pravim nalog..."));
   });
 }
 // Nalozi za goste koji nemaju svoj. Rezultat ostaje otvoren dok ga radnik ne
@@ -1409,7 +1436,10 @@ function guestsModal() {
     <button class="btn btn-primary btn-block" id="gbSave">Otvori naloge</button>`, (root, close) => {
     $$("[data-gq]", root).forEach((b) => b.addEventListener("click", () => { $("#gbBal", root).value = Number(b.dataset.gq); }));
     $$("[data-sati]", root).forEach((b) => b.addEventListener("click", () => { $("#gbBal", root).value = Math.round(Number(b.dataset.sati) * ratePerHour()); }));
-    $("#gbSave", root).addEventListener("click", async () => {
+    // Dupli klik je ovde skuplji nego drugde: napravio bi DVA seta naloga, oba
+    // sa kreditom, a lozinke prvog seta se posle ne mogu videti nigde - one se
+    // pokazuju samo jednom, u prozoru koji drugi set prepiše.
+    $("#gbSave", root).addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
       const count = Number($("#gbCount", root).value);
       if (!count || count < 1) { $("#gbErr", root).textContent = "Unesi bar jedan nalog"; return; }
       try {
@@ -1418,7 +1448,7 @@ function guestsModal() {
         prikaziGoste(r.players);
         renderPlayers();
       } catch (err) { $("#gbErr", root).textContent = err.message; }
-    });
+    }, "Otvaram naloge..."));
   });
 }
 
@@ -1591,12 +1621,12 @@ async function topupModal(p) {
         close(); renderPlayers();
       } catch (err) { $("#tuErr", root).textContent = err.message; b.disabled = false; }
     }));
-    $("#tuSave", root).addEventListener("click", async () => {
+    $("#tuSave", root).addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
       const amt = Number($("#tuAmt", root).value);
       if (!amt || amt <= 0) { $("#tuErr", root).textContent = "Unesi iznos veći od nule"; return; }
       try { await api(`/players/${p.id}/topup`, "POST", { amount: mode === "add" ? amt : -amt }); toast(mode === "add" ? "Kredit je dopunjen" : "Kredit je skinut", "success"); close(); renderPlayers(); }
       catch (err) { $("#tuErr", root).textContent = err.message; }
-    });
+    }, mode === "add" ? "Dodajem..." : "Skidam..."));
   });
 }
 async function editPlayerModal(p) {
@@ -1868,7 +1898,7 @@ function renderCart() {
   const combo = $("#posCombo");
   if (combo) mountPlayerCombo(combo, players, (p) => { state.posPlayerId = p ? p.id : null; renderCart(); });
   $("#posClear").addEventListener("click", () => { const bili = [...state.posCart.keys()]; state.posCart.clear(); state.posPlayerId = null; renderCart(); bili.forEach(osveziPosPlocicu); });
-  $("#posSubmit").addEventListener("click", async () => {
+  $("#posSubmit").addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
     const items = [...state.posCart].map(([id, qty]) => ({ id, qty }));
     if (!items.length) return;
     if (state.posPayment === "credit" && !state.posPlayerId) { toast("Ukucaj i izaberi nalog igrača", "error"); return; }
@@ -1880,7 +1910,7 @@ function renderCart() {
       try { state.shop = await api("/shop"); } catch {} // zaliha se promenila
       bili.forEach(osveziPosPlocicu);
     } catch (e) { toast(e.message, "error"); }
-  });
+  }, "Naplaćujem..."));
 }
 
 // Porudžbina u pop-upu
@@ -1919,13 +1949,13 @@ async function openOrderModal() {
       $$("[data-pay]", root).forEach((b) => b.addEventListener("click", () => { payment = b.dataset.pay; if (payment === "cash") selPlayer = null; renderSide(); }));
       const combo = $("#omCombo", root);
       if (combo) mountPlayerCombo(combo, players, (p) => { selPlayer = p; renderSide(); });
-      $("#omSubmit", root).addEventListener("click", async () => {
+      $("#omSubmit", root).addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
         const items = [...cart].map(([id, qty]) => ({ id, qty }));
         if (!items.length) { toast("Dodaj bar jedan artikal", "error"); return; }
         if (payment === "credit" && !selPlayer) { toast("Ukucaj i izaberi nalog igrača", "error"); return; }
         try { const r = await api("/pos", "POST", { items, playerId: payment === "credit" ? selPlayer.id : null, payment }); toast(`Porudžbina #${r.orderId} - ${money(r.total)}`, "success"); close(); if (state.view === "orders") renderOrders(); }
         catch (e) { toast(e.message, "error"); }
-      });
+      }, "Naplaćujem..."));
     }
     // Pločice u modalu pokazuju koliko je čega već na računu, pa se preiscrtavaju
     // zajedno sa desnom stranom.

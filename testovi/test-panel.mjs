@@ -191,5 +191,53 @@ proveri("pregled trazi odsecen tekst", pregled.includes("scrollWidth > e.clientW
 proveri("kod koji se izvrsava u strani stoji u zasebnim fajlovima", pregled.includes("u-strani"),
   "ugnjezden u tekst se escape lomio na svakoj izmeni i alat je tiho visio");
 
+// ---- DUPLI KLIK NE SME DA NAPLATI DVAPUT ----
+//
+// Radnik na kasi radi u zurbi i pred gostom. Dok se dugme nije zakljucavalo,
+// tri brza klika na "Naplati" pravila su TRI racuna: izmereno u pravom
+// pregledacu, 390 dinara umesto 130. Dupli klik na "Dodaj" je isto tako
+// dopunjavao kredit dvaput.
+//
+// Oba se otkriju tek na kraju smene, kao razlika u kasi koju niko ne ume da
+// objasni - a razlika u kasi mora da ima ime.
+//
+// U launcheru je ta zastita postojala od ranije ("Poruci" se zakljucava do
+// odgovora servera); u panelu je nije bilo, a bas se on koristi u guzvi.
+proveri("postoji jedno mesto koje zakljucava dugme", /async function jednomKlik\(btn, posao/.test(app));
+proveri("dugme se vraca bez obzira na ishod", /finally \{[\s\S]{0,200}btn\.disabled = false/.test(app),
+  "neuspeo zahtev ne sme da ostavi radnika sa zakljucanim dugmetom");
+proveri("ponovljen klik se odbija i ako stigne", /if \(!btn \|\| btn\.disabled\) return;/.test(app));
+
+// Svako dugme koje pomera novac ili pravi naloge mora kroz njega.
+for (const [sta, id] of [
+  ["Naplati na kasi", "posSubmit"],
+  ["Naplati u pop-upu", "omSubmit"],
+  ["dopuna/skidanje kredita", "tuSave"],
+  ["novi nalog igraca", "npSave"],
+  ["brzi gosti", "gbSave"],
+  ["otvaranje smene", "osOpen"],
+  ["zatvaranje smene", "csClose"],
+]) {
+  const red = app.split("\n").find((l) => l.includes(`#${id}`) && l.includes("addEventListener"));
+  proveri(`${sta} se zakljucava do odgovora`, !!red && red.includes("jednomKlik"), red?.trim().slice(0, 90));
+}
+
+// I da se sutra ne doda novo dugme bez zastite: nijedan klik-rukovalac ne sme
+// SAM da zove rutu koja menja novac.
+const nezasticeni = [];
+for (const ruta of ['api\\("/pos"', "api\\(`/players/\\$\\{[^}]+\\}/topup`", "api\\(`/players/\\$\\{[^}]+\\}/paket`", 'api\\("/players/guests"', 'api\\("/shift/open"', 'api\\("/shift/close"']) {
+  const re = new RegExp(ruta);
+  app.split("\n").forEach((l, i) => {
+    if (!re.test(l)) return;
+    // Gleda se 12 redova unazad do pocetka rukovaoca klika.
+    const okolina = app.split("\n").slice(Math.max(0, i - 12), i + 1).join("\n");
+    const uKliku = /addEventListener\("click"/.test(okolina);
+    if (!uKliku) return;
+    if (/jednomKlik|b\.disabled = true/.test(okolina)) return;
+    nezasticeni.push(`red ${i + 1}: ${l.trim().slice(0, 60)}`);
+  });
+}
+proveri("nijedno dugme koje menja novac nije ostalo bez zastite", nezasticeni.length === 0, nezasticeni.join(" | "));
+
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 process.exit(pao ? 1 : 0);
