@@ -11,10 +11,50 @@ const { snimiStanje, ugasiNoveProcese, presretniPokretanja, spisakZaPanel, ugasi
 const winPod = require("./windows-podesavanja.js");
 
 const DEV = process.argv.includes("--dev");
-// Proba na sopstvenom/glavnom računaru: kiosk radi, ali se Windows ne dira
-// (Task Manager, Win taster i ostalo ostaju kako jesu).
+
+// ŠTA STOJI IZMEĐU RAZVOJNOG RAČUNARA I ŠTETE
+//
+// Četiri stvari u launcheru menjaju sam Windows i ne tiču se samo njegovog
+// prozora:
+//   1. politike u registru (Task Manager, Win taster, odjava, gašenje)
+//   2. plan napajanja
+//   3. gašenje svega što je pokrenuto tokom sesije
+//   4. ČIŠĆENJE SESIJE - briše profile Chrome/Edge/Firefox/Opera/Brave,
+//      prijave na Steam/Epic/Riot/Battle.net/EA/Ubisoft, Temp, skorašnje
+//      dokumente, i prazni korpu za otpatke
+//
+// Četvrta je nepovratna. Na računaru na kom se program PIŠE to znači gubitak
+// svih prijava i istorije pregledača - i to bez pitanja, u jednoj sekundi.
+//
+// Dosad je sve to čuvala jedna jedina zastavica iz komandne linije. Dovoljno je
+// da je jedan alat u testovi/ zaboravi i razvojni računar strada. Zastavica koja
+// se pamti nije brava.
+//
+// Zato postoje DVE nezavisne brave i obe moraju da budu otvorene:
+//
+//   A) izričito rečeno da se ne zaključava (--dev, --no-lock, bez-zakljucavanja.txt)
+//   B) LAUNCHER MORA DA BUDE INSTALIRAN. `app.isPackaged` je tačno kad launcher
+//      radi iz instalacije (electron-builder). `npm start`, `electron .` i svaki
+//      alat iz testovi/ daju netačno - a nijedno od toga nije računar u
+//      igraonici. Ovo se ne može zaboraviti jer se ništa i ne kuca.
+//
+// Ko baš mora da zaključa nepakovanu kopiju (proba na mašini u igraonici pre
+// pravljenja instalera), dodaje --zakljucaj. Podrazumevano je bezbedno,
+// opasno se traži izričito.
+const PAKOVAN = app.isPackaged;
+const IZRICITO_ZAKLJUCAJ = process.argv.includes("--zakljucaj");
 const NO_LOCK = DEV || process.argv.includes("--no-lock") ||
-  fs.existsSync(path.join(path.dirname(process.execPath), "bez-zakljucavanja.txt"));
+  fs.existsSync(path.join(path.dirname(process.execPath), "bez-zakljucavanja.txt")) ||
+  (!PAKOVAN && !IZRICITO_ZAKLJUCAJ);
+
+// Odbijanje mora da se ČUJE. Tiho preskočeno zaključavanje na mašini u
+// igraonici izgleda isto kao pokvaren launcher, a niko ne bi znao zašto.
+if (NO_LOCK && !PAKOVAN && !DEV) {
+  console.log(
+    "\n  Launcher NE dira Windows: pokrenut je iz izvornog koda, ne iz instalacije.\n" +
+    "  Ne menjaju se politike u registru, plan napajanja, niti se čiste tragovi sesije.\n" +
+    "  Na računaru u igraonici koristi instaler. Za nepakovanu probu SA zaključavanjem: --zakljucaj\n");
+}
 const CONFIG_PATH = path.join(app.getPath("userData"), "config.json");
 
 let win = null;

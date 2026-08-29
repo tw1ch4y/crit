@@ -168,6 +168,24 @@
 - [x] **Git** - projekat do tada nije imao nijedan commit. Meseci rada su živeli
   u jednom folderu na OneDrive-u, bez istorije i bez načina da se nađe kad je
   greška ušla
+- [x] **RAZVOJNI RAČUNAR VIŠE NE MOŽE DA STRADA OD SOPSTVENOG PROGRAMA.**
+  Launcher menja Windows na četiri načina - politike u registru, plan napajanja,
+  gašenje pokrenutih programa i **čišćenje sesije**. Poslednje briše profile
+  Chrome/Edge/Firefox/Opera/Brave, prijave na Steam/Epic/Riot/Battle.net/EA/
+  Ubisoft, skorašnje dokumente i prazni korpu za otpatke - nepovratno. Sve to je
+  čuvala **jedna zastavica iz komandne linije** (`--no-lock`), a alati u
+  `testovi/` puštaju pravi launcher: dovoljno je da je jedan zaboravi. Sada
+  postoje tri nezavisne brave:
+  1. `app.isPackaged` - **nepakovan launcher ne dira Windows**. `npm start`,
+     `electron .` i svaki alat odavde daju netačno, a nijedno od toga nije
+     računar u igraonici. Ovo se ne može zaboraviti jer se ništa i ne kuca.
+     Za nepakovanu probu SA zaključavanjem postoji `--zakljucaj`
+  2. postojeće `--dev` / `--no-lock` / `bez-zakljucavanja.txt`
+  3. fajl **`CRIT-NE-DIRAJ.txt`** u korisničkom folderu - čišćenje se odbija bez
+     obzira na sve ostalo. Provera je prva u `ocistiSesiju`, po imenu fajla, i
+     ne zavisi ni od jedne zastavice
+  Uz to test koji čita svaki alat u `testovi/` i ne da da neki pusti pravi
+  launcher bez brave, ni da postavi bravu POSLE učitavanja
 - [x] Uklonjen mrtav kod iz `auth.js` (tokeni igrača koje niko nije pozivao);
   `.claude/launch.json` je pokazivao na port 8090, server radi na 8095
 - [x] **Fabrički servisni PIN više nije tih** - launcher uz MAC adrese javlja i

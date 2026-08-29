@@ -1,0 +1,158 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { citajIzvor, KOREN } from "./_okruzenje.mjs";
+// RAČUNAR NA KOM SE PROGRAM PIŠE NE SME DA STRADA OD SOPSTVENOG PROGRAMA.
+//
+// Launcher radi četiri stvari koje menjaju sam Windows, a ne samo njegov prozor:
+//   1. politike u registru (Task Manager, Win taster, odjava, gašenje)
+//   2. plan napajanja
+//   3. gašenje svega što je pokrenuto tokom sesije
+//   4. ČIŠĆENJE SESIJE - briše profile Chrome/Edge/Firefox/Opera/Brave, prijave
+//      na Steam/Epic/Riot/Battle.net/EA/Ubisoft, skorašnje dokumente, i prazni
+//      korpu za otpatke
+//
+// Četvrta je nepovratna. Na razvojnom računaru to je gubitak svih prijava i
+// istorije pregledača, bez pitanja, u jednoj sekundi.
+//
+// Dosad je sve to čuvala JEDNA zastavica iz komandne linije (--no-lock). Alati u
+// ovom folderu pokreću pravi launcher; dovoljno je da jedan od njih zastavicu
+// zaboravi. Zastavica koja se pamti nije brava.
+//
+// Ovde se proverava da brava stvarno postoji i da je više njih, nezavisnih.
+//
+// PAŽNJA za onoga ko menja ovaj test: NIKAD ne puštaj `ocistiSesiju` tako da
+// prođe. Ono uzima staze iz PRAVOG okruženja (LOCALAPPDATA, APPDATA), pa bi
+// obrisalo prave profile na mašini na kojoj se test pušta. Sve provere ispod
+// ili traže ODBIJANJE, ili idu kroz `--suvo` (probni rad) uz izmišljeno
+// okruženje - i to oboje odjednom.
+const OVDE = path.dirname(fileURLToPath(import.meta.url));
+
+let pao = 0, prosao = 0;
+const proveri = (n, u, d = "") => { if (u) { prosao++; console.log("  OK   " + n); } else { pao++; console.log("  PAO  " + n + (d ? "  -> " + d : "")); } };
+
+const main = citajIzvor("client/main.js");
+const ciscenje = citajIzvor("client/ciscenje.js");
+
+// ---- 1) DRUGA BRAVA: nepakovan launcher ne dira Windows ----
+//
+// `app.isPackaged` je tačno samo kad launcher radi iz instalacije. `npm start`,
+// `electron .` i svaki alat odavde daju netačno - a nijedno od toga nije računar
+// u igraonici. Ovu bravu niko ne može da zaboravi, jer se ništa i ne kuca.
+proveri("postoji provera da je launcher instaliran", /const PAKOVAN = app\.isPackaged/.test(main));
+proveri("nepakovan launcher podrazumevano NE zaključava",
+  /\(!PAKOVAN && !IZRICITO_ZAKLJUCAJ\)/.test(main),
+  "bez ovoga jedan zaboravljen --no-lock briše profile na razvojnom računaru");
+proveri("opasno se traži izričito (--zakljucaj)", /IZRICITO_ZAKLJUCAJ = process\.argv\.includes\("--zakljucaj"\)/.test(main));
+proveri("odbijanje se ispisuje, ne prećutkuje",
+  /Launcher NE dira Windows/.test(main),
+  "tiho preskočeno zaključavanje na mašini u igraonici izgleda isto kao pokvaren launcher");
+
+// Sve četiri opasne radnje moraju da vise o istoj bravi.
+for (const [sta, sablon] of [
+  ["politike u registru", /function setPolicies\(on\) \{\s*\n\s*if \(NO_LOCK/],
+  ["plan napajanja", /function planNapajanja\(ukljuci\) \{\s*\n\s*if \(NO_LOCK/],
+  ["gašenje pokrenutih programa", /if \(!NO_LOCK && procesiPreSesije\)/],
+  ["čišćenje tragova", /dozvoljeno: !NO_LOCK/],
+]) proveri(`${sta} zavisi od brave`, sablon.test(main));
+
+// ---- 2) TREĆA BRAVA: fajl koji ne zavisi ni od čega ----
+proveri("postoji zaštita po fajlu", /const STOP_FAJL = "CRIT-NE-DIRAJ\.txt"/.test(ciscenje));
+{
+  // Redosled u samoj funkciji: zaštita mora da bude prva provera, pre svih
+  // ostalih uslova. Sve ispod nje su odluke o TOME KAKO se čisti; ova odlučuje
+  // DA LI se uopšte sme.
+  const telo = ciscenje.slice(ciscenje.indexOf("function ocistiSesiju("));
+  const brava = telo.indexOf("racunarJeZasticen(");
+  const prviUslov = telo.indexOf("if (!dozvoljeno)");
+  proveri("zaštita se proverava PRE svih ostalih uslova",
+    brava > -1 && prviUslov > -1 && brava < prviUslov,
+    `brava na ${brava}, prvi uslov na ${prviUslov}`);
+}
+
+// A sada ponašanjem, u zasebnom procesu sa IZMIŠLJENIM okruženjem.
+const { racunarJeZasticen, STOP_FAJL } = await import(
+  "file://" + path.join(KOREN, "client", "ciscenje.js").replace(/\\/g, "/")).then((m) => m.default || m);
+
+const saFajlom = fs.mkdtempSync(path.join(os.tmpdir(), "crit-zasticen-"));
+const bezFajla = fs.mkdtempSync(path.join(os.tmpdir(), "crit-obican-"));
+fs.writeFileSync(path.join(saFajlom, STOP_FAJL), "razvojni racunar");
+
+proveri("fajl u korisničkom folderu štiti računar", racunarJeZasticen({ USERPROFILE: saFajlom }) === true);
+proveri("bez fajla računar nije zaštićen", racunarJeZasticen({ USERPROFILE: bezFajla }) === false);
+proveri("prazno okruženje ne prolazi kao zaštićeno", racunarJeZasticen({}) === false,
+  "inače bi računar igrača ćutke prestao da se čisti");
+
+// NAJGORI SLUČAJ: sve dozvole date, kao da je svaka druga brava zaboravljena.
+// Traži se da fajl svejedno zaustavi brisanje.
+const pusti = (userprofile, dodatno = []) => {
+  const skripta = path.join(saFajlom, "proba.cjs");
+  fs.writeFileSync(skripta, `
+    const { ocistiSesiju } = require(${JSON.stringify(path.join(KOREN, "client", "ciscenje.js").replace(/\\/g, "/"))});
+    const r = ocistiSesiju({
+      dozvoljeno: true,
+      resourcesPath: ${JSON.stringify(path.join(KOREN, "client").replace(/\\/g, "/"))},
+      execPath: process.execPath,
+      dirname: ${JSON.stringify(path.join(KOREN, "client").replace(/\\/g, "/"))},
+      log: () => {},
+    });
+    console.log(JSON.stringify(r));
+  `);
+  const izlaz = execFileSync(process.execPath, [skripta, ...dodatno], {
+    encoding: "utf8",
+    env: { ...process.env, USERPROFILE: userprofile },
+  });
+  return JSON.parse(izlaz.trim().split("\n").pop());
+};
+
+const zasticen = pusti(saFajlom);
+proveri("sa fajlom se brisanje ODBIJA i kad su sve dozvole date",
+  zasticen.radjeno === false && zasticen.razlog === "zasticen", JSON.stringify(zasticen));
+
+// Isto to bez fajla MORA da prođe - inače bi provera gore prolazila iz pogrešnog
+// razloga i računari igrača bi ćutke prestali da se čiste. Ide kroz `--suvo`,
+// probni rad u kom se ništa ne briše.
+const obican = pusti(bezFajla, ["--suvo"]);
+proveri("bez fajla čišćenje ide dalje (probni rad)", obican.probni === true && obican.radjeno === false,
+  `${JSON.stringify(obican)} - da ovo ne prolazi, gornja provera ne bi značila nista`);
+
+fs.rmSync(saFajlom, { recursive: true, force: true });
+fs.rmSync(bezFajla, { recursive: true, force: true });
+
+// ---- 3) NIJEDAN ALAT NE SME DA PUSTI PRAVI LAUNCHER BEZ BRAVE ----
+//
+// Alati odavde pišu svoj main.js koji učitava pravi client/main.js. Ko to radi,
+// mora prvo da postavi --no-lock, i to PRE učitavanja - posle je kasno, jer je
+// zaključavanje već odrađeno.
+const alati = fs.readdirSync(OVDE).filter((f) => f.endsWith(".mjs") && f !== path.basename(fileURLToPath(import.meta.url)));
+const problemi = [];
+for (const f of alati) {
+  const t = fs.readFileSync(path.join(OVDE, f), "utf8");
+  // Da li uopšte učitava pravi launcher?
+  const ucitava = /require\(\$\{JSON\.stringify\(path\.join\(KOREN, "client", "main\.js"\)/.test(t);
+  if (!ucitava) continue;
+  const brava = t.indexOf('process.argv.push("--no-lock")');
+  const uvoz = t.indexOf('path.join(KOREN, "client", "main.js")');
+  if (brava === -1) problemi.push(`${f}: pušta pravi launcher BEZ --no-lock`);
+  else if (brava > uvoz) problemi.push(`${f}: --no-lock stoji POSLE učitavanja, kasno je`);
+}
+proveri("svaki alat koji pušta pravi launcher postavlja bravu", problemi.length === 0, problemi.join("; "));
+
+const saZakljucaj = alati.filter((f) => /--zakljucaj/.test(fs.readFileSync(path.join(OVDE, f), "utf8")));
+proveri("nijedan alat ne traži zaključavanje izričito", saZakljucaj.length === 0, saZakljucaj.join(", "));
+
+// ---- 4) alat koji menja PODEŠAVANJA ove mašine mora to da kaže ----
+// proba-podesavanja.mjs stvarno menja miša i zvuk na računaru na kom se pušta.
+// Vraća ih na kraju, ali ako se prekine na pola, ostaju promenjeni.
+const podes = path.join(OVDE, "proba-podesavanja.mjs");
+if (fs.existsSync(podes)) {
+  const t = fs.readFileSync(podes, "utf8");
+  proveri("proba koja menja mašinu to jasno piše u zaglavlju",
+    /MENJA PODEŠAVANJA|menja podešavanja|MENJA PODESAVANJA/i.test(t.slice(0, 2000)),
+    "ko je pusti ne sme da bude iznenađen");
+}
+
+console.log(`\n${prosao}/${prosao + pao} proslo`);
+process.exit(pao ? 1 : 0);

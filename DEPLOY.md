@@ -123,7 +123,40 @@ Za servis računara: **`client\zastita-iskljuci.bat`** (isto kao administrator) 
 > Launcher pokušava da postavi ova podešavanja i sam pri pokretanju, ali na nekim
 > računarima Windows odbije upis bez admin prava. Zato pokreni `.bat` - to je pouzdan način.
 
-### 3.3 Šta se ne može blokirati
+### 3.3 Launcher dira Windows samo kad je INSTALIRAN
+
+Ovo je namerno i važno je da se zna, jer menja šta radi `npm start`.
+
+Četiri stvari koje launcher radi ne tiču se samo njegovog prozora nego menjaju
+sam Windows: **politike u registru**, **plan napajanja**, **gašenje pokrenutih
+programa** i **čišćenje tragova sesije** (profili pregledača, prijave na Steam i
+ostale, korpa za otpatke). Poslednje je nepovratno.
+
+Zato launcher to radi **samo kad je pokrenut iz instalacije** (`Crit Launcher
+Setup .exe`). Pokrenut iz izvornog koda — `npm start`, `electron .`, ili bilo
+koji alat iz `testovi/` — ne dira ništa od toga i to ispiše u konzoli.
+
+| Kako je pokrenut | Kiosk prozor | Menja Windows |
+|---|---|---|
+| Instaler (računari igrača) | da | **da** |
+| `npm start` iz izvornog koda | da | ne |
+| `npm run dev` | ne (u prozoru) | ne |
+| alati iz `testovi/` | zavisi od alata | ne |
+
+Raniji način je zavisio samo od zastavice `--no-lock`. Dovoljno je bilo da je
+jedan alat zaboravi i **računar na kom se program piše ostane bez svih prijava
+na pregledače i Steam**. Zastavica koja se pamti nije zaštita.
+
+Ako baš treba probati zaključavanje bez pravljenja instalera, na mašini u
+igraonici: `npm start -- --zakljucaj`. Podrazumevano je bezbedno, opasno se traži.
+
+> **Zaštita razvojnog računara.** Napravi prazan fajl **`CRIT-NE-DIRAJ.txt`** u
+> svom korisničkom folderu (`%USERPROFILE%`, npr. `C:\Users\tvoje-ime\`). Dok on
+> stoji, taj računar se ne čisti nikad, bez obzira na sve ostalo — ni ako se
+> sve druge zaštite zaobiđu. Na računarima igrača tog fajla nema, pa tamo
+> čišćenje radi normalno.
+
+### 3.4 Šta se ne može blokirati
 
 Budi svestan granica, da ne računaš na nešto što ne postoji:
 
@@ -134,7 +167,7 @@ Budi svestan granica, da ne računaš na nešto što ne postoji:
   paljenju sam vraća, pa nema štete.
 - **Igra sa svojim pregledačem** (npr. Steam ugrađeni browser) ne prolazi kroz naša ograničenja.
 
-### 3.4 Najjača varijanta (kad budeš spreman)
+### 3.5 Najjača varijanta (kad budeš spreman)
 
 Launcher umesto Explorer-a kao Windows "shell" na nalogu igrača - tada nema ni desktopa
 ni Start menija, čak ni ispod launchera. Radi se preko `Winlogon\Shell` po nalogu.

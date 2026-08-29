@@ -177,6 +177,19 @@ crit/
   DEPLOY.md                detaljno postavljanje i zaključavanje sistema
 ```
 
+## Razvojni računar se ne dira
+
+Launcher menja Windows na računaru igrača: politike u registru, plan napajanja,
+gašenje pokrenutih programa i **čišćenje tragova sesije** (profili pregledača,
+prijave na Steam i ostale, korpa za otpatke). Poslednje je nepovratno.
+
+Zato to radi **samo kad je pokrenut iz instalacije**. `npm start`, `npm run dev`
+i alati iz `testovi/` ne diraju Windows i to ispišu u konzoli.
+
+> Na računaru na kom razvijaš, napravi prazan fajl **`CRIT-NE-DIRAJ.txt`** u
+> svom korisničkom folderu (`%USERPROFILE%`). Dok stoji, taj računar se ne čisti
+> nikad — ni ako se sve druge zaštite zaobiđu. Detalji: DEPLOY.md §3.3.
+
 ## Provera posle izmena
 
 `testovi/PROVERI-SISTEM.bat` prolazi kroz **preko 1400 provera** (obračun smene,
