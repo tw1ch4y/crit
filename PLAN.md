@@ -202,6 +202,37 @@
   usput promenio miša usred posla. Sad se odbija na mašini sa
   `CRIT-NE-DIRAJ.txt`, i vraća zatečeno i kad se prekine sa Ctrl+C - dotad je
   vraćanje stajalo samo u `finally`, koji prekid ne hvata
+### Revizija launchera (ekran koji igrač gleda)
+
+- [x] **OTKLJUČAVANJE RAČUNARA GASILO JE LAUNCHER.** Čim se otvori prozor za
+  admin izlaz (`Ctrl+Alt+Shift+Q`), launcher upamti „izlazim" — i onda ga je
+  **bilo kakvo** otključavanje gasilo: radnik sa panela, *Otključaj sve* (gasi
+  svaku takvu mašinu odjednom), ili sam igrač PIN-om na zaključanom ekranu.
+  Mašina ostaje bez launchera do sledećeg paljenja. Splet okolnosti nije redak
+  nego svakodnevni: na zaključanom ekranu stoje **dva polja za PIN**, pa radnik
+  ukuca u ono koje mu je bliže. Uzrok: ostatak iz vremena kad je admin izlaz išao
+  kroz istu poruku kao otključavanje
+- [x] **Zaglavljena vrtnja točka zamrzavala je kredit ZAUVEK.** Klik upali
+  „vrtnja traje", a ishod se čeka sa servera; dok vrtnja traje launcher namerno
+  odbacuje svako novo stanje kredita (da se brojka ne promeni pre nego što igrač
+  sazna šta je dobio). Ako odgovor nikad ne stigne — veza pukne baš u tih pet
+  sekundi — HUD ostaje zamrznut dok naplata teče: igrač gleda „1000 din, ostalo
+  8:20" dok mu vreme curi, računar se zaključa bez upozorenja, a dopuna na kasi
+  se ne vidi pa radnik dopunjuje drugi put. Sada rok od 12 s i otpuštanje čim
+  veza padne. Prijava i porudžbina su rok imale od ranije; točak je bio jedini bez
+- [x] **Način plaćanja se nije vraćao.** Kad kredita nema, program sam prebaci na
+  keš — ali nikad nazad. Igrač sa 100 din doda kolu od 130 (skoči na keš),
+  predomisli se i uzme vodu od 80: kredit sad ima, a i dalje piše „Keš". Isto i
+  kad ga radnik dopuni. Gost plaća kešom nešto što je već platio, a radnik ustaje
+  bez potrebe. Sada se pamti da li je keš bio **igračev** izbor
+- [x] **Escape nije čistio ono što čisti „Odustani"** u prozoru za PIN — svrha je
+  ostajala od prošlog otvaranja. Danas se ne može iskoristiti, ali svrha koja
+  preživi odustajanje bi pri prvoj sledećoj upotrebi obrisala launcheru adresu
+  servera umesto da izađe iz kioska
+- [x] Pregledani i **bez nalaza**: tajmeri (svi se gase pre postavljanja, nema
+  gomilanja), slušaoci događaja (svi na `document`, registrovani jednom),
+  bekstvo teksta u HTML (`esc` svuda gde ulaze podaci iz baze), korpa i
+  ograničenje količine, pokretanje igara, donja statusna traka
 - [x] Uklonjen mrtav kod iz `auth.js` (tokeni igrača koje niko nije pozivao);
   `.claude/launch.json` je pokazivao na port 8090, server radi na 8095
 - [x] **Fabrički servisni PIN više nije tih** - launcher uz MAC adrese javlja i
