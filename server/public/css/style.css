@@ -816,6 +816,14 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 /* "pre-line" da prazan red u poruci ostane prazan red. Bez toga se upozorenje
    slepi uz prethodnu recenicu i procita se kao nastavak, a ne kao upozorenje. */
 .confirm-s { font-size: 13px; color: var(--text-2); line-height: 1.55; white-space: pre-line; }
+/* Ono sto se NE SME prevideti pre potvrde - npr. da tri gosta trenutno igraju i
+   da ce im igra biti ugasena. Stoji odvojeno od obicnog objasnjenja, jer se
+   objasnjenje posle petog puta preskace pogledom. */
+.confirm-hi {
+  margin-top: 10px; padding: 9px 12px; border-radius: var(--r);
+  background: var(--danger-soft); border: 1px solid rgba(229, 72, 77, 0.32);
+  font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.5;
+}
 .confirm-row { display: flex; gap: 8px; margin-top: 20px; }
 .confirm-row .btn { flex: 1; padding: 9px; }
 .modal.confirm .field { text-align: left; margin-top: 16px; }

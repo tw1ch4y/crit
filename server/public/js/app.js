@@ -222,6 +222,12 @@ function confirmDialog(text, opts = {}) {
       <div class="confirm-ic ${opts.danger ? "danger" : ""}">${icon(opts.danger ? "alert" : "info")}</div>
       <div class="confirm-t">${esc(opts.title || "Potvrda")}</div>
       <div class="confirm-s">${esc(text)}</div>
+      ${/* Posebno naglašena rečenica ispod objašnjenja - ono što se NE SME
+           prevideti (npr. "trenutno igraju 3 igrača, igra će im biti ugašena").
+           Ide kao svoje polje, a ne kao HTML u tekstu, jer se tekst BEŽI: u
+           njemu se pojavljuju imena računara i naloga, koja ne smeju da postanu
+           oznake. */ ""}
+      ${opts.istaknuto ? `<div class="confirm-hi">${esc(opts.istaknuto)}</div>` : ""}
       <div class="confirm-row">
         <button class="btn" data-c="no">Otkaži</button>
         <button class="btn ${opts.danger ? "btn-danger-solid" : "btn-primary"}" data-c="yes">${esc(opts.ok || "Potvrdi")}</button>
@@ -1067,13 +1073,27 @@ async function bulkClick(action) {
     });
     return;
   }
-  if (action === "shutdown" || action === "restart") {
-    const ok = await confirmDialog(
-      action === "shutdown" ? `Ugasiće se ${ids.length} označenih računara.` : `Restartovaće se ${ids.length} označenih računara.`,
-      { title: action === "shutdown" ? "Gašenje računara" : "Restart računara", ok: action === "shutdown" ? "Ugasi" : "Restartuj", danger: true }
-    );
-    if (!ok) return;
-  }
+  // KOLIKO IH TRENUTNO IGRA - to je jedini broj koji ovde nešto znači.
+  //
+  // "Zaključaj" i "Odjavi" na računaru sa igračem zatvaraju sesiju i GASE MU
+  // IGRU. Do sada su išli bez ijednog pitanja, dok su "Ugasi" i "Restart" imali
+  // potvrdu - a posledica je ista: čovek usred meča ostaje bez igre. U igraonici
+  // je to najskuplja greška koja se pravi jednim promašenim klikom, jer gost
+  // koji tako izgubi partiju sledeći put ide preko puta.
+  const igraju = ids.filter((id) => state.computers.find((c) => c.id === id)?.player).length;
+  const uzIgrace = igraju
+    ? `Od toga ${igraju === 1 ? "1 računar ima igrača koji trenutno igra" : `${igraju} ${oblik(igraju, "računar ima igrača koji", "računara imaju igrače koji", "računara ima igrače koji")} trenutno ${igraju === 1 ? "igra" : "igraju"}`} - igra će im biti ugašena.`
+    : null;
+
+  const potvrde = {
+    shutdown: { text: `Ugasiće se ${ids.length} označenih računara.`, istaknuto: uzIgrace, title: "Gašenje računara", ok: "Ugasi", danger: true },
+    restart: { text: `Restartovaće se ${ids.length} označenih računara.`, istaknuto: uzIgrace, title: "Restart računara", ok: "Restartuj", danger: true },
+    lock: igraju ? { text: `Zaključaće se ${ids.length} označenih računara.`, istaknuto: uzIgrace, title: "Zaključavanje računara", ok: "Zaključaj", danger: true } : null,
+    logout: igraju ? { text: `Odjaviće se igrači sa ${ids.length} označenih računara.`, istaknuto: uzIgrace, title: "Odjava igrača", ok: "Odjavi", danger: true } : null,
+  }[action];
+  // Zaključavanje i odjava PRAZNIH računara ne pitaju ništa - nema šta da se
+  // prekine, a pitanje bez sadržaja se nauči da se preskače.
+  if (potvrde && !(await confirmDialog(potvrde.text, potvrde))) return;
   try {
     const r = await api("/computers-action", "POST", { ids, action });
     toast(`Izvršeno na ${r.sent} od ${r.total} računara`, "success");
@@ -1083,10 +1103,17 @@ async function bulkClick(action) {
 }
 
 async function shiftAction(action) {
+  // Isto kao kod grupnih akcija: broj onih koji TRENUTNO IGRAJU je jedino što
+  // ovde nešto znači. "Zaključaj sve" na punoj igraonici gasi igru svima
+  // odjednom, a stara poruka to nije ni pominjala.
+  const igraju = state.computers.filter((c) => c.player).length;
+  const uzIgrace = igraju
+    ? `Trenutno ${igraju === 1 ? "igra 1 igrač" : `igraju ${igraju} igrača`} - igra će im biti ugašena.`
+    : null;
   const conf = {
-    shutdown: { text: "Svi računari će biti ugašeni.", title: "Kraj smene", ok: "Ugasi sve", danger: true },
-    lock: { text: "Svi računari će biti zaključani.", title: "Zaključavanje svih računara", ok: "Zaključaj sve", danger: false },
-    unlock: { text: "Svi zaključani računari će biti otključani.", title: "Otključavanje", ok: "Otključaj sve", danger: false },
+    shutdown: { text: "Svi računari će biti ugašeni.", istaknuto: uzIgrace, title: "Kraj smene", ok: "Ugasi sve", danger: true },
+    lock: { text: "Svi računari će biti zaključani.", istaknuto: uzIgrace, title: "Zaključavanje svih računara", ok: "Zaključaj sve", danger: !!igraju },
+    unlock: { text: "Svi zaključani računari će biti otključani. Sesije koje su u toku se ne diraju.", title: "Otključavanje", ok: "Otključaj sve", danger: false },
   }[action];
   if (!(await confirmDialog(conf.text, conf))) return;
   try {

@@ -239,5 +239,32 @@ for (const ruta of ['api\\("/pos"', "api\\(`/players/\\$\\{[^}]+\\}/topup`", "ap
 }
 proveri("nijedno dugme koje menja novac nije ostalo bez zastite", nezasticeni.length === 0, nezasticeni.join(" | "));
 
+// ---- GRUPNA AKCIJA KOJA GASI IGRU MORA DA PITA ----
+//
+// "Zakljucaj" i "Odjavi" na racunaru sa igracem zatvaraju sesiju i GASE MU
+// IGRU - isto kao "Ugasi", samo sto su "Ugasi" i "Restart" imali potvrdu a ova
+// dva nisu. Jedan promasen klik na punoj igraonici prekida mec svima odjednom,
+// a gost koji tako izgubi partiju sledeci put ide preko puta.
+//
+// Potvrda pri tom mora da kaze KOLIKO IH TRENUTNO IGRA - to je jedini broj koji
+// tu nesto znaci. "Zakljucace se 5 racunara" ne govori nista.
+proveri("grupna akcija broji koliko ih trenutno igra",
+  /const igraju = ids\.filter\(\(id\) => state\.computers\.find\(\(c\) => c\.id === id\)\?\.player\)\.length/.test(app));
+for (const akcija of ["lock", "logout"]) {
+  proveri(`grupno "${akcija}" pita kad neko igra`, new RegExp(`${akcija}: igraju \\?`).test(app),
+    "zatvara sesiju i gasi igru isto kao gasenje racunara");
+}
+proveri("prazni racunari se ne pitaju", /igraju \? \{ text: `Zaključaće se/.test(app),
+  "pitanje bez sadrzaja se nauci da se preskace, pa se onda preskoci i ono pravo");
+proveri("i 'Ugasi sve' kaze koliko ih igra", /const igraju = state\.computers\.filter\(\(c\) => c\.player\)\.length/.test(app));
+proveri("grupno otkljucavanje kaze da ne dira sesije",
+  /Sesije koje su u toku se ne diraju/.test(app),
+  "radnik inace ne zna sme li da ga pusti dok je igraonica puna");
+
+// Istaknuta recenica ide kao svoje polje, ne kao HTML u tekstu: tekst se BEZI
+// jer u njemu stoje imena racunara i naloga.
+proveri("istaknuto upozorenje ima svoje polje", /opts\.istaknuto \? `<div class="confirm-hi">\$\{esc\(opts\.istaknuto\)\}/.test(app));
+proveri("istaknuto upozorenje ima svoj stil", /\.confirm-hi \{/.test(css));
+
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 process.exit(pao ? 1 : 0);
