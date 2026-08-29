@@ -395,6 +395,8 @@ export function computersSnapshot() {
       ip: c.ip || null,
       mac: c.mac || null,
       verzija: c.launcher_version || null,
+      // null = launcher to ne javlja (starija verzija); true = PIN je fabrički
+      pinFabricki: c.pin_fabricki == null ? null : !!c.pin_fabricki,
       connectedAt: connectedSince.get(c.id) || null,
       player,
       session,
@@ -2526,6 +2528,32 @@ function normalizeMac(mac) {
   return hex.toUpperCase().match(/.{2}/g).join(":");
 }
 function clientSysInfo(computerId, msg) {
+  // FABRICKI SERVISNI PIN SE PRIJAVLJUJE, NE PRECUTKUJE.
+  //
+  // Launcher javlja da li mu je servisni PIN jos uvek 1234. Taj PIN cuva ulaz u
+  // podesavanja i izlaz iz kioska kad server ne radi - dok je fabricki, igrac
+  // koji iscupa mrezni kabl moze da preusmeri masinu na svoj server i tako sebi
+  // otvori besplatnu igru. Menja se rucno po masini, pa se na trinaestoj
+  // zaboravi, a zaboravljeno se nikad ne primeti samo od sebe.
+  //
+  // Isti pristup kao za fabricku lozinku vlasnika: sistem to ne moze da popravi
+  // umesto coveka, ali moze da stoji crveno dok se ne popravi.
+  //
+  // Stariji launcheri ovo ne salju. Tada se NE dira ono sto vec znamo - prazno
+  // polje znaci "ne javlja", ne "sve je u redu".
+  if (typeof msg.fabrickiPin === "boolean") {
+    const staro = db.prepare("SELECT pin_fabricki FROM computers WHERE id=?").get(computerId)?.pin_fabricki;
+    const novo = msg.fabrickiPin ? 1 : 0;
+    if (staro !== novo) {
+      db.prepare("UPDATE computers SET pin_fabricki=? WHERE id=?").run(novo, computerId);
+      if (novo) {
+        logEvent({ category: "sistem", action: "pin_fabricki", actor: "sistem", target: compName(computerId),
+          detail: "Servisni PIN launchera je fabrički (1234). Dok je tako, igrač koji iščupa mrežni kabl može da preusmeri računar na svoj server." });
+      }
+      pushComputers();
+    }
+  }
+
   const nics = Array.isArray(msg.nics) ? msg.nics : (msg.mac ? [{ ip: null, mac: msg.mac }] : []);
   if (!nics.length) return;
   const c = db.prepare("SELECT ip, mac FROM computers WHERE id=?").get(computerId);

@@ -347,7 +347,7 @@ router.get("/computers", (req, res) => {
   const tokens = new Map(db.prepare("SELECT id, token FROM computers").all().map((r) => [r.id, r.token]));
   res.json(svc.computersSnapshot().map((c) => ({
     id: c.id, name: c.name, status: c.status, online: c.online,
-    ip: c.ip, mac: c.mac, verzija: c.verzija, lastSeen: c.lastSeen, token: tokens.get(c.id),
+    ip: c.ip, mac: c.mac, verzija: c.verzija, pinFabricki: c.pinFabricki, lastSeen: c.lastSeen, token: tokens.get(c.id),
   })));
 });
 

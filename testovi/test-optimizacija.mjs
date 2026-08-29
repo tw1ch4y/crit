@@ -67,9 +67,16 @@ for (const gotovo of ["Plan napajanja na **High Performance**", "Vremenski paket
   const red = plan.split("\n").find((l) => l.includes(gotovo));
   proveri(`plan zna da je gotovo: ${gotovo.replace(/\*/g, "").slice(0, 34)}`, !!red && red.startsWith("- [x]"), red?.slice(0, 60));
 }
+// Svaka neurađena stavka mora da kaže U KOM JE STANJU. Bez toga se posle dva
+// meseca ne razlikuje ono što je namerno odbačeno od onoga što je ispalo iz
+// glave - a jedino drugo traži da se nešto uradi.
+//
+// "sledeće na redu" i "planirano" su dodati kasnije: plan je u početku imao samo
+// gotovo i odbačeno, pa je i rečnik pokrivao sve. Čim se pojavila stavka koja je
+// prihvaćena i čeka red, pravilo ju je odbijalo iako je uredno objašnjena.
 proveri("neurađeno stoji uz razlog zašto",
-  plan.split("\n").filter((l) => l.startsWith("- [ ]")).every((l) => /NIJE urađeno|ne planira se|preporuka|Nije potrebna/.test(l)),
-  "stavka bez objašnjenja ne kaže da li je zaboravljena ili odbačena");
+  plan.split("\n").filter((l) => l.startsWith("- [ ]")).every((l) => /NIJE urađeno|ne planira se|preporuka|Nije potrebna|sledeće na redu|planirano/.test(l)),
+  "stavka bez objašnjenja ne kaže da li je zaboravljena, odbačena ili čeka red");
 proveri("odlaganje ažuriranja je objašnjeno u uputstvu",
   /Active hours/.test(citajIzvor("DEPLOY.md")),
   "restart nasred turnira je najskuplji kvar u igraonici");

@@ -170,10 +170,23 @@
   greška ušla
 - [x] Uklonjen mrtav kod iz `auth.js` (tokeni igrača koje niko nije pozivao);
   `.claude/launch.json` je pokazivao na port 8090, server radi na 8095
-- [ ] **Servisni PIN mora da prestane da bude `1234`** - sledeće na redu.
-  Zaštita koja zavisi od toga da se neko seti ručnog koraka nije zaštita
-- [ ] **Auto-update launchera** preko sopstvenog servera (`electron-updater`) -
-  13 mašina × ručna prijava na admin nalog po verziji
+- [x] **Fabrički servisni PIN više nije tih** - launcher uz MAC adrese javlja i
+  da li mu je servisni PIN još `1234`. Kontrolna tabla stoji crveno i **nabraja
+  imena mašina** (bez imena vlasnik zna da negde nešto fali, ali mora da obiđe
+  svih trinaest da nađe koju), a zapis ide i u Logove. Stariji launcher to ne
+  šalje - tada se ne dira poznato stanje, jer prazno polje znači "ne javlja", ne
+  "u redu je"
+- [ ] **Servisni PIN da se deli sa servera** - *sledeće na redu.* Gornje
+  upozorenje čini zaborav vidljivim, ali PIN se i dalje menja ručno po mašini.
+  Trebalo bi da se upiše jednom u panelu i stigne na sve launchere (kao heš, uz
+  čuvanje u `config.json` koji nadogradnja ne dira), da radi i kad server ne
+  odgovara. Nije urađeno odmah jer dira jedini izlaz iz kioska: pogrešan potez
+  tu zaključava osoblje na svih trinaest mašina, pa traži probu na pravoj
+  mašini pre nego što se pusti
+- [ ] **Auto-update launchera** preko sopstvenog servera - *planirano*
+  (`electron-updater`). Sada je 13 mašina × ručna prijava na administratorski
+  nalog po svakoj verziji; to se uradi dvaput, treći put se preskoči, i za mesec
+  dana u prostoriji stoji pet različitih verzija
 
 ---
 

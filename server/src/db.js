@@ -276,6 +276,9 @@ function migrate() {
   // može znati koja je gde instalirana - jedan računar se ponaša drugačije, a
   // nigde ne piše zašto. Upisuje se pri svakom povezivanju.
   if (!columnExists("computers", "launcher_version")) db.exec("ALTER TABLE computers ADD COLUMN launcher_version TEXT");
+  // Da li je servisni PIN launchera na toj masini jos fabricki (1234). NULL =
+  // launcher to ne javlja (starija verzija), sto NIJE isto sto i "u redu je".
+  if (!columnExists("computers", "pin_fabricki")) db.exec("ALTER TABLE computers ADD COLUMN pin_fabricki INTEGER");
   // konačne brojke smene se čuvaju pri zatvaranju (da se ne preračunavaju iz logova)
   if (!columnExists("shifts", "total_shop_cash")) db.exec("ALTER TABLE shifts ADD COLUMN total_shop_cash REAL");
   if (!columnExists("shifts", "total_sessions")) db.exec("ALTER TABLE shifts ADD COLUMN total_sessions REAL");

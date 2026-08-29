@@ -227,7 +227,14 @@ function connectWs() {
   sveza.on("open", () => {
     if (!jeAktuelna()) return;
     sendToRenderer("ws-status", { connected: true });
-    wsSend({ t: "sys_info", nics: localNics() }); // MAC adrese za Wake-on-LAN
+    // Uz MAC adrese (za Wake-on-LAN) ide i da li je servisni PIN jos fabricki.
+    //
+    // Taj PIN cuva ulaz u podesavanja launchera i izlaz iz kioska kad server ne
+    // radi. Dok stoji na 1234, igrac koji iscupa mrezni kabl moze da preusmeri
+    // masinu na svoj server. Menja se rucno, po masini - a rucni korak se
+    // zaboravi bas na onoj trinaestoj. Sam launcher to ne moze da resi, ali moze
+    // da PRIJAVI, pa panel vise ne cuti o tome.
+    wsSend({ t: "sys_info", nics: localNics(), fabrickiPin: servisniPin() === FABRICKI_PIN });
   });
   sveza.on("message", (buf) => {
     if (!jeAktuelna()) return;

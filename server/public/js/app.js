@@ -772,6 +772,30 @@ function upozorenjeLozinka() {
   </div>`;
 }
 
+// SERVISNI PIN LAUNCHERA JOŠ FABRIČKI.
+//
+// Taj PIN čuva ulaz u podešavanja launchera i izlaz iz kioska kad server ne
+// radi. Dok stoji na 1234, igrač koji iščupa mrežni kabl može da preusmeri
+// računar na svoj server i tako sebi otvori besplatnu igru.
+//
+// Menja se ručno, po mašini - a ručni korak se zaboravi baš na onoj trinaestoj.
+// Zato ovde stoje IMENA računara: bez njih vlasnik zna da negde nešto fali, ali
+// mora da obiđe sve mašine da nađe koju. Isti razlog zbog kog je i fabrička
+// lozinka vlasnika dobila svoje upozorenje.
+function upozorenjePin() {
+  if (!isOwner()) return "";
+  const masine = state.computers.filter((c) => c.pinFabricki === true).map((c) => c.name);
+  if (!masine.length) return "";
+  return `<div class="upozorenje-fabricko" id="upozPin">
+    ${icon("alert")}
+    <div>
+      <b>Servisni PIN launchera je fabrički (1234) na ${masine.length === 1 ? "računaru" : `${masine.length} računara`}: ${esc(masine.join(", "))}.</b>
+      <span>Taj PIN čuva ulaz u podešavanja launchera i izlaz iz kioska kad server ne radi. Dok je fabrički, igrač koji iščupa mrežni kabl može da preusmeri računar na svoj server.
+      Menja se na samoj mašini: u folderu gde je launcher instaliran, podfolder <span class="mono">resources</span>, fajl <span class="mono">podesavanja.json</span>, polje <span class="mono">servisniPin</span>. Posle izmene restartuj launcher.</span>
+    </div>
+  </div>`;
+}
+
 async function renderDashboard() {
   let rep = {};
   try { rep = await api("/report"); } catch {}
@@ -792,6 +816,7 @@ async function renderDashboard() {
     <div class="page-head"><div><h1>Kontrolna tabla</h1><div class="sub">${state.computers.length} računara u mreži</div></div>
       <button class="btn" id="dashOrder">${icon("plus")} Porudžbina</button></div>
     ${upozorenjeLozinka()}
+    ${upozorenjePin()}
     ${upozorenjeSmena()}
     <div class="stat-strip">
       <div class="stat"><div class="k">Zauzeto</div><div class="v online">${online}</div></div>
