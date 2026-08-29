@@ -186,6 +186,22 @@
      ne zavisi ni od jedne zastavice
   Uz to test koji čita svaki alat u `testovi/` i ne da da neki pusti pravi
   launcher bez brave, ni da postavi bravu POSLE učitavanja
+- [x] **„Promet danas" na kontrolnoj tabli lagao je na dve strane.** To je
+  jedina brojka koju vlasnik pogleda u prolazu, sa telefona. (a) **Nije videla
+  nikoga ko trenutno igra** - trošak sesije se u `transactions` upisuje tek pri
+  završetku, pa je u osam uveče, sa deset zauzetih mašina po dva sata,
+  nedostajalo oko 2400 dinara; „zarada po računaru" u Izveštajima ih je pri tom
+  videla, pa su se dva broja na istoj strani razilazila. (b) **Brojala je
+  otkazane porudžbine** - keš jer filter po statusu nije ni pisan, a kupovina sa
+  naloga jer se čitala iz `transactions`, gde povraćaj ulazi kao zaseban red i
+  original ne poništava. Obračun smene i Izveštaji su otkazano oduvek izbacivali;
+  tabla je jedina pokazivala više, i to zauvek
+- [x] **Proba koja menja miša i zvuk se ne pušta na razvojnom računaru** -
+  `proba-podesavanja.mjs` stvarno menja mašinu na kojoj se pusti (tako se to
+  jedino i može proveriti). `node pokreni-probe.mjs` pušta sve alate, pa bi
+  usput promenio miša usred posla. Sad se odbija na mašini sa
+  `CRIT-NE-DIRAJ.txt`, i vraća zatečeno i kad se prekine sa Ctrl+C - dotad je
+  vraćanje stajalo samo u `finally`, koji prekid ne hvata
 - [x] Uklonjen mrtav kod iz `auth.js` (tokeni igrača koje niko nije pozivao);
   `.claude/launch.json` je pokazivao na port 8090, server radi na 8095
 - [x] **Fabrički servisni PIN više nije tih** - launcher uz MAC adrese javlja i
