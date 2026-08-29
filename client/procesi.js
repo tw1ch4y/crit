@@ -97,10 +97,15 @@ function zabranjenaPutanja(putanja, env) {
 
   const HOME = String(env.USERPROFILE || "").toLowerCase();
   const TEMP = String(env.TEMP || "").toLowerCase();
+  // Zavrsna kosa crta je bitna: bez nje "...\downloads" hvata i
+  // "...\downloads-igre\game.exe", pa bi se uredno instalirana igra u folderu
+  // takvog imena gasila igracu usred partije. Poredi se FOLDER, ne pocetak
+  // teksta.
+  const uz = (s) => (s.endsWith("\\") ? s : s + "\\");
   const mesta = [
-    HOME && path.join(HOME, "downloads").toLowerCase(),
-    TEMP,
-    HOME && path.join(HOME, "desktop").toLowerCase(),
+    HOME && uz(path.join(HOME, "downloads").toLowerCase()),
+    TEMP && uz(TEMP),
+    HOME && uz(path.join(HOME, "desktop").toLowerCase()),
   ].filter(Boolean);
   return mesta.some((m) => p.startsWith(m));
 }

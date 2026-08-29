@@ -511,20 +511,66 @@ function ocistiTragove() {
 function reportInstall(program, state, message) {
   wsSend({ t: "install_status", program, state, message });
 }
+// PREUZIMANJE INSTALACIJE.
+//
+// Ono što se ovde skine biće POKRENUTO na računaru igrača, pa je jedina stvar
+// koja se ne sme desiti da nedovršen fajl prođe kao gotov.
+//
+// Dve zamke su bile otvorene:
+//
+//  1. Povratni poziv je mogao da opali DVAPUT. Kad preuzimanje pukne nasred
+//     (istekne vreme, mreža padne), greška stiže i sa zahteva i sa fajla, pa
+//     panel dobije dva odgovora za istu instalaciju - a u nezgodnom redosledu i
+//     "greška" i "gotovo" za isti posao.
+//  2. Nedovršen fajl se nije prepoznavao. Prekinuto preuzimanje ostavlja pola
+//     .exe-a; Windows ga uredno pokrene i on pukne uz poruku koju niko ne ume
+//     da protumači. Zato se veličina poredi sa onim što je server najavio.
 function downloadFile(url, dest, cb, redirects = 0) {
   const mod = url.startsWith("https") ? https : http;
+  // Jedan posao - jedan odgovor.
+  let odgovoreno = false;
+  const gotovo = (greska) => {
+    if (odgovoreno) return;
+    odgovoreno = true;
+    // Pola fajla ne sme da ostane na disku: sledeći pokušaj bi mogao da naiđe
+    // na njega, a i sam po sebi zauzima mesto koje niko ne čisti.
+    if (greska) { try { fs.unlinkSync(dest); } catch {} }
+    cb(greska);
+  };
+
   const req = mod.get(url, (res) => {
     if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location && redirects < 6) {
       res.resume();
-      return downloadFile(res.headers.location, dest, cb, redirects + 1);
+      if (odgovoreno) return;
+      // Location sme da bude RELATIVAN ("/download/setup.exe") - HTTP to
+      // dozvoljava i mreze za isporuku sadrzaja to koriste. Prosledjen ovakav
+      // kakav je, http.get puca na "Invalid URL", pa program iz biblioteke
+      // instalacija odbija da se skine bez ijednog razumljivog razloga.
+      let sledeci;
+      try { sledeci = new URL(res.headers.location, url).href; }
+      catch { return gotovo(new Error("neispravno preusmerenje: " + res.headers.location)); }
+      odgovoreno = true; // dalje odgovara pozvani
+      return downloadFile(sledeci, dest, cb, redirects + 1);
     }
-    if (res.statusCode !== 200) { res.resume(); return cb(new Error("HTTP " + res.statusCode)); }
+    if (res.statusCode !== 200) { res.resume(); return gotovo(new Error("HTTP " + res.statusCode)); }
+
+    const najavljeno = Number(res.headers["content-length"]) || 0;
+    let skinuto = 0;
+    res.on("data", (d) => { skinuto += d.length; });
+
     const file = fs.createWriteStream(dest);
     res.pipe(file);
-    file.on("finish", () => file.close(() => cb(null)));
-    file.on("error", (e) => cb(e));
+    res.on("error", (e) => { try { file.destroy(); } catch {} gotovo(e); });
+    file.on("error", (e) => gotovo(e));
+    file.on("finish", () => file.close(() => {
+      if (najavljeno && skinuto !== najavljeno) {
+        return gotovo(new Error(`preuzeto ${skinuto} od ${najavljeno} bajtova - veza je pukla nasred`));
+      }
+      if (!skinuto) return gotovo(new Error("preuzet prazan fajl"));
+      gotovo(null);
+    }));
   });
-  req.on("error", (e) => cb(e));
+  req.on("error", (e) => gotovo(e));
   req.setTimeout(180000, () => req.destroy(new Error("Isteklo vreme preuzimanja")));
 }
 function runInstall({ name, url, args }) {
@@ -544,8 +590,15 @@ function runInstall({ name, url, args }) {
         if (/\.msi$/i.test(dest)) { cmd = "msiexec"; cargs = ["/i", dest, ...(args ? args.split(" ").filter(Boolean) : ["/qn"])]; }
         else { cmd = dest; cargs = args ? args.split(" ").filter(Boolean) : []; }
         const child = spawn(cmd, cargs, { windowsHide: true });
-        child.on("exit", (code) => reportInstall(name, code === 0 ? "done" : "error", code === 0 ? "Instalirano" : "Instalacija je vratila kod " + code));
-        child.on("error", (e) => reportInstall(name, "error", e.message));
+        // Skinuta instalacija se briše kad odradi svoje. Bez toga se u Temp
+        // fascikli gomilaju puni instalateri - Steam, Chrome i Firefox su
+        // zajedno oko 300 MB po prolazu, a niko ih ne čisti.
+        const pospremi = () => { try { fs.unlinkSync(dest); } catch {} };
+        child.on("exit", (code) => {
+          reportInstall(name, code === 0 ? "done" : "error", code === 0 ? "Instalirano" : "Instalacija je vratila kod " + code);
+          pospremi();
+        });
+        child.on("error", (e) => { reportInstall(name, "error", e.message); pospremi(); });
       } catch (e) { reportInstall(name, "error", e.message); }
     });
   } catch (e) { reportInstall(name, "error", e.message); }

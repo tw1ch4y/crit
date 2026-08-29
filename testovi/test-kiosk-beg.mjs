@@ -65,6 +65,33 @@ proveri("alatke za programere su samo u dev rezimu", /devTools: DEV/.test(main))
 proveri("presretanje pokretanja postoji", /presretniPokretanja/.test(main));
 proveri("blokiranje preuzetih programa se moze ukljuciti", /blokirajPreuzeteProgram/.test(pod));
 
+// A sada ista stvar PONASANJEM, ne citanjem koda: pusta se prava funkcija koja
+// odlucuje sta se gasi. Gornje dve provere hvataju da je neko obrisao liniju;
+// ove hvataju da odluka nije tacna - a ta razlika se ovde placa skupo na obe
+// strane. Prestrogo gasi igru igracu usred partije, preblago pusta .exe koji je
+// upravo skinuo.
+const { createRequire } = await import("node:module");
+const { zabranjenaPutanja } = createRequire(import.meta.url)("../client/procesi.js");
+const B = String.fromCharCode(92); // obrnuta kosa crta
+const env = { USERPROFILE: `C:${B}Users${B}igrac`, TEMP: `C:${B}Users${B}igrac${B}AppData${B}Local${B}Temp` };
+const put = (...d) => d.join(B);
+
+for (const [opis, p, ocekivano] of [
+  ["skinut .exe iz Preuzimanja", put("C:", "Users", "igrac", "Downloads", "hack.exe"), true],
+  ["nesto ostavljeno na radnoj povrsini", put("C:", "Users", "igrac", "Desktop", "cheat.exe"), true],
+  ["pokrenuto iz Temp fascikle", put("C:", "Users", "igrac", "AppData", "Local", "Temp", "x.exe"), true],
+  ["nasa daljinska instalacija", put("C:", "Users", "igrac", "AppData", "Local", "Temp", "crit-install", "setup.exe"), false],
+  ["uredno instalirana igra", put("C:", "Games", "CS2", "cs2.exe"), false],
+  // Bez zavrsne kose crte u poredjenju, "...\Downloads" hvata i
+  // "...\Downloads-igre". Igra u folderu takvog imena bi se gasila igracu
+  // usred partije, a iz panela bi to izgledalo kao da igra puca sama od sebe.
+  ["folder koji samo POCINJE isto (Downloads-igre)", put("C:", "Users", "igrac", "Downloads-igre", "game.exe"), false],
+  ["folder koji samo POCINJE isto (DesktopIgre)", put("C:", "Users", "igrac", "DesktopIgre", "game.exe"), false],
+]) {
+  const r = zabranjenaPutanja(p, env);
+  proveri(`${ocekivano ? "gasi" : "pusta"}: ${opis}`, r === ocekivano, `dobijeno ${r ? "gasi" : "pusta"} za ${p}`);
+}
+
 // ---- 6) prekid veze ne oslobadja racunar ----
 proveri("prekid veze pokriva ekran", /show\("connScreen"\)/.test(rend));
 proveri("naplata staje dok nema veze", /stopTimer\(\)/.test(rend));
