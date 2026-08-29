@@ -1,6 +1,7 @@
 import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
 import { KOREN, radniFolder, ugasiLaunchere } from "./_okruzenje.mjs";
 // MIS I ZVUK: DA SE STVARNO PROMENI I DA SE STVARNO VRATI
 //
@@ -12,10 +13,25 @@ import { KOREN, radniFolder, ugasiLaunchere } from "./_okruzenje.mjs";
 //   2. pri odjavi se mora vratiti ZATECENO - inace sledeci gost sedne za
 //      racunar sa tudjim mis podesavanjima, i tako kroz ceo dan
 //
-// PAZNJA: ova proba menja podesavanja masine na kojoj se pusta. Zato na pocetku
-// snima zatecno stanje i na kraju ga vraca, bez obzira na ishod.
+// PAZNJA: ova proba MENJA PODESAVANJA MASINE na kojoj se pusta - brzinu misa,
+// ubrzanje pokazivaca i jacinu zvuka. Na pocetku snima zatecno stanje i vraca ga
+// na kraju, bez obzira na ishod, pa i kad se prekine sa Ctrl+C.
 //
-//   node proba-podesavanja.mjs
+// Na racunaru na kom se program PISE se ne pusta: tamo covek radi, a prekinuta
+// proba bi mu ostavila promenjenog misa usred posla. Zato se odbija na masini
+// koja nosi CRIT-NE-DIRAJ.txt (isti fajl koji cuva i od ciscenja sesije).
+//
+//   node proba-podesavanja.mjs          na masini u igraonici
+//   node proba-podesavanja.mjs --ipak   i na zasticenoj, ako bas mora
+import os from "node:os";
+if (fs.existsSync(path.join(os.homedir(), "CRIT-NE-DIRAJ.txt")) && !process.argv.includes("--ipak")) {
+  console.log("  PRESKOCENO  ovaj racunar je zasticen (CRIT-NE-DIRAJ.txt u korisnickom folderu).");
+  console.log("              Proba menja misa i zvuk ove masine, pa se ovde ne pusta.");
+  console.log("              Pusti je na racunaru u igraonici, ili dodaj --ipak.\n");
+  console.log("0/0 proslo");
+  process.exit(0);
+}
+
 const PORT = 8203;
 const BASE = `http://127.0.0.1:${PORT}`;
 const DATA = radniFolder("podesavanja-data");
@@ -31,11 +47,43 @@ const winPod = await import(new URL("../client/windows-podesavanja.js", import.m
 // ---- zatecno stanje masine, da se na kraju vrati ----
 const zateceno = await winPod.procitajSve();
 console.log(`  (zatečeno na ovom računaru: miš ${zateceno.mis.brzina}, ubrzanje ${zateceno.mis.ubrzanje}, zvuk ${zateceno.zvuk.jacina})`);
+let vraceno = false;
 const vratiSve = async () => {
+  if (vraceno) return;
+  vraceno = true;
   try { await winPod.primeniMis(zateceno.mis); } catch {}
   try { if (zateceno.zvuk.jacina != null) await winPod.primeniZvuk({ jacina: zateceno.zvuk.jacina }); } catch {}
 };
-process.on("exit", () => {});
+
+// VRACANJE I KAD SE PROBA PREKINE.
+//
+// `finally` na kraju hvata gresku u samoj probi, ali ne i Ctrl+C ni neuhvacenu
+// gresku - a bas tada proba stane NA POLA, sa vec promenjenim misem. Covek za
+// tim racunarom bi ostao sa tudjim podesavanjima i ne bi znao odakle mu.
+//
+// Vracanje ide kroz `execFileSync` jer se pri gasenju procesa ne ceka na
+// obecanja: asinhroni poziv bi bio zakazan i nikad izvrsen.
+const vratiSinhrono = () => {
+  if (vraceno) return;
+  vraceno = true;
+  const { execFileSync } = createRequire(import.meta.url)("node:child_process");
+  const b = Math.max(1, Math.min(20, Number(zateceno.mis.brzina) || 10));
+  const u = zateceno.mis.ubrzanje ? 1 : 0;
+  try {
+    execFileSync("powershell", ["-NoProfile", "-NonInteractive", "-Command",
+      `$p="HKCU:\\Control Panel\\Mouse";` +
+      `Set-ItemProperty -Path $p -Name MouseSensitivity -Value "${b}";` +
+      `Set-ItemProperty -Path $p -Name MouseSpeed -Value "${u}";` +
+      `Set-ItemProperty -Path $p -Name MouseThreshold1 -Value "${u ? 6 : 0}";` +
+      `Set-ItemProperty -Path $p -Name MouseThreshold2 -Value "${u ? 10 : 0}"`,
+    ], { timeout: 8000, windowsHide: true, stdio: "ignore" });
+  } catch {}
+  console.log("\n  (prekinuto - podešavanja miša vraćena na zatečeno)");
+};
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"]) {
+  process.on(signal, () => { vratiSinhrono(); process.exit(130); });
+}
+process.on("uncaughtException", (e) => { vratiSinhrono(); console.error(e); process.exit(1); });
 
 const server = spawn(process.execPath, [path.join(KOREN, "server", "src", "index.js")], {
   env: { ...process.env, CRIT_DATA_DIR: DATA, PORT: String(PORT) }, stdio: "ignore",

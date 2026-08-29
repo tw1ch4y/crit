@@ -143,15 +143,37 @@ proveri("svaki alat koji pušta pravi launcher postavlja bravu", problemi.length
 const saZakljucaj = alati.filter((f) => /--zakljucaj/.test(fs.readFileSync(path.join(OVDE, f), "utf8")));
 proveri("nijedan alat ne traži zaključavanje izričito", saZakljucaj.length === 0, saZakljucaj.join(", "));
 
-// ---- 4) alat koji menja PODEŠAVANJA ove mašine mora to da kaže ----
-// proba-podesavanja.mjs stvarno menja miša i zvuk na računaru na kom se pušta.
-// Vraća ih na kraju, ali ako se prekine na pola, ostaju promenjeni.
+// ---- 4) alat koji menja OVU mašinu se na njoj i ne pušta ----
+//
+// proba-podesavanja.mjs stvarno menja brzinu miša, ubrzanje pokazivača i jačinu
+// zvuka na računaru na kom se pušta. Na mašini u igraonici je to u redu - tamo
+// se to i proverava. Na računaru na kom se program piše nije: tamo čovek radi, a
+// prekinuta proba bi mu ostavila promenjenog miša usred posla.
 const podes = path.join(OVDE, "proba-podesavanja.mjs");
+proveri("proba koja menja mašinu i dalje postoji", fs.existsSync(podes));
 if (fs.existsSync(podes)) {
   const t = fs.readFileSync(podes, "utf8");
-  proveri("proba koja menja mašinu to jasno piše u zaglavlju",
-    /MENJA PODEŠAVANJA|menja podešavanja|MENJA PODESAVANJA/i.test(t.slice(0, 2000)),
+  proveri("jasno piše u zaglavlju šta menja",
+    /MENJA PODESAVANJA MASINE|MENJA PODEŠAVANJA MAŠINE/i.test(t.slice(0, 2000)),
     "ko je pusti ne sme da bude iznenađen");
+  proveri("sama sebe odbija na zaštićenom računaru",
+    /CRIT-NE-DIRAJ\.txt[\s\S]{0,120}--ipak/.test(t),
+    "inače `node pokreni-probe.mjs` menja miša na razvojnoj mašini");
+  proveri("vraća zatečeno i kad se prekine (Ctrl+C)",
+    /SIGINT[\s\S]{0,120}vratiSinhrono/.test(t),
+    "finally ne hvata prekid, a proba tada stane sa vec promenjenim misem");
+  proveri("vraćanje pri prekidu je sinhrono",
+    /execFileSync/.test(t),
+    "pri gasenju procesa se ne ceka na obecanja - asinhroni poziv bi bio zakazan i nikad izvrsen");
+
+  // Ponašanjem: na OVOJ mašini mora da odbije ako je zaštićena.
+  if (fs.existsSync(path.join(os.homedir(), "CRIT-NE-DIRAJ.txt"))) {
+    const izlaz = execFileSync(process.execPath, [podes], { encoding: "utf8", cwd: OVDE });
+    proveri("na ovom računaru se stvarno preskače", /PRESKOCENO/.test(izlaz), izlaz.slice(0, 200));
+  } else {
+    console.log("  (ovaj računar nije zaštićen - preskočena provera ponašanja;");
+    console.log("   ako je ovo mašina na kojoj razvijaš, napravi ~/CRIT-NE-DIRAJ.txt)");
+  }
 }
 
 console.log(`\n${prosao}/${prosao + pao} proslo`);
