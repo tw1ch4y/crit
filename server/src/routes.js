@@ -817,9 +817,29 @@ router.get("/report", (req, res) => {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   const from = start.getTime();
-  const sessionRevenue = db.prepare("SELECT COALESCE(SUM(-amount),0) s FROM transactions WHERE type='session' AND created_at>=?").get(from).s;
-  const shopRevenue = db.prepare("SELECT COALESCE(SUM(-amount),0) s FROM transactions WHERE type='shop' AND created_at>=?").get(from).s;
-  const cashRevenue = db.prepare("SELECT COALESCE(SUM(total),0) s FROM orders WHERE payment='cash' AND created_at>=?").get(from).s;
+  // PROMET DANAS MORA DA VIDI I ONE KOJI TRENUTNO IGRAJU.
+  //
+  // Trošak sesije se u `transactions` upisuje tek kad se sesija ZAVRŠI. Dok se
+  // gledalo samo tamo, kontrolna tabla u osam uveče nije brojala nikoga ko je za
+  // računarom: sa deset zauzetih mašina po dva sata to je oko 2400 dinara koje
+  // vlasnik ne vidi, pa mu veče izgleda slabo dok je u stvari puno.
+  //
+  // Zato se dodaje i ono što je do sada nateklo aktivnim sesijama. Kad se takva
+  // sesija završi, njen zapis stigne sa PUNIM iznosom i istim datumom, pa brojka
+  // ne poskoči - ovo je isto ono što bi ionako ušlo, samo ranije.
+  const zavrsene = db.prepare("SELECT COALESCE(SUM(-amount),0) s FROM transactions WHERE type='session' AND created_at>=?").get(from).s;
+  const uToku = db.prepare("SELECT COALESCE(SUM(cost),0) s FROM sessions WHERE status='active'").get().s;
+  const sessionRevenue = zavrsene + uToku;
+
+  // OTKAZANO NIJE PRODATO.
+  //
+  // Ovde se ranije brojalo sve, pa je otkazana porudžbina ostajala u prometu
+  // zauvek: keš zato što se filter po statusu nije ni pisao, a kupovina sa
+  // naloga zato što se čitala iz `transactions`, gde povraćaj ulazi kao zaseban
+  // red tipa `refund` i original ne poništava. Obračun smene i Izveštaji su
+  // otkazano oduvek izbacivali - kontrolna tabla je jedina pokazivala više.
+  const shopRevenue = db.prepare("SELECT COALESCE(SUM(total),0) s FROM orders WHERE payment='credit' AND status!='cancelled' AND created_at>=?").get(from).s;
+  const cashRevenue = db.prepare("SELECT COALESCE(SUM(total),0) s FROM orders WHERE payment='cash' AND status!='cancelled' AND created_at>=?").get(from).s;
   const topups = db.prepare("SELECT COALESCE(SUM(amount),0) s FROM transactions WHERE type='topup' AND created_at>=?").get(from).s;
   const activeSessions = db.prepare("SELECT COUNT(*) c FROM sessions WHERE status='active'").get().c;
   const playersCount = db.prepare("SELECT COUNT(*) c FROM players").get().c;

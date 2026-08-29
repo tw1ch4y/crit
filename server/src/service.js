@@ -283,7 +283,18 @@ export function shiftsList(limit = 50) {
 // Izveštaji / statistika
 export function stats(from, to) {
   const g2 = (sql) => db.prepare(sql).get(from, to).s;
-  const sessionRev = g2("SELECT COALESCE(SUM(-amount),0) s FROM transactions WHERE type='session' AND created_at BETWEEN ? AND ?");
+  // Trošak sesije se u `transactions` upisuje tek pri završetku, pa "ukupan
+  // promet" nije video nikoga ko trenutno igra - a "zarada po računaru" niže
+  // čita `sessions.cost` i vidi ga. Dva broja na istoj strani se onda nisu
+  // poklapala, i to najviše baš uveče, kad su sve mašine pune.
+  //
+  // Aktivne sesije se dodaju samo kad period ide DO SADA (Danas / 7 / 30 dana).
+  // Za zatvoren period u prošlosti nemaju šta da traže.
+  const sadaUPeriodu = to >= Date.now() - 60000;
+  const uToku = sadaUPeriodu
+    ? db.prepare("SELECT COALESCE(SUM(cost),0) s FROM sessions WHERE status='active' AND started_at<=?").get(to).s
+    : 0;
+  const sessionRev = g2("SELECT COALESCE(SUM(-amount),0) s FROM transactions WHERE type='session' AND created_at BETWEEN ? AND ?") + uToku;
   const shopRev = g2("SELECT COALESCE(SUM(total),0) s FROM orders WHERE status!='cancelled' AND created_at BETWEEN ? AND ?");
   const shopCash = g2("SELECT COALESCE(SUM(total),0) s FROM orders WHERE payment='cash' AND status!='cancelled' AND created_at BETWEEN ? AND ?");
   const topups = g2("SELECT COALESCE(SUM(amount),0) s FROM transactions WHERE type='topup' AND created_at BETWEEN ? AND ?");
