@@ -25,6 +25,7 @@ const S = {
   cart: new Map(),
   shopFilter: null,   // izabrana kategorija u shopu; null znači "sve"
   nacinPlacanja: "credit",
+  nacinRucno: false,  // da li je igrac SAM izabrao nacin placanja (vidi renderCart)
   timer: null,
   pendingExit: false,
   pinSvrha: null,     // zašto je PIN tražen: "izlaz" ili "setup"
@@ -471,7 +472,7 @@ function handleMsg(m) {
       S.mojaTekstura = m.mojaTekstura || null;
       S.tocak = m.tocak || null;
       osveziZnackuNaloga();
-      S.cart.clear();
+      S.cart.clear(); S.nacinPlacanja = "credit"; S.nacinRucno = false;
       playBoot(S.player?.displayName || S.player?.username);
       enterDesktop();
       break;
@@ -534,7 +535,10 @@ function handleMsg(m) {
       $("#msgText").textContent = m.text; $("#msgOverlay").classList.add("active"); sfx.notify();
       break;
     case "order_ok": {
-      S.balance = m.balance; S.remaining = m.remainingSeconds; S.cart.clear();
+      S.balance = m.balance; S.remaining = m.remainingSeconds;
+      // Nova korpa krece cista: i artikli i nacin placanja. Bez ovoga bi
+      // jednom izabran kes vazio do kraja smene.
+      S.cart.clear(); S.nacinPlacanja = "credit"; S.nacinRucno = false;
       clearOrderPending();
       updateHud(); if (S.tab === "shop") renderContent();
       const chip = $("#hudBal")?.closest(".hud-chip");
@@ -1380,7 +1384,16 @@ function renderCart() {
   const dovoljno = S.balance >= total;
   // Kredit se nudi samo ako ga stvarno ima; inace bi igrac birao opciju koja
   // sigurno pada i tek na kraju dobio poruku da nema para.
-  if (S.nacinPlacanja === "credit" && !dovoljno) S.nacinPlacanja = "cash";
+  //
+  // PREBACIVANJE NA KES SE VRACA SAMO OD SEBE.
+  //
+  // Ranije se prebacivalo na kes cim kredita nema, ali se NIKAD nije vracalo.
+  // Igrac sa 100 dinara doda kolu od 130 (skoci na kes), predomisli se i uzme
+  // vodu od 80 - kredit sad ima, a i dalje pise "Kes". Isto i kad ga radnik
+  // dopuni: gost placa kesom nesto sto je vec platio. Zato se pamti da li je
+  // KES BIO IGRACEV IZBOR; ako nije, cim kredit bude dovoljan vraca se na njega.
+  if (!dovoljno) S.nacinPlacanja = "cash";
+  else if (S.nacinPlacanja === "cash" && !S.nacinRucno) S.nacinPlacanja = "credit";
   const nacin = S.nacinPlacanja || "credit";
   return `<div class="cart-head">
       <h3>Korpa</h3>
@@ -2164,6 +2177,7 @@ $("#content").addEventListener("click", (e) => {
   const nacinEl = e.target.closest("[data-nacin]");
   if (nacinEl && !nacinEl.disabled) {
     S.nacinPlacanja = nacinEl.dataset.nacin;
+    S.nacinRucno = true; // igrac je sam izabrao - ne vracaj mu izbor (vidi renderCart)
     refreshCart();
     return;
   }
@@ -2313,7 +2327,14 @@ function openPin(title, isExit, svrha = "izlaz") {
   $("#pinTitle").textContent = title; $("#pinInput").value = ""; $("#pinErr").textContent = "";
   $("#pinOverlay").classList.add("active"); $("#pinInput").focus();
 }
-$("#pinCancel").addEventListener("click", () => { S.pendingExit = false; S.pinSvrha = null; $("#pinOverlay").classList.remove("active"); });
+// Jedno mesto za odustajanje, da se Escape i dugme "Odustani" ne razilaze.
+function odustaniOdPina() {
+  S.pendingExit = false;
+  S.pinSvrha = null;
+  $("#pinInput").value = ""; // PIN ne ostaje u polju za sledećeg
+  $("#pinOverlay").classList.remove("active");
+}
+$("#pinCancel").addEventListener("click", odustaniOdPina);
 $("#pinOk").addEventListener("click", async () => {
   const pin = $("#pinInput").value.trim(); if (!pin) return;
   // Ulaz u podešavanja se uvek proverava lokalno: tu se ide baš kad servera
@@ -2368,6 +2389,13 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if ($("#msgOverlay").classList.contains("active")) $("#msgOverlay").classList.remove("active");
     else if ($("#confirmOverlay").classList.contains("active")) $("#confirmOverlay").classList.remove("active");
-    else if ($("#pinOverlay").classList.contains("active")) { S.pendingExit = false; $("#pinOverlay").classList.remove("active"); }
+    // Escape mora da ostavi ISTO stanje kao dugme "Odustani". Ranije je čistio
+    // samo `pendingExit`, a `pinSvrha` je ostajala od prethodnog otvaranja - pa
+    // je posle odustajanja od "Promeni adresu servera" u stanju visilo "setup".
+    // Danas se to ne može iskoristiti, jer svako otvaranje PIN-a svrhu upisuje
+    // iznova. Ali svrha koja preživi odustajanje je napunjen pištolj: prva
+    // sledeća upotreba PIN-a koja je ne postavi izričito obrisala bi launcheru
+    // adresu servera umesto da izađe iz kioska.
+    else if ($("#pinOverlay").classList.contains("active")) { odustaniOdPina(); }
   }
 });

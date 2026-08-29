@@ -86,5 +86,48 @@ proveri("server ne gasi proces posle pada",
   !/process\.exit/.test(idx.slice(idx.indexOf("uncaughtException"))),
   "gasenje bi ostavilo 13 racunara bez naplate usred smene");
 
+// ---- STANJE "CEKAM ODGOVOR" MORA DA SE SAMO OTPUSTI ----
+//
+// Tri mesta u launcheru upale "cekam server" i cekaju odgovor: prijava,
+// porudzbina i nagradni tocak. Ako odgovor nikad ne stigne - veza pukne, server
+// se restartuje, ruter se resetuje - to stanje ostaje upaljeno zauvek.
+//
+// Kod tocka je posledica bila najgora: dok "vrtnja traje", launcher NAMERNO
+// odbacuje svako novo stanje kredita (da se brojka ne promeni pre nego sto igrac
+// sazna sta je dobio). Zaglavljena vrtnja je zato ZAMRZAVALA HUD: igrac gleda
+// "1000 din, ostalo 8:20" dok mu vreme stvarno curi, racunar se zakljuca bez
+// upozorenja, a dopuna na kasi se ne vidi pa radnik dopunjuje drugi put.
+for (const [sta, sablon] of [
+  ["prijava", /clearLoginPending\._t = setTimeout\(clearLoginPending/],
+  ["porudzbina", /sendOrder\._t = setTimeout\(clearOrderPending/],
+  ["nagradni tocak", /tocakRokTajmer = setTimeout\(/],
+]) proveri(`${sta} ne ceka odgovor zauvek`, sablon.test(launcher),
+  "bez roka dugme ostaje zakljucano do kraja smene");
+
+proveri("tocak se otpusta i kad veza padne", /otpustiTocak\("Veza je pukla usred vrtnje/.test(launcher),
+  "preko puknute veze ishod ionako ne moze da stigne");
+proveri("otpusten tocak upisuje zadrzano stanje", /function otpustiTocak[\s\S]{0,600}S\.tocakStanje/.test(launcher),
+  "inace kredit koji je stigao tokom vrtnje ostaje zarobljen");
+proveri("igracu pise da spin NIJE potrosen", /Spin nije potrošen/.test(launcher),
+  "inace misli da je izgubio nedeljni spin ni za sta");
+
+// ---- ODUSTAJANJE OD PIN-A OSTAVLJA ISTO STANJE, BEZ OBZIRA KAKO ----
+proveri("Escape i dugme 'Odustani' rade istu stvar", /function odustaniOdPina\(/.test(launcher));
+proveri("odustajanje brise svrhu PIN-a", /function odustaniOdPina[\s\S]{0,200}S\.pinSvrha = null/.test(launcher),
+  "svrha koja prezivi odustajanje bi pri sledecoj upotrebi obrisala adresu servera umesto da izadje iz kioska");
+
+// ---- NACIN PLACANJA KOJI JE PROGRAM SAM PROMENIO SE I SAM VRACA ----
+//
+// Igrac sa 100 dinara doda kolu od 130 - program prebaci na kes jer kredita
+// nema. Predomisli se i uzme vodu od 80: kredit sad ima, a i dalje pise "Kes".
+// Isto i kad ga radnik u medjuvremenu dopuni. Gost onda placa kesom nesto sto je
+// vec platio, a radnik ustaje da naplati bez potrebe.
+proveri("pamti se da li je kes bio IGRACEV izbor", /S\.nacinRucno = true/.test(launcher));
+proveri("kad kredit bude dovoljan, izbor se vraca",
+  /S\.nacinPlacanja === "cash" && !S\.nacinRucno\) S\.nacinPlacanja = "credit"/.test(launcher));
+proveri("nova porudzbina krece sa cistim izborom",
+  (launcher.match(/S\.nacinRucno = false/g) || []).length >= 2,
+  "i pri prijavi i posle poslate porudzbine");
+
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 process.exit(pao ? 1 : 0);
