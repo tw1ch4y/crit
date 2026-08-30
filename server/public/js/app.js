@@ -1781,6 +1781,22 @@ async function renderOrders() {
 document.addEventListener("click", async (e) => {
   const btn = e.target.closest("[data-o]");
   if (!btn) return;
+  // OTKAZIVANJE PITA, OSTALO NE.
+  //
+  // Dugme "×" stoji tik uz "Dostavljeno", a radi nešto sasvim drugo: vraća
+  // gostu novac na nalog, izbacuje račun iz pazara i vraća piće na stanje. Jedan
+  // promašen klik na porudžbini koja je uredno doneta znači da je gost dobio i
+  // piće i novac nazad, a da manjak ispliva tek pri obračunu smene.
+  if (btn.dataset.o === "cancelled") {
+    const o = (state.orders || []).find((x) => String(x.id) === String(btn.dataset.id));
+    const novac = o
+      ? (o.payment === "cash" ? `Račun od ${money(o.total)} izlazi iz pazara.` : `${money(o.total)} se vraća gostu na nalog.`)
+      : null;
+    const ok = await confirmDialog(
+      `Porudžbina #${btn.dataset.id} će biti otkazana. Piće se vraća na stanje.`,
+      { title: "Otkazivanje porudžbine", ok: "Otkaži porudžbinu", danger: true, istaknuto: novac });
+    if (!ok) return;
+  }
   try { await api(`/orders/${btn.dataset.id}/status`, "POST", { status: btn.dataset.o }); renderOrders(); } catch (err) { toast(err.message, "error"); }
 });
 

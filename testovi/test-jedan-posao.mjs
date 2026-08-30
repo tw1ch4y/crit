@@ -108,7 +108,10 @@ for (const [gde, sablon] of [
   // gost preda preko pulta.
   ["dopuna kredita", /log = uJednomPoslu\(\(\) => \{\s*\n\s*db\.prepare\("UPDATE players SET balance=\? WHERE id=\?"\)/],
   ["prodaja paketa", /\{ bal, log \} = uJednomPoslu/],
-  ["otkazivanje porudzbine", /\{ vracen, log \} = uJednomPoslu/],
+  // Uz kredit i status, isti posao vraca i pice na stanje - inace bi pad izmedju
+  // njih ostavio gosta sa vracenim novcem i picem koje i dalje fali u evidenciji.
+  ["otkazivanje porudzbine", /\{ vracen, log, vracenoNaStanje \} = uJednomPoslu/],
+  ["vracanje pica na stanje", /const naStanje = cancelling \? vratiStock\(orderId\) : \[\];/],
   ["kraj sesije", /log = uJednomPoslu\(\(\) => \{\s*\n\s*let l = null;/],
 ]) proveri(`${gde} je jedan posao`, sablon.test(src));
 proveri("igracu se javlja tek posle potvrde upisa",

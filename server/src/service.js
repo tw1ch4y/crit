@@ -648,6 +648,30 @@ function consumeStock(resolved) {
   if (changed) pushCatalog();
 }
 
+// OTKAZANA PORUDŽBINA VRAĆA PIĆE NA STANJE.
+//
+// Zaliha se skidala pri poručivanju, a pri otkazivanju se nije vraćala nikad -
+// kredit jeste, zaliha ne. Svako otkazivanje je time trajno "pojelo" po jedno
+// piće iz evidencije. Kroz mesec dana stanje u panelu je niže od onoga što
+// stvarno stoji u frižideru: launcher piše "Rasprodato" nad punim sanducima, a
+// traka za dopunu doziva radnika na artikle kojih ima.
+//
+// Vraća se samo ono što se DANAS vodi po komadu. Ako je vlasnik u međuvremenu
+// uključio brojanje zalihe na artiklu koji je u trenutku porudžbine bio
+// neograničen, ovde bi se dodao komad koji nikad nije ni skinut - retko i
+// ispravlja se pri prvom brojanju frižidera.
+function vratiStock(orderId) {
+  const stavke = db.prepare(
+    `SELECT oi.item_id, SUM(oi.qty) qty FROM order_items oi
+     JOIN shop_items si ON si.id = oi.item_id
+     WHERE oi.order_id = ? AND si.stock IS NOT NULL
+     GROUP BY oi.item_id`).all(orderId);
+  if (!stavke.length) return [];
+  const upd = db.prepare("UPDATE shop_items SET stock = stock + ? WHERE id=? AND stock IS NOT NULL");
+  for (const s of stavke) upd.run(s.qty, s.item_id);
+  return stavke;
+}
+
 // Artikli koje treba dopuniti, za traku na kontrolnoj tabli.
 export function zaliheNaIzmaku() {
   return db.prepare(
@@ -1831,9 +1855,13 @@ export function setOrderStatus(orderId, status, actor = "osoblje") {
   // obračunu moraju da prođu zajedno. Da nisu, pad između njih ostavlja
   // porudžbinu koja je i naplaćena i otkazana (ili obrnuto: kredit vraćen, a
   // porudžbina i dalje stoji u pazaru).
-  let vracen = null, log;
+  let vracen = null, log, vracenoNaStanje = [];
   try {
-    ({ vracen, log } = uJednomPoslu(() => {
+    ({ vracen, log, vracenoNaStanje } = uJednomPoslu(() => {
+      // Piće se vraća na stanje u ISTOM poslu sa kreditom - inače bi pad između
+      // njih ostavio gosta sa vraćenim novcem i pićem koje i dalje fali u
+      // evidenciji (ili obrnuto).
+      const naStanje = cancelling ? vratiStock(orderId) : [];
       let v = null;
       // otkazivanje vraca kredit (samo ako je plaćeno kreditom sa naloga)
       if (cancelling && o.payment === "credit" && o.player_id) {
@@ -1853,7 +1881,8 @@ export function setOrderStatus(orderId, status, actor = "osoblje") {
             detail: `Otkazana porudžbina #${orderId}${o.payment === "credit" ? " - kredit vraćen" : ""}`,
             amount: round2(o.total) })
         : upisiLog({ category: "shop", action: "order_status", actor, target: `#${orderId}`,
-            detail: `Porudžbina #${orderId}: ${ORDER_STATUS_LABEL[status] || status}` }) };
+            detail: `Porudžbina #${orderId}: ${ORDER_STATUS_LABEL[status] || status}` }),
+        vracenoNaStanje: naStanje };
     }));
   } catch (e) {
     logEvent({ category: "sistem", action: "greska", actor: "server",
@@ -1868,6 +1897,9 @@ export function setOrderStatus(orderId, status, actor = "osoblje") {
 
   if (o.computer_id) sendClient(o.computer_id, { t: "order_status", orderId, status });
   posaljiPorudzbineIgracu(o.player_id);
+  // Vraceno pice mora odmah da se vidi i u launcheru ("Rasprodato" nestaje) i u
+  // traci za dopunu na kontrolnoj tabli.
+  if (vracenoNaStanje.length) pushCatalog();
   pushOrders();
   pushComputers();
   return { ok: true };

@@ -95,6 +95,62 @@ await cekaj(700);
 proveri("porudzbina igraca takodje javlja zalihu",
   dogadjaji.some((d) => d.kind === "zaliha" && /Test Cips/.test(d.text)), JSON.stringify(dogadjaji.map((d) => d.text)));
 
+// ---- OTKAZANA PORUDZBINA VRACA PICE NA STANJE ----
+//
+// Zaliha se skidala pri porucivanju, a pri otkazivanju se nije vracala nikad -
+// kredit jeste, zaliha ne. Svako otkazivanje je time trajno "pojelo" po jedno
+// pice iz evidencije. Kroz mesec dana stanje u panelu je nize od onoga sto
+// stvarno stoji u frizideru: launcher pise "Rasprodato" nad punim sanducima, a
+// traka za dopunu doziva radnika na artikle kojih ima.
+const stanje = async (id) => (await api("/api/shop")).find((x) => x.id === id)?.stock;
+
+await api("/api/shop", "POST", { name: "Test Povratak", category: "Test", price: 100, stock: 10 });
+const povratak = (await api("/api/shop")).find((x) => x.name === "Test Povratak");
+proveri("polazno stanje je 10", (await stanje(povratak.id)) === 10);
+
+// kes racun sa kase: 3 komada
+const kesRacun = await api("/api/pos", "POST", { items: [{ id: povratak.id, qty: 3 }], payment: "cash" });
+proveri("porucivanje skida sa stanja", (await stanje(povratak.id)) === 7, String(await stanje(povratak.id)));
+
+await api(`/api/orders/${kesRacun.orderId}/status`, "POST", { status: "cancelled" });
+await cekaj(300);
+proveri("OTKAZIVANJE VRACA PICE NA STANJE", (await stanje(povratak.id)) === 10,
+  `stanje ${await stanje(povratak.id)} umesto 10 - pice je nestalo iz evidencije, a stoji u frizideru`);
+
+// isto i za racun placen sa naloga: i kredit i zaliha moraju nazad
+await api("/api/players", "POST", { username: "zalihe-gost", password: "test1234", balance: 1000 });
+const gost = (await api("/api/players")).find((p) => p.username === "zalihe-gost");
+const kreditRacun = await api("/api/pos", "POST", { items: [{ id: povratak.id, qty: 2 }], payment: "credit", playerId: gost.id });
+proveri("kupovina sa naloga skida sa stanja", (await stanje(povratak.id)) === 8, String(await stanje(povratak.id)));
+await api(`/api/orders/${kreditRacun.orderId}/status`, "POST", { status: "cancelled" });
+await cekaj(300);
+const gostPosle = (await api("/api/players")).find((p) => p.username === "zalihe-gost");
+proveri("otkazivanje vraca i kredit i zalihu",
+  (await stanje(povratak.id)) === 10 && Math.abs(gostPosle.balance - 1000) < 0.01,
+  `stanje ${await stanje(povratak.id)}, kredit ${gostPosle.balance}`);
+
+// Dvostruko otkazivanje ne sme da vrati dvaput - inace bi radnik koji dvaput
+// klikne napravio pice ni iz cega.
+await api(`/api/orders/${kreditRacun.orderId}/status`, "POST", { status: "cancelled" });
+await cekaj(300);
+proveri("ponovljeno otkazivanje ne vraca dvaput", (await stanje(povratak.id)) === 10,
+  `stanje ${await stanje(povratak.id)} - zaliha se pravi ni iz cega`);
+
+// Neograniceni artikal (stock = NULL) se ne dira ni pri porucivanju ni pri otkazivanju.
+await api("/api/shop", "POST", { name: "Test Neograniceno", category: "Test", price: 50 });
+const neogr = (await api("/api/shop")).find((x) => x.name === "Test Neograniceno");
+const neogrRacun = await api("/api/pos", "POST", { items: [{ id: neogr.id, qty: 4 }], payment: "cash" });
+await api(`/api/orders/${neogrRacun.orderId}/status`, "POST", { status: "cancelled" });
+await cekaj(300);
+proveri("neogranicen artikal ostaje neogranicen", (await stanje(neogr.id)) == null, String(await stanje(neogr.id)));
+
+// Panel mora da PITA pre otkazivanja: dugme "x" stoji tik uz "Dostavljeno", a
+// radi nesto sasvim drugo - vraca gostu novac i izbacuje racun iz pazara.
+const app = citajIzvor("server/public/js/app.js");
+proveri("panel pita pre otkazivanja", /if \(btn\.dataset\.o === "cancelled"\)[\s\S]{0,400}confirmDialog/.test(app),
+  "jedan promasen klik vraca novac za pice koje je uredno doneto");
+proveri("potvrda kaze sta se desava sa novcem", /se vraća gostu na nalog|izlazi iz pazara/.test(app));
+
 ws.close(); panel.close();
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 process.exit(pao ? 1 : 0);
