@@ -21,6 +21,7 @@ const state = {
   ordersTab: "active",
   logFilter: "sve",
   installStatus: {},
+  nadogradnja: null,
   shift: null,
   reportPeriod: "today",
   plPage: 1, plSearch: "", playersPage: null,
@@ -689,6 +690,7 @@ function connectWs() {
     else if (m.t === "log") { state.logs.unshift(m.log); if (state.view === "logs") prependLog(m.log); }
     else if (m.t === "install") { state.installStatus[m.computerId] = m; if (state.view === "install") updateInstallStatus(); }
     else if (m.t === "install_clear") { state.installStatus = {}; if (state.view === "install") updateInstallStatus(); }
+    else if (m.t === "nadogradnja") { if (state.view === "install") osveziNadogradnju(); }
     else if (m.t === "istice") upozoriIstice(m);
     else if (m.t === "shift") { state.shift = m.shift; updateShiftBar(); }
     else if (m.t === "event") {
@@ -2914,6 +2916,183 @@ function skratiLink(url) {
   } catch { return url; }
 }
 
+// ---------- Nadogradnja launchera ----------
+//
+// Do sada je svaka izmena launchera znacila obilazak svih trinaest masina.
+// Odavde se instalater postavi jednom, pusti u rad, i racunari ga uzimaju sami
+// cim se oslobode.
+//
+// Podela posla nije slucajna: instalater postavlja i pusta SERVISER (on ga je i
+// napravio, pa jedini moze da zna da li valja), a vlasnik vidi stanje i sme da
+// pogura one koji su slobodni.
+const NAD_STANJE = {
+  poslato: ["Poslato", "gray"],
+  preuzimam: ["Preuzima...", "blue"],
+  instaliram: ["Instalira...", "amber"],
+  gotovo: ["Nadograđen", "green"],
+  greska: ["Greška", "red"],
+  preskoceno: ["Čeka", "gray"],
+};
+// Prima BAJTOVE. Ime je puno namerno: nize u fajlu postoji lokalni `mb` koji
+// prima megabajte, a dve funkcije istog imena sa razlicitim jedinicama su
+// greska koja ceka da se desi.
+const velicinaFajla = (b) => (b >= 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.round(b / 1024) + " KB");
+
+function nadogradnjaHtml(n) {
+  if (!n) return "";
+  const zaostali = n.racunari.filter((r) => r.zaostaje);
+  // Kad su svi na istoj verziji, nema sta da se gleda - jedan red je dovoljan.
+  const spisak = zaostali.length ? `<div class="nad-masine">${zaostali.map((r) => {
+    const s = r.status && NAD_STANJE[r.status.state];
+    const zivo = r.status && (r.status.state === "preuzimam" || r.status.state === "instaliram");
+    return `<div class="nad-masina${r.slobodan ? "" : " zauzeta"}" title="${esc(r.status?.message || "")}">
+      <b>${esc(r.name)}</b>
+      <span class="mono faint">${r.verzija ? esc(r.verzija) : "nepoznata"}</span>
+      ${s ? `<span class="pill ${s[1]} ${zivo ? "pulse" : ""}">${s[0]}</span>`
+          : `<span class="pill ${r.slobodan ? "blue" : "gray"}">${r.online ? (r.slobodan ? "spreman" : "zauzet") : "ugašen"}</span>`}
+    </div>`;
+  }).join("")}</div>` : "";
+
+  const fajlovi = isServiser() && n.fajlovi?.length ? `<div class="nad-fajlovi">${n.fajlovi.map((f) => `
+    <div class="nad-fajl"><span class="mono">${esc(f.ime)}</span><span class="faint">${velicinaFajla(f.velicina)}</span>
+      <button class="btn btn-sm btn-danger" data-nad="obrisi" data-ime="${esc(f.ime)}" title="Obriši">${icon("trash")}</button></div>`).join("")}</div>` : "";
+
+  if (!n.ima) {
+    return `<div class="card"><div class="card-head"><h2>Nadogradnja launchera</h2></div>
+      <div class="empty" style="padding:28px 18px">Na serveru nema instalatera launchera.<br>
+        ${isServiser() ? "Postavi ga ovde i računari će ga preuzeti sami, čim se oslobode."
+                       : "Instalater postavlja serviser."}</div>
+      ${isServiser() ? `<div class="nad-akcije"><button class="btn btn-primary" data-nad="postavi">${icon("download")} Postavi instalater</button></div>` : ""}
+    </div>`;
+  }
+
+  return `<div class="card"><div class="card-head"><h2>Nadogradnja launchera</h2>
+      <span class="pill ${n.pusteno ? "green" : "amber"}">${n.pusteno ? "Puštena u rad" : "Nije puštena"}</span></div>
+    <div class="nad-vrh">
+      <div><div class="faint" style="font-size:12px">Na serveru</div>
+        <div style="font-size:20px;font-weight:700">${esc(n.verzija)}</div>
+        <div class="faint mono" style="font-size:12px">${esc(n.fajl)} · ${velicinaFajla(n.velicina)}</div></div>
+      <div><div class="faint" style="font-size:12px">Zaostaje</div>
+        <div style="font-size:20px;font-weight:700">${n.zaostalih} ${n.zaostalih === 1 ? "računar" : "računara"}</div>
+        <div class="faint" style="font-size:12px">od ${n.racunari.length}</div></div>
+    </div>
+    ${n.pusteno ? `<div class="nad-nota">Računari je preuzimaju sami, čim se oslobode. Onaj na kom neko igra se ne dira.</div>`
+                : `<div class="nad-nota upozorenje">Dok verzija nije puštena u rad, nijedan računar je ne preuzima.</div>`}
+    ${spisak}
+    ${fajlovi}
+    <div class="nad-akcije">
+      ${isServiser() ? `<button class="btn" data-nad="postavi">${icon("download")} Postavi instalater</button>` : ""}
+      ${isServiser() ? (n.pusteno
+        ? `<button class="btn btn-danger" data-nad="povuci">Povuci iz rada</button>`
+        : `<button class="btn btn-primary" data-nad="pusti">Pusti verziju ${esc(n.verzija)} u rad</button>`) : ""}
+      ${n.pusteno && n.zaostalih ? `<button class="btn" data-nad="posalji">${icon("send")} Pošalji slobodnima odmah</button>` : ""}
+    </div>
+  </div>`;
+}
+
+async function osveziNadogradnju() {
+  const el = $("#nadKarta");
+  if (!el) return;
+  try {
+    state.nadogradnja = await api("/nadogradnja");
+    el.innerHTML = nadogradnjaHtml(state.nadogradnja);
+  } catch {}
+}
+
+// Instalater je oko sto megabajta, pa ide kao sirov tok, ne kroz JSON.
+async function posaljiInstalater(file) {
+  const r = await fetch("/api/nadogradnja/fajl?ime=" + encodeURIComponent(file.name), {
+    method: "PUT",
+    headers: { "Content-Type": "application/octet-stream", ...(state.token ? { Authorization: "Bearer " + state.token } : {}) },
+    body: file,
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || "Slanje nije uspelo");
+  return d;
+}
+
+function nadogradnjaKlik(e) {
+  const btn = e.target.closest("[data-nad]");
+  if (!btn) return;
+  const sta = btn.dataset.nad;
+
+  if (sta === "postavi") {
+    const ulaz = document.createElement("input");
+    ulaz.type = "file";
+    ulaz.accept = ".exe";
+    ulaz.addEventListener("change", async () => {
+      const f = ulaz.files?.[0];
+      if (!f) return;
+      await jednomKlik(btn, async () => {
+        try {
+          state.nadogradnja = await posaljiInstalater(f);
+          $("#nadKarta").innerHTML = nadogradnjaHtml(state.nadogradnja);
+          toast(`Instalater ${f.name} je na serveru`, "success");
+        } catch (err) { toast(err.message, "error"); }
+      }, "Šaljem instalater...");
+    });
+    ulaz.click();
+    return;
+  }
+
+  if (sta === "pusti") {
+    const n = state.nadogradnja;
+    jednomKlik(btn, async () => {
+      // Ovo je jedina radnja u panelu koja pokrece instalaciju na svim
+      // masinama. Broj masina stoji u pitanju da bi se videlo koliko je siroko.
+      const ok = await confirmDialog(
+        `Računari će je preuzeti i instalirati sami, čim se oslobode. ` +
+        `Računar na kom neko igra se ne dira - on dolazi na red kasnije.`,
+        { title: "Pustiti verziju u rad?", istaknuto: `${n.verzija} → ${n.zaostalih} računara`, ok: "Pusti u rad" });
+      if (!ok) return;
+      try {
+        state.nadogradnja = await api("/nadogradnja/pusti", "POST", { verzija: n.verzija });
+        $("#nadKarta").innerHTML = nadogradnjaHtml(state.nadogradnja);
+        toast("Verzija je puštena u rad", "success");
+      } catch (err) { toast(err.message, "error"); }
+    }, "Puštam...");
+    return;
+  }
+
+  if (sta === "povuci") {
+    jednomKlik(btn, async () => {
+      try {
+        state.nadogradnja = await api("/nadogradnja/povuci", "POST");
+        $("#nadKarta").innerHTML = nadogradnjaHtml(state.nadogradnja);
+        toast("Nadogradnja je povučena", "success");
+      } catch (err) { toast(err.message, "error"); }
+    }, "Povlačim...");
+    return;
+  }
+
+  if (sta === "posalji") {
+    jednomKlik(btn, async () => {
+      try {
+        const r = await api("/nadogradnja/posalji", "POST", {});
+        state.nadogradnja = r;
+        $("#nadKarta").innerHTML = nadogradnjaHtml(state.nadogradnja);
+        toast(r.poslato ? `Poslato na ${r.poslato} računara` +
+          (r.zauzeto ? `, ${r.zauzeto} zauzeto ili ugašeno` : "")
+          : "Nema slobodnog računara koji zaostaje", r.poslato ? "success" : "info");
+      } catch (err) { toast(err.message, "error"); }
+    });
+    return;
+  }
+
+  if (sta === "obrisi") {
+    const ime = btn.dataset.ime;
+    jednomKlik(btn, async () => {
+      const ok = await confirmDialog("Instalater se briše sa servera. Ovo ne dira računare koji su ga već instalirali.",
+        { title: "Obrisati instalater?", istaknuto: ime, ok: "Obriši", danger: true });
+      if (!ok) return;
+      try {
+        state.nadogradnja = await api("/nadogradnja/fajl?ime=" + encodeURIComponent(ime), "DELETE");
+        $("#nadKarta").innerHTML = nadogradnjaHtml(state.nadogradnja);
+      } catch (err) { toast(err.message, "error"); }
+    }, "Brišem...");
+  }
+}
+
 async function renderInstall() {
   let programs = [];
   try {
@@ -2922,6 +3101,7 @@ async function renderInstall() {
     state.installStatus = {};
     st.forEach((s) => (state.installStatus[s.computerId] = s));
   } catch {}
+  try { state.nadogradnja = await api("/nadogradnja"); } catch { state.nadogradnja = null; }
   window._programs = programs;
   const progRows = programs.map((p) => `<tr>
     <td><b>${esc(p.name)}</b>${p.note ? `<div class="faint" style="font-size:12px">${esc(p.note)}</div>` : ""}
@@ -2937,6 +3117,7 @@ async function renderInstall() {
         <button class="btn" id="quickInstall">${icon("send")} Instaliraj sa linka</button>
         <button class="btn btn-primary" id="addProg">${icon("plus")} Novi program</button>
       </div></div>
+    <div id="nadKarta">${nadogradnjaHtml(state.nadogradnja)}</div>
     <div class="install-layout">
       <div class="card"><div class="card-head"><h2>Biblioteka programa</h2></div>
         <div class="table-wrap"><table><thead><tr><th>Program</th><th>Tihi argumenti</th><th></th></tr></thead>
@@ -2948,6 +3129,7 @@ async function renderInstall() {
     </div>`;
   $("#addProg").addEventListener("click", () => progModal());
   $("#quickInstall").addEventListener("click", quickInstallModal);
+  $("#nadKarta").addEventListener("click", nadogradnjaKlik);
   const ci = $("#clearInstall");
   if (ci) ci.addEventListener("click", async () => {
     try { await api("/install-status", "DELETE"); state.installStatus = {}; updateInstallStatus(); }

@@ -249,10 +249,8 @@ Sve granice se menjaju u *Podešavanja > Prostor na disku*, tu je i dugme
 
 ## 5.1 Nadogradnja na novu verziju
 
-Radi se **posle zatvaranja**, nikad dok neko igra: nadogradnja launchera gasi
-launcher, a to prekida sesiju u toku.
-
-**Server (glavni računar) - prvo on.**
+**Server (glavni računar) - prvo on.** Radi se **posle zatvaranja**: server u
+toku rada drži naplatu.
 
 1. Ugasi server.
 2. Napravi kopiju celog `server/data/` foldera sa strane (server i sam pravi
@@ -263,11 +261,54 @@ launcher, a to prekida sesiju u toku.
    ništa se ne unosi ručno.
 5. U panelu otvori Podešavanja i proveri da piše nova verzija.
 
-**Računari igrača - svaki posebno.**
+**Računari igrača - odjednom, sa panela.**
 
-Instaler ide u `Program Files`, pa **traži administratora**. Zato se nadogradnja
-ne može gurnuti sa panela kroz *Instalacije* - nalog igrača je standardni i UAC
-bi je odbio bez ikakve poruke. Na svakom računaru:
+Instalater se postavlja **jednom**, na server, a računari ga preuzimaju sami.
+Strana *Instalacije*, kartica **Nadogradnja launchera**:
+
+1. **Postavi instalater** - izaberi `Crit Launcher Setup X.Y.Z.exe` iz `dist/`.
+   Ime mora da sadrži verziju; po njoj se zna šta je novije. Postavlja ga
+   **serviser** - on ga je i napravio, pa jedini može da zna da li valja.
+2. Proveri šta piše: verzija, veličina, i koliko računara zaostaje.
+3. **Pusti verziju u rad**. Dok to ne uradiš, nijedan računar je ne preuzima -
+   ni sa ispravnim tokenom. Prekopiran fajl sam po sebi ne znači ništa.
+4. Dalje ide samo. Svaki računar se nadogradi **čim se oslobodi**.
+
+**Računar na kom neko igra se ne dira.** Nadogradnja gasi launcher; usred
+plaćenog sata to je oduzeto vreme gostu. Zauzeta mašina stoji u spisku kao
+*zauzet* i dolazi na red kad gost ustane. Ne moraš da čekaš i gledaš.
+
+Ako ti treba odmah, *Pošalji slobodnima odmah* pogura sve koji su slobodni.
+*Povuci iz rada* zaustavlja dalje preuzimanje (već nadograđene ne vraća).
+
+**Šta računar radi kad dobije poruku.** Preuzme instalater sa tvog servera,
+svojim tokenom - adresa ne dolazi u poruci nego je računar sam sklapa, pa
+podmetnuta poruka ne može da mu pokrene tuđi program. Proveri da se poklapaju
+veličina i otisak (sha256) sa onim što je server najavio; ako ne, briše fajl i
+ne pokreće ništa. Tek onda instalira i vraća se. Ceo taj put je pokriven
+probama (`testovi/test-nadogradnja-launchera.mjs`,
+`testovi/test-pomocnik-nadogradnje.mjs`).
+
+**Računar se vraća i kad nadogradnja ne uspe.** Instalaciju vodi kratka skripta
+koja živi duže od launchera, a uz nju ide i *osigurač* - druga skripta koja
+posle pet minuta vraća launcher bez obzira na sve. Računar bez launchera je
+računar sa otvorenim Windowsom, i to ne sme da potraje.
+
+> **JEDAN POSLEDNJI OBILAZAK.** Sve gore radi tek od verzije koja to ume.
+> Verziju sa ovim mehanizmom moraš da instaliraš ručno na svih 13 mašina, po
+> postupku ispod. Posle toga više nikad.
+
+> **UAC.** Instaler ide u `Program Files`, pa traži administratora
+> (`perMachine: true` u `client/package.json`). Pod nalogom igrača Windows tada
+> podigne UAC prozor i čeka da neko klikne - a za kasom niko ne gleda ekran
+> računara broj sedam. Osigurač tada vrati stari launcher, a u panelu stoji
+> crveno *"nije odobreno (instaler traži administratora)"*. Da bi nadogradnja
+> prolazila sama, instalacija mora da bude **po korisniku**
+> (`perMachine: false`) - launcher tada ide u profil igrača umesto u
+> `Program Files`. To je odluka koja se donosi jednom, pre onog poslednjeg
+> obilaska.
+
+**Ručno, na jednoj mašini** (prvi put, ili kad nešto zapne):
 
 1. Prijavi se na **administratorski** nalog (ne igračev).
 2. Pokreni novi `Crit Launcher Setup X.Y.Z.exe`. Instaler sam zatvori stari
@@ -278,8 +319,8 @@ bi je odbio bez ikakve poruke. Na svakom računaru:
 Adresa servera i token ostaju - stoje u nalogu korisnika, a instaler ga ne dira.
 
 > **Verzije smeju da se razlikuju dok traje nadogradnja.** Stariji launcheri rade
-> normalno dok im ne dođeš na red, pa ne moraš sve mašine u istoj večeri. Panel
-> pokazuje verziju svakog računara, tako da se lako vidi ko je ostao.
+> normalno dok im ne dođe red. Panel pokazuje verziju svakog računara, tako da se
+> lako vidi ko je ostao.
 
 > **Servisni PIN ostaje tvoj.** Upisan je u panelu i čuva se na svakoj mašini
 > odvojeno od instalacije, pa ga nadogradnja ne dira.

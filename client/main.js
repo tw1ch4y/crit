@@ -3,13 +3,14 @@ const path = require("node:path");
 const fs = require("node:fs");
 const { spawn, exec } = require("node:child_process");
 const https = require("node:https");
-const { scryptSync, timingSafeEqual } = require("node:crypto");
+const { scryptSync, timingSafeEqual, createHash } = require("node:crypto");
 const http = require("node:http");
 const os = require("node:os");
 const WebSocket = require("ws");
-const { ocistiSesiju } = require("./ciscenje.js");
+const { ocistiSesiju, racunarJeZasticen, STOP_FAJL } = require("./ciscenje.js");
 const { snimiStanje, ugasiNoveProcese, presretniPokretanja, spisakZaPanel, ugasiProces } = require("./procesi.js");
 const winPod = require("./windows-podesavanja.js");
+const { napraviSkriptu, napraviOsigurac, KOD_OSIGURAC } = require("./nadogradnja-skripta.js");
 
 const DEV = process.argv.includes("--dev");
 
@@ -325,6 +326,9 @@ function connectWs() {
     // zaboravi bas na onoj trinaestoj. Sam launcher to ne moze da resi, ali moze
     // da PRIJAVI, pa panel vise ne cuti o tome.
     wsSend({ t: "sys_info", nics: localNics(), fabrickiPin: !imaPinSaServera() && servisniPin() === FABRICKI_PIN });
+    // Ako se prosla nadogradnja polomila, ovo je prvi trenutak kad ima kome
+    // da se javi - vidi javiIshodNadogradnje.
+    javiIshodNadogradnje();
   });
   sveza.on("message", (buf) => {
     if (!jeAktuelna()) return;
@@ -430,6 +434,7 @@ function handleServerMsg(msg) {
   }
   if (msg.t === "command") runCommand(msg.cmd);
   if (msg.t === "install") runInstall(msg);
+  if (msg.t === "nadogradnja") primiNadogradnju(msg);
 }
 
 // Igrač skine program kroz pregledač i pokrene ga - time bi zaobišao launcher.
@@ -704,6 +709,183 @@ function runInstall({ name, url, args }) {
       } catch (e) { reportInstall(name, "error", e.message); }
     });
   } catch (e) { reportInstall(name, "error", e.message); }
+}
+
+// ---------- Nadogradnja launchera ----------
+//
+// Server javi da postoji novija verzija; racunar je preuzme sa TOG ISTOG
+// servera, proveri da je stigla cela i ispravna, pa je instalira i vrati se.
+//
+// Ono sto se ovde skine pokrece se sa punim pravima na racunaru igraca, pa su
+// tri stvari obavezne, i nijedna nije formalnost:
+//
+//  1. ADRESU SKLAPA RACUNAR, NE PORUKA. U poruci sa servera nema nikakvog
+//     linka - preuzima se sa servera na koji je masina vec vezana, njenim
+//     tokenom. Da adresa stize u poruci, jedna podmetnuta poruka bi znacila
+//     tudji .exe pokrenut na svih trinaest masina.
+//  2. OTISAK MORA DA SE POKLOPI. Server najavi sha256; ako se ne slaze, fajl
+//     se brise i nista se ne pokrece.
+//  3. NE DIRA SE MASINA NA KOJOJ NEKO SEDI, ni ova na kojoj se program pise.
+const NADOGRADNJA_DIR = path.join(os.tmpdir(), "crit-nadogradnja");
+const NADOGRADNJA_ISHOD = path.join(NADOGRADNJA_DIR, "ishod.txt");
+let nadogradnjaUToku = false;
+
+function javiNadogradnju(verzija, state, message) {
+  wsSend({ t: "nadogradnja_status", verzija, state, message });
+}
+
+// Isto poredjenje kao na serveru: "2.44.0" je novije od "2.9.0", iako je kao
+// tekst manje. Vidi server/src/nadogradnja.js.
+function verzijaNovija(a, b) {
+  const raspakuj = (v) => String(v || "").trim().split(/[.\-+]/).map((d) => parseInt(d, 10));
+  const x = raspakuj(a), y = raspakuj(b);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const p = Number.isFinite(x[i]) ? x[i] : 0;
+    const q = Number.isFinite(y[i]) ? y[i] : 0;
+    if (p !== q) return p > q;
+  }
+  return false;
+}
+
+function otisakFajla(put) {
+  const h = createHash("sha256");
+  const fd = fs.openSync(put, "r");
+  try {
+    const bafer = Buffer.alloc(1024 * 1024);
+    let n;
+    while ((n = fs.readSync(fd, bafer, 0, bafer.length, null)) > 0) h.update(bafer.subarray(0, n));
+  } finally { fs.closeSync(fd); }
+  return h.digest("hex");
+}
+
+// Zasto se ova masina NE SME nadograditi sada. Prazan odgovor znaci da sme.
+function nadogradnjaSmeta(verzija) {
+  // Razvojni racunar se ne dira - ni ovde, kao ni pri ciscenju.
+  if (racunarJeZasticen()) return `zaštićen računar (${STOP_FAJL})`;
+  // Nepakovan launcher radi iz izvornog koda. Instalater bi pored njega
+  // postavio instalaciju koju niko nije trazio, a izvorni kod bi ostao da radi
+  // uporedo - to je zabuna koju bi neko trazio danima.
+  if (!PAKOVAN) return "launcher radi iz izvornog koda, ne iz instalacije";
+  if (sesijaAktivna) return "igrač je prijavljen";
+  if (spawnedGames.size) return "igra je pokrenuta";
+  if (!verzijaNovija(verzija, app.getVersion())) return `već ima verziju ${app.getVersion()}`;
+  return "";
+}
+
+function primiNadogradnju(msg) {
+  const verzija = String(msg.verzija || "");
+  if (nadogradnjaUToku) return;
+  if (!verzija || !/^[\d.]+$/.test(verzija)) return;
+
+  const smeta = nadogradnjaSmeta(verzija);
+  if (smeta) {
+    // Ovo NIJE greska: server pita ponovo cim se masina oslobodi. Zato se samo
+    // javi razlog, da vlasnik u panelu vidi zasto ta jedna masina jos ceka.
+    javiNadogradnju(verzija, "preskoceno", smeta);
+    return;
+  }
+  if (!config.host || !config.token) return;
+
+  nadogradnjaUToku = true;
+  javiNadogradnju(verzija, "preuzimam", "Preuzimam nadogradnju...");
+  const odustani = (poruka) => {
+    nadogradnjaUToku = false;
+    javiNadogradnju(verzija, "greska", poruka);
+  };
+
+  let dest;
+  try {
+    fs.mkdirSync(NADOGRADNJA_DIR, { recursive: true });
+    // Ostaci od ranijih pokusaja: instalater je oko sto megabajta i ne sme da
+    // se gomila po Temp fascikli.
+    for (const f of fs.readdirSync(NADOGRADNJA_DIR)) {
+      if (/\.exe$/i.test(f)) try { fs.unlinkSync(path.join(NADOGRADNJA_DIR, f)); } catch {}
+    }
+    dest = path.join(NADOGRADNJA_DIR, `launcher-${verzija}.exe`);
+  } catch (e) { return odustani("Nema mesta za preuzimanje: " + e.message); }
+
+  const url = config.host.replace(/\/+$/, "") + "/nadogradnja/launcher.exe?token=" + encodeURIComponent(config.token);
+  downloadFile(url, dest, (err) => {
+    if (err) return odustani("Preuzimanje nije uspelo: " + err.message);
+    try {
+      const st = fs.statSync(dest);
+      if (msg.velicina && st.size !== Number(msg.velicina)) {
+        fs.unlinkSync(dest);
+        return odustani(`preuzeto ${st.size} od ${msg.velicina} bajtova`);
+      }
+      if (msg.sha256 && otisakFajla(dest) !== String(msg.sha256).toLowerCase()) {
+        fs.unlinkSync(dest);
+        return odustani("otisak se ne poklapa - fajl nije onaj koji je server najavio");
+      }
+    } catch (e) { return odustani("Provera fajla nije uspela: " + e.message); }
+    pokreniNadogradnju(dest, verzija);
+  });
+}
+
+// INSTALACIJU VODI POMOCNIK, NE LAUNCHER.
+//
+// Instalater gasi launcher da bi mogao da prepise njegove fajlove - a ugasen
+// launcher ne moze ni da saceka kraj instalacije ni da se sam vrati. Zato
+// posao preuzima kratka skripta koja zivi duze od nas: saceka da se ugasimo,
+// pokrene instalater, pa vrati launcher.
+//
+// Ishod se upisuje u fajl jer ga u tom trenutku nema ko prijaviti: ako
+// instalacija pukne, vrati se STARA verzija, procita taj fajl i javi sta je
+// bilo. Bez toga bi neuspela nadogradnja izgledala isto kao da se nista nije
+// ni desilo.
+function pokreniNadogradnju(instalater, verzija) {
+  const skripta = path.join(NADOGRADNJA_DIR, "nadogradi.cmd");
+  const osigurac = path.join(NADOGRADNJA_DIR, "osigurac.cmd");
+  const zajedno = { launcher: process.execPath, ishod: NADOGRADNJA_ISHOD, verzija };
+  try {
+    fs.writeFileSync(skripta, napraviSkriptu({ instalater, ...zajedno }), "utf8");
+    fs.writeFileSync(osigurac, napraviOsigurac(zajedno), "utf8");
+    try { fs.unlinkSync(NADOGRADNJA_ISHOD); } catch {}
+  } catch (e) {
+    nadogradnjaUToku = false;
+    return javiNadogradnju(verzija, "greska", "Priprema nije uspela: " + e.message);
+  }
+  javiNadogradnju(verzija, "instaliram", `Instaliram ${verzija} i vraćam se`);
+  const pusti = (put) => {
+    const p = spawn("cmd.exe", ["/c", put], { detached: true, stdio: "ignore", windowsHide: true });
+    p.unref();
+  };
+  try {
+    pusti(skripta);
+    // Osigurac ide ODVOJENO, da ga ne povuce nista sto se desi glavnoj skripti.
+    pusti(osigurac);
+  } catch (e) {
+    nadogradnjaUToku = false;
+    return javiNadogradnju(verzija, "greska", "Pokretanje instalacije nije uspelo: " + e.message);
+  }
+  // Malo vremena da poruka "instaliram" stigne do servera pre nego sto veza
+  // nestane - inace panel ne bi imao sta da pokaze dok masina nije nazad.
+  setTimeout(() => { try { app.exit(0); } catch { process.exit(0); } }, 800);
+}
+
+// DA LI JE PROSLI POKUSAJ USPEO - ODGOVARA VERZIJA, NE PORUKA.
+//
+// Ako ovo cita NOV launcher, nadogradnja je prosla i server to vec vidi po
+// verziji kojom se predstavio - nema sta da se javlja. Ako je stari, nije
+// prosla, i on jedini moze da kaze zasto.
+//
+// Zove se kad se veza uspostavi, jer se tek tada ima kome javiti.
+function javiIshodNadogradnje() {
+  let red;
+  try { red = fs.readFileSync(NADOGRADNJA_ISHOD, "utf8").trim(); } catch { return; }
+  try { fs.unlinkSync(NADOGRADNJA_ISHOD); } catch {}
+  const [kod, verzija = ""] = red.split(/\s+/);
+  if (!verzija) return;
+  if (!verzijaNovija(verzija, app.getVersion())) return; // stigli smo do nje - proslo je
+
+  // Instalater ide u Program Files i trazi administratora, a launcher radi pod
+  // nalogom igraca. Kad UAC prozor niko ne odobri, glavna skripta ostane da
+  // ceka i launcher vrati OSIGURAC. Vlasnik mora da vidi bas to, a ne "nesto
+  // nije uspelo" - inace kvar trazi u mrezi ili u serveru.
+  javiNadogradnju(verzija, "greska", kod === KOD_OSIGURAC
+    ? `Instalacija ${verzija} se nije završila - najverovatnije nije odobrena ` +
+      `(instaler traži administratora). Launcher je ostao na ${app.getVersion()}.`
+    : `Instalacija ${verzija} je vratila kod ${kod}. Launcher je ostao na ${app.getVersion()}.`);
 }
 
 // daljinske komande sa panela

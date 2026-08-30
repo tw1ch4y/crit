@@ -71,11 +71,14 @@ for (const gotovo of ["Plan napajanja na **High Performance**", "Vremenski paket
 // meseca ne razlikuje ono što je namerno odbačeno od onoga što je ispalo iz
 // glave - a jedino drugo traži da se nešto uradi.
 //
-// "sledeće na redu" i "planirano" su dodati kasnije: plan je u početku imao samo
-// gotovo i odbačeno, pa je i rečnik pokrivao sve. Čim se pojavila stavka koja je
-// prihvaćena i čeka red, pravilo ju je odbijalo iako je uredno objašnjena.
+// Rečnik se širio kako su se pojavljivala nova stanja, i to je u redu dok je
+// svako od njih STVARNO drugačije:
+//   "sledeće na redu" / "planirano" - prihvaćeno, čeka red (plan je u početku
+//     imao samo gotovo i odbačeno, pa je prvu takvu stavku odbijao)
+//   "odluka" - ne čeka posao nego ODGOVOR vlasnika; dok ga nema, nema šta da se
+//     radi, a to nije isto što i "nije stiglo"
 proveri("neurađeno stoji uz razlog zašto",
-  plan.split("\n").filter((l) => l.startsWith("- [ ]")).every((l) => /NIJE urađeno|ne planira se|preporuka|Nije potrebna|sledeće na redu|planirano/.test(l)),
+  plan.split("\n").filter((l) => l.startsWith("- [ ]")).every((l) => /NIJE urađeno|ne planira se|preporuka|Nije potrebna|sledeće na redu|planirano|odluka/.test(l)),
   "stavka bez objašnjenja ne kaže da li je zaboravljena, odbačena ili čeka red");
 proveri("odlaganje ažuriranja je objašnjeno u uputstvu",
   /Active hours/.test(citajIzvor("DEPLOY.md")),

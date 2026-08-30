@@ -306,10 +306,9 @@ igraonicu". Prvo sve mora da radi kako treba; licence dolaze posle.
   igrača. Radi i kad server ne radi, jer tada i služi. Ručni PIN iz
   `podesavanja.json` i dalje prolazi kao rezerva - namerno, jer pogrešna
   strogost ovde zaključava osoblje na svih trinaest mašina
-- [ ] **Auto-update launchera** preko sopstvenog servera - *planirano*
-  (`electron-updater`). Sada je 13 mašina × ručna prijava na administratorski
-  nalog po svakoj verziji; to se uradi dvaput, treći put se preskoči, i za mesec
-  dana u prostoriji stoji pet različitih verzija
+- [x] **Nadogradnja launchera sa panela** - instalater se postavlja jednom, na server, a računari ga preuzimaju sami čim se oslobode. Ranije je bilo 13 mašina × ručna prijava na administratorski nalog po svakoj verziji; to se uradi dvaput, treći put se preskoči, i za mesec dana u prostoriji stoji pet različitih verzija. Fajl sam po sebi ne znači ništa - dok ga serviser ne *pusti u rad*, niko ga ne preuzima ni sa ispravnim tokenom. **Računar na kom neko igra se ne dira** (nadogradnja gasi launcher, a usred plaćenog sata to je oduzeto vreme gostu). Adresu preuzimanja sklapa sam računar, svojim tokenom - u poruci nema linka, pa podmetnuta poruka ne može da pokrene tuđi `.exe` na 13 mašina; uz najavu ide sha256 koji se proverava pre pokretanja
+- [x] **Računar se vraća i kad nadogradnja ne uspe** - instalaciju vodi skripta koja živi duže od launchera, uz *osigurač* koji ga vraća posle pet minuta bez obzira na sve. Proba koja tu skriptu STVARNO pokreće (`test-pomocnik-nadogradnje.mjs`) našla je dva kvara koja se čitanjem koda ne vide: launcher je pokreće bez konzole, a tamo `tasklist` tiho odgovara "nema ga" (launcher bi se vratio nasred instalacije) i `start /wait` se nikad ne vrati (računar bi ostao bez launchera do kraja smene). Obe stvari rade savršeno kad se skripta pokrene ručno
+- [ ] **Nadogradnja bez UAC-a** - *odluka pred obilazak*. Instaler ide u `Program Files` pa traži administratora; pod nalogom igrača Windows čeka klik koji niko neće dati, osigurač vrati stari launcher i panel javi "nije odobreno". Da ide sama, instalacija mora da bude po korisniku (`perMachine: false`) - launcher tada ide u profil igrača umesto u `Program Files`. Bilo kako, verzija sa ovim mehanizmom traži jedan poslednji ručni obilazak svih 13 mašina
 
 ---
 

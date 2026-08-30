@@ -2,7 +2,9 @@ import express from "express";
 import { db, getSetting, setSetting, randomToken } from "./db.js";
 import * as odrz from "./odrzavanje.js";
 const backupDb = odrz.backupDb;
-import { verifyPassword, issueAdminToken, revokeAdminToken, requireAdmin, requireOwner } from "./auth.js";
+import fs from "node:fs";
+import { verifyPassword, issueAdminToken, revokeAdminToken, requireAdmin, requireOwner, requireServiser } from "./auth.js";
+import * as nadg from "./nadogradnja.js";
 import * as svc from "./service.js";
 
 export const router = express.Router();
@@ -796,6 +798,80 @@ router.post("/kopija-van/sada", requireOwner, (req, res) => {
     detail: `Kopija odneta van računara: ${r.fajl} -> ${r.cilj}` });
   res.json({ ok: true, ...odrz.kopijaVanPodesavanja() });
 });
+
+// ---------- NADOGRADNJA LAUNCHERA ----------
+//
+// Vlasnik VIDI stanje i sme da pogura nadogradnju na slobodne racunare.
+// Sta ce se uopste deliti bira SERVISER - on je taj koji je instalater i
+// napravio, i jedini koji moze da zna da li je ispravan.
+router.get("/nadogradnja", requireOwner, (req, res) => res.json(svc.nadogradnjaStanje()));
+
+router.post("/nadogradnja/pusti", requireServiser, (req, res) => {
+  const r = nadg.pusti(req.body?.verzija);
+  if (r.error) return res.status(400).json(r);
+  svc.logEvent({ category: "racunar", action: "nadogradnja_pustena", actor: req.admin.username,
+    detail: `Verzija ${r.verzija} puštena u rad - računari je preuzimaju čim se oslobode` });
+  // Ko je vec slobodan ne mora da ceka sledecu proveru.
+  svc.nadogradnjaTick();
+  res.json(svc.nadogradnjaStanje());
+});
+
+router.post("/nadogradnja/povuci", requireServiser, (req, res) => {
+  nadg.povuci();
+  svc.logEvent({ category: "racunar", action: "nadogradnja_povucena", actor: req.admin.username,
+    detail: "Nadogradnja povučena - računari je više ne preuzimaju" });
+  res.json(svc.nadogradnjaStanje());
+});
+
+router.post("/nadogradnja/posalji", requireOwner, (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : null;
+  const r = svc.posaljiNadogradnju(ids, req.admin.username);
+  if (r.error) return res.status(400).json(r);
+  res.json({ ...r, ...svc.nadogradnjaStanje() });
+});
+
+// PRENOS INSTALATERA U KOMADIMA, NE U MEMORIJI.
+//
+// Instalater je oko sto megabajta. Da ide kroz express.json, ceo bi se pre
+// upisa skupio u memoriji servera - a taj server u igraonici deli racunar sa
+// bazom i naplatom. Zato telo zahteva ide pravo u fajl, komad po komad.
+router.put("/nadogradnja/fajl", requireServiser, (req, res) => {
+  const r = nadg.putanjaZaUpis(req.query?.ime);
+  if (r.error) return res.status(400).json(r);
+  const izlaz = fs.createWriteStream(r.privremena);
+  let pukao = false;
+  const propalo = (poruka) => {
+    if (pukao) return;
+    pukao = true;
+    try { izlaz.destroy(); } catch {}
+    try { fs.unlinkSync(r.privremena); } catch {}
+    if (!res.headersSent) res.status(400).json({ error: poruka });
+  };
+  req.on("aborted", () => propalo("Prenos je prekinut"));
+  req.on("error", (e) => propalo("Prenos nije uspeo: " + e.message));
+  izlaz.on("error", (e) => propalo("Upis nije uspeo: " + e.message));
+  req.pipe(izlaz);
+  izlaz.on("finish", () => {
+    if (pukao) return;
+    // Prazan fajl je prekinut prenos koji se zavrsio "uredno".
+    let st;
+    try { st = fs.statSync(r.privremena); } catch { return propalo("Fajl nije sačuvan"); }
+    if (!st.size) return propalo("Stigao je prazan fajl");
+    try { fs.renameSync(r.privremena, r.konacna); } catch (e) { return propalo("Premeštanje nije uspelo: " + e.message); }
+    svc.logEvent({ category: "racunar", action: "nadogradnja_fajl", actor: req.admin.username,
+      detail: `Postavljen instalater ${r.ime} (${Math.round(st.size / 1048576)} MB)` });
+    res.json(svc.nadogradnjaStanje());
+  });
+});
+
+router.delete("/nadogradnja/fajl", requireServiser, (req, res) => {
+  const r = nadg.obrisi(req.query?.ime);
+  if (r.error) return res.status(400).json(r);
+  svc.logEvent({ category: "racunar", action: "nadogradnja_brisanje", actor: req.admin.username,
+    detail: `Obrisan instalater ${req.query.ime}` });
+  res.json(svc.nadogradnjaStanje());
+});
+
 
 // ---------- SKLADIŠTE / ODRŽAVANJE (vlasnik) ----------
 router.get("/skladiste", requireOwner, (req, res) => res.json(odrz.stanjeSkladista()));

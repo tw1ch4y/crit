@@ -9,6 +9,7 @@ import { db, checkpoint } from "./db.js";
 import { backupDb, odrzavanje } from "./odrzavanje.js";
 import { getAdmin } from "./auth.js";
 import { router } from "./routes.js";
+import * as nadg from "./nadogradnja.js";
 import { initWs, setHandlers, broadcastPanels } from "./hub.js";
 import * as svc from "./service.js";
 
@@ -41,6 +42,45 @@ app.use("/api", router);
 // odgovore cita kao JSON, pa bi na HTML javio nerazumljivu gresku umesto jasnog
 // "ta adresa ne postoji" - a to se desi kad panel i server nisu iste verzije.
 app.use("/api", (req, res) => res.status(404).json({ error: `Nepoznata adresa: ${req.method} /api${req.path}` }));
+
+// ---- Preuzimanje launchera (nadogradnja) ----
+//
+// Jedina adresa van /api koja nesto daje, i jedina koju racunari zovu bez
+// prijave osoblja. Zato se ovde traze tri stvari, i to ovim redom:
+//
+//  1. Token racunara. Nije panelski token - masina ga dobija pri postavljanju
+//     i drzi ga u svojim podesavanjima. Bez njega niko sa mreze ne moze da
+//     skine instalater, pa ni da ga razgleda.
+//  2. Verzija mora da bude PUSTENA. Fajl koji stoji u folderu, a covek ga jos
+//     nije odobrio, ne postoji za spoljni svet.
+//  3. Salje se tacno ona verzija koja je pustena. Racunar je najavljen otisak
+//     vec zapamtio i proverice ga; ako mu stigne bilo sta drugo, odbice da to
+//     pokrene.
+app.get("/nadogradnja/launcher.exe", (req, res) => {
+  const token = String(req.query.token || "");
+  const comp = token ? db.prepare("SELECT id FROM computers WHERE token = ?").get(token) : null;
+  if (!comp) return res.status(403).type("text").send("Nevažeći token računara");
+
+  const st = nadg.stanje();
+  if (!st.ima || !st.pusteno) return res.status(404).type("text").send("Nema puštene nadogradnje");
+
+  const put = path.join(nadg.FOLDER, st.fajl);
+  res.setHeader("Content-Type", "application/octet-stream");
+  res.setHeader("Content-Length", st.velicina);
+  res.setHeader("X-Crit-Verzija", st.verzija);
+  res.setHeader("X-Crit-Sha256", st.sha256);
+  // Instalater se ne kesira: isto ime fajla posle nove gradnje znaci drugi
+  // sadrzaj, a posrednik koji vrati stari bi vratio i staru gresku.
+  res.setHeader("Cache-Control", "no-store");
+  if (req.method === "HEAD") return res.end();
+
+  const tok = fs.createReadStream(put);
+  tok.on("error", () => { if (!res.headersSent) res.status(500).end(); else res.destroy(); });
+  // Racunar koji prekine preuzimanje (restart, iscupan kabl) ne sme da ostavi
+  // otvoren tok koji dalje cita sa diska.
+  res.on("close", () => tok.destroy());
+  tok.pipe(res);
+});
 
 // index.html se sklapa u hodu: verzija se ubaci u adrese CSS-a i JS-a, pa
 // pregledac za svaku novu verziju povuce sveze fajlove. Sama strana se ne
@@ -96,6 +136,11 @@ setInterval(() => {
 }, 5000);
 
 // ---- Zaštita: WAL checkpoint (2 min) + backup baze (15 min + na startu) ----
+// Racunari se nadograde sami cim se oslobode - vidi nadogradnjaTick.
+setInterval(() => {
+  try { svc.nadogradnjaTick(); } catch (e) { console.error("nadogradnja:", e.message); }
+}, 60 * 1000);
+
 setInterval(() => checkpoint(), 2 * 60 * 1000);
 setInterval(() => backupDb(), 15 * 60 * 1000);
 backupDb();

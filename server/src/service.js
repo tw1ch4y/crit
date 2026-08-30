@@ -8,6 +8,7 @@ import { db, getSetting, setSetting, DATA_DIR, uJednomPoslu } from "./db.js";
 import { verifyPassword, hashPassword, rang } from "./auth.js";
 import { broadcastPanels, broadcastClients, sendClient, isClientOnline, izbaciPanel } from "./hub.js";
 import { banerIgre, promoCrit } from "./banner.js";
+import * as nad from "./nadogradnja.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -749,6 +750,8 @@ export function onClientOpen(comp, ip, verzija) {
   // "ovaj racunar ima launcher stariji od 2.22".
   db.prepare("UPDATE computers SET last_seen = ?, ip = COALESCE(?, ip), launcher_version = COALESCE(?, launcher_version) WHERE id = ?")
     .run(Date.now(), ip || null, verzija || null, comp.id);
+  // Racunar koji se vratio sa novom verzijom je dokaz da je nadogradnja prosla.
+  nadogradnjaPoPovratku(comp, verzija);
   sendWelcomeState(comp.id);
   pushComputers();
 }
@@ -984,6 +987,8 @@ export function handleClientMessage(computerId, msg) {
       return clientTekstura(computerId, msg);
     case "install_status":
       return clientInstallStatus(computerId, msg);
+    case "nadogradnja_status":
+      return clientNadogradnjaStatus(computerId, msg);
     case "game_start":
       return zabeleziPokretanje(computerId, Number(msg.gameId));
     case "igra_ne_radi":
@@ -2766,6 +2771,134 @@ function clientInstallStatus(computerId, msg) {
   if (msg.state === "done" || msg.state === "error") {
     logEvent({ category: "racunar", action: "install_" + msg.state, actor: "sistem", target: compName(computerId), detail: `Instalacija "${msg.program}": ${msg.state === "done" ? "uspešno završena" : "greška - " + (msg.message || "")}` });
   }
+}
+
+// ---------- NADOGRADNJA LAUNCHERA ----------
+//
+// Pravila i zasto su takva stoje u nadogradnja.js. Ovde je odluka KOME se i
+// KADA salje.
+
+// Racunar na kom neko sedi se ne dira.
+//
+// Nadogradnja gasi launcher i vraca ga tek posle instalacije. Usred placenog
+// sata to je oduzeto vreme gostu i posao radniku koji mora da objasni sta se
+// desilo. Zato mora sve troje: da je povezan, da nije zauzet i da nema sesiju
+// u toku. "locked" (zakljucan od osoblja) i "idle" (prijavni ekran) su jedina
+// dva stanja u kojima za tim racunarom sigurno niko ne igra.
+function smeNadogradnju(c) {
+  if (!isClientOnline(c.id)) return false;
+  if (c.current_session_id) return false;
+  return c.status === "idle" || c.status === "locked";
+}
+
+// Posle slanja se ceka - druga najava ne bi ubrzala nista, a mogla bi da
+// pokrene drugo preuzimanje preko prvog koje jos traje.
+const nadogradnjaPoslato = new Map(); // computerId -> { verzija, ts }
+const NADOGRADNJA_PAUZA = 10 * 60 * 1000;
+
+// Stanje po racunaru vidi vlasnik u panelu, isto kao za instalacije.
+const nadogradnjaStatus = new Map(); // computerId -> { verzija, state, message, ts }
+
+export function nadogradnjaStanje() {
+  const st = nad.stanje();
+  const racunari = db.prepare("SELECT * FROM computers ORDER BY id").all().map((c) => {
+    const v = c.launcher_version || null;
+    return {
+      id: c.id,
+      name: c.name,
+      verzija: v,
+      online: isClientOnline(c.id),
+      slobodan: smeNadogradnju(c),
+      // Bez verzije (launcher stariji od 2.22) racunamo da zaostaje - i jeste.
+      zaostaje: st.ima ? (!v || nad.uporediVerzije(v, st.verzija) < 0) : false,
+      status: nadogradnjaStatus.get(c.id) || null,
+    };
+  });
+  return {
+    ...st,
+    fajlovi: nad.listaFajlova(),
+    racunari,
+    zaostalih: racunari.filter((r) => r.zaostaje).length,
+  };
+}
+
+// Sta se salje racunaru. Adresu za preuzimanje launcher sklapa SAM, od servera
+// na koji je vec vezan - ovde ide samo sta i koliko. Vidi main.js.
+function najava(st) {
+  return { t: "nadogradnja", verzija: st.verzija, sha256: st.sha256, velicina: st.velicina };
+}
+
+export function posaljiNadogradnju(ids, actor = "vlasnik", automatski = false) {
+  const st = nad.stanje();
+  if (!st.ima) return { error: "Nema instalatera na serveru" };
+  if (!st.pusteno) return { error: "Ta verzija nije puštena u rad" };
+
+  const svi = db.prepare("SELECT * FROM computers ORDER BY id").all();
+  const trazeni = ids && ids.length ? svi.filter((c) => ids.includes(c.id)) : svi;
+  let poslato = 0, zauzeto = 0, vecImaju = 0;
+  for (const c of trazeni) {
+    const v = c.launcher_version || null;
+    if (v && nad.uporediVerzije(v, st.verzija) >= 0) { vecImaju++; continue; }
+    if (!smeNadogradnju(c)) { zauzeto++; continue; }
+    const ranije = nadogradnjaPoslato.get(c.id);
+    if (ranije && ranije.verzija === st.verzija && Date.now() - ranije.ts < NADOGRADNJA_PAUZA) continue;
+    if (!sendClient(c.id, najava(st))) { zauzeto++; continue; }
+    nadogradnjaPoslato.set(c.id, { verzija: st.verzija, ts: Date.now() });
+    nadogradnjaStatus.set(c.id, { verzija: st.verzija, state: "poslato", message: "Poslato", ts: Date.now() });
+    poslato++;
+  }
+  if (poslato) {
+    broadcastPanels({ t: "nadogradnja" });
+    logEvent({ category: "racunar", action: "nadogradnja", actor,
+      detail: `Nadogradnja na ${st.verzija} poslata na ${poslato} računara` +
+        (zauzeto ? ` (${zauzeto} zauzeto ili offline)` : "") + (automatski ? " (automatski)" : "") });
+  }
+  return { ok: true, poslato, zauzeto, vecImaju };
+}
+
+// Racunari se nadograde SAMI, cim se oslobode.
+//
+// Jedna provera u razmaku pokriva sve puteve kojima masina postaje slobodna -
+// kraj sesije, zakljucavanje od osoblja, ponovno povezivanje posle restarta.
+// Da se kacilo na svaki od tih dogadjaja posebno, prvi zaboravljen bi ostavio
+// racunar zauvek na staroj verziji, a to se ne bi ni primetilo.
+export function nadogradnjaTick() {
+  const st = nad.stanje();
+  if (!st.ima || !st.pusteno) return;
+  posaljiNadogradnju(null, "sistem", true);
+}
+
+function clientNadogradnjaStatus(computerId, msg) {
+  const stanje = String(msg.state || "").slice(0, 20);
+  const st = { verzija: String(msg.verzija || "").slice(0, 20), state: stanje, message: String(msg.message || "").slice(0, 200), ts: Date.now() };
+  nadogradnjaStatus.set(computerId, st);
+  broadcastPanels({ t: "nadogradnja" });
+  if (stanje === "greska") {
+    // Racunar koji je pukao mora da sme da proba ponovo, bez cekanja pauze -
+    // inace bi jedno prekinuto preuzimanje zakljucalo masinu na deset minuta.
+    nadogradnjaPoslato.delete(computerId);
+    logEvent({ category: "racunar", action: "nadogradnja_greska", actor: "sistem", target: compName(computerId),
+      detail: `Nadogradnja nije uspela: ${st.message}` });
+  }
+  if (stanje === "instaliram") {
+    logEvent({ category: "racunar", action: "nadogradnja_start", actor: "sistem", target: compName(computerId),
+      detail: `Instalira launcher ${st.verzija}` });
+  }
+}
+
+// Uspeh se ne prijavljuje - dokazuje se.
+//
+// Racunar koji instalira gasi svoj launcher, pa ne moze da javi "gotovo je".
+// Jedini pouzdan dokaz je da se vratio i predstavio NOVOM verzijom; tek tada
+// se u panelu upisuje da je nadogradnja uspela.
+function nadogradnjaPoPovratku(comp, verzija) {
+  const cekao = nadogradnjaStatus.get(comp.id);
+  if (!cekao || !verzija) return;
+  if (nad.uporediVerzije(verzija, cekao.verzija) < 0) return;
+  nadogradnjaStatus.set(comp.id, { verzija, state: "gotovo", message: "Nadogradnja uspela", ts: Date.now() });
+  nadogradnjaPoslato.delete(comp.id);
+  logEvent({ category: "racunar", action: "nadogradnja_gotovo", actor: "sistem", target: comp.name,
+    detail: `Launcher nadograđen na ${verzija}` });
 }
 
 // Wake-on-lan

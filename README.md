@@ -179,6 +179,30 @@ Uslovi da radi bez greške:
 - Za instalacije koje traže administratorska prava, launcher treba da bude pokrenut kao administrator.
 - Računar mora biti **online** (launcher povezan) da bi primio instalaciju.
 
+## Nadogradnja launchera (panel > Instalacije)
+
+Instalater se postavlja **jednom, na server**, a računari ga preuzimaju sami -
+umesto obilaska svih 13 mašina po svakoj verziji.
+
+1. **Postavi instalater** - `Crit Launcher Setup X.Y.Z.exe` iz `dist/`. Ime mora
+   da sadrži verziju; po njoj se zna šta je novije. Postavlja ga **serviser**.
+2. **Pusti verziju u rad.** Dok to ne uradiš, nijedan računar je ne preuzima ni
+   sa ispravnim tokenom - prekopiran fajl sam po sebi ne znači ništa.
+3. Dalje ide samo: svaki računar se nadogradi **čim se oslobodi**.
+
+Šta drži da bude bezbedno:
+- **Računar na kom neko igra se ne dira.** Nadogradnja gasi launcher, a usred
+  plaćenog sata to je oduzeto vreme gostu. Zauzeta mašina čeka svoj red.
+- **U poruci nema linka.** Adresu preuzimanja računar sklapa sam, od servera na
+  koji je već vezan i svojim tokenom - podmetnuta poruka ne može da mu pokrene
+  tuđi `.exe`.
+- **Otisak mora da se poklopi.** Uz najavu ide sha256; ako se ne slaže, fajl se
+  briše i ništa se ne pokreće.
+- **Računar se vraća i kad instalacija ne uspe** - posle pet minuta ga vrati
+  osigurač, a u panelu piše zašto nije prošlo.
+
+Detalji i jedno preostalo pitanje (UAC / `perMachine`) su u DEPLOY.md §5.1.
+
 ## Prečice na tastaturi (na računaru igrača)
 
 | Prečica | Radnja |

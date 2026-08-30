@@ -28,6 +28,7 @@
       "backdrop-preload.js",
       "overlay-preload.js",
       "ciscenje.js",
+      "nadogradnja-skripta.js",
       "procesi.js",
       "windows-podesavanja.js",
       "renderer/**/*",
