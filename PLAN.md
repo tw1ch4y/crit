@@ -233,6 +233,34 @@
   gomilanja), slušaoci događaja (svi na `document`, registrovani jednom),
   bekstvo teksta u HTML (`esc` svuda gde ulaze podaci iz baze), korpa i
   ograničenje količine, pokretanje igara, donja statusna traka
+### Revizija panela (ono što osoblje gleda ceo dan)
+
+- [x] **DUPLI KLIK NA „NAPLATI" NAPLAĆIVAO JE DVAPUT.** Dugmad koja pomeraju
+  novac nisu se zaključavala dok server ne odgovori. Izmereno u pravom
+  pregledaču: **tri klika = tri računa, 390 dinara umesto 130**; tri klika na
+  „Dodaj" pri dopuni = **1500 kredita umesto 500**. Najskuplji je bio *Brzi
+  gost*: dupli klik pravi dva seta naloga sa kreditom, a lozinke prvog seta se
+  posle ne mogu videti nigde. U launcheru je ta zaštita postojala od ranije; u
+  panelu je nije bilo, a baš se on koristi u gužvi
+- [x] **Grupno „Zaključaj" i „Odjavi" prekidali su meč bez ijednog pitanja.**
+  Na računaru sa igračem obe akcije zatvaraju sesiju i gase igru — isto što radi
+  i „Ugasi", ali su „Ugasi" i „Restart" imali potvrdu a ova dva nisu. Potvrda sad
+  kaže **koliko ih trenutno igra**; prazni računari se ne pitaju, jer se pitanje
+  bez sadržaja nauči da se preskače
+- [x] **Otkazana porudžbina nije vraćala piće na stanje.** Kredit jeste, zaliha
+  ne — svako otkazivanje je trajno „pojelo" po jedno piće iz evidencije. Kroz
+  mesec dana launcher piše *Rasprodato* nad punim sanducima, a traka za dopunu
+  doziva radnika na artikle kojih ima. Uz to, dugme `×` stoji tik uz
+  „Dostavljeno" a radi nešto sasvim drugo — sad pita, i kaže šta se dešava sa
+  novcem
+- [x] **Blokiranje naloga** takođe prekida sesiju i gasi igru, a išlo je bez
+  pitanja i bez hvatanja greške — kad zahtev padne, radnik ne vidi ništa i misli
+  da je nalog blokiran
+- [x] Pregledani i **bez nalaza**: promena cene po satu (ima odličnu potvrdu sa
+  primerom na brojkama), oduzimanje pristupa radniku (upozorava na otvorenu
+  smenu), brisanje naloga igrača, pretraga naloga na kasi, logovi
+- [x] Provereno u pregledaču posle svih izmena: **svih 15 strana panela se
+  otvara bez ijedne greške**
 - [x] Uklonjen mrtav kod iz `auth.js` (tokeni igrača koje niko nije pozivao);
   `.claude/launch.json` je pokazivao na port 8090, server radi na 8095
 - [x] **Fabrički servisni PIN više nije tih** - launcher uz MAC adrese javlja i
