@@ -1688,7 +1688,24 @@ async function editPlayerModal(p) {
       } catch (e) { $("#epErr", root).textContent = e.message; }
     });
     $("#epPassBtn", root).addEventListener("click", async () => { try { await api(`/players/${p.id}/password`, "POST", { password: $("#epPass", root).value }); toast("Lozinka je resetovana", "success"); } catch (e) { toast(e.message, "error"); } });
-    $("#epBan", root).addEventListener("click", async () => { await api(`/players/${p.id}/ban`, "POST", { banned: !p.banned }); toast(p.banned ? "Nalog je odblokiran" : "Nalog je blokiran", "success"); close(); renderPlayers(); });
+    // BLOKIRANJE PREKIDA SESIJU I GASI IGRU.
+    //
+    // Nije samo oznaka na nalogu: ako gost trenutno igra, blokiranje mu zatvara
+    // sesiju i gasi igru na licu mesta. Do sada je išlo bez ijednog pitanja, a i
+    // bez hvatanja greške - kad zahtev padne, radnik ne vidi ništa i misli da je
+    // nalog blokiran.
+    $("#epBan", root).addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
+      const zaRacunarom = !p.banned && state.computers.find((c) => c.player?.id === p.id);
+      if (zaRacunarom && !(await confirmDialog(
+        `Nalog "${p.username}" biće blokiran i neće moći da se prijavi.`,
+        { title: "Blokiranje naloga", ok: "Blokiraj", danger: true,
+          istaknuto: `Igrač trenutno igra na ${zaRacunarom.name} - sesija se prekida i igra mu se gasi.` }))) return;
+      try {
+        await api(`/players/${p.id}/ban`, "POST", { banned: !p.banned });
+        toast(p.banned ? "Nalog je odblokiran" : "Nalog je blokiran", "success");
+        close(); renderPlayers();
+      } catch (e) { $("#epErr", root).textContent = e.message; }
+    }, p.banned ? "Odblokiravam..." : "Blokiram..."));
     const del = $("#epDel", root);
     if (del) del.addEventListener("click", async () => {
       const extra = p.balance > 0 ? ` Na nalogu je ostalo ${money(p.balance)} kredita.` : "";
@@ -2887,12 +2904,15 @@ function installTargets(prog) {
     <div style="max-height:300px;overflow-y:auto">${rows}</div>
     <div class="err-msg" id="itErr"></div>
     <button class="btn btn-primary btn-block" id="itSend">Pošalji instalaciju</button>`, (root, close) => {
-    $("#itSend", root).addEventListener("click", async () => {
+    // Dupli klik bi poslao istu instalaciju dvaput na iste mašine: dva
+    // preuzimanja i dva instalatera istog programa u isto vreme, koji onda
+    // smetaju jedan drugom i oba padnu.
+    $("#itSend", root).addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
       const ids = $$(".inst-t:checked", root).map((c) => Number(c.dataset.id));
       if (!ids.length) { $("#itErr", root).textContent = "Izaberi bar jedan online računar"; return; }
       try { const r = await api("/install", "POST", { ...prog, ids }); toast(`Instalacija poslata na ${r.sent} računara`, "success"); close(); if (state.view === "install") updateInstallStatus(); }
       catch (e) { $("#itErr", root).textContent = e.message; }
-    });
+    }, "Šaljem..."));
   });
 }
 

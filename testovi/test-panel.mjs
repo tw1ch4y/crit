@@ -261,6 +261,21 @@ proveri("grupno otkljucavanje kaze da ne dira sesije",
   /Sesije koje su u toku se ne diraju/.test(app),
   "radnik inace ne zna sme li da ga pusti dok je igraonica puna");
 
+// ---- BLOKIRANJE NALOGA TAKODJE PREKIDA SESIJU ----
+//
+// Nije samo oznaka na nalogu: ako gost trenutno igra, blokiranje mu zatvara
+// sesiju i gasi igru na licu mesta. Islo je bez ijednog pitanja, i bez hvatanja
+// greske - kad zahtev padne, radnik ne vidi nista i misli da je nalog blokiran.
+proveri("blokiranje pita ako igrac trenutno igra",
+  /const zaRacunarom = !p\.banned && state\.computers\.find\(\(c\) => c\.player\?\.id === p\.id\)/.test(app));
+proveri("potvrda kaze na kom racunaru igra", /Igrač trenutno igra na \$\{zaRacunarom\.name\}/.test(app));
+proveri("neuspelo blokiranje se vidi", /api\(`\/players\/\$\{p\.id\}\/ban`[\s\S]{0,220}catch \(e\) \{ \$\("#epErr"/.test(app),
+  "bez toga radnik misli da je nalog blokiran, a nije");
+
+// Dupla instalacija na istu masinu: dva preuzimanja i dva instalatera istog
+// programa u isto vreme, koji smetaju jedan drugom i oba padnu.
+proveri("slanje instalacije se zakljucava", /#itSend[\s\S]{0,60}jednomKlik/.test(app));
+
 // Istaknuta recenica ide kao svoje polje, ne kao HTML u tekstu: tekst se BEZI
 // jer u njemu stoje imena racunara i naloga.
 proveri("istaknuto upozorenje ima svoje polje", /opts\.istaknuto \? `<div class="confirm-hi">\$\{esc\(opts\.istaknuto\)\}/.test(app));
