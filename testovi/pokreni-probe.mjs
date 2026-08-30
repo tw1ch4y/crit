@@ -37,6 +37,7 @@ const ALATI = [
   { ime: "proba-porudzbine", args: [String(PORT)], opis: "porudžbina od klika do baze, preko pravog WebSocketa" },
   { ime: "proba-procesa", args: [], opis: "daljinski task manager: popis i gašenje pravog programa", sam: true },
   { ime: "proba-nadogradnja-pin", args: [], opis: "servisni PIN preživljava nadogradnju launchera", sam: true },
+  { ime: "proba-servisni-pin-server", args: [], opis: "servisni PIN se upisuje jednom u panelu i vazi na svim masinama, i bez servera", sam: true },
   { ime: "proba-veza", args: [], opis: "launcher preživljava otkucaj servera i sam se vraća", sam: true },
   { ime: "proba-pokretanje-igre", args: [], opis: "klik na igru stiže do baze, izveštaja i logova", sam: true },
   { ime: "proba-tocka", args: [], opis: "nagrada sa točka stiže na kredit tek kad se objavi", sam: true },

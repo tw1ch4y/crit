@@ -90,7 +90,38 @@ proveri("upozorenje stoji na kontrolnoj tabli", /\$\{upozorenjePin\(\)\}/.test(a
 proveri("upozorenje NABRAJA racunare", /masine\.join\(", "\)/.test(app),
   "bez imena vlasnik mora da obidje svih 13 masina da nadje koju");
 const main = citajIzvor("client/main.js");
-proveri("launcher javlja stanje svog PIN-a", /fabrickiPin: servisniPin\(\) === FABRICKI_PIN/.test(main));
+proveri("launcher javlja stanje svog PIN-a",
+  /fabrickiPin: !imaPinSaServera\(\) && servisniPin\(\) === FABRICKI_PIN/.test(main));
+
+// ---- PIN SE UPISUJE JEDNOM, U PANELU, I STIZE NA SVE MASINE ----
+//
+// Rucno upisivanje u podesavanja.json na svakoj masini nije bila nezgodna
+// procedura nego los dizajn: PIN koji se menja na trinaest mesta ne promeni se
+// nigde. Ostajao je fabricki 1234 - bas onaj kojim igrac koji iscupa mrezni
+// kabl preusmerava racunar na svoj server.
+const srv = citajIzvor("server/src/service.js");
+proveri("server ume da posalje servisni PIN", /export function servisniPinZaKlijenta\(/.test(srv));
+proveri("SALJE SE HES, NE SAM PIN", /scryptSync\(pin, Buffer\.from\(so, "hex"\), 32\)/.test(srv),
+  "server nikad ne salje unlock_pin klijentima; isto pravilo vazi i ovde");
+proveri("PIN ide uz svako povezivanje", /servisniPin: servisniPinZaKlijenta\(\),/.test(srv));
+proveri("izmena u panelu stize ODMAH", /export function posaljiServisniPin\(/.test(srv)
+  && /broadcastClients\(\{ t: "servisni_pin"/.test(srv),
+  "inace bi nov PIN vazio tek posle restarta svakog racunara");
+const rt = citajIzvor("server/src/routes.js");
+proveri("ruta salje PIN kad se promeni", /if \(changed\.includes\("servisniPin"\)\) svc\.posaljiServisniPin\(\)/.test(rt));
+
+proveri("launcher pamti PIN sa servera", /function zapamtiServisniPin\(/.test(main));
+proveri("cuva se u config.json koji nadogradnja ne dira", /servisniPinHes: novi/.test(main));
+proveri("FABRICKI PRESTAJE DA VAZI kad stigne pravi",
+  /if \(lokalni === FABRICKI_PIN && saServera\?\.hes\) return false;/.test(main),
+  "cela poenta: dok 1234 radi, masina se preusmerava na tudji server");
+proveri("i dalje prolazi rucno upisan PIN", /return pin === lokalni;/.test(main),
+  "pogresna strogost ovde zakljucava osoblje na svih 13 masina");
+proveri("poredjenje hesa je otporno na merenje vremena", /timingSafeEqual\(Buffer\.from\(test, "hex"\)/.test(main));
+
+proveri("panel ima polje za servisni PIN", /id="setSPin"/.test(app));
+proveri("polje se salje pri cuvanju", /servisniPin: \$\("#setSPin"\)\.value/.test(app));
+proveri("panel upozorava dok PIN nije podesen", /Još nije podešen, pa na računarima važi fabrički 1234/.test(app));
 
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 await new Promise((r) => setTimeout(r, 300));

@@ -281,10 +281,31 @@ Adresa servera i token ostaju - stoje u nalogu korisnika, a instaler ga ne dira.
 > normalno dok im ne dođeš na red, pa ne moraš sve mašine u istoj večeri. Panel
 > pokazuje verziju svakog računara, tako da se lako vidi ko je ostao.
 
-> **Servisni PIN ostaje tvoj.** Fajl `podesavanja.json` instaler prepisuje
-> fabričkim, ali launcher pamti PIN koji nije fabrički odvojeno, pa se posle
-> nadogradnje ne vraća na `1234`. Ako namerno menjaš PIN, upiši novi u
-> `podesavanja.json` - novi odmah preuzima.
+> **Servisni PIN ostaje tvoj.** Upisan je u panelu i čuva se na svakoj mašini
+> odvojeno od instalacije, pa ga nadogradnja ne dira.
+
+## 5.2 Servisni PIN - upisuje se jednom, u panelu
+
+Servisni PIN otvara **podešavanja launchera** i **izlaz iz kioska kad server ne
+radi**. To je jedini izlaz koji osoblje ima kad glavni računar padne, pa mora da
+se proveri lokalno, na samoj mašini.
+
+Upisuje se u **Podešavanja > Servisni PIN launchera** i odatle stiže na sve
+računare **odmah**, dok gledaš u ekran. Ne kuca se ni na jednoj mašini posebno.
+
+- Dok nije upisan, na mašinama važi fabrički **`1234`** i panel stoji crveno.
+  Dok je tako, igrač koji iščupa mrežni kabl može da sačeka dugme *Promeni
+  adresu servera*, ukuca `1234` i preusmeri računar na svoj server.
+- Čim ga upišeš, **fabrički prestaje da važi na svima odjednom**.
+- Radi i kad server ne radi: launcher ga pamti u svom `config.json` (u nalogu
+  korisnika, koji nadogradnja ne dira).
+- Šalje se kao **heš, ne kao sam PIN** - ne putuje mrežom i ne stoji u čitljivom
+  obliku na računaru igrača.
+
+> Ručno upisivanje u `podesavanja.json` pored programa i dalje radi kao rezerva
+> i preživljava nadogradnju, ali više nije potrebno. Ako je tamo upisan PIN koji
+> nije fabrički, prolazi i on - namerno, jer pogrešna strogost ovde zaključava
+> osoblje na svih trinaest mašina.
 
 ## 6. Bezbednost
 

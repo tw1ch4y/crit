@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import dgram from "node:dgram";
+import { scryptSync, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { db, getSetting, setSetting, DATA_DIR, uJednomPoslu } from "./db.js";
 import { verifyPassword, hashPassword } from "./auth.js";
@@ -21,8 +22,43 @@ export function settingsObj() {
     ratePerHour: Number(getSetting("rate_per_hour", "120")),
     unlockPin: getSetting("unlock_pin", "1234"),
     idleMinutes: Number(getSetting("idle_minutes", "15")),
+    servisniPin: getSetting("servisni_pin", ""),
     fabrickaLozinka: fabrickaLozinkaVlasnika(),
   };
+}
+
+// SERVISNI PIN SE UPISUJE JEDNOM, U PANELU, I STIŽE NA SVE RAČUNARE.
+//
+// Taj PIN čuva ulaz u podešavanja launchera i izlaz iz kioska KAD SERVER NE
+// RADI - zato mora da se proveri lokalno, bez servera, i zato mora da stoji na
+// samoj mašini.
+//
+// Ranije se upisivao ručno, u `podesavanja.json` pored programa, na svakoj
+// mašini posebno. To nije bila nezgodna procedura nego loš dizajn: PIN koji se
+// menja na trinaest mesta ne promeni se nigde. Ostajao je fabrički `1234`, a to
+// je baš onaj PIN kojim igrač koji iščupa mrežni kabl preusmerava računar na
+// svoj server.
+//
+// ŠALJE SE HEŠ, NE SAM PIN. Server nikad ne šalje `unlock_pin` klijentima i to
+// je namerno; isto pravilo važi i ovde. Launcher čuva heš i proverava unos
+// prema njemu, pa PIN ne putuje mrežom niti stoji u čitljivom obliku na
+// računaru igrača - a i dalje radi kad servera nema.
+export function servisniPinZaKlijenta() {
+  const pin = String(getSetting("servisni_pin", "") || "").trim();
+  if (!pin) return null; // nije podešen - launcheri rade po starom
+  // So se pamti uz PIN, da svi računari dobiju isti heš i da se ne menja na
+  // svakom povezivanju (inače bi launcher pisao config.json bez potrebe).
+  let so = getSetting("servisni_pin_so", "");
+  if (!so) { so = randomBytes(16).toString("hex"); setSetting("servisni_pin_so", so); }
+  return { hes: scryptSync(pin, Buffer.from(so, "hex"), 32).toString("hex"), so };
+}
+
+// Nov PIN ide svim povezanim launcherima odmah.
+export function posaljiServisniPin() {
+  const p = servisniPinZaKlijenta();
+  broadcastClients({ t: "servisni_pin", pin: p });
+  logEvent({ category: "podesavanja", action: "servisni_pin", actor: "sistem",
+    detail: p ? "Servisni PIN je poslat svim povezanim launcherima" : "Servisni PIN je obrisan - launcheri se vraćaju na lokalni" });
 }
 
 // Da li vlasnik jos uvek ima fabricku lozinku (admin / admin).
@@ -727,6 +763,9 @@ export function sendWelcomeState(computerId) {
     t: "welcome",
     computer: { id: comp.id, name: comp.name },
     settings: { cafeName: settings.cafeName, currency: settings.currency, ratePerHour: settings.ratePerHour },
+    // Heš servisnog PIN-a, da ga launcher zapamti i proverava lokalno kad
+    // servera nema. Sam PIN se NE šalje - vidi servisniPinZaKlijenta.
+    servisniPin: servisniPinZaKlijenta(),
     shop: shopList(),
     games: gamesForClient(),
     tools: toolsForClient(),

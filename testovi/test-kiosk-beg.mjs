@@ -18,7 +18,7 @@ const pod = citajIzvor("client/podesavanja.json");
 
 // ---- 1) ulaz u podesavanja trazi PIN ----
 proveri("brisanje podesavanja trazi servisni PIN",
-  /ipcMain\.handle\("reset-config", \(e, pin\) => \{[\s\S]{0,220}servisniPin\(\)/.test(main),
+  /ipcMain\.handle\("reset-config", \(e, pin\) => \{[\s\S]{0,220}proveriPin\(pin\)/.test(main),
   "bez toga se masina preusmerava na tudji server jednim klikom");
 proveri("pogresan PIN ne brise nista", /return \{ ok: false, error: "Pogrešan servisni PIN\." \}/.test(main));
 proveri("dugme u launcheru otvara PIN, ne resetuje odmah",

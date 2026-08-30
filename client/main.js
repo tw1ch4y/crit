@@ -3,6 +3,7 @@ const path = require("node:path");
 const fs = require("node:fs");
 const { spawn, exec } = require("node:child_process");
 const https = require("node:https");
+const { scryptSync, timingSafeEqual } = require("node:crypto");
 const http = require("node:http");
 const os = require("node:os");
 const WebSocket = require("ws");
@@ -136,6 +137,55 @@ function pinIzPodesavanja() {
 // nadogradnja ne dira). Ako posle nadogradnje u podesavanjima opet stoji 1234,
 // vazi zapamceni. Kad vlasnik namerno upise NOVI PIN, on je razlicit od
 // fabrickog pa odmah preuzima - i pamti se umesto starog.
+// PIN SA SERVERA - upisuje se JEDNOM, u panelu, i stiže na sve računare.
+//
+// Ručno upisivanje u `podesavanja.json` na svakoj mašini nije bilo nezgodna
+// procedura nego loš dizajn: PIN koji se menja na trinaest mesta ne promeni se
+// nigde. Ostajao je fabrički 1234 - baš onaj kojim igrač koji iščupa mrežni
+// kabl preusmerava računar na svoj server.
+//
+// Stiže kao HEŠ, ne kao PIN: server nikad ne šalje PIN klijentima. Pamti se u
+// `config.json` (u nalogu korisnika, koji nadogradnja ne dira), pa radi i kad
+// servera nema - a to je jedini trenutak kad i treba.
+function zapamtiServisniPin(p) {
+  const stari = config.servisniPinHes || null;
+  const novi = p && p.hes && p.so ? { hes: p.hes, so: p.so } : null;
+  if ((stari?.hes || null) === (novi?.hes || null)) return; // ništa novo
+  try {
+    config = { ...config, servisniPinHes: novi };
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+    console.log(novi ? "servisni PIN primljen sa servera" : "servisni PIN sa servera obrisan");
+  } catch (e) { console.error("servisni PIN nije zapamćen:", e.message); }
+}
+
+// Da li je PIN ispravan. Namerno prihvata VIŠE izvora, jer je ovo jedini izlaz
+// iz kioska - pogrešna strogost ovde zaključava osoblje na svih trinaest mašina.
+//
+//   1. PIN sa servera (ako je stigao)
+//   2. PIN upisan ručno u podesavanja.json, ako NIJE fabrički
+//   3. fabrički 1234 - ali SAMO dok server nije poslao svoj
+//
+// Treća stavka je cela poenta: čim vlasnik jednom upiše PIN u panelu, fabrički
+// prestaje da važi na svim mašinama odjednom. Dok to ne uradi, ništa se ne menja.
+const imaPinSaServera = () => !!(config.servisniPinHes && config.servisniPinHes.hes);
+
+function proveriPin(uneti) {
+  const pin = String(uneti || "").trim();
+  if (!pin) return false;
+
+  const saServera = config.servisniPinHes;
+  if (saServera?.hes && saServera?.so) {
+    try {
+      const test = scryptSync(pin, Buffer.from(saServera.so, "hex"), 32).toString("hex");
+      if (timingSafeEqual(Buffer.from(test, "hex"), Buffer.from(saServera.hes, "hex"))) return true;
+    } catch {}
+  }
+  const lokalni = servisniPin();
+  // Fabrički prolazi samo dok sa servera nije stigao pravi PIN.
+  if (lokalni === FABRICKI_PIN && saServera?.hes) return false;
+  return pin === lokalni;
+}
+
 function servisniPin() {
   const izFajla = pinIzPodesavanja();
   const zapamcen = String(config.servisniPin || "").trim();
@@ -274,7 +324,7 @@ function connectWs() {
     // masinu na svoj server. Menja se rucno, po masini - a rucni korak se
     // zaboravi bas na onoj trinaestoj. Sam launcher to ne moze da resi, ali moze
     // da PRIJAVI, pa panel vise ne cuti o tome.
-    wsSend({ t: "sys_info", nics: localNics(), fabrickiPin: servisniPin() === FABRICKI_PIN });
+    wsSend({ t: "sys_info", nics: localNics(), fabrickiPin: !imaPinSaServera() && servisniPin() === FABRICKI_PIN });
   });
   sveza.on("message", (buf) => {
     if (!jeAktuelna()) return;
@@ -321,6 +371,16 @@ function localNics() {
 
 // server komande koje main obrađuje lokalno
 function handleServerMsg(msg) {
+  // Servisni PIN stiže uz "welcome" (pri svakom povezivanju) i zasebno kad ga
+  // vlasnik promeni u panelu - da nova vrednost važi odmah, ne tek posle
+  // restarta svakog računara.
+  if (msg.t === "welcome" && "servisniPin" in msg) zapamtiServisniPin(msg.servisniPin);
+  if (msg.t === "servisni_pin") {
+    zapamtiServisniPin(msg.pin);
+    // Panel odmah vidi da je ova mašina primila nov PIN.
+    wsSend({ t: "sys_info", nics: localNics(), fabrickiPin: !imaPinSaServera() && servisniPin() === FABRICKI_PIN });
+    return;
+  }
   // DALJINSKI TASK MANAGER: radnik iz panela gleda sta radi na ovoj masini i
   // gasi zaglavljenu igru, ne ustajuci od kase.
   if (msg.t === "procesi_trazi") {
@@ -1047,12 +1107,12 @@ ipcMain.handle("save-config", (e, c) => {
 // servera" bio otvoren put: iscupa se kabl, sacekaju se sekunde dok se dugme ne
 // pojavi, i masina se preusmeri gde igrac hoce.
 ipcMain.handle("reset-config", (e, pin) => {
-  if (String(pin || "") !== servisniPin()) return { ok: false, error: "Pogrešan servisni PIN." };
+  if (!proveriPin(pin)) return { ok: false, error: "Pogrešan servisni PIN." };
   resetConfig();
   return { ok: true };
 });
 // Lokalna provera PIN-a - radi i kad server ne odgovara.
-ipcMain.handle("proveri-servisni-pin", (e, pin) => ({ ok: String(pin || "") === servisniPin() }));
+ipcMain.handle("proveri-servisni-pin", (e, pin) => ({ ok: proveriPin(pin) }));
 ipcMain.handle("to-server", (e, msg) => { wsSend(msg); return true; });
 ipcMain.handle("launch-game", (e, { path: p, args, name }) => launchGame(p, args, name));
 ipcMain.handle("open-browser", (e, url) => { openBrowser(url); return true; });

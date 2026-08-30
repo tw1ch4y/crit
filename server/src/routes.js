@@ -705,7 +705,7 @@ router.get("/settings", (req, res) => {
   res.json(s);
 });
 router.post("/settings", requireOwner, (req, res) => {
-  const map = { cafeName: "cafe_name", currency: "currency", ratePerHour: "rate_per_hour", unlockPin: "unlock_pin", idleMinutes: "idle_minutes" };
+  const map = { cafeName: "cafe_name", currency: "currency", ratePerHour: "rate_per_hour", unlockPin: "unlock_pin", idleMinutes: "idle_minutes", servisniPin: "servisni_pin" };
   // Negativna cena po satu bi igračima DODAVALA kredit dok sede, a negativno
   // mirovanje bi ih odjavljivalo odmah - oba se odbijaju pre upisa.
   const brojevi = { ratePerHour: "Cena po satu", idleMinutes: "Odjava zbog mirovanja" };
@@ -731,6 +731,10 @@ router.post("/settings", requireOwner, (req, res) => {
     if (dbKey in zaUpis) { setSetting(dbKey, zaUpis[dbKey]); changed.push(k); }
   }
   svc.logEvent({ category: "podesavanja", action: "settings", actor: req.admin.username, detail: `Izmenjena podešavanja: ${changed.join(", ")}` });
+  // Nov servisni PIN mora da stigne do launchera ODMAH, dok vlasnik gleda u
+  // ekran - inače bi važio tek posle restarta svakog računara, a niko ne bi
+  // znao kada je to bilo. Strana Računari odmah pokazuje ko ga je primio.
+  if (changed.includes("servisniPin")) svc.posaljiServisniPin();
   res.json({ ok: true, settings: svc.settingsObj() });
 });
 

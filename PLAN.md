@@ -269,13 +269,17 @@
   svih trinaest da nađe koju), a zapis ide i u Logove. Stariji launcher to ne
   šalje - tada se ne dira poznato stanje, jer prazno polje znači "ne javlja", ne
   "u redu je"
-- [ ] **Servisni PIN da se deli sa servera** - *sledeće na redu.* Gornje
-  upozorenje čini zaborav vidljivim, ali PIN se i dalje menja ručno po mašini.
-  Trebalo bi da se upiše jednom u panelu i stigne na sve launchere (kao heš, uz
-  čuvanje u `config.json` koji nadogradnja ne dira), da radi i kad server ne
-  odgovara. Nije urađeno odmah jer dira jedini izlaz iz kioska: pogrešan potez
-  tu zaključava osoblje na svih trinaest mašina, pa traži probu na pravoj
-  mašini pre nego što se pusti
+- [x] **SERVISNI PIN SE UPISUJE JEDNOM, U PANELU.** Ručno upisivanje u
+  `podesavanja.json` na svakoj mašini nije bila nezgodna procedura nego loš
+  dizajn: PIN koji se menja na trinaest mesta ne promeni se nigde. Ostajao je
+  fabrički `1234` - baš onaj kojim igrač koji iščupa mrežni kabl preusmerava
+  računar na svoj server. Sada: upiše se u Podešavanjima, stigne na sve
+  launchere odmah, i **fabrički prestaje da važi na svima odjednom**. Šalje se
+  kao **heš**, ne kao sam PIN (server nikad ne šalje `unlock_pin` klijentima -
+  isto pravilo važi i ovde), pa ne putuje mrežom niti stoji čitljiv na računaru
+  igrača. Radi i kad server ne radi, jer tada i služi. Ručni PIN iz
+  `podesavanja.json` i dalje prolazi kao rezerva - namerno, jer pogrešna
+  strogost ovde zaključava osoblje na svih trinaest mašina
 - [ ] **Auto-update launchera** preko sopstvenog servera - *planirano*
   (`electron-updater`). Sada je 13 mašina × ručna prijava na administratorski
   nalog po svakoj verziji; to se uradi dvaput, treći put se preskoči, i za mesec

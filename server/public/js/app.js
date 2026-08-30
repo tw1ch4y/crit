@@ -3073,6 +3073,11 @@ async function renderSettings() {
             : "Osoblje ga kuca na računaru igrača (Ctrl+Alt+U)",
             `<div class="input-eye"><input id="setPin" type="password" value="${esc(s.unlockPin)}" autocomplete="off" /><button type="button" class="btn btn-ghost ic-btn" id="pinEye" title="Prikaži PIN">${icon("eye")}</button></div>`,
             s.unlockPin === "1234" ? "upozorenje" : "")}
+          ${setRow("Servisni PIN launchera", s.servisniPin
+            ? "Otvara podešavanja launchera i izlaz iz kioska kad server ne radi. Upisuješ ga ovde jednom - stiže na sve računare odmah."
+            : "Još nije podešen, pa na računarima važi fabrički 1234. Dok je tako, igrač koji iščupa mrežni kabl može da preusmeri računar na svoj server. Upiši ga ovde jednom - stiže na sve računare odmah.",
+            `<div class="input-eye"><input id="setSPin" type="password" value="${esc(s.servisniPin || "")}" placeholder="npr. 7431" autocomplete="off" /><button type="button" class="btn btn-ghost ic-btn" id="spinEye" title="Prikaži PIN">${icon("eye")}</button></div>`,
+            s.servisniPin ? "" : "upozorenje")}
           ${setRow("Odjava zbog mirovanja", "Igrač koji ustane i zaboravi da se odjavi prestaje da plaća, a računar se oslobađa. Dobija odbrojavanje od 60 s pre odjave. Upiši 0 da isključiš.", `<div class="input-suffix"><input id="setIdle" type="number" value="${s.idleMinutes ?? 15}" /><span>min</span></div>`)}
         </div>
         <div class="card-foot"><button class="btn btn-primary" id="setSave">Sačuvaj podešavanja</button></div>
@@ -3147,17 +3152,21 @@ async function renderSettings() {
         { title: "Promena cene po satu", ok: "Promeni cenu", danger: gore });
       if (!ok) return;
     }
-    try { const d = await api("/settings", "POST", { cafeName: $("#setName").value, currency: $("#setCur").value, ratePerHour: $("#setRate").value, unlockPin: $("#setPin").value, idleMinutes: $("#setIdle").value }); state.settings = d.settings; toast("Podešavanja su sačuvana", "success"); }
+    try { const d = await api("/settings", "POST", { cafeName: $("#setName").value, currency: $("#setCur").value, ratePerHour: $("#setRate").value, unlockPin: $("#setPin").value, servisniPin: $("#setSPin").value, idleMinutes: $("#setIdle").value }); state.settings = d.settings; toast("Podešavanja su sačuvana", "success"); }
     catch (e) { toast(e.message, "error"); }
   });
-  const eye = $("#pinEye");
-  if (eye) eye.addEventListener("click", () => {
-    const i = $("#setPin");
-    const show = i.type === "password";
-    i.type = show ? "text" : "password";
-    eye.innerHTML = icon(show ? "eyeoff" : "eye");
-    eye.title = show ? "Sakrij PIN" : "Prikaži PIN";
-  });
+  // Oba PIN polja se otkrivaju istim dugmetom-okom.
+  for (const [dugme, polje] of [["#pinEye", "#setPin"], ["#spinEye", "#setSPin"]]) {
+    const eye = $(dugme);
+    if (!eye) continue;
+    eye.addEventListener("click", () => {
+      const i = $(polje);
+      const show = i.type === "password";
+      i.type = show ? "text" : "password";
+      eye.innerHTML = icon(show ? "eyeoff" : "eye");
+      eye.title = show ? "Sakrij PIN" : "Prikaži PIN";
+    });
+  }
   const bk = $("#backupNow");
   if (bk) bk.addEventListener("click", async () => {
     bk.disabled = true;
