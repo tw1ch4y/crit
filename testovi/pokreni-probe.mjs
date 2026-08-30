@@ -40,6 +40,7 @@ const ALATI = [
   { ime: "proba-servisni-pin-server", args: [], opis: "servisni PIN se upisuje jednom u panelu i vazi na svim masinama, i bez servera", sam: true },
   { ime: "proba-veza", args: [], opis: "launcher preživljava otkucaj servera i sam se vraća", sam: true },
   { ime: "proba-pokretanje-igre", args: [], opis: "klik na igru stiže do baze, izveštaja i logova", sam: true },
+  { ime: "proba-pokretanje-van-kataloga", args: [], opis: "most odbija pokretanje van kataloga (cmd.exe, powershell)", sam: true },
   { ime: "proba-tocka", args: [], opis: "nagrada sa točka stiže na kredit tek kad se objavi", sam: true },
   { ime: "proba-tocak-zaglavljen", args: [], opis: "veza pukne usred vrtnje - launcher se sam izvuče, kredit se ne zamrzava", sam: true },
   { ime: "proba-admin-izlaz", args: [], opis: "otkljucavanje ne gasi launcher, a admin izlaz i dalje radi", sam: true },

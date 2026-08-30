@@ -581,6 +581,7 @@ function handleMsg(m) {
       // Nova korpa krece cista: i artikli i nacin placanja. Bez ovoga bi
       // jednom izabran kes vazio do kraja smene.
       S.cart.clear(); S.nacinPlacanja = "credit"; S.nacinRucno = false;
+      novPoId();
       clearOrderPending();
       updateHud(); if (S.tab === "shop") renderContent();
       const chip = $("#hudBal")?.closest(".hud-chip");
@@ -2257,6 +2258,7 @@ async function launchFromTile(el) {
 }
 
 function cartChange(id, delta) {
+  novPoId(); // promenjena korpa = druga porudzbina, pa i nov broj pokusaja
   const cur = S.cart.get(id) || 0;
   const next = cur + delta;
   if (next <= 0) S.cart.delete(id);
@@ -2293,13 +2295,27 @@ function setOrderBusy(b) {
   if (btn) { btn.disabled = b; btn.textContent = b ? "Šaljem..." : "Poruči"; }
 }
 function clearOrderPending() { orderPending = false; clearTimeout(sendOrder._t); setOrderBusy(false); }
+
+// BROJ POKUŠAJA - isti dok se korpa ne promeni.
+//
+// Dugme se otključava posle osam sekundi bez odgovora, da igrač ne ostane
+// zarobljen kad server zaćuti. U tom procepu drugi klik bi prošao kao NOVA
+// porudžbina i naplatio dvaput. Zato uz nju ide broj koji se ne menja pri
+// ponavljanju: server po njemu prepozna da je to isti pokušaj i vrati stari
+// odgovor umesto da napravi drugi račun.
+//
+// Nov broj se pravi tek kad porudžbina prođe ili se korpa promeni - onda je to
+// stvarno druga porudžbina i treba da se naplati.
+let poId = null;
+const novPoId = () => { poId = null; };
 function sendOrder() {
   if (orderPending) return;
   const items = [...S.cart].map(([id, qty]) => ({ id, qty }));
   if (!items.length) return;
+  if (!poId) poId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   orderPending = true;
   setOrderBusy(true);
-  window.crit.toServer({ t: "order", items, payment: S.nacinPlacanja === "cash" ? "cash" : "credit" });
+  window.crit.toServer({ t: "order", items, payment: S.nacinPlacanja === "cash" ? "cash" : "credit", poId });
   // ako server ne odgovori, ne ostavljaj dugme zauvek zaključano
   clearTimeout(sendOrder._t);
   sendOrder._t = setTimeout(clearOrderPending, 8000);

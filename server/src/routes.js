@@ -524,6 +524,14 @@ router.post("/shop/:id/stock", requireOwner, (req, res) => {
   const add = Math.floor(Number(req.body?.add) || 0);
   const it = db.prepare("SELECT name, stock FROM shop_items WHERE id=?").get(id);
   if (!it) return res.status(404).json({ error: "Artikal ne postoji" });
+  // DOPUNA NULOM NE SME DA RASPRODA ARTIKAL.
+  //
+  // Neograničen artikal (stock = NULL) se ovom rutom prvi put stavlja pod
+  // brojanje: base je 0, pa "dopuni +10" daje 10. Ali zahtev bez ispravnog
+  // broja - pogrešno ime polja, prazno polje, tekst umesto broja - daje add = 0,
+  // pa je isti taj artikal postajao 0 komada, to jest RASPRODAT. Piće bi
+  // nestalo iz launchera bez ijedne poruke, a niko ne bi znao zašto.
+  if (!add) return res.status(400).json({ error: "Unesi koliko komada dodaješ (ili oduzimaš)" });
   const base = it.stock == null ? 0 : it.stock;
   const next = Math.max(0, base + add);
   db.prepare("UPDATE shop_items SET stock=? WHERE id=?").run(next, id);

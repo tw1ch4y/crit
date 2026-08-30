@@ -977,7 +977,7 @@ export function handleClientMessage(computerId, msg) {
       return sendClient(computerId, r.ok ? { t: "pin_ok" } : { t: "pin_err", wait: r.wait });
     }
     case "order":
-      return clientOrder(computerId, msg.items || [], msg.note || "", msg.payment === "cash" ? "cash" : "credit");
+      return clientOrder(computerId, msg.items || [], msg.note || "", msg.payment === "cash" ? "cash" : "credit", msg.poId);
     case "change_password":
       return clientChangePassword(computerId, msg.oldPassword, msg.newPassword);
     case "moja_tekstura":
@@ -1149,7 +1149,45 @@ function clientUnlockPin(computerId, pin) {
   unlockComputer(computerId, null);
 }
 
-function clientOrder(computerId, items, note, payment = "credit") {
+// ISTA PORUDŽBINA SE NE NAPLAĆUJE DVAPUT - I KAD DUGME ZAKAŽE.
+//
+// Dugmad se zaključavaju do odgovora servera, i u launcheru i u panelu. Ali ta
+// brava ima rok: posle osam sekundi bez odgovora dugme se otključava, da radnik
+// ne ostane zarobljen kad server zaćuti. U tom procepu - spor server, mreža koja
+// se zagrcnula, odgovor koji je stigao prekasno - drugi klik prolazi kao nova
+// porudžbina i gost je naplaćen dvaput.
+//
+// Zato se uz svaku porudžbinu šalje njen BROJ POKUŠAJA (`poId`), isti pri svakom
+// ponavljanju. Server pamti šta je sa tim brojem već uradio i drugi put vraća
+// isti odgovor umesto da napravi nov račun.
+//
+// Ovo nije zamena za zaključano dugme nego druga brava: prva sprečava da se
+// klikne, druga da se naplati. Onaj ko poruči isto piće dvaput namerno šalje
+// nov broj, pa mu ništa ne smeta.
+const NALOZI_PAMTI = 3 * 60000; // koliko se pamti jedan broj pokušaja
+const obradjeniNalozi = new Map(); // poId -> { odgovor, kad }
+
+function ocistiNaloge() {
+  const granica = Date.now() - NALOZI_PAMTI;
+  for (const [k, v] of obradjeniNalozi) if (v.kad < granica) obradjeniNalozi.delete(k);
+}
+// Vrati raniji odgovor ako je ovaj broj već obrađen.
+export function ranijiOdgovor(poId) {
+  if (!poId) return null;
+  ocistiNaloge();
+  return obradjeniNalozi.get(String(poId))?.odgovor ?? null;
+}
+export function zapamtiOdgovor(poId, odgovor) {
+  if (!poId) return odgovor;
+  ocistiNaloge();
+  obradjeniNalozi.set(String(poId), { odgovor, kad: Date.now() });
+  return odgovor;
+}
+
+function clientOrder(computerId, items, note, payment = "credit", poId = null) {
+  // Isti pokušaj drugi put: vrati raniji odgovor, ne pravi nov račun.
+  const ranije = ranijiOdgovor(poId);
+  if (ranije) return sendClient(computerId, ranije);
   const comp = computerById(computerId);
   if (!comp.current_player_id) return sendClient(computerId, { t: "error", message: "Niste prijavljeni." });
   const p = playerById(comp.current_player_id);
@@ -1199,14 +1237,14 @@ function clientOrder(computerId, items, note, payment = "credit") {
     return sendClient(computerId, { t: "order_err", message: "Porudžbina nije prošla. Pokušaj ponovo ili pozovi osoblje." });
   }
 
-  sendClient(computerId, {
+  sendClient(computerId, zapamtiOdgovor(poId, {
     t: "order_ok",
     orderId,
     payment: kes ? "cash" : "credit",
     total: round2(total),
     balance: newBal,
     remainingSeconds: remainingSeconds(newBal),
-  });
+  }));
   posaljiPorudzbineIgracu(p.id);
   pushOrders();
   pushComputers();
@@ -1816,7 +1854,11 @@ export function pushTocak() {
 }
 
 // POS: radnik ručno kuca porudžbinu (kredit sa naloga ili keš)
-export function createPosOrder({ items, playerId, computerId, payment = "cash", note, actor = "radnik" }) {
+export function createPosOrder({ items, playerId, computerId, payment = "cash", note, actor = "radnik", poId = null }) {
+  // Isti pokusaj drugi put: vrati raniji odgovor, ne pravi nov racun - vidi
+  // objasnjenje uz obradjeniNalozi.
+  const ranije = ranijiOdgovor(poId);
+  if (ranije) return ranije;
   // Isti artikal se spaja u jedan red - inace bi se zaliha proveravala vise
   // puta prema istom stanju i prodalo bi se vise nego sto ima. Radnik sme veci
   // broj komada i skrivene artikle.
@@ -1877,7 +1919,7 @@ export function createPosOrder({ items, playerId, computerId, payment = "cash", 
   const who = player ? player.username : "keš";
   logEvent({ category: "shop", action: "pos", actor, target: who, detail: `POS #${orderId} (${payment === "cash" ? "keš" : "kredit"}): ` + resolved.map((r) => `${r.qty}x ${r.item.name}`).join(", "), amount: -total });
   broadcastPanels({ t: "event", kind: "order", text: `Nova porudžbina #${orderId} (${payment === "cash" ? "keš" : who})` });
-  return { ok: true, orderId, total: round2(total) };
+  return zapamtiOdgovor(poId, { ok: true, orderId, total: round2(total) });
 }
 
 const ORDER_STATUS_LABEL = { pending: "na čekanju", preparing: "priprema se", delivered: "dostavljeno", cancelled: "otkazano" };

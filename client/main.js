@@ -375,6 +375,8 @@ function handleServerMsg(msg) {
   // vlasnik promeni u panelu - da nova vrednost važi odmah, ne tek posle
   // restarta svakog računara.
   if (msg.t === "welcome" && "servisniPin" in msg) zapamtiServisniPin(msg.servisniPin);
+  // Spisak onoga što se sme pokrenuti - vidi zapamtiDozvoljeno.
+  if (msg.t === "welcome" || msg.t === "catalog") zapamtiDozvoljeno(msg);
   if (msg.t === "servisni_pin") {
     zapamtiServisniPin(msg.pin);
     // Panel odmah vidi da je ova mašina primila nov PIN.
@@ -987,7 +989,50 @@ function izvorIkone(put) {
   }
 }
 
+// POKREĆE SE SAMO ONO ŠTO JE SERVER POSLAO.
+//
+// Ekran launchera traži pokretanje preko mosta (`launch-game`), a most do sada
+// nije proveravao ŠTA se traži - prosleđivao je svaku putanju. Dok je ekran
+// ispravan, tu nema problema: on nudi samo ono što je stiglo sa servera, a sve
+// što ulazi u stranu prolazi kroz bekstvo teksta.
+//
+// Ali to znači da između igrača i "pokreni bilo šta na ovom računaru" stoji
+// jedna jedina pretpostavka - da se u ekran nikad ništa ne ubaci. Ovo je kiosk
+// na mašini za kojom sedi tinejdžer koji ima vremena; takva pretpostavka ne sme
+// da bude jedina brava.
+//
+// Zato glavni proces pamti šta je server poslao i pokreće samo to. Sve ostalo
+// odbija i ZAPISUJE - pokušaj pokretanja nečega van spiska nije greška u kucanju
+// nego znak da nešto nije u redu.
+const dozvoljeno = new Set();
+const kljucPutanje2 = (p) => String(p || "").trim().replace(/^"|"$/g, "").trim().toLowerCase();
+
+function zapamtiDozvoljeno(msg) {
+  // Katalog stiže pri svakom povezivanju i na svaku izmenu u panelu, pa se
+  // spisak pravi iznova - igra koju je osoblje sklonilo prestaje da se pokreće.
+  dozvoljeno.clear();
+  for (const g of msg.games || []) if (g?.path) dozvoljeno.add(kljucPutanje2(g.path));
+  for (const t of msg.tools || []) if (t?.target) dozvoljeno.add(kljucPutanje2(t.target));
+}
+
+function smePokretanje(put) {
+  // Dok katalog nije stigao (prvi trenuci posle pokretanja), ne blokiramo -
+  // inače bi igrač koji brzo klikne dobio grešku bez razloga. Tada ionako nema
+  // ni jedne pločice na ekranu.
+  if (!dozvoljeno.size) return true;
+  return dozvoljeno.has(kljucPutanje2(put));
+}
+
 function launchGame(gamePath, args, name) {
+  if (!smePokretanje(gamePath)) {
+    console.error("odbijeno pokretanje van kataloga:", gamePath);
+    javiProblem("pokretanje_odbijeno", `Odbijeno pokretanje van kataloga: ${String(gamePath).slice(0, 120)}`);
+    return { ok: false, error: "Ova stavka nije u katalogu igraonice. Pozovite osoblje." };
+  }
+  return launchGameStvarno(gamePath, args, name);
+}
+
+function launchGameStvarno(gamePath, args, name) {
   // "C:\Games\game.exe" -> C:\Games\game.exe (kopiranje putanje iz Windows-a
   // često ponese navodnike, pa spawn ne nađe fajl)
   gamePath = String(gamePath || "").trim().replace(/^"|"$/g, "").trim();

@@ -519,7 +519,17 @@ async function renderReports() {
 // računarima očekuje tačku-zarez i BOM da bi čitao ćirilicu/latinicu iz UTF-8.
 function izveziIzvestaj(period, d) {
   const r = d.revenue || {}, s = d.sessions || {};
-  const red = (a, b) => `${a};${b}`;
+  // NAZIV IGRE SE PRIPREMA ZA CSV, NE LEPI SIROV.
+  //
+  // Kolone deli tačka-zarez, a naziv igre kuca čovek. Jedan „Half-Life; Alyx"
+  // razdvaja jedan red u dve kolone i tabela se pomeri od tog mesta naniže -
+  // knjigovođa dobije fajl koji izgleda ispravno, a nije. Isto važi za navodnike
+  // i za prelom reda.
+  const polje = (v) => {
+    const t = String(v ?? "");
+    return /[;"\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  const red = (a, b) => `${polje(a)};${polje(b)}`;
   const linije = [
     red("Izveštaj", { today: "Danas", week: "Poslednjih 7 dana", month: "Poslednjih 30 dana" }[period] || period),
     red("Napravljeno", new Date().toLocaleString("sr-Latn-RS")),
@@ -531,6 +541,10 @@ function izveziIzvestaj(period, d) {
     red("  - keš", r.shopCash || 0),
     red("  - kredit", r.shopCredit || 0),
     red("Dopune kredita", r.topups || 0),
+    // Poklonjen kredit (nagradni točak i popust na paket) stoji na ekranu kao
+    // trošak, pa mora i ovde: bez njega izveštaj koji ide knjigovođi kaže manje
+    // nego što piše u panelu, a to je razlika koju treba objašnjavati.
+    red("Poklonjen kredit (točak, paketi)", r.poklonjeno || 0),
     red("Broj sesija", s.count || 0),
     red("Odigrano minuta", s.minutes || 0),
     red("Prosek po sesiji", s.avg || 0),
@@ -1979,6 +1993,7 @@ function renderCart() {
     const id = Number(b.dataset.id);
     const q = (state.posCart.get(id) || 0) + (b.dataset.cq === "inc" ? 1 : -1);
     if (q <= 0) state.posCart.delete(id); else state.posCart.set(id, q);
+    state.posId = null; // promenjen racun = druga naplata, pa i nov broj pokusaja
     renderCart();
     osveziPosPlocicu(id);
   }));
@@ -1989,16 +2004,23 @@ function renderCart() {
   }));
   const combo = $("#posCombo");
   if (combo) mountPlayerCombo(combo, players, (p) => { state.posPlayerId = p ? p.id : null; renderCart(); });
-  $("#posClear").addEventListener("click", () => { const bili = [...state.posCart.keys()]; state.posCart.clear(); state.posPlayerId = null; renderCart(); bili.forEach(osveziPosPlocicu); });
+  $("#posClear").addEventListener("click", () => { const bili = [...state.posCart.keys()]; state.posCart.clear(); state.posPlayerId = null; state.posId = null; renderCart(); bili.forEach(osveziPosPlocicu); });
   $("#posSubmit").addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
     const items = [...state.posCart].map(([id, qty]) => ({ id, qty }));
     if (!items.length) return;
     if (state.posPayment === "credit" && !state.posPlayerId) { toast("Ukucaj i izaberi nalog igrača", "error"); return; }
+    // BROJ POKUŠAJA - isti dok se račun ne promeni.
+    //
+    // Zaključano dugme sprečava da se klikne dvaput. Ali ono ima rok: posle
+    // osam sekundi bez odgovora se otključava, da radnik ne ostane zarobljen kad
+    // server zaćuti. U tom procepu drugi klik bi prošao kao NOV račun i naplatio
+    // dvaput. Server po ovom broju prepozna isti pokušaj i vrati stari odgovor.
+    if (!state.posId) state.posId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     try {
-      const r = await api("/pos", "POST", { items, playerId: state.posPayment === "credit" ? state.posPlayerId : null, payment: state.posPayment });
+      const r = await api("/pos", "POST", { items, playerId: state.posPayment === "credit" ? state.posPlayerId : null, payment: state.posPayment, poId: state.posId });
       toast(`Porudžbina #${r.orderId} - ${money(r.total)}`, "success");
       const bili = [...state.posCart.keys()];
-      state.posCart.clear(); state.posPlayerId = null; renderCart();
+      state.posCart.clear(); state.posPlayerId = null; state.posId = null; renderCart();
       try { state.shop = await api("/shop"); } catch {} // zaliha se promenila
       bili.forEach(osveziPosPlocicu);
     } catch (e) { toast(e.message, "error"); }
