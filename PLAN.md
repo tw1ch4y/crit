@@ -233,6 +233,32 @@
   gomilanja), slušaoci događaja (svi na `document`, registrovani jednom),
   bekstvo teksta u HTML (`esc` svuda gde ulaze podaci iz baze), korpa i
   ograničenje količine, pokretanje igara, donja statusna traka
+### Faza 10 - Priprema za izdavanje drugim igraonicama
+
+Cilj nije licenciranje sada, nego da program prestane da bude „program za jednu
+igraonicu". Prvo sve mora da radi kako treba; licence dolaze posle.
+
+- [x] **SERVISER KAO TREĆA ULOGA.** Odozdo nagore: radnik < vlasnik < serviser.
+  Viša sme sve što sme niža, ali **niko ne dira sebi ravnog ni višeg**. Pravljenje
+  naloga ide do svoje uloge (vlasnik sme drugog vlasnika — igraonica sa dva gazde
+  je normalna stvar), menjanje i uklanjanje samo ispod nje, pa se dva vlasnika ne
+  mogu međusobno isključiti. Prvi serviserski nalog nastaje sa glavnog računara
+  (`alati/serviser.mjs`), jer na svežoj instalaciji servisera nema pa ne može da
+  se napravi kroz panel. Nalog se **vidi** na spisku, označen: nalog sa pristupom
+  tuđim podacima ne sme da bude sakriven od onoga čiji su podaci
+- [x] **IZGLED PO IGRAONICI** - znak i boja se podešavaju iz panela i menjaju se
+  svuda odjednom, u panelu i na svim launcherima. Dok su stajali ušiveni u
+  fajlove, druga igraonica je morala da dobije prepravljenu kopiju programa - pa
+  bi i svaka nadogradnja morala da se pravi posebno za svakoga. Vlasnik bira
+  **jednu** boju, nijanse se izvode iz nje. Zelena, zlatna i status boje se ne
+  diraju: one nose značenje, nisu ukras
+- [ ] **Licence** - *planirano, i tek posle svega ostalog.* Uslovi rada vezani za
+  serviserski nalog; CRIT ostaje bez licence. Ne kreće dok program ne odradi
+  sezonu u ovoj igraonici bez ijednog kvara
+- [ ] **Odvajanje ostatka brenda** - *planirano.* Ime `Crit` još stoji u
+  `appId` instalera, u imenu paketa i u nazivima `.bat` skripti. Ne smeta radu,
+  ali svaka nova igraonica dobija instaler koji se zove tuđim imenom
+
 ### Revizija panela (ono što osoblje gleda ceo dan)
 
 - [x] **DUPLI KLIK NA „NAPLATI" NAPLAĆIVAO JE DVAPUT.** Dugmad koja pomeraju

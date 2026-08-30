@@ -112,8 +112,38 @@ imati posle nje, tako da radnik ne mora da računa pred gostom.
 
 ## Uloge u panelu
 
-- **Vlasnik** - potpuna kontrola: cene, sva podešavanja, shop, igre, računari, upravljanje radnicima, sve akcije.
-- **Radnik** - svakodnevni rad: kontrolna tabla (pun nadzor i kontrola računara), igrači (kreiranje/dopuna), porudžbine. Cene, podešavanja, shop/igre katalog i radnici su mu **zaključani**.
+Tri, i idu odozdo nagore. Viša uvek sme sve što sme niža.
+
+- **Radnik** - svakodnevni rad: kontrolna tabla (pun nadzor i kontrola računara), igrači (kreiranje/dopuna), porudžbine, kasa. Cene, podešavanja, shop/igre katalog, logovi i radnici su mu **zaključani**.
+- **Vlasnik** - sve u svojoj igraonici: cene, sva podešavanja, shop, igre, računari, izgled, logovi, upravljanje radnicima.
+- **Serviser** - onaj ko je program postavio i ko ga održava. Vidi se na spisku Radnici, označen, ali ga vlasnik **ne menja i ne uklanja**. Postavlja se sa glavnog računara:
+
+```bash
+node alati/serviser.mjs <ime> <lozinka>
+```
+
+> **Zašto odvojeno.** Vlasnik je gazda svoje igraonice, ali ne i programa. Serviserski nalog postoji da bi podrška mogla da uđe i onog dana kad se vlasnik sam zaključa — i da bi kasnije uslovi pod kojima program radi mogli da stoje van naloga onoga na koga se odnose.
+>
+> Nalog se **vidi** namerno: nalog sa pristupom tuđim podacima ne sme da bude sakriven od onoga čiji su podaci. I da budemo iskreni do kraja — na računaru koji vlasnik fizički drži nijedna uloga nije neprobojna. Ova podela postoji da uloge budu **jasne** i da svaki potez bude **zapisan**, ne da vlasnika zaključa iz sopstvenog računara.
+
+## Izgled po igraonici
+
+Program je jedan, izgled je svačiji. Sve se podešava iz panela i menja se
+**svuda odjednom** — u panelu i na svim launcherima, bez obilaska mašina:
+
+| Šta | Gde |
+|---|---|
+| Naziv igraonice | Podešavanja |
+| **Znak (logo)** | Izgled launchera > Znak i boja |
+| **Boja** | isto — biraš jednu, nijanse se izvode iz nje |
+| Pozadine svih pet ekrana | Izgled launchera |
+| Šara i njeno kretanje | Izgled launchera |
+| Promo baneri | Izgled launchera |
+| Omoti i baneri igara | Igre |
+
+> Zelena, zlatna i status boje se **ne menjaju** izborom boje kuće. Zelena znači
+> „ima kredita", zlatna „nagrada", crvena u launcheru „ističe vreme" — to su
+> značenja, ne ukras.
 
 Radnike dodaje vlasnik u panelu > **Radnici**. Svako menja svoju lozinku klikom na svoj profil (na širokom ekranu dole levo, na telefonu gore desno).
 
