@@ -270,6 +270,31 @@ function toast(msg, type = "info") {
 // Saru crta server (service.js), ovde se samo prosledi u CSS. Stariji server
 // ovo polje ne salje uopste - tada tekstura ostaje ugasena, umesto da ekran
 // zavrsi u polovicnom stanju.
+// BREND: ZNAK I BOJA IGRAONICE
+//
+// Launcher je crven zato što je Crit crven - ali sledeća igraonica nije. Dok su
+// znak i boja stajali ušiveni u fajlove, svaka bi morala da dobije prepravljenu
+// kopiju programa, pa bi i svaka nadogradnja morala da se pravi posebno za
+// svakoga.
+//
+// Ovde se menja SAMO boja kuće (`--red*`). Zlatna, zelena i ostale ostaju:
+// zelena je "ima kredita", crvena "ističe vreme" - to su značenja, ne ukras, i
+// ne smeju da zavise od toga koju je boju vlasnik izabrao.
+function primeniBrend(b) {
+  if (!b) return;
+  S.brend = b;
+  const s = document.documentElement.style;
+  s.setProperty("--red", b.akcenat);
+  s.setProperty("--red-deep", b.down);
+  s.setProperty("--red-soft", `rgba(${b.rgb}, 0.14)`);
+  s.setProperty("--red-glow", `rgba(${b.rgb}, 0.6)`);
+  // Znak na svim ekranima: podešavanje, prijava, gornja traka, zaključan ekran.
+  if (b.logo) {
+    const put = (S.host || "") + b.logo;
+    $$(".brand-logo, .topbar-logo, .lb-logo").forEach((i) => { i.src = put; i.alt = b.naziv || ""; });
+  }
+}
+
 function primeniTeksturu(t) {
   if (t && typeof t === "object") S.tekstura = t;
   const sara = String(S.tekstura?.sara || "");
@@ -437,6 +462,7 @@ function handleMsg(m) {
       S.pozadine = m.pozadine || {};
       S.promo = m.promo || [];
       S.teksture = m.teksture || null;
+      primeniBrend(m.brend);
       primeniPozadinu();
       primeniTeksturu(m.tekstura);
       $("#loginPc").textContent = m.computer?.name || "-";
@@ -581,6 +607,10 @@ function handleMsg(m) {
       S.pozadine = m.pozadine || {};
       primeniPozadinu();
       postaviPozadinuPrijave();
+      break;
+    case "brend":
+      // Vlasnik je promenio znak ili boju - vidi se odmah, na svih 13 masina.
+      primeniBrend(m.brend);
       break;
     case "tekstura":
       primeniTeksturu(m.tekstura);

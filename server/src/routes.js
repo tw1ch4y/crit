@@ -63,20 +63,21 @@ router.post("/me/password", (req, res) => {
 // ---------- RADNICI / ADMINI (samo vlasnik) ----------
 router.get("/admins", requireOwner, (req, res) => res.json(svc.listAdmins()));
 router.post("/admins", requireOwner, (req, res) => {
-  const r = svc.createAdmin(req.body || {});
+  const r = svc.createAdmin(req.body || {}, req.admin);
   if (r.error) return res.status(400).json(r);
-  svc.logEvent({ category: "nalozi", action: "admin_create", actor: req.admin.username, target: req.body?.username, detail: `Kreiran ${req.body?.role === "owner" ? "vlasnik" : "radnik"} nalog` });
+  const ULOGA_NAZIV = { serviser: "serviser", owner: "vlasnik", staff: "radnik" };
+  svc.logEvent({ category: "nalozi", action: "admin_create", actor: req.admin.username, target: req.body?.username, detail: `Kreiran ${ULOGA_NAZIV[req.body?.role] || "radnik"} nalog` });
   res.json(r);
 });
 router.post("/admins/:id/password", requireOwner, (req, res) => {
-  const r = svc.updateAdminPassword(Number(req.params.id), req.body?.password);
+  const r = svc.updateAdminPassword(Number(req.params.id), req.body?.password, req.admin);
   if (r.error) return res.status(400).json(r);
   svc.logEvent({ category: "nalozi", action: "admin_pw", actor: req.admin.username, detail: "Reset lozinke radniku" });
   res.json(r);
 });
 router.delete("/admins/:id", requireOwner, (req, res) => {
   const ko = db.prepare("SELECT username FROM admins WHERE id=?").get(Number(req.params.id))?.username || "";
-  const r = svc.deleteAdmin(Number(req.params.id), req.admin.adminId);
+  const r = svc.deleteAdmin(Number(req.params.id), req.admin.adminId, req.admin);
   if (r.error) return res.status(400).json(r);
   svc.logEvent({ category: "nalozi", action: r.ugasen ? "admin_off" : "admin_delete", actor: req.admin.username,
     target: ko, detail: r.ugasen ? `Ugašen nalog ${ko} - pristup oduzet, smene i promet ostaju zapisani` : `Obrisan nalog ${ko}` });
@@ -84,7 +85,7 @@ router.delete("/admins/:id", requireOwner, (req, res) => {
 });
 router.post("/admins/:id/vrati", requireOwner, (req, res) => {
   const ko = db.prepare("SELECT username FROM admins WHERE id=?").get(Number(req.params.id))?.username || "";
-  const r = svc.vratiAdmin(Number(req.params.id));
+  const r = svc.vratiAdmin(Number(req.params.id), req.admin);
   if (r.error) return res.status(400).json(r);
   svc.logEvent({ category: "nalozi", action: "admin_on", actor: req.admin.username, target: ko,
     detail: `Vraćen nalog ${ko}` });
@@ -109,6 +110,7 @@ router.get("/snapshot", (req, res) => {
     role: req.admin.role,
     shift: svc.activeShiftInfo(),
     vanSmene: svc.novacVanSmene(),
+    brend: svc.brendObj(),
     zalihe: svc.zaliheNaIzmaku(),
   });
 });
@@ -855,4 +857,29 @@ router.get("/report", (req, res) => {
     activeSessions,
     playersCount,
   });
+});
+
+// ---------- BREND: LOGO I BOJA (vlasnik) ----------
+//
+// Svaka igraonica ima svoje ime, svoj znak i svoju boju. Dok su logo i crvena
+// stajali usiveni u fajlove, druga igraonica je morala da dobije prepravljenu
+// kopiju programa - pa bi svaka nadogradnja morala da se pravi posebno za
+// svakoga. Ovako se program izdaje jedan, a izgled se podesava odavde.
+router.get("/brend", (req, res) => res.json(svc.brendObj()));
+router.post("/brend/logo", requireOwner, (req, res) => {
+  const r = svc.sacuvajLogo(req.body?.image);
+  if (r.error) return res.status(400).json(r);
+  svc.logEvent({ category: "podesavanja", action: "brend", actor: req.admin.username, detail: "Postavljen logo igraonice" });
+  res.json(r);
+});
+router.delete("/brend/logo", requireOwner, (req, res) => {
+  const r = svc.obrisiLogo();
+  svc.logEvent({ category: "podesavanja", action: "brend", actor: req.admin.username, detail: "Uklonjen logo igraonice" });
+  res.json(r);
+});
+router.post("/brend/boja", requireOwner, (req, res) => {
+  const r = svc.sacuvajAkcenat(req.body?.akcenat);
+  if (r.error) return res.status(400).json(r);
+  svc.logEvent({ category: "podesavanja", action: "brend", actor: req.admin.username, detail: `Boja igraonice: ${r.akcenat}` });
+  res.json(r);
 });

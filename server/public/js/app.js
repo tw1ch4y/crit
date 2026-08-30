@@ -32,7 +32,15 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 // inicijali kad artikal/igra nema sliku
 const monogram = (name) => esc(String(name || "?").trim().slice(0, 2).toUpperCase());
-const isOwner = () => state.admin?.role === "owner";
+// Uloge idu odozdo nagore: radnik < vlasnik < serviser. Visa uvek sme sve sto
+// sme niza, pa se svuda pita "da li je BAR vlasnik", ne "da li je tacno vlasnik".
+const RANG = { staff: 1, owner: 2, serviser: 3 };
+const rang = (u) => RANG[u] || 0;
+const isOwner = () => rang(state.admin?.role) >= RANG.owner;
+const isServiser = () => rang(state.admin?.role) >= RANG.serviser;
+// Nad tudjim nalogom se sme samo ako je NIZI od mog - isto pravilo kao na serveru.
+const smemNad = (uloga) => rang(state.admin?.role) > rang(uloga);
+const ULOGA_NAZIV = { serviser: "Serviser", owner: "Vlasnik", staff: "Radnik" };
 
 // Api
 async function api(path, method = "GET", body) {
@@ -163,6 +171,28 @@ function toast(msg, type = "info") {
   el.querySelector(".t-msg").textContent = msg;
   $("#toasts").appendChild(el);
   setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 280); }, 3200);
+}
+
+// BREND: LOGO I BOJA IGRAONICE
+//
+// Dok su logo i crvena stajali ušiveni u fajlove, druga igraonica je morala da
+// dobije prepravljenu kopiju programa - pa bi svaka nadogradnja morala da se
+// pravi posebno za svakoga. Ovako se program izdaje jedan, a izgled se podešava
+// iz panela i menja se svuda odjednom, bez osvežavanja strane.
+function primeniBrend(b) {
+  if (!b) return;
+  state.brend = b;
+  const s = document.documentElement.style;
+  s.setProperty("--accent", b.akcenat);
+  s.setProperty("--accent-hover", b.hover);
+  s.setProperty("--accent-down", b.down);
+  s.setProperty("--accent-soft", b.soft);
+  s.setProperty("--accent-line", b.line);
+  // Logo na sva tri mesta: prijava, bočna traka, mobilna traka. Kad ga nema,
+  // ostaje ugrađeni - nova igraonica ne sme da gleda prazan pravougaonik dok ne
+  // okači svoj.
+  if (b.logo) $$(".login-logo-img, .side-logo-img").forEach((i) => { i.src = b.logo; i.alt = b.naziv || ""; });
+  if (b.naziv) document.title = `${b.naziv} - Panel`;
 }
 
 // DUGME KOJE MENJA NOVAC SE ZAKLJUČAVA DOK SERVER NE ODGOVORI.
@@ -600,7 +630,7 @@ function applyRole() {
   const owner = isOwner();
   $$('[data-owner="1"]').forEach((el) => el.classList.toggle("hidden", !owner));
   $("#pfName").textContent = state.admin?.username || "";
-  $("#pfRole").textContent = owner ? "Vlasnik" : "Radnik";
+  $("#pfRole").textContent = ULOGA_NAZIV[state.admin?.role] || "Radnik";
   $("#pfAvatar").textContent = (state.admin?.username || "?").charAt(0).toUpperCase();
   $("#pfAvatar").classList.toggle("owner", owner);
   if (!owner && ["shop", "games", "tools", "izgled", "computers", "staff", "settings", "logs", "install", "shifts", "reports"].includes(state.view)) state.view = "dashboard";
@@ -612,6 +642,7 @@ async function loadSnapshot() {
     state.computers = d.computers; state.orders = d.orders; state.players = d.players; state.settings = d.settings; state.shift = d.shift;
     state.zalihe = d.zalihe || [];
     state.vanSmene = d.vanSmene || 0;
+    primeniBrend(d.brend);
     updateCounts();
   } catch (e) { toast(e.message, "error"); }
 }
@@ -639,6 +670,7 @@ function connectWs() {
     let m; try { m = JSON.parse(ev.data); } catch { return; }
     if (m.t === "snapshot") { state.computers = m.computers; state.orders = m.orders; state.settings = m.settings; refreshView(["dashboard", "orders"]); updateCounts(); }
     else if (m.t === "computers") { state.computers = m.computers; osveziIstice(); refreshView(["dashboard", "computers"]); }
+    else if (m.t === "brend") primeniBrend(m.brend);
     else if (m.t === "orders") { state.orders = m.orders; refreshView(["orders", "dashboard"]); updateCounts(); }
     else if (m.t === "log") { state.logs.unshift(m.log); if (state.view === "logs") prependLog(m.log); }
     else if (m.t === "install") { state.installStatus[m.computerId] = m; if (state.view === "install") updateInstallStatus(); }
@@ -2409,6 +2441,74 @@ document.addEventListener("click", async (e) => {
   } catch (err) { toast(err.message, "error"); }
 });
 
+// ZNAK I BOJA IGRAONICE
+//
+// Program se izdaje jedan, a svaka igraonica ima svoje ime, znak i boju. Dok su
+// logo i crvena stajali ušiveni u fajlove, druga igraonica je morala da dobije
+// prepravljenu kopiju - pa bi i svaka nadogradnja morala da se pravi posebno.
+async function ucitajBrend() {
+  const telo = $("#brendTelo");
+  if (!telo) return;
+  let b;
+  try { b = await api("/brend"); } catch { telo.innerHTML = '<div class="faint">Nije učitano</div>'; return; }
+  if (!$("#brendTelo")) return;
+
+  telo.innerHTML = `
+    <div class="poz-uputstvo" style="margin-bottom:16px">
+      <div><b>Znak</b><span>PNG sa providnošću</span><i>Stoji na prijavi, u bočnoj traci panela i na svim ekranima launchera. Najbolje radi širi nego viši, oko 600x200 px. Najviše 3 MB.</i></div>
+      <div><b>Boja</b><span>jedna, ostalo se izvodi</span><i>Iz nje se prave svetlija i tamnija nijansa za dugmad i okvire. Zelena i zlatna se ne diraju - one znače "ima kredita" i "nagrada", to su značenja a ne ukras.</i></div>
+    </div>
+    <div class="brend-red">
+      <div class="brend-logo-box">
+        ${b.logo ? `<img src="${esc(b.logo)}" alt="${esc(b.naziv || "")}" />` : `<span class="poz-prazno">${icon("image")} ugrađeni znak</span>`}
+      </div>
+      <div class="brend-akcije">
+        <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden" id="brendFile" />
+        <button class="btn btn-primary" id="brendOkaci">${icon("image")} ${b.logo ? "Zameni znak" : "Okači znak"}</button>
+        ${b.logo ? `<button class="btn btn-danger" id="brendSkini">${icon("trash")} Vrati ugrađeni</button>` : ""}
+      </div>
+    </div>
+    <div class="card-sub" style="margin:16px -18px 0">Boja igraonice</div>
+    <div class="brend-boje">
+      <input type="color" id="brendBoja" value="${esc(b.akcenat)}" />
+      <input id="brendHeks" value="${esc(b.akcenat)}" maxlength="7" spellcheck="false" />
+      <button class="btn btn-primary" id="brendSacuvaj">Primeni boju</button>
+      <button class="btn btn-ghost" id="brendVrati" title="Vrati fabričku crvenu">Fabrička</button>
+    </div>
+    <div class="err-msg" id="brendErr"></div>`;
+
+  const heks = $("#brendHeks"), boja = $("#brendBoja");
+  // Dva polja za istu stvar: birač boje za one koji biraju okom, i tekst za
+  // one koji imaju tačnu boju iz svog logotipa.
+  boja.addEventListener("input", () => { heks.value = boja.value; });
+  heks.addEventListener("input", () => { if (/^#[0-9a-f]{6}$/i.test(heks.value)) boja.value = heks.value; });
+
+  const primeni = async (v) => {
+    try { const r = await api("/brend/boja", "POST", { akcenat: v }); primeniBrend(r); toast("Boja je primenjena", "success"); ucitajBrend(); }
+    catch (e) { $("#brendErr").textContent = e.message; }
+  };
+  $("#brendSacuvaj").addEventListener("click", (ev) => jednomKlik(ev.currentTarget, () => primeni(heks.value.trim()), "Primenjujem..."));
+  $("#brendVrati").addEventListener("click", (ev) => jednomKlik(ev.currentTarget, () => primeni("#e23b34"), "Vraćam..."));
+
+  $("#brendOkaci").addEventListener("click", () => $("#brendFile").click());
+  $("#brendFile").addEventListener("change", async (e) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    const čitač = new FileReader();
+    čitač.onload = async () => {
+      try { const r = await api("/brend/logo", "POST", { image: čitač.result }); primeniBrend(r); toast("Znak je postavljen", "success"); ucitajBrend(); }
+      catch (err) { $("#brendErr").textContent = err.message; }
+    };
+    čitač.readAsDataURL(f);
+    e.target.value = "";
+  });
+  const skini = $("#brendSkini");
+  if (skini) skini.addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
+    if (!(await confirmDialog("Vraća se ugrađeni znak programa.", { title: "Uklanjanje znaka", ok: "Vrati ugrađeni" }))) return;
+    try { const r = await api("/brend/logo", "DELETE"); primeniBrend(r); toast("Vraćen ugrađeni znak", "success"); ucitajBrend(); }
+    catch (e) { $("#brendErr").textContent = e.message; }
+  }, "Uklanjam..."));
+}
+
 async function renderIzgled() {
   let podaci = { spisak: {}, slike: {} };
   try { podaci = await api("/pozadine"); } catch (e) { toast(e.message, "error"); }
@@ -2454,6 +2554,12 @@ async function renderIzgled() {
         </div>
       </div>
     </details>
+
+    <div class="card" style="margin-bottom:18px" id="kartaBrend">
+      <div class="card-head"><h2>Znak i boja igraonice</h2>
+        <span class="faint" style="font-size:12px">menja se svuda odjednom</span></div>
+      <div class="card-body" id="brendTelo"><div class="faint">učitavam...</div></div>
+    </div>
 
     <div class="card" style="margin-bottom:18px">
       <div class="card-head">
@@ -2543,6 +2649,7 @@ async function renderIzgled() {
     $("#promoFile").value = "";
   });
   ucitajPromo();
+  ucitajBrend();
 
   $$("[data-poz-pick]").forEach((b) => b.addEventListener("click", () => {
     $(`[data-poz-file="${b.dataset.pozPick}"]`).click();
@@ -2921,24 +3028,47 @@ async function renderStaff() {
   const admins = await api("/admins");
   // Ugašen nalog (otpušten radnik) ostaje na spisku: vlasnik mora da vidi ko je
   // sve imao pristup, a smene i promet i dalje nose njegovo ime.
-  const rows = admins.map((a) => `<tr${a.aktivan === false ? ' class="red-ugasen"' : ""}><td><b>${esc(a.username)}</b>
-      ${a.aktivan === false ? '<div class="faint" style="font-size:12px">nalog ugašen - prijava više ne radi</div>' : ""}</td>
-    <td>${a.role === "owner" ? '<span class="pill amber">Vlasnik</span>' : '<span class="pill blue">Radnik</span>'}</td>
+  // SERVISERSKI NALOG SE VIDI, ALI SE NE DIRA.
+  //
+  // Vlasnik je gazda svoje igraonice, ali ne i programa: serviserski nalog ne
+  // pravi i ne uklanja. Zato dugmad stoje samo nad nalozima NIŽIM od mog.
+  //
+  // Vidi se namerno. Nalog koji ima pristup tuđim podacima ne sme da bude
+  // sakriven od onoga čiji su podaci - vlasnik u svakom trenutku zna ko još
+  // može da uđe. Ne može da ga ukloni (to je cena podrške), ali ne može ni da
+  // bude obmanut da ga nema.
+  const PILULA = { serviser: "pill red", owner: "pill amber", staff: "pill blue" };
+  const rows = admins.map((a) => {
+    const smem = smemNad(a.role);
+    return `<tr${a.aktivan === false ? ' class="red-ugasen"' : ""}><td><b>${esc(a.username)}</b>
+      ${a.aktivan === false ? '<div class="faint" style="font-size:12px">nalog ugašen - prijava više ne radi</div>' : ""}
+      ${a.role === "serviser" ? '<div class="faint" style="font-size:12px">održava program - postavlja se sa glavnog računara</div>' : ""}</td>
+    <td><span class="${PILULA[a.role] || "pill blue"}">${ULOGA_NAZIV[a.role] || "Radnik"}</span></td>
     <td class="mono faint">${new Date(a.createdAt).toLocaleDateString("sr-Latn-RS")}</td>
-    <td style="text-align:right;white-space:nowrap">${a.aktivan === false
-      ? `<button class="btn btn-sm" data-staff="vrati" data-id="${a.id}" data-name="${esc(a.username)}">${icon("refresh")} Vrati</button>`
-      : `<button class="btn btn-sm" data-staff="pw" data-id="${a.id}" data-name="${esc(a.username)}">${icon("key")}</button>
-      ${a.id === state.admin.id ? "" : `<button class="btn btn-sm btn-danger" data-staff="del" data-id="${a.id}" data-name="${esc(a.username)}">${icon("trash")}</button>`}`}</td></tr>`).join("");
+    <td style="text-align:right;white-space:nowrap">${!smem
+      ? `<span class="faint" style="font-size:12px">${a.id === state.admin.id ? "tvoj nalog" : "nije u tvojoj nadležnosti"}</span>`
+      : a.aktivan === false
+        ? `<button class="btn btn-sm" data-staff="vrati" data-id="${a.id}" data-name="${esc(a.username)}">${icon("refresh")} Vrati</button>`
+        : `<button class="btn btn-sm" data-staff="pw" data-id="${a.id}" data-name="${esc(a.username)}">${icon("key")}</button>
+      <button class="btn btn-sm btn-danger" data-staff="del" data-id="${a.id}" data-name="${esc(a.username)}">${icon("trash")}</button>`}</td></tr>`;
+  }).join("");
   $("#main").innerHTML = `
     <div class="page-head"><div><h1>Radnici</h1><div class="sub">Nalozi za prijavu na panel</div></div>
       <button class="btn btn-primary" id="addStaff">${icon("plus")} Novi nalog</button></div>
     <div class="card"><div class="table-wrap"><table><thead><tr><th>Korisnik</th><th>Uloga</th><th>Kreiran</th><th></th></tr></thead>
       <tbody>${rows}</tbody></table></div></div>
-    <div class="faint" style="font-size:13px;margin-top:12px;max-width:640px">Radnik ima pristup kontrolnoj tabli, igračima, porudžbinama i kasi. Vlasnik ima pristup svemu, uključujući cene, podešavanja, shop, igre, računare, logove i radnike.</div>`;
+    <div class="faint" style="font-size:13px;margin-top:12px;max-width:680px">
+      <b>Radnik</b> - kontrolna tabla, igrači, porudžbine, kasa.<br>
+      <b>Vlasnik</b> - sve u igraonici: cene, podešavanja, shop, igre, računari, logovi, radnici.<br>
+      <b>Serviser</b> - onaj ko je program postavio i ko ga održava. Vidi se na spisku, ali ga vlasnik ne menja i ne uklanja: postavlja se sa glavnog računara (<span class="mono">alati/serviser.mjs</span>). Postoji da bi podrška mogla da uđe i kad se vlasnik sam zaključa.
+    </div>`;
   $("#addStaff").addEventListener("click", () => modal("Novi nalog za panel", `
     <div class="field"><label>Korisničko ime</label><input id="saUser" autofocus /></div>
     <div class="field"><label>Lozinka</label><input id="saPass" /></div>
-    <div class="field"><label>Uloga</label><select id="saRole"><option value="staff">Radnik</option><option value="owner">Vlasnik</option></select></div>
+    <div class="field"><label>Uloga</label><select id="saRole"><option value="staff">Radnik</option><option value="owner">Vlasnik</option>${
+      // Serviserski nalog nudi samo serviseru. Vlasnik ne sme sebi da napravi
+      // nadređenog - ni slučajno ni namerno; server to i odbija.
+      isServiser() ? '<option value="serviser">Serviser</option>' : ""}</select></div>
     <div class="err-msg" id="saErr"></div><button class="btn btn-primary btn-block" id="saSave">Kreiraj</button>`, (root, close) => {
     $("#saSave", root).addEventListener("click", async () => { try { await api("/admins", "POST", { username: $("#saUser", root).value, password: $("#saPass", root).value, role: $("#saRole", root).value }); toast("Nalog je kreiran", "success"); close(); renderStaff(); } catch (e) { $("#saErr", root).textContent = e.message; } });
   }));

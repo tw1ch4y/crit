@@ -67,14 +67,45 @@ export function requireAdmin(req, res, next) {
   next();
 }
 
-export function requireOwner(req, res, next) {
-  const token = tokenFromReq(req);
-  const admin = getAdmin(token);
-  if (!admin) return res.status(401).json({ error: "Neautorizovano" });
-  if (admin.role !== "owner") return res.status(403).json({ error: "Samo vlasnik ima pristup ovoj opciji" });
-  req.admin = admin;
-  next();
+// ---- ULOGE ----
+//
+// Tri, i idu odozdo nagore. Viša uvek sme sve što sme niža.
+//
+//   radnik    svakodnevni rad: kontrolna tabla, igrači, porudžbine, kasa
+//   vlasnik   sve u svojoj igraonici: cene, podešavanja, katalog, radnici
+//   serviser  onaj ko je program postavio i ko ga održava
+//
+// SERVISER JE ODVOJEN OD VLASNIKA NAMERNO. Vlasnik je gazda svoje igraonice,
+// ali ne i programa: ne dodaje i ne uklanja serviserske naloge. To postoji zbog
+// dve stvari koje dolaze sa izdavanjem programa drugim igraonicama:
+//
+//   1. PODRŠKA. Kad vlasnik zaboravi svoju lozinku ili se sam zaključa, mora
+//      postojati neko ko to može da razreši a da se ne dira baza ručno.
+//   2. LICENCIRANJE (kasnije). Uslovi pod kojima program radi ne mogu da stoje
+//      pod nalogom onoga na koga se odnose.
+//
+// Šta serviser NE radi: ne skriva se. Serviserski nalog se VIDI na strani
+// Radnici, označen, i vlasnik u svakom trenutku zna ko još ima pristup njegovim
+// podacima. Ne može da ga ukloni - to je cena podrške - ali ne može ni da bude
+// obmanut da ga nema.
+export const RANG = { staff: 1, owner: 2, serviser: 3 };
+export const rang = (uloga) => RANG[uloga] || 0;
+export const jeServiser = (a) => rang(a?.role) >= RANG.serviser;
+
+function traziRang(potreban, poruka) {
+  return (req, res, next) => {
+    const admin = getAdmin(tokenFromReq(req));
+    if (!admin) return res.status(401).json({ error: "Neautorizovano" });
+    if (rang(admin.role) < potreban) return res.status(403).json({ error: poruka });
+    req.admin = admin;
+    next();
+  };
 }
+
+// Vlasnik I serviser - serviser sme sve što sme vlasnik.
+export const requireOwner = traziRang(RANG.owner, "Samo vlasnik ima pristup ovoj opciji");
+// Samo serviser.
+export const requireServiser = traziRang(RANG.serviser, "Samo serviser ima pristup ovoj opciji");
 
 export function tokenFromReq(req) {
   const h = req.headers["authorization"];

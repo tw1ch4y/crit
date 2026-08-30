@@ -1332,3 +1332,24 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
   }
   html { scroll-behavior: auto; }
 }
+
+/* ZNAK I BOJA IGRAONICE (Izgled launchera)
+   Program se izdaje jedan, a svaka igraonica ima svoj znak i svoju boju. */
+.brend-red { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.brend-logo-box {
+  flex: 1 1 260px; min-height: 96px; display: flex; align-items: center; justify-content: center;
+  padding: 14px 18px; border: 1px solid var(--line); border-radius: var(--r);
+  /* Sahovnica ispod: znak je najcesce PNG sa providnoscu, pa se na ravnoj
+     podlozi ne vidi ima li belu ivicu ili je stvarno providan. */
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.03) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.03) 75%) 0 0/16px 16px,
+    linear-gradient(45deg, rgba(255, 255, 255, 0.03) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.03) 75%) 8px 8px/16px 16px;
+}
+.brend-logo-box img { max-width: 100%; max-height: 84px; object-fit: contain; }
+.brend-akcije { display: flex; flex-direction: column; gap: 8px; min-width: 190px; }
+.brend-boje { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.brend-boje input[type="color"] {
+  width: 52px; height: 38px; padding: 3px; cursor: pointer;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--r);
+}
+.brend-boje #brendHeks { width: 110px; font-family: var(--mono, monospace); text-transform: lowercase; }

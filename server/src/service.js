@@ -5,7 +5,7 @@ import dgram from "node:dgram";
 import { scryptSync, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { db, getSetting, setSetting, DATA_DIR, uJednomPoslu } from "./db.js";
-import { verifyPassword, hashPassword } from "./auth.js";
+import { verifyPassword, hashPassword, rang } from "./auth.js";
 import { broadcastPanels, broadcastClients, sendClient, isClientOnline, izbaciPanel } from "./hub.js";
 import { banerIgre, promoCrit } from "./banner.js";
 
@@ -763,6 +763,7 @@ export function sendWelcomeState(computerId) {
     t: "welcome",
     computer: { id: comp.id, name: comp.name },
     settings: { cafeName: settings.cafeName, currency: settings.currency, ratePerHour: settings.ratePerHour },
+    brend: brendObj(),
     // Heš servisnog PIN-a, da ga launcher zapamti i proverava lokalno kad
     // servera nema. Sam PIN se NE šalje - vidi servisniPinZaKlijenta.
     servisniPin: servisniPinZaKlijenta(),
@@ -2088,19 +2089,59 @@ function cmdLabel(c) { return { shutdown: "Ugasi", restart: "Restartuj", logoff:
 export function listAdmins() {
   // Ugaseni nalozi idu na dno, ali se VIDE: vlasnik mora da zna ko je sve imao
   // pristup, i da moze da vrati radnika koji se vratio na posao.
-  return db.prepare("SELECT id, username, role, active, created_at FROM admins ORDER BY active DESC, role='owner' DESC, username")
+  // Redosled: serviser, pa vlasnici, pa radnici - isto kako se i moc granа.
+  return db.prepare("SELECT id, username, role, active, created_at FROM admins ORDER BY active DESC, CASE role WHEN 'serviser' THEN 0 WHEN 'owner' THEN 1 ELSE 2 END, username")
     .all().map((a) => ({ id: a.id, username: a.username, role: a.role, aktivan: a.active !== 0, createdAt: a.created_at }));
 }
-export function createAdmin({ username, password, role }) {
+// KO KOGA SME DA DIRA.
+//
+// Jedno pravilo, na jednom mestu, i važi za sve: promenu lozinke, oduzimanje
+// pristupa, vraćanje naloga, pravljenje novog. Ranije je bilo dovoljno biti
+// vlasnik, pa bi vlasnik mogao da ukloni serviserski nalog - a onda podrška
+// nema kako da uđe kad se on sam zaključa.
+//
+// Pravilo: **možeš da diraš samo naloge NIŽE od sebe.** Vlasnik dira radnike,
+// serviser dira i vlasnike. Niko ne dira sebi ravnog ni višeg.
+export function smePreko(kojiRadi, ciljnaUloga) {
+  return rang(kojiRadi?.role) > rang(ciljnaUloga);
+}
+function proveriPravo(kojiRadi, cilj) {
+  if (!cilj) return { error: "Nalog ne postoji" };
+  if (smePreko(kojiRadi, cilj.role)) return null;
+  return {
+    error: cilj.role === "serviser"
+      ? "Serviserski nalog može da menja samo serviser."
+      : "Nemate pravo nad ovim nalogom.",
+  };
+}
+
+export function createAdmin({ username, password, role }, kojiRadi) {
   username = String(username || "").trim();
   if (!username || !password) return { error: "Korisničko ime i lozinka su obavezni" };
-  if (!["owner", "staff"].includes(role)) role = "staff";
+  if (!["owner", "staff", "serviser"].includes(role)) role = "staff";
+  // PRAVLJENJE ide do SVOJE uloge, menjanje samo ISPOD nje.
+  //
+  // Razlika je namerna. Vlasnik sme da doda drugog vlasnika (igraonica sa dva
+  // gazde je normalna stvar), a serviser drugog servisera - ali nijedan od njih
+  // posle ne sme da tog sebi ravnog ukloni ili mu promeni lozinku. Tako se dva
+  // vlasnika ne mogu međusobno iskључiti iz sopstvene igraonice.
+  //
+  // Naviše se ne ide ni u jednom slučaju: vlasnik ne može sebi da napravi
+  // nadređenog, ni slučajno ni namerno.
+  if (rang(kojiRadi?.role) < rang(role)) {
+    return { error: role === "serviser"
+      ? "Serviserski nalog može da napravi samo serviser."
+      : "Nemate pravo da pravite nalog te uloge." };
+  }
   if (db.prepare("SELECT id FROM admins WHERE username=?").get(username)) return { error: "Korisničko ime već postoji" };
   const info = db.prepare("INSERT INTO admins (username, password_hash, role, created_at) VALUES (?,?,?,?)")
     .run(username, hashPassword(password), role, Date.now());
   return { ok: true, id: info.lastInsertRowid };
 }
-export function updateAdminPassword(id, newPassword) {
+export function updateAdminPassword(id, newPassword, kojiRadi) {
+  const cilj = db.prepare("SELECT id, role FROM admins WHERE id=?").get(id);
+  const zabrana = proveriPravo(kojiRadi, cilj);
+  if (zabrana) return zabrana;
   if (!newPassword || String(newPassword).length < 3) return { error: "Lozinka mora imati bar 3 znaka" };
   db.prepare("UPDATE admins SET password_hash=? WHERE id=?").run(hashPassword(newPassword), id);
   zaboraviProveruLozinke(); // upozorenje o fabrickoj lozinki mora odmah da nestane
@@ -2108,10 +2149,12 @@ export function updateAdminPassword(id, newPassword) {
   db.prepare("DELETE FROM admin_tokens WHERE admin_id=?").run(id);
   return { ok: true };
 }
-export function deleteAdmin(id, currentAdminId) {
+export function deleteAdmin(id, currentAdminId, kojiRadi) {
   const a = db.prepare("SELECT * FROM admins WHERE id=?").get(id);
   if (!a) return { error: "Nalog ne postoji" };
   if (a.id === currentAdminId) return { error: "Ne možete obrisati sopstveni nalog" };
+  const zabrana = proveriPravo(kojiRadi, a);
+  if (zabrana) return zabrana;
   const owners = db.prepare("SELECT COUNT(*) c FROM admins WHERE role='owner' AND active=1").get().c;
   if (a.role === "owner" && owners <= 1) return { error: "Mora postojati bar jedan vlasnik" };
 
@@ -2143,9 +2186,10 @@ export function deleteAdmin(id, currentAdminId) {
 }
 
 // Vracanje ugasenog naloga (radnik se vratio na posao).
-export function vratiAdmin(id) {
+export function vratiAdmin(id, kojiRadi) {
   const a = db.prepare("SELECT * FROM admins WHERE id=?").get(id);
-  if (!a) return { error: "Nalog ne postoji" };
+  const zabrana = proveriPravo(kojiRadi, a);
+  if (zabrana) return zabrana;
   db.prepare("UPDATE admins SET active=1 WHERE id=?").run(id);
   return { ok: true };
 }
@@ -2198,6 +2242,87 @@ export function pozadineObj() {
   const out = {};
   for (const k of Object.keys(POZADINE)) out[k] = getSetting(`pozadina_${k}`, null) || null;
   return out;
+}
+
+// BREND: LOGO I BOJA, PO IGRAONICI
+//
+// Svaka igraonica ima svoje ime, svoj znak i svoju boju. Dok su logo i crvena
+// stajali ušiveni u fajlove, druga igraonica je morala da dobije prepravljenu
+// kopiju programa - a to znači da svaka nadogradnja mora da se pravi posebno za
+// svakoga. Ovako se program izdaje jedan, a izgled se podešava iz panela.
+//
+// Naziv se već podešavao (`cafe_name`); ovde se dodaju znak i boja. Pozadine
+// ekrana i promo baneri su i ranije bili podesivi, pa je ovo poslednje što je
+// bilo ušiveno.
+export const AKCENAT_PODRAZUMEVANI = "#e23b34";
+const HEKS = /^#[0-9a-f]{6}$/i;
+
+// Iz jedne boje se izvode sve nijanse koje panel i launcher koriste. Vlasnik
+// bira JEDNU boju - traziti od njega pet je isto što i ne dati mu izbor.
+export function nijanse(heks) {
+  const osnovna = HEKS.test(String(heks || "")) ? String(heks).toLowerCase() : AKCENAT_PODRAZUMEVANI;
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(osnovna.slice(i, i + 2), 16));
+  const pomeri = (k) => "#" + [r, g, b].map((v) => Math.max(0, Math.min(255, Math.round(k > 1 ? v + (255 - v) * (k - 1) : v * k)))
+    .toString(16).padStart(2, "0")).join("");
+  return {
+    akcenat: osnovna,
+    hover: pomeri(1.14),
+    down: pomeri(0.86),
+    soft: `rgba(${r}, ${g}, ${b}, 0.12)`,
+    line: `rgba(${r}, ${g}, ${b}, 0.45)`,
+    rgb: `${r}, ${g}, ${b}`,
+  };
+}
+
+export function brendObj() {
+  return {
+    naziv: getSetting("cafe_name", "Crit"),
+    logo: getSetting("brend_logo", "") || null,
+    ...nijanse(getSetting("brend_akcenat", AKCENAT_PODRAZUMEVANI)),
+  };
+}
+
+export function sacuvajLogo(dataUrl) {
+  const m = /^data:image\/(png|jpe?g|webp|svg\+xml);base64,(.+)$/i.exec(String(dataUrl || ""));
+  if (!m) return { error: "Neispravan format slike (PNG, JPG, WEBP ili SVG)" };
+  const buf = Buffer.from(m[2], "base64");
+  if (buf.length > 3 * 1024 * 1024) return { error: "Logo je prevelik (maksimum 3 MB)" };
+  const ext = { jpeg: "jpg", "svg+xml": "svg" }[m[1].toLowerCase()] || m[1].toLowerCase();
+  const dir = path.join(__dirname, "..", "public", "uploads");
+  fs.mkdirSync(dir, { recursive: true });
+  const staro = getSetting("brend_logo", null);
+  if (staro) { try { fs.unlinkSync(path.join(__dirname, "..", "public", staro)); } catch {} }
+  const fname = `logo-${Date.now()}.${ext}`;
+  fs.writeFileSync(path.join(dir, fname), buf);
+  const url = `/uploads/${fname}`;
+  setSetting("brend_logo", url);
+  pushBrend();
+  return { ok: true, ...brendObj() };
+}
+
+export function obrisiLogo() {
+  const staro = getSetting("brend_logo", null);
+  if (staro) { try { fs.unlinkSync(path.join(__dirname, "..", "public", staro)); } catch {} }
+  setSetting("brend_logo", "");
+  pushBrend();
+  return { ok: true, ...brendObj() };
+}
+
+export function sacuvajAkcenat(heks) {
+  const v = String(heks || "").trim();
+  if (!HEKS.test(v)) return { error: "Boja mora biti u obliku #RRGGBB (npr. #e23b34)" };
+  setSetting("brend_akcenat", v.toLowerCase());
+  pushBrend();
+  return { ok: true, ...brendObj() };
+}
+
+// Izgled se menja na SVIM ekranima odmah - i u panelu i na svih trinaest
+// launchera. Bez ovoga bi vlasnik menjao boju pa obilazio mašine da vidi šta je
+// dobio.
+export function pushBrend() {
+  const b = brendObj();
+  broadcastClients({ t: "brend", brend: b });
+  broadcastPanels({ t: "brend", brend: b });
 }
 
 export function savePozadinu(kljuc, dataUrl) {
