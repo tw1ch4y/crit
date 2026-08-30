@@ -46,16 +46,19 @@ proveri("traka stoji IZNAD mreze artikala",
   /\$\{traka\}\$\{shopPorudzbine\(\)\}<div class="shop-grid">/.test(launcher),
   "ispod mreze je igrac mora skrolovati da bi saznao stize li mu pice");
 
-// ---- POCETNA: traka "Nastavi gde si stao" ----
-// Levi deo trake na vrhu je nosio logo koji igrac vec vidi gore levo i naziv
-// igraonice u kojoj sedi - dva podatka koja mu ne trebaju.
-proveri("pocetna nudi poslednje igre na jedan klik", /function nastaviIgre\(\)/.test(launcher));
-proveri("promo baner osoblja ima prednost", /if \(S\.promo\?\.length\) return "";/.test(launcher),
-  "njihov materijal je vazniji od nase trake");
-proveri("novom igracu se pokazuje znak igraonice", /nastaviHtml\(\) \|\| `<div class="hero-brend">/.test(launcher),
-  "njemu nema sta da se nastavi");
-proveri("polica ne ponavlja igre iz trake", /if \(nastaviHtml\(\)\) return S\.games;/.test(launcher),
-  "iste tri igre u traci i odmah ispod nje na polici su ista stvar dvaput");
+// ---- BANER JE BANER: IGRE NE IDU U NJEGA ----
+//
+// U gornjoj traci je nekad stajala traka "Nastavi gde si stao" - tri poslednje
+// igre kao sitna dugmad. Bilo je pogresno dvaput: baner je mesto za promo
+// materijal osoblja ili znak igraonice (jedna mirna slika preko cele sirine), a
+// zbog te trake se polica NAMERNO nije sortirala, da se iste igre ne ponove -
+// pa je pokvareno ono sto je zaista korisno.
+proveri("u baneru nema igara", !/hero-nastavi|hn-igra/.test(launcher),
+  "baner nosi promo ili znak, ne pločice sa imenima igara");
+proveri("promo baner osoblja ima prednost nad znakom", /const lista = S\.promo \|\| \[\];/.test(launcher));
+proveri("kad promo nema, stoji znak igraonice", /: `<div class="hero-brend">/.test(launcher));
+proveri("znak u baneru prati brend igraonice", /class="hb-logo brand-logo"/.test(launcher),
+  "inace svaka igraonica gleda tudji logo usred svog banera");
 
 // ---- MREZE NE SMEJU DA SIRE EKRAN ----
 // "minmax(196px, 1fr)" na uskom ekranu daje kolonu siru od raspolozivog
@@ -142,7 +145,9 @@ proveri("greska je vidljivija od obicne poruke", /\.toast\.error \{[^}]*border-l
 // ---- RASPORED POCETNE ----
 // Vrh nosi znak kuce levo i tocak desno; traka je niska da bi ostalo mesta
 // koricama. Polica je na 1080p gubila 163 px izmedju imena igara i alata.
-proveri("vrh pocetne nosi znak kuce", launcher.includes('class="hb-logo" src="img/crit-logo.png"'));
+// Znak nosi i klasu "brand-logo", da ga primeniBrend zameni znakom te
+// igraonice - inace bi svaka gledala tudji logo usred svog banera.
+proveri("vrh pocetne nosi znak kuce", launcher.includes('class="hb-logo brand-logo" src="img/crit-logo.png"'));
 proveri("tocak stoji u vrhu, kao deo trake", launcher.includes("heroTocakHtml()") && /\.hero-tocak \{[^}]*flex: 0 0 auto/.test(jedanRed));
 proveri("traka ima svoju visinu, ne odnos strana", /\.hero \{[^}]*height: clamp\(/.test(jedanRed));
 proveri("korice popunjavaju policu", /\.games-shelf \.tile \{[^}]*max-height: 505px/.test(jedanRed));

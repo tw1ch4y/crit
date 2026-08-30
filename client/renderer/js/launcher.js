@@ -1167,8 +1167,8 @@ function heroHtml() {
         ${lista.length > 1 ? `<div class="promo-tacke">${lista.map((_, i) =>
           `<button class="promo-tacka ${i === 0 ? "aktivna" : ""}" data-promo-idi="${i}" aria-label="Baner ${i + 1}"></button>`).join("")}</div>` : ""}
       </div>`
-    : nastaviHtml() || `<div class="hero-brend">
-        <img class="hb-logo" src="img/crit-logo.png" alt="Crit" draggable="false" />
+    : `<div class="hero-brend">
+        <img class="hb-logo brand-logo" src="img/crit-logo.png" alt="${esc(S.settings.cafeName || "")}" draggable="false" />
         <div class="hb-tekst">
           <div class="hb-ime">${esc(S.settings.cafeName || "Crit")}</div>
           <div class="hb-pod">Gaming centar</div>
@@ -1179,36 +1179,21 @@ function heroHtml() {
   return `<section class="hero ${lista.length ? "promo" : ""}">${levo}${heroTocakHtml()}</section>`;
 }
 
-// NASTAVI GDE SI STAO.
+// IGRE NE IDU U BANER.
 //
-// Levi deo trake na vrhu je najskuplji prostor na ekranu, a nosio je logo koji
-// igrač već vidi gore levo i naziv igraonice u kojoj sedi - dva podatka koja mu
-// ne trebaju. Kad osoblje okači promo baner, on ima prednost jer je njihov
-// materijal. Kad ga nema, tu stoje poslednje igre ovog igrača, na jedan klik:
-// sedne za računar i nastavi, bez traženja po polici.
+// Ovde je nekad stajala traka "Nastavi gde si stao" - tri poslednje igre kao
+// sitna dugmad u gornjoj traci. Bila je greška iz dva razloga:
 //
-// Novom igraču se i dalje pokazuje znak igraonice - njemu nema šta da se nastavi.
-function nastaviIgre() {
-  if (!S.skoroIgrane?.length || !S.games?.length) return [];
-  const poId = new Map(S.games.map((g) => [g.id, g]));
-  return S.skoroIgrane.map((id) => poId.get(id)).filter(Boolean).slice(0, 3);
-}
-function nastaviHtml() {
-  // Kad je okačen promo baner, on ima prednost i traka se ne prikazuje.
-  if (S.promo?.length) return "";
-  const izbor = nastaviIgre();
-  if (!izbor.length) return "";
-  return `<div class="hero-nastavi">
-    <div class="hn-naslov">Nastavi gde si stao</div>
-    <div class="hn-igre">
-      ${izbor.map((g) => `<button class="hn-igra" data-game='${esc(JSON.stringify({ id: g.id, path: g.path, args: g.args, name: g.name }))}'>
-        <span class="hn-znak" style="--h:${hueFromName(g.name)}">${mono(g.name)}</span>
-        <span class="hn-ime">${esc(g.name)}</span>
-        <span class="hn-play">${icon("play", 15)}</span>
-      </button>`).join("")}
-    </div>
-  </div>`;
-}
+//   1. Baner je baner. Tu ide promo materijal koji je osoblje napravilo, ili
+//      znak igraonice - jedna mirna slika preko celе širine. Tri male pločice
+//      sa imenima igara u tom prostoru izgledaju kao da su tu upale slučajno.
+//   2. Iste te igre su onda stajale i u traci i na polici odmah ispod nje, pa
+//      se polica NAMERNO nije sortirala da se ne ponove. Time je pokvareno ono
+//      što je zaista korisno: da poslednje igrana igra bude prva na polici.
+//
+// Sada je obrnuto i jednostavnije: baner nosi promo ili znak, a POLICA se ređa
+// po tome šta je igrač poslednje igrao. Ko je sinoć igrao CS2, njega zatiče
+// prvog - na istom mestu i u istom obliku kao i sve ostale igre.
 
 // Widget tocka u baneru: mini tocak, traka napretka i stanje. Ceo je dugme.
 function heroTocakHtml() {
@@ -1244,14 +1229,17 @@ function heroTocakHtml() {
     </span>
   </button>`;
 }
-// Redosled igara na polici.
+// REDOSLED IGARA NA POLICI: POSLEDNJE IGRANA JE PRVA.
 //
-// Skoro igrane idu na početak SAMO ako traka "Nastavi gde si stao" nije
-// prikazana. Kad jeste, iste tri igre bi stajale i u traci i odmah ispod nje na
-// polici - ista stvar dvaput, jedna do druge. Tada polica zadržava redosled koji
-// je osoblje postavilo u panelu, pa traka i polica rade različit posao.
+// Igrač sedne i traži ono što je sinoć igrao. Ko je poslednji put pokrenuo CS2,
+// zatiče ga prvog - u istoj kartici i istog oblika kao sve ostale, samo na
+// prvom mestu. Iza njih ide redosled koji je osoblje postavilo u panelu.
+//
+// Ranije je ovo radilo SAMO kad traka "Nastavi gde si stao" nije bila
+// prikazana, jer bi se iste igre pojavile dvaput. Ta traka je uklonjena (igre
+// ne idu u baner), pa sortiranje sad važi uvek - a to je i jedini oblik u kom
+// je korisno.
 function poredakIgara() {
-  if (nastaviHtml()) return S.games;
   if (!S.skoroIgrane.length) return S.games;
   const mesto = new Map(S.skoroIgrane.map((id, i) => [id, i]));
   const skoro = [], ostale = [];
