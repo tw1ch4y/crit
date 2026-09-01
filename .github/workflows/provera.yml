@@ -36,6 +36,12 @@ jobs:
       - name: Verzija se poklapa na svim mestima
         run: node verzija.mjs
 
+      # Ime igraonice stoji na desetak mesta (instaler, precice, alati za
+      # oporavak). Alat bez argumenta samo proverava da se svuda slaze i vraca
+      # gresku ako ne - jeftinije ovde nego da se otkrije na instaleru.
+      - name: Ime igraonice se poklapa na svim mestima
+        run: node igraonica.mjs
+
       - name: Sve suite
         working-directory: testovi
         run: node pokreni-sve.mjs

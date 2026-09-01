@@ -1,4 +1,6 @@
 import path from "node:path";
+import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import { KOREN, radniFolder, podigniServer, ucitajWebSocket, citajIzvor } from "./_okruzenje.mjs";
 // Postojeca baza iz igraonice mora da preziveljava nadogradnju servera:
 // nova tabela se sama pravi, a zatecni podaci ostaju netaknuti.
@@ -6,10 +8,35 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 
 const DATA = radniFolder("stara-baza");
-const dbPath = DATA + "\\crit.db";
+const dbPath = path.join(DATA, "crit.db");
 
-// Sveza kopija prave baze pri svakom pokretanju, da test bude ponovljiv.
-fs.copyFileSync(path.join(KOREN, "server", "data", "crit.db"), dbPath);
+// ODAKLE DOLAZI "ZATECENA" BAZA
+//
+// Najbolji izvor je PRAVA baza iz igraonice: stara je godinu dana i puna
+// stvarnih redova, pa je migracija nad njom najverodostojnija proba.
+//
+// Ali ta baza je runtime podatak i namerno NIJE u gitu (u njoj su nalozi,
+// lozinke i promet). Na klonu i na CI-ju je nema - a ovaj test ju je kopirao
+// bezuslovno, pa bi pao na "ENOENT" prvog dana posle postavljanja privatnog
+// repozitorijuma. Crven CI koji je crven zbog sebe niko ne gleda, i tu prestaje
+// da vredi.
+//
+// Zato: kad prave baze nema, napravi se sveza. Put kroz nadogradnju je isti -
+// tabela i kolona se svejedno skidaju nize, pa se glumi starija verzija.
+const prava = path.join(KOREN, "server", "data", "crit.db");
+if (fs.existsSync(prava)) {
+  // Sveza kopija pri svakom pokretanju, da test bude ponovljiv.
+  fs.copyFileSync(prava, dbPath);
+  console.log("  (zatecena baza: prava iz server/data)");
+} else {
+  // Ucitavanje db.js samo po sebi napravi i popuni bazu. Ide u ZASEBNOM procesu:
+  // u ovom bi ostalo kesirano na prvoj putanji, pa bi server ispod dizao drugu
+  // bazu od one koju test gleda.
+  const url = pathToFileURL(path.join(KOREN, "server", "src", "db.js")).href;
+  execFileSync(process.execPath, ["--input-type=module", "-e", `await import(${JSON.stringify(url)});`],
+    { env: { ...process.env, CRIT_DATA_DIR: DATA }, stdio: "ignore" });
+  console.log("  (zatecena baza: sveza - prave nema, ovo je klon ili CI)");
+}
 
 // Baza u projektu je u medjuvremenu i sama nadogradjena, pa se staro stanje
 // pravi ovde: tabela i indeksi se skidaju. Ranije se test oslanjao na to da
