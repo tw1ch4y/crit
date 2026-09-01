@@ -5,7 +5,11 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 const ROOT = import.meta.dirname;
-const OUT = path.join(path.dirname(ROOT), "CRIT-ZA-IGRAONICU");
+// Ime igraonice stoji na jednom mestu (igraonica.json). Ovaj alat pravi i
+// UPUTSTVO koje ide u igraonicu, pa ono mora da nosi njeno ime, a ne tudje.
+const BREND = JSON.parse(fs.readFileSync(path.join(ROOT, "igraonica.json"), "utf8"));
+const IME = BREND.ime, LAUNCHER = BREND.launcher;
+const OUT = path.join(path.dirname(ROOT), `${IME.toUpperCase().replace(/\s+/g, "-")}-ZA-IGRAONICU`);
 const SRV = path.join(OUT, "1 - SERVER (glavni racunar)");
 const CLI = path.join(OUT, "2 - LAUNCHER (racunari igraca)");
 
@@ -107,11 +111,14 @@ for (const f of ["package.json", "Pokreni server.bat", "Otvori port u firewall-u
 }
 
 // ---- launcher ----
-const dist = path.join(path.dirname(ROOT), "crit", "dist");
+// dist/ je u samom projektu (client/package.json: output "../dist"). Ranije se
+// do njega islo preko IMENA FOLDERA na disku - preimenuj folder projekta i
+// pakovanje pukne, a poruka o gresci govori o necem trecem.
+const dist = path.join(ROOT, "dist");
 // U dist-u ostaju i stariji instaleri, pa uzimamo najskorije napravljen -
 // inace bi paket tiho poneo prethodnu verziju launchera.
 const setup = fs.readdirSync(dist)
-  .filter((f) => f.startsWith("Crit Launcher Setup") && f.endsWith(".exe"))
+  .filter((f) => f.startsWith(`${LAUNCHER} Setup`) && f.endsWith(".exe"))
   .map((f) => ({ f, vreme: fs.statSync(path.join(dist, f)).mtimeMs }))
   .sort((a, b) => b.vreme - a.vreme)[0]?.f;
 if (!setup) { console.error("Nema instalera u dist/ - pokreni prvo build launchera."); process.exit(1); }
@@ -123,7 +130,7 @@ if (!setup) { console.error("Nema instalera u dist/ - pokreni prvo build launche
 // nosio staru verziju launchera, a niko to nije video dok se ne instalira.
 {
   const verzija = JSON.parse(fs.readFileSync(path.join(ROOT, "client", "package.json"), "utf8")).version;
-  const uImenu = /Crit Launcher Setup ([\d.]+)\.exe$/.exec(setup)?.[1];
+  const uImenu = new RegExp("^" + LAUNCHER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + " Setup ([\\d.]+)\\.exe$").exec(setup)?.[1];
   if (uImenu !== verzija) {
     console.error(`\n  STOP - instaler ne odgovara verziji projekta.`);
     console.error(`    client/package.json:  ${verzija}`);
@@ -141,7 +148,7 @@ fs.copyFileSync(path.join(dist, setup), path.join(CLI, setup));
 // Cuvaju se poslednja DVA: tekuci i prethodni, da moze da se vrati unazad.
 const CUVA_SE = 2;
 const sviInstaleri = fs.readdirSync(dist)
-  .filter((f) => f.startsWith("Crit Launcher Setup") && f.endsWith(".exe"))
+  .filter((f) => f.startsWith(`${LAUNCHER} Setup`) && f.endsWith(".exe"))
   .map((f) => ({ f, vreme: fs.statSync(path.join(dist, f)).mtimeMs }))
   .sort((a, b) => b.vreme - a.vreme);
 let oslobodjeno = 0, obrisano = 0;
@@ -189,7 +196,7 @@ for (const f of ["POKRETANJE.md", "DEPLOY.md", "README.md", "PROVERI.md"]) {
 kopiraj(path.join(ROOT, "assets", "sabloni"), path.join(OUT, "SABLONI ZA DIZAJN"));
 
 const readme = [
-  "CRIT - postavljanje u igraonici",
+  `${IME.toUpperCase()} - postavljanje u igraonici`,
   "================================",
   "",
   "Panel prijava:  admin / admin  (promeni odmah u Podesavanjima)",
@@ -209,7 +216,7 @@ const readme = [
   "   otvoren - dok je otvoren, server radi.",
   "3. Otvori http://localhost:8095 u pregledacu i prijavi se sa admin / admin.",
   "   Ovo je panel - odavde se sve podesava.",
-  "4. Instaliraj 'Crit Launcher Setup' i pokreni ga.",
+  `4. Instaliraj '${LAUNCHER} Setup' i pokreni ga.`,
   "5. Na prvom ekranu OBRISI ponudjenu adresu i upisi:  http://127.0.0.1:8095",
   "   Token uzmi iz TOKENI.txt (bilo koji red, npr. za PC-01).",
   "6. Launcher se povezuje i staje na ekran za prijavu.",
@@ -231,7 +238,7 @@ const readme = [
   "GLAVNI RACUNAR (server)",
   "-----------------------",
   "1. Instaliraj Node.js sa https://nodejs.org (dugme LTS, sve dalje-dalje).",
-  "2. Prekopiraj folder \"1 - SERVER\" na taj racunar, npr. u C:\\Crit\\server",
+  `2. Prekopiraj folder "1 - SERVER" na taj racunar, npr. u C:\\${IME.replace(/\s+/g, "")}\\server`,
   "3. Proveri da racunar ima IP adresu 192.168.1.100.",
   "   (Najbolje je zakucati je u ruteru - DHCP rezervacija.)",
   "4. Pokreni \"Otvori port u firewall-u.bat\"  (desni klik - Run as administrator)",
@@ -244,7 +251,7 @@ const readme = [
   "--------------------------",
   "1. Na svakom racunaru napravi POSEBAN Windows nalog za igrace - STANDARDNI,",
   "   ne administrator. Program se pokrece na tom nalogu.",
-  "2. Instaliraj \"Crit Launcher Setup\".",
+  `2. Instaliraj "${LAUNCHER} Setup".`,
   "3. Pokreni launcher. Adresa servera je vec popunjena - unesi samo TOKEN",
   "   za taj racunar (spisak je u TOKENI.txt).",
   "4. U panelu ce taj racunar preci iz Offline u Standby.",
@@ -337,7 +344,7 @@ const uputstvoProbe = [
   "   Napuni server tako da launcher ODMAH izgleda kompletno: baneri,",
   "   promo, pun shop, upaljen tocak, i demo igrac 'test'.",
   "",
-  "7. Pokreni Crit Launcher. Adresa je vec popunjena, unesi samo token:",
+  `7. Pokreni ${LAUNCHER}. Adresa je vec popunjena, unesi samo token:`,
   `     ${pcs[0]?.name || "PC-01"}   ${pcs[0]?.token || "(vidi TOKENI.txt)"}`,
   "",
   "8. U launcheru se prijavi kao:  test  /  test1234",
@@ -373,7 +380,7 @@ const uputstvoProbe = [
   "",
   "  IZGLED I IZVESTAJI:",
   "  - Izvestaji -> promet po satu, kes/kredit podela, Izvoz u CSV",
-  "  - Izgled launchera -> promeni teksturu / napravi CRIT baner",
+  `  - Izgled launchera -> promeni teksturu / napravi ${IME.toUpperCase()} baner`,
   "  - Igre -> klikni 'baner' na kartici da napravis privremeni baner",
   "  - Internet alati -> svih 9 alata sa originalnim logotipima",
   "",

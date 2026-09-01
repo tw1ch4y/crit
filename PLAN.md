@@ -255,9 +255,7 @@ igraonicu". Prvo sve mora da radi kako treba; licence dolaze posle.
 - [ ] **Licence** - *planirano, i tek posle svega ostalog.* Uslovi rada vezani za
   serviserski nalog; CRIT ostaje bez licence. Ne kreće dok program ne odradi
   sezonu u ovoj igraonici bez ijednog kvara
-- [ ] **Odvajanje ostatka brenda** - *planirano.* Ime `Crit` još stoji u
-  `appId` instalera, u imenu paketa i u nazivima `.bat` skripti. Ne smeta radu,
-  ali svaka nova igraonica dobija instaler koji se zove tuđim imenom
+- [x] **Ime igraonice se menja na jednom mestu** (`igraonica.json` + `node igraonica.mjs "Ime"`). Ranije je `Crit` stajao u `appId` instalera, u prečici, u imenu foldera instalacije i u alatima za oporavak - pa bi svaka nova igraonica dobila instaler sa tuđim imenom, a njeni `.bat` alati gasili proces koji na toj mašini ne postoji i pri tom javili da je sve prošlo. Unutrašnja imena (`crit.db`, `CRIT_DATA_DIR`) namerno ostaju - preimenovanje baze bi odseklo postojeće podatke. Šara sa imenom kuće se sada crta od naziva iz Podešavanja, pa se menja bez nove verzije launchera. Provera (`test-ime-igraonice.mjs`) preimenovanje stvarno izvrši u memoriji i gleda šta je preživelo - tako je i našla dva promašaja, od kojih je jedan ostavljao `POPRAVI-RACUNAR.bat` u uverenju da launcher još radi
 
 ### Revizija panela (ono što osoblje gleda ceo dan)
 

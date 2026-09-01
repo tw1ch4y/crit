@@ -778,7 +778,7 @@ export function sendWelcomeState(computerId) {
     // Spisak sara ide klijentu da bi igrac mogao da bira svoju na svom nalogu.
     // Sve sare zajedno su oko 4 KB - salje se jednom, pri povezivanju.
     teksture: {
-      spisak: Object.fromEntries(Object.entries(TEKSTURE).map(([k, o]) => [k, { naziv: o.naziv, opis: o.opis, sara: o.sara }])),
+      spisak: teksturaSpisak(),
       jacine: JACINE, kretanja: KRETANJA, prozirnosti: PROZIRNOSTI,
     },
     promo: promoZaKlijenta(),
@@ -2414,7 +2414,25 @@ export function pushPozadine() {
 // Prozirnost je po sari razlicita namerno: tackice pokrivaju malo povrsine pa
 // im treba vise, kose linije pokrivaju mnogo pa im treba manje - da sve sare
 // deluju podjednako prisutno kad se prebacuje sa jedne na drugu.
+// Šara koja se crta od naziva igraonice se pravi u hodu; ostale su upisane.
+// Bez ovoga bi `o.sara` za nju bilo `undefined` i pozadina bi nestala.
+const saraTeksture = (o) => (o.saraOd ? o.saraOd(getSetting("cafe_name", "Igraonica")) : o.sara);
+
+// Spisak šara spreman za slanje - i launcheru i panelu.
+//
+// Stoji na jednom mestu jer je već jednom razišlo: launcher je dobijao razrešenu
+// šaru, a panel sirov objekat sa funkcijom u sebi. `JSON.stringify` funkciju
+// izbaci, pa je vlasnik u Podešavanjima gledao prazan kvadrat umesto šare -
+// bez ijedne greške, i to samo za onu jednu koja se crta u hodu.
+export function teksturaSpisak() {
+  return Object.fromEntries(Object.entries(TEKSTURE)
+    .map(([k, o]) => [k, { naziv: o.naziv, opis: o.opis, korak: o.korak, sara: saraTeksture(o) }]));
+}
 const svg = (s) => `url("data:image/svg+xml,${s.replace(/</g, "%3C").replace(/>/g, "%3E").replace(/#/g, "%23")}")`;
+// Naziv igraonice upisuje vlasnik i završava USRED SVG-a. Ime sa `&` ili `<`
+// pokvarilo bi celu sliku, a šara je pozadina svakog ekrana u launcheru - jedan
+// ampersand u nazivu i trinaest mašina ostane bez pozadine.
+const escXml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 // ISKRE: ista sara, ali u boji kuce i punom jacinom.
 // Sluzi za kretanje "Iskre" - preko nasumicne plocice u mrezi legne ista figura
@@ -2440,7 +2458,7 @@ export const TEKSTURE = {
     sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14'><circle cx='3.5' cy='3.5' r='1.15' fill='#fff' fill-opacity='0.17'/><circle cx='10.5' cy='10.5' r='1.15' fill='#fff' fill-opacity='0.17'/></svg>`),
   },
   zvezde: {
-    naziv: "Zvezdice", opis: "Sitne zvezde iz Crit logotipa, poređane u red", korak: 58,
+    naziv: "Zvezdice", opis: "Sitne zvezde iz logotipa, poređane u red", korak: 58,
     sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='58' height='58'><path d='M14 4c1.1 6 2.9 7.8 8.9 8.9-6 1.1-7.8 2.9-8.9 8.9-1.1-6-2.9-7.8-8.9-8.9C11.1 11.8 12.9 10 14 4z' fill='#fff' fill-opacity='0.16'/><path d='M43 33c.75 4.1 1.98 5.33 6.08 6.08-4.1.75-5.33 1.98-6.08 6.08-.75-4.1-1.98-5.33-6.08-6.08C41.02 38.33 42.25 37.1 43 33z' fill='#fff' fill-opacity='0.12'/></svg>`),
   },
   prasak: {
@@ -2455,7 +2473,7 @@ export const TEKSTURE = {
   // Kockica sa 20 strana je znak kritičnog pogotka - odatle i ime igraonice.
   // Od svih šara ova jedina nešto ZNAČI, pa je i najbolji izbor za kuću.
   kockice: {
-    naziv: "Kockice d20", opis: "Znak kritičnog pogotka - odatle i ime Crit", korak: 64,
+    naziv: "Kockice d20", opis: "Znak kritičnog pogotka iz stonih igara", korak: 64,
     sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><g fill='none' stroke='#fff' stroke-opacity='0.15' stroke-width='1.4' stroke-linejoin='round'><path d='M16 3L27.3 9.5L27.3 22.5L16 29L4.7 22.5L4.7 9.5Z'/><path d='M16 9.5L21.6 19.3L10.3 19.3Z'/><path d='M16 3L16 9.5M27.3 22.5L21.6 19.3M4.7 22.5L10.3 19.3'/></g><g transform='translate(32 32) scale(0.62)' fill='none' stroke='#fff' stroke-opacity='0.1' stroke-width='2.2' stroke-linejoin='round'><path d='M16 3L27.3 9.5L27.3 22.5L16 29L4.7 22.5L4.7 9.5Z'/><path d='M16 9.5L21.6 19.3L10.3 19.3Z'/></g></svg>`),
   },
   // Sestougaona mreza - najmirnija od svih, dobra ispod okacene fotografije.
@@ -2469,10 +2487,28 @@ export const TEKSTURE = {
     naziv: "Munje", opis: "Sitne munje, najživlja od svih šara", korak: 48,
     sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48'><path d='M14 4L7 21h6l-3 13 12-19h-7l4-11z' fill='#fff' fill-opacity='0.14'/><path d='M37 27L32.5 38h3.8l-1.9 8.4L42 34h-4.5l2.5-7z' fill='#fff' fill-opacity='0.1'/></svg>`),
   },
-  // Slovo iz logotipa, okrenuto naizmenicno - najbrendiranija sara.
+  // ŠARA SA IMENOM KUĆE - PIŠE SE U HODU, NE STOJI UPISANA.
+  //
+  // Ovde je stajalo slovo po slovo "CRIT". Dok je igraonica jedna, to je bila
+  // najbrendiranija šara u spisku. Drugoj igraonici bi to bila šara sa TUĐIM
+  // imenom - jedina stvar u launcheru koju vlasnik ne bi mogao da promeni iz
+  // panela, a igrač je gleda ceo dan iza svake police.
+  //
+  // Zato se crta od naziva iz Podešavanja. Promeni ime igraonice u panelu i
+  // pozadina se promeni sa njim, bez nove verzije launchera.
+  // Ključ ostaje `crit` iako se šara više ne zove tako: postojeće baze u
+  // igraonici ga imaju upisanog u podešavanjima. Preimenovanje ključa bi im
+  // tiho ugasilo pozadinu - `TEKSTURE["crit"]` više ne bi postojalo, pa bi
+  // pala na "nema" i niko ne bi znao zašto je pozadina nestala.
   crit: {
-    naziv: "CRIT", opis: "Ime kuće kao šara, najbrendiranije", korak: 96,
-    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><text x='6' y='30' font-family='Segoe UI, Arial, sans-serif' font-size='21' font-weight='900' letter-spacing='2' fill='#fff' fill-opacity='0.11'>CRIT</text><text x='54' y='78' font-family='Segoe UI, Arial, sans-serif' font-size='15' font-weight='900' letter-spacing='2' fill='#fff' fill-opacity='0.075' transform='rotate(-14 54 78)'>CRIT</text></svg>`),
+    naziv: "Ime kuće", opis: "Naziv igraonice kao šara, najbrendiranije", korak: 96,
+    saraOd: (ime) => {
+      // Duga imena se ne skraćuju nego se smanjuju - presečeno ime izgleda kao
+      // kvar, a sitno ime je i dalje ime.
+      const t = String(ime || "").toUpperCase().trim().slice(0, 14) || "?";
+      const v = Math.max(9, Math.min(21, Math.round(126 / Math.max(t.length, 4))));
+      return svg(`<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><text x='6' y='30' font-family='Segoe UI, Arial, sans-serif' font-size='${v}' font-weight='900' letter-spacing='2' fill='#fff' fill-opacity='0.11'>${escXml(t)}</text><text x='54' y='78' font-family='Segoe UI, Arial, sans-serif' font-size='${Math.round(v * 0.72)}' font-weight='900' letter-spacing='2' fill='#fff' fill-opacity='0.075' transform='rotate(-14 54 78)'>${escXml(t)}</text></svg>`);
+    },
   },
   romb: {
     naziv: "Rombovi", opis: "Mirna dijagonalna šara, najdiskretnija", korak: 34,
@@ -2516,7 +2552,7 @@ export function spremiTeksturu({ kljuc, jacina, kretanje } = {}) {
   const vazi = radi ? kr : "mirno";
   return {
     kljuc: k, jacina: j, kretanje: vazi,
-    sara: TEKSTURE[k].sara,
+    sara: saraTeksture(TEKSTURE[k]),
     prozirnost: k === "nema" ? 0 : PROZIRNOSTI[j],
     // Korak je velicina plocice: kretanje pomera saru za tacno jednu plocicu,
     // pa se petlja zatvara bez vidljivog skoka. Iskre ga koriste da se crvena
@@ -2525,7 +2561,7 @@ export function spremiTeksturu({ kljuc, jacina, kretanje } = {}) {
     sekundi: radi ? KRETANJA[vazi].sekundi : 0,
     // Ista sara u boji kuce - salje se samo kad zatreba, da welcome ne nosi
     // dvostruko vise podataka bez potrebe.
-    iskra: vazi === "iskre" ? iskraOd(TEKSTURE[k].sara) : "",
+    iskra: vazi === "iskre" ? iskraOd(saraTeksture(TEKSTURE[k])) : "",
   };
 }
 
@@ -2709,7 +2745,7 @@ export function napraviPromoCrit() {
   const url = `/uploads/${fname}`;
   const zadnji = db.prepare("SELECT COALESCE(MAX(sort), 0) s FROM promo").get().s;
   const info = db.prepare("INSERT INTO promo (image, naziv, available, sort, created_at) VALUES (?,?,1,?,?)")
-    .run(url, "CRIT (privremeni)", zadnji + 1, Date.now());
+    .run(url, `${getSetting("cafe_name", "Igraonica")} (privremeni)`, zadnji + 1, Date.now());
   pushPromo();
   return { ok: true, id: info.lastInsertRowid, image: url };
 }

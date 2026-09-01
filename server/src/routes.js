@@ -129,7 +129,7 @@ router.post("/pozadine/:kljuc", requireOwner, (req, res) => {
 });
 // ---------- TEKSTURA POZADINE ----------
 router.get("/tekstura", requireOwner, (req, res) =>
-  res.json({ spisak: svc.TEKSTURE, jacine: svc.JACINE, kretanja: svc.KRETANJA,
+  res.json({ spisak: svc.teksturaSpisak(), jacine: svc.JACINE, kretanja: svc.KRETANJA,
     izbor: svc.teksturaObj(), prozirnosti: svc.PROZIRNOSTI }));
 router.post("/tekstura", requireOwner, (req, res) => {
   const r = svc.saveTeksturu(req.body?.kljuc, req.body?.jacina, req.body?.kretanje);

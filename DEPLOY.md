@@ -62,6 +62,12 @@ Podešavanje se pamti (`config.json` u user data folderu), tako da sledeći put 
 > na računarima igrača ne treba ni Node ni npm. Postupak je u
 > [POKRETANJE.md](POKRETANJE.md), korak 2.
 
+> **Za DRUGU igraonicu prvo se menja ime**, pa tek onda gradi:
+> `node igraonica.mjs "Ime igraonice"`. Bez toga ta igraonica dobija instaler
+> koji se zove tuđim imenom, a njeni alati za oporavak (`POPRAVI-RACUNAR.bat` i
+> ostali) gase proces koji na njenim mašinama ne postoji - i pri tom jave da je
+> sve prošlo. Bez argumenta alat samo pokaže gde koje ime stoji.
+
 ### 2.3 Automatsko pokretanje launchera pri paljenju
 Napravi `client/start-launcher.bat`:
 ```bat

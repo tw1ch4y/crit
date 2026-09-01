@@ -1,4 +1,4 @@
 @echo off
-title CRIT Launcher
+title Crit Launcher
 cd /d "%~dp0"
 npm start

@@ -179,6 +179,27 @@ Uslovi da radi bez greške:
 - Za instalacije koje traže administratorska prava, launcher treba da bude pokrenut kao administrator.
 - Računar mora biti **online** (launcher povezan) da bi primio instalaciju.
 
+## Ime igraonice (za drugu igraonicu)
+
+Ime stoji na jednom mestu, u `igraonica.json`. Menja se alatom:
+
+```
+node igraonica.mjs                 pokaže gde koje ime stoji i da li se slaže
+node igraonica.mjs "Nova Igraonica"  upiše svuda
+```
+
+Upisuje se u instaler (`appId`, ime instalera i foldera instalacije, prečica),
+u imena paketa, u alate za oporavak (`POPRAVI-RACUNAR.bat` i ostali zovu
+launcher po imenu procesa) i u podrazumevani naziv igraonice u bazi.
+
+Unutrašnja imena **ostaju** (`crit.db`, `CRIT_DATA_DIR`, imena funkcija): ne vidi
+ih nijedan korisnik, a preimenovanje baze bi ostavilo sve postojeće podatke sa
+strane.
+
+> Na mašinama gde je stara verzija već instalirana: prvo `DEINSTALIRAJ-LAUNCHER.bat`
+> (drugo ime = Windows je vidi kao drugi program pa nastaje pored stare), pa se
+> posle instalacije ponovo unose adresa servera i token.
+
 ## Nadogradnja launchera (panel > Instalacije)
 
 Instalater se postavlja **jednom, na server**, a računari ga preuzimaju sami -
