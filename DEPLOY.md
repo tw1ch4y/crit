@@ -294,29 +294,48 @@ koja živi duže od launchera, a uz nju ide i *osigurač* - druga skripta koja
 posle pet minuta vraća launcher bez obzira na sve. Računar bez launchera je
 računar sa otvorenim Windowsom, i to ne sme da potraje.
 
-> **JEDAN POSLEDNJI OBILAZAK.** Sve gore radi tek od verzije koja to ume.
-> Verziju sa ovim mehanizmom moraš da instaliraš ručno na svih 13 mašina, po
-> postupku ispod. Posle toga više nikad.
+> **JEDAN POSLEDNJI OBILAZAK.** Sve gore radi tek od verzije koja to ume, a ta
+> verzija se instalira **drugačije nego dosadašnje** (vidi ispod). Zato jednom
+> moraš na svih 13 mašina. Posle toga više nikad.
 
-> **UAC.** Instaler ide u `Program Files`, pa traži administratora
-> (`perMachine: true` u `client/package.json`). Pod nalogom igrača Windows tada
-> podigne UAC prozor i čeka da neko klikne - a za kasom niko ne gleda ekran
-> računara broj sedam. Osigurač tada vrati stari launcher, a u panelu stoji
-> crveno *"nije odobreno (instaler traži administratora)"*. Da bi nadogradnja
-> prolazila sama, instalacija mora da bude **po korisniku**
-> (`perMachine: false`) - launcher tada ide u profil igrača umesto u
-> `Program Files`. To je odluka koja se donosi jednom, pre onog poslednjeg
-> obilaska.
+**Zašto se instalacija promenila.** Do sada je launcher išao u `Program Files`
+(`perMachine: true`), pa je instaler tražio **administratora**. Pod nalogom
+igrača Windows tada podigne UAC prozor i čeka klik - a za kasom niko ne gleda
+ekran računara broj sedam. Nadogradnja tako ne bi prošla nigde, a razlog se ne bi
+video ni u jednoj poruci.
 
-**Ručno, na jednoj mašini** (prvi put, ili kad nešto zapne):
+Od sada je instalacija **po korisniku** (`perMachine: false`): launcher ide u
+profil naloga igrača i instaler ne traži administratora.
 
-1. Prijavi se na **administratorski** nalog (ne igračev).
-2. Pokreni novi `Crit Launcher Setup X.Y.Z.exe`. Instaler sam zatvori stari
-   launcher i prepiše ga. Ne treba prethodno deinstalirati.
-3. Prijavi se nazad na nalog igrača i proveri da se launcher javio u panelu -
-   kolona *verzija* na strani Računari mora da pokaže novu.
+Launcheru administrator ionako nije ni trebao - politike piše u `HKCU`,
+`powercfg` menja plan tog korisnika, a autostart je prečica u njegovom `Startup`
+folderu. `Program Files` je čuvao samo **sam fajl launchera** od igrača. Igrač
+koji ume da pokrene svoj program pod svojim nalogom i danas može da ugasi
+launcher i obriše prečicu iz autostarta - kiosk padne bez diranja
+`Program Files`-a. Prava brana je spisak dozvoljenog za pokretanje (main.js), ne
+mesto na disku.
 
-Adresa servera i token ostaju - stoje u nalogu korisnika, a instaler ga ne dira.
+> Kad nabaviš **sertifikat za potpisivanje koda** (trebaće ti ionako, zbog
+> SmartScreen upozorenja pred prodaju), otvara se i treći put: `Program Files` uz
+> zakazani zadatak sa punim pravima koji instalira umesto igrača. Tada se ovo
+> vraća na `perMachine: true`.
+
+**Ručno, na jednoj mašini** (poslednji obilazak, ili kad nešto zapne):
+
+1. Prijavi se na **administratorski** nalog i **deinstaliraj staru verziju** -
+   `DEINSTALIRAJ-LAUNCHER.bat` (radi i za staru iz `Program Files` i za novu iz
+   profila). Ovaj korak se preskače samo ako na mašini nikad nije ni bilo
+   launchera.
+2. Prijavi se na **nalog igrača** - nova instalacija ide u njegov profil, pa se
+   pokreće **odatle**, ne sa administratorskog naloga.
+3. Pokreni `Crit Launcher Setup X.Y.Z.exe`. Ne traži administratora.
+4. Proveri da prečica u `Startup` folderu tog naloga pokazuje na novu putanju
+   (`%LOCALAPPDATA%\Programs\Crit Launcher\`), pa restartuj računar i vidi da se
+   launcher digao sam.
+5. U panelu, na strani Računari, kolona *verzija* mora da pokaže novu.
+
+Adresa servera i token ostaju - stoje u nalogu korisnika, a instaler ih ne dira.
+
 
 > **Verzije smeju da se razlikuju dok traje nadogradnja.** Stariji launcheri rade
 > normalno dok im ne dođe red. Panel pokazuje verziju svakog računara, tako da se

@@ -242,6 +242,27 @@ proveri("instalaciju vodi izdvojena skripta, sa osiguracem",
 proveri("neuspela instalacija se javi po povratku", /function javiIshodNadogradnje\(\)/.test(main) &&
   /javiIshodNadogradnje\(\);/.test(main));
 
+// ---- 12) INSTALACIJA MORA DA BUDE PO KORISNIKU ----
+//
+// Sve gore radi do poslednjeg koraka, a taj korak zavisi od jedne recu u
+// package.json. Sa `perMachine: true` instaler ide u Program Files i trazi
+// administratora; launcher radi pod nalogom igraca, pa Windows podigne UAC
+// prozor i ceka klik koji za kasom niko nece dati. Nadogradnja tada ne prolazi
+// nigde, a razlog se ne vidi ni u jednoj poruci - izgleda kao da mreza ne valja.
+//
+// Launcheru administrator ni ne treba: politike pise u HKCU, `powercfg` menja
+// korisnikov plan, a autostart je precica u Startup folderu tog korisnika.
+// Program Files je cuvao samo sam fajl launchera od igraca - a igrac koji ume
+// da pokrene svoj program pod svojim nalogom ionako moze da ugasi launcher i
+// obrise precicu, pa kiosk pada i bez diranja Program Files-a.
+const pkg = JSON.parse(citajIzvor("client/package.json"));
+proveri("instalacija je po korisniku, ne po masini", pkg.build?.nsis?.perMachine === false,
+  "sa perMachine: true nadogradnja ceka UAC koji niko nece odobriti");
+proveri("verzija launchera stoji u package.json", /^\d+\.\d+\.\d+$/.test(pkg.version || ""),
+  "po njoj se imenuje instaler, a po imenu server zna sta je novije");
+proveri("skripta za nadogradnju ide u paket", (pkg.build?.files || []).includes("nadogradnja-skripta.js"),
+  "bez nje launcher puca pri pokretanju u igraonici");
+
 pc1.ws.close(); pc2.ws.close(); pc3.ws.close();
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 await cekaj(300);

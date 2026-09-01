@@ -43,7 +43,10 @@ Odmah idi na **Podešavanja** i promeni lozinku i PIN.
 
 **2.2** Na tom računaru napravi **poseban Windows nalog za igrače** - obavezno *standardni*, ne administrator.
 
-**2.3** Prekopiraj `Crit Launcher Setup.exe` i pokreni instalaciju.
+**2.3** Prijavi se **na nalog igrača** i odatle pokreni `Crit Launcher Setup.exe`.
+Instalacija ide u profil tog naloga i ne traži administratora - zato mora da se
+pokrene sa njegovog naloga, a ne sa administratorskog. Tako launcher kasnije ume
+sam da se nadogradi sa panela, bez obilaska mašina.
 
 **2.4** Pokreni **Crit Launcher**. Adresa servera je već popunjena
 (`http://192.168.1.100:8095`) - unesi samo **token** iz koraka 2.1 i klikni *Sačuvaj i poveži*.

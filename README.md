@@ -201,7 +201,10 @@ umesto obilaska svih 13 mašina po svakoj verziji.
 - **Računar se vraća i kad instalacija ne uspe** - posle pet minuta ga vrati
   osigurač, a u panelu piše zašto nije prošlo.
 
-Detalji i jedno preostalo pitanje (UAC / `perMachine`) su u DEPLOY.md §5.1.
+Instalacija je **po korisniku** (`perMachine: false`) - bez toga bi instaler tražio
+administratora, pa bi nadogradnja stigla do mašine i tu čekala UAC prozor koji za
+kasom niko neće odobriti. Zbog te promene je potreban **jedan poslednji ručni
+obilazak** svih mašina; postupak je u DEPLOY.md §5.1.
 
 ## Prečice na tastaturi (na računaru igrača)
 
