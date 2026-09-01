@@ -36,6 +36,42 @@ app.use((err, req, res, next) => {
   next();
 });
 
+// ---- Zastitna zaglavlja ----
+//
+// Panel prikazuje ono sto ljudi upisuju: imena igraca, nazive igara, beleske uz
+// nalog. Sve to prolazi kroz `esc()` pre nego sto udje u stranu, i to je prva
+// brana. Ovo je druga: i da jedno jedino mesto ikad promasi, ubacena skripta ne
+// moze da se pokrene jer pregledac izvrsava samo skripte sa ovog servera.
+//
+// Zasto je to vazno bas ovde: iz panela se upisuje kredit. Skripta koja se
+// izvrsi u vlasnikovom pregledacu ne mora nista da provaljuje - ona VEC jeste
+// vlasnik.
+//
+// `style-src` mora da dozvoli inline: panel sklapa HTML sa `style="..."` na
+// desetinama mesta, a sara pozadine se postavlja kao `background-image`.
+// `img-src data:` je zbog te sare (SVG kao data adresa) i zbog pregleda slike
+// pre slanja (FileReader).
+app.use((req, res, next) => {
+  res.setHeader("Content-Security-Policy", [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join("; "));
+  // Pregledac ne sme da nagadja vrstu fajla: slika koju je neko postavio, a
+  // koja "lici" na skriptu, ne sme da se izvrsi kao skripta.
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  // Panel radi na lokalnoj mrezi i nema sta da javlja spolja odakle se dolazi.
+  res.setHeader("Referrer-Policy", "no-referrer");
+  next();
+});
+
 // API
 app.use("/api", router);
 // Nepoznata adresa pod /api vraca JSON, ne Express-ovu HTML stranicu. Panel sve

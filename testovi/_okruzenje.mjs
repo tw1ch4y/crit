@@ -93,8 +93,19 @@ export function brojac() {
       if (uslov) { prosao++; console.log("  OK   " + naziv); }
       else { pao++; console.log("  PAO  " + naziv + (detalj ? "  -> " + detalj : "")); }
     },
-    kraj() {
+    // IZLAZ SE NE ŽURI.
+    //
+    // `process.exit` odmah po poslednjoj proveri ume da obori Node na Windows-u:
+    // "Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)". Uzrok su veze
+    // koje `fetch` drži otvorenim ka podignutom serveru - gase se u pozadini, a
+    // izlaz ih zatekne nasred gašenja.
+    //
+    // Posledica nije bezazlena: suita ispiše "19/19 proslo" pa vrati izlazni kod
+    // 127, i pokretač je vidi kao PALU. Zelena provera koja se prijavljuje kao
+    // crvena je gora od nikakve - posle dva takva niko više ne gleda rezultat.
+    async kraj() {
       console.log(`\n${prosao}/${prosao + pao} proslo`);
+      await new Promise((r) => setTimeout(r, 300));
       process.exit(pao ? 1 : 0);
     },
   };

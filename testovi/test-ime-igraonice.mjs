@@ -133,4 +133,24 @@ proveri("spisak sara je na jednom mestu", /export function teksturaSpisak\(\)/.t
   /svc\.teksturaSpisak\(\)/.test(citajIzvor("server/src/routes.js")),
   "vec se jednom razislo: launcher je dobijao razresenu saru, panel sirov objekat sa funkcijom");
 
+// ---- 7) ni panel ni launcher ne nose ime u tekstu ----
+//
+// Naziv uvek dolazi iz Podesavanja. Ali dok podesavanja ne stignu sa servera,
+// na ekranu stoji pocetna vrednost - i ako je ona upisano ime, druga igraonica
+// na trenutak vidi TUDJE ime na svom panelu i na svom ekranu za prijavu.
+const app = citajIzvor("server/public/js/app.js");
+const rend = citajIzvor("client/renderer/js/launcher.js");
+// Komentari se izuzimaju: oni su za onoga ko odrzava program, ne za igraonicu.
+const bezKomentara = (t) => t.split("\n").filter((r) => !/^\s*(\/\/|\*|\/\*)/.test(r)).join("\n");
+proveri("panel nema upisano ime igraonice",
+  !new RegExp(`["'\`>]${brend.ime}["'\`<]`).test(bezKomentara(app)),
+  "naziv se uvek uzima iz Podesavanja");
+proveri("launcher nema upisano ime igraonice",
+  !new RegExp(`["'\`>]${brend.ime}["'\`<]`).test(bezKomentara(rend)),
+  "isto vazi za ekran za prijavu i zaglavlje pocetne");
+proveri("naslovi strana su bez imena",
+  !new RegExp(brend.ime, "i").test(citajIzvor("server/public/index.html").match(/<title>.*<\/title>/)?.[0] || "") &&
+  !new RegExp(brend.ime, "i").test(citajIzvor("client/renderer/index.html").match(/<title>.*<\/title>/)?.[0] || ""),
+  "naslov panela se svejedno postavlja iz brenda cim se ucita");
+
 kraj();

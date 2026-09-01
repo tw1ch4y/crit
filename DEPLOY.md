@@ -102,6 +102,16 @@ a bezopasni su jer je launcher raširen ispod svega i ne može da se zatvori.
 Prečice za osoblje: `Ctrl+Alt+U` otključavanje (PIN), `Ctrl+Alt+Home` povratak u launcher,
 `Ctrl+Alt+Shift+Q` izlaz iz launchera (PIN).
 
+> **PANEL SE NE OTVARA PREKO GOSTINSKOG WiFi-ja.** Lozinke i token panela
+> putuju mrežom u čistom tekstu (HTTPS još nije urađen - vidi PLAN.md). Ko je na
+> istoj mreži i ume da sluša saobraćaj, uhvati vlasnikovu lozinku i onda sam sebi
+> upisuje kredit.
+>
+> Zato: gosti na jednoj mreži, osoblje i računari igraonice na drugoj. Na većini
+> rutera je to jedan potvrđen kvadratić ("Guest network" / "Izolacija gostiju").
+> Ako to nije moguće - panel se otvara samo sa telefona koji je na kablu ili sa
+> glavnog računara, nikad sa mreže koju koriste gosti.
+
 ### 3.2 Windows podešavanje (jednom po računaru)
 
 1. Napravi **poseban Windows nalog za igrače** - obavezno *standardni*, ne administrator.

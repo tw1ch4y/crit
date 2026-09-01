@@ -252,10 +252,30 @@ igraonicu". Prvo sve mora da radi kako treba; licence dolaze posle.
   bi i svaka nadogradnja morala da se pravi posebno za svakoga. Vlasnik bira
   **jednu** boju, nijanse se izvode iz nje. Zelena, zlatna i status boje se ne
   diraju: one nose značenje, nisu ukras
+- [ ] **HTTPS na panelu i ka launcheru** - *sledeće na redu od bezbednosnih stvari.*
+  Lozinke osoblja i igrača, i token panela, putuju mrežom **u čistom tekstu**.
+  Na WiFi-ju koji dele gosti to znači: neko sa laptopom i uobičajenim alatom
+  uhvati vlasnikovu lozinku, uđe u panel i sam sebi upiše kredit. Nije teorija,
+  to je najjeftiniji napad na ovaj program.
+
+  Ne radi se naprečac jer je pola posla gore od nikakvog: samopotpisan sertifikat
+  znači upozorenje u pregledaču na svakom telefonu osoblja (a ljudi nauče da
+  kliknu "nastavi", pa upozorenje prestane da išta znači), i traži da se
+  sertifikat uveze na sve mašine. Node nema ugrađen alat za pravljenje
+  sertifikata, pa treba ili nova zavisnost ili Windows-ov
+  `New-SelfSignedCertificate`. Ništa od toga se ne može ispitati sa razvojnog
+  računara - traži pravu mrežu, prave telefone i 13 mašina.
+
+  **Dok se ne uradi**, jedina stvarna zaštita je mrežna i ne košta ništa: panel
+  se ne otvara preko WiFi-ja na kom su gosti. Upisano u DEPLOY.md.
+
 - [ ] **Licence** - *planirano, i tek posle svega ostalog.* Uslovi rada vezani za
   serviserski nalog; CRIT ostaje bez licence. Ne kreće dok program ne odradi
   sezonu u ovoj igraonici bez ijednog kvara
 - [x] **Ime igraonice se menja na jednom mestu** (`igraonica.json` + `node igraonica.mjs "Ime"`). Ranije je `Crit` stajao u `appId` instalera, u prečici, u imenu foldera instalacije i u alatima za oporavak - pa bi svaka nova igraonica dobila instaler sa tuđim imenom, a njeni `.bat` alati gasili proces koji na toj mašini ne postoji i pri tom javili da je sve prošlo. Unutrašnja imena (`crit.db`, `CRIT_DATA_DIR`) namerno ostaju - preimenovanje baze bi odseklo postojeće podatke. Šara sa imenom kuće se sada crta od naziva iz Podešavanja, pa se menja bez nove verzije launchera. Provera (`test-ime-igraonice.mjs`) preimenovanje stvarno izvrši u memoriji i gleda šta je preživelo - tako je i našla dva promašaja, od kojih je jedan ostavljao `POPRAVI-RACUNAR.bat` u uverenju da launcher još radi
+
+- [x] **Ubačena skripta se ne izvršava** - panel i launcher prihvataju samo skripte sa svog servera (CSP). Sve što ljudi upisuju već prolazi kroz `esc()`, ovo je druga brana: i da jedno mesto ikad promaši, skripta ne može da se pokrene. Bitno baš ovde jer se iz panela upisuje kredit - skripta u vlasnikovom pregledaču ne mora ništa da provaljuje, ona **već jeste** vlasnik. Provereno u pravom pregledaču (pregled slike, izvoz izveštaja i živa veza rade, ubačena skripta ne prolazi) i sa 17 alata na pravom Electronu
+- [x] **Kopija koda van računara** (`node alati/kopija-koda.mjs D:\kopije`) - baza je odlazila van računara, sam program nije: kod i istorija su postojali samo na razvojnom laptopu. Jedan fajl sa svim granama i commitovima, provereno da se iz njega stvarno klonira ceo projekat. Odredište koje ne postoji je greška, ne poziv da se napravi
 
 ### Revizija panela (ono što osoblje gleda ceo dan)
 

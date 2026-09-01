@@ -8,7 +8,9 @@ const state = {
   players: [],
   shop: [],
   logs: [],
-  settings: { cafeName: "Crit", currency: "RSD", ratePerHour: 120 },
+  // Pocetna vrednost dok podesavanja ne stignu sa servera. Namerno bez imena
+  // igraonice: druga igraonica bi na trenutak videla tudje ime na svom panelu.
+  settings: { cafeName: "Igraonica", currency: "RSD", ratePerHour: 120 },
   ws: null,
   wsOk: false,
   selection: new Set(),
@@ -2589,7 +2591,7 @@ async function renderIzgled() {
       <div class="card-head">
         <h2>Promo baneri</h2>
         <div class="head-actions">
-          <button class="btn btn-sm" id="promoCrit">${icon("image")} Napravi CRIT baner</button>
+          <button class="btn btn-sm" id="promoCrit">${icon("image")} Napravi baner sa imenom</button>
           <button class="btn btn-sm btn-primary" id="promoDodaj">${icon("plus")} Novi baner</button>
         </div>
       </div>
@@ -2658,7 +2660,7 @@ async function renderIzgled() {
   $("#promoDodaj").addEventListener("click", () => $("#promoFile").click());
   $("#promoCrit").addEventListener("click", async (e) => {
     e.target.closest("button").disabled = true;
-    try { await api("/promo/crit", "POST"); toast("CRIT baner je napravljen", "success"); ucitajPromo(); }
+    try { await api("/promo/crit", "POST"); toast(`Baner "${state.settings.cafeName}" je napravljen`, "success"); ucitajPromo(); }
     catch (err) { toast(err.message, "error"); e.target.closest("button").disabled = false; }
   });
   $("#promoFile").addEventListener("change", async () => {

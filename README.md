@@ -179,6 +179,31 @@ Uslovi da radi bez greške:
 - Za instalacije koje traže administratorska prava, launcher treba da bude pokrenut kao administrator.
 - Računar mora biti **online** (launcher povezan) da bi primio instalaciju.
 
+## Kopija koda van računara
+
+Baza igraonice ide van računara sama (*Podešavanja > Kopija van računara*). Sam
+program to nije imao - izvorni kod i cela istorija izmena postoje samo na
+razvojnom laptopu. Otkaz tog diska znači da igraonica nastavi da radi (server je
+na drugoj mašini), ali da se program više ne može ni ispraviti ni nadograditi.
+
+```
+node alati/kopija-koda.mjs D:\kopije
+```
+
+Pravi jedan fajl sa **svim granama i svim commitovima**, proveri da je čitav, i
+obriše najstarije (čuva poslednjih pet). Vraćanje na bilo kom računaru sa git-om:
+
+```
+git clone "D:\kopije\crit-kod-2.44.0-2026-09-02.bundle" crit
+```
+
+Odredište koje ne postoji je **greška, ne poziv da se napravi** - folder
+napravljen na lokalnom disku izgledao bi kao uspela kopija, a bio bi na istom
+disku od kog čuva. Isto pravilo kao za kopiju baze.
+
+> Ovo nije zamena za privatni repozitorijum nego ono što radi odmah, bez ijednog
+> naloga.
+
 ## Ime igraonice (za drugu igraonicu)
 
 Ime stoji na jednom mestu, u `igraonica.json`. Menja se alatom:

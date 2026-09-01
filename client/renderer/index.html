@@ -2,7 +2,27 @@
 <html lang="sr">
 <head>
   <meta charset="UTF-8" />
-  <title>Crit Launcher</title>
+  <!--
+    Ubacena skripta ne sme da se pokrene ni ovde.
+
+    Ovaj ekran prikazuje ono sto stize sa servera: nazive igara, imena igraca,
+    artikle iz shopa. Sve to prolazi kroz `esc()`, i to je prva brana; ovo je
+    druga - pregledac izvrsava samo `js/launcher.js`, nista drugo.
+
+    `img-src` je namerno siroko: korice igara stizu sa servera cija se adresa
+    upisuje pri postavljanju (pa se ne moze unapred upisati ovde), a ikone
+    programa dolaze kao `data:` adrese iz samog Windows-a. Slike se ne izvrsavaju,
+    pa to nista ne otvara.
+
+    `style-src` mora da dozvoli inline: police i kartice se sklapaju sa
+    `style="..."`, a sara pozadine se postavlja kao `background-image`.
+
+    overlay.html i backdrop.html nemaju ovo pravilo jer imaju skriptu u samoj
+    strani, a ne prikazuju nista sto stize spolja kao HTML - poruka osoblja se
+    upisuje preko `textContent`, ne `innerHTML`.
+  -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'" />
+  <title>Launcher</title>
   <link rel="stylesheet" href="css/font.css" />
   <link rel="stylesheet" href="css/launcher.css" />
 </head>
@@ -58,7 +78,7 @@
     <div class="login-sadrzaj">
       <div class="login-brend">
         <img class="lb-logo" src="img/crit-logo.png" alt="Crit" />
-        <div class="lb-ime" id="loginKuca">Crit</div>
+        <div class="lb-ime" id="loginKuca">Igraonica</div>
         <div class="lb-pod">Gaming centar</div>
         <div class="lb-cinjenice">
           <div class="lb-c"><span class="lb-c-l">Cena po satu</span><span class="lb-c-v" id="loginCena">-</span></div>

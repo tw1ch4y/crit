@@ -1,6 +1,8 @@
 // CRIT LAUNCHER (renderer)
 const S = {
-  settings: { cafeName: "Crit", currency: "RSD", ratePerHour: 120 },
+  // Pocetna vrednost dok "welcome" ne stigne. Bez imena igraonice - inace bi
+  // druga igraonica na trenutak videla tudje ime na svom ekranu za prijavu.
+  settings: { cafeName: "Igraonica", currency: "RSD", ratePerHour: 120 },
   host: "",
   computer: null,
   games: [],
@@ -467,7 +469,7 @@ function handleMsg(m) {
       primeniTeksturu(m.tekstura);
       $("#loginPc").textContent = m.computer?.name || "-";
       // Ekran prijave nosi i podatke kuće - gost sa ulice ih tu i traži.
-      $("#loginKuca").textContent = S.settings.cafeName || "Crit";
+      $("#loginKuca").textContent = S.settings.cafeName || "Igraonica";
       $("#loginCena").textContent = S.settings.ratePerHour > 0 ? money(S.settings.ratePerHour) : "-";
       postaviPozadinuPrijave();
       break;
@@ -1171,7 +1173,7 @@ function heroHtml() {
     : `<div class="hero-brend">
         <img class="hb-logo brand-logo" src="img/crit-logo.png" alt="${esc(S.settings.cafeName || "")}" draggable="false" />
         <div class="hb-tekst">
-          <div class="hb-ime">${esc(S.settings.cafeName || "Crit")}</div>
+          <div class="hb-ime">${esc(S.settings.cafeName || "Igraonica")}</div>
           <div class="hb-pod">Gaming centar</div>
         </div>
       </div>`;
