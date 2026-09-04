@@ -284,6 +284,14 @@ function migrate() {
   if (!columnExists("shifts", "total_sessions")) db.exec("ALTER TABLE shifts ADD COLUMN total_sessions REAL");
   // Kad je igrač poslednji put zavrteo nagradni točak - da ne može više puta nedeljno.
   if (!columnExists("players", "last_spin_at")) db.exec("ALTER TABLE players ADD COLUMN last_spin_at INTEGER");
+  // ISKUSTVO: jedan potrosen dinar = jedan XP. Stoji na igracu, ne racuna se iz
+  // prometa - promet se sece pri odrzavanju (stari logovi se brisu), pa bi se
+  // nivo igraca tiho vratio unazad onog dana kad odrzavanje prodje.
+  if (!columnExists("players", "xp")) db.exec("ALTER TABLE players ADD COLUMN xp REAL NOT NULL DEFAULT 0");
+  // Izgled profila: boja imena i okvir oko znaka. Kao tekst (JSON), jer su to
+  // dva sitna izbora koja se ne pretrazuju. Odvojeno od `tema` (sara) da se
+  // citanje sare ne kvari kad se doda jos nesto na profil.
+  if (!columnExists("players", "profil")) db.exec("ALTER TABLE players ADD COLUMN profil TEXT");
 }
 migrate();
 

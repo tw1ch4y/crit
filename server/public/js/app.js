@@ -1411,7 +1411,7 @@ async function renderPlayers() {
       </div></div>
     <div class="toolbar hidden" id="plTraka"><div class="search">${icon("search")}<input id="playerSearch" placeholder="Pretraži igrače..." value="${esc(state.plSearch)}" /></div></div>
     <div class="card"><div class="table-wrap"><table>
-      <thead><tr><th>Korisnik</th><th>Kredit</th><th>Status</th><th>Poslednja prijava</th><th></th></tr></thead>
+      <thead><tr><th>Korisnik</th><th>Nivo</th><th>Kredit</th><th>Status</th><th>Poslednja prijava</th><th></th></tr></thead>
       <tbody id="playerRows"></tbody></table></div><div id="plPager"></div></div>`;
   $("#addPlayer").addEventListener("click", playerModal);
   $("#addGuests").addEventListener("click", guestsModal);
@@ -1447,6 +1447,9 @@ async function refreshPlayers() {
   state.playersPage = d;
   const rows = d.items.map((p) => `<tr data-prow="${p.id}" style="cursor:pointer">
     <td><b>${esc(p.username)}</b>${p.displayName && p.displayName !== p.username ? `<div class="faint" style="font-size:12.5px">${esc(p.displayName)}</div>` : ""}</td>
+    ${/* Nivo je jedini podatak o vernosti koji program ima: ko je stalan gost
+         vidi se odavde, bez otvaranja ijedne strane. */ ""}
+    <td class="nivo-c"><span class="nivo-znak">${p.nivo || 1}</span><span class="faint">${esc(p.nivoNaziv || "")}</span></td>
     <td class="mono ${p.balance > 0 ? "pos" : "zero"}">${money(p.balance)}</td>
     <td>${p.banned ? '<span class="pill red">Blokiran</span>' : '<span class="pill green">Aktivan</span>'}</td>
     <td class="mono faint">${p.lastLogin ? timeAgo(p.lastLogin) : "-"}</td>

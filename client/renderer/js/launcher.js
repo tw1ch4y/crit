@@ -70,6 +70,9 @@ const ICONS = {
   cash: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
   gift: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v9h14v-9"/><path d="M12 8S10.5 3 8 3a2.5 2.5 0 0 0 0 5ZM12 8s1.5-5 4-5a2.5 2.5 0 0 1 0 5Z"/>',
   key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.5 12.5 8-8M18 4l3 3M15 7l3 3"/>',
+  // Znak profila. Dodat uz stranu Profil - ranije ga nije bilo, a bez ikone bi
+  // stavka u meniju stajala prazna dok ostale imaju svoju.
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>',
   // "image" se koristio za Moju pozadinu, ali ga u ovom spisku nije bilo - pa
   // se crtao prazan SVG i stavka je stajala bez ikone.
   image: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="m3 15 5-5 4 4 3-3 6 6"/><circle cx="8.5" cy="8.5" r="1.5"/>',
@@ -196,15 +199,19 @@ function show(id) {
   $$(".screen").forEach((s) => s.classList.toggle("active", s.id === id));
   primeniPozadinu();
 }
-function toast(msg, type = "info") {
+// Trajanje je podesivo jer nova poruka nije kao nova poruka: "nalog dopunjen"
+// se procita za sekund, a "nov nivo, otkljucano ti je ovo i ono" trazi duze -
+// inace nestane pre nego sto igrac stigne da vidi sta je dobio.
+function toast(msg, type = "info", trajanje = 3000) {
   const el = document.createElement("div");
   el.className = "toast " + type;
-  const ic = type === "success" ? "check" : type === "error" ? "alert" : "info";
+  const ic = type === "success" ? "check" : type === "error" ? "alert" : type === "nivo" ? "gift" : "info";
   el.innerHTML = `<span class="t-ic">${icon(ic)}</span><span class="t-msg"></span>`;
   el.querySelector(".t-msg").textContent = msg;
   $("#toasts").appendChild(el);
-  if (type === "success") sfx.success(); else if (type === "error") sfx.error();
-  setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 280); }, 3000);
+  // Obicno obavestenje ostaje tiho - zvuk je za ono sto se desilo igracu.
+  if (type === "error") sfx.error(); else if (type === "success" || type === "nivo") sfx.success();
+  setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 280); }, trajanje);
 }
 
 // Init
@@ -503,6 +510,9 @@ function handleMsg(m) {
       // birao svoju, pa vazi ono sto je vlasnik podesio.
       if (m.tekstura) primeniTeksturu(m.tekstura);
       S.mojaTekstura = m.mojaTekstura || null;
+      S.vip = m.vip || null;
+      S.profil = m.profil || null;
+      S.accSekcija = null; // sledeci igrac ne nasledjuje odeljak koji je prethodni gledao
       S.tocak = m.tocak || null;
       osveziZnackuNaloga();
       S.cart.clear(); S.nacinPlacanja = "credit"; S.nacinRucno = false;
@@ -523,6 +533,9 @@ function handleMsg(m) {
       // upiše tačno u trenutku kad se nagrada pokaže.
       if (S.tocakVrti) { S.tocakStanje = { balance: m.balance, remaining: m.remainingSeconds }; break; }
       S.balance = m.balance; S.remaining = m.remainingSeconds; updateHud();
+      // Iskustvo raste dok naplata tece, pa traka na vrhu pocetne mora da se
+      // pomera dok igrac gleda - inace bi napredak postojao samo u bazi.
+      if (m.vip) { S.vip = m.vip; osveziVip(); }
       break;
     case "tocak":
       // Vlasnik je upalio/ugasio tocak ili promenio nagrade - osvezi prikaz.
@@ -628,6 +641,20 @@ function handleMsg(m) {
       break;
     case "moja_tekstura_err":
       toast(m.message || "Ne mogu da promenim pozadinu.", "error");
+      break;
+    case "vip":
+      S.vip = m.vip || null;
+      osveziVip();
+      break;
+    case "profil":
+      S.profil = m.profil || null;
+      if (S.tab === "account") renderContent();
+      break;
+    case "profil_err":
+      toast(m.message || "Ne mogu da promenim profil.", "error");
+      break;
+    case "nivo_gore":
+      proslaviNivo(m);
       break;
     case "moje_porudzbine":
       S.porudzbine = Array.isArray(m.porudzbine) ? m.porudzbine : [];
@@ -793,6 +820,10 @@ function stopTimer() { if (S.timer) clearInterval(S.timer); S.timer = null; docu
 
 $$(".tab").forEach((t) => t.addEventListener("click", () => {
   S.tab = t.dataset.tab;
+  // Odeljak naloga se bira pri OTVARANJU, ne pri svakom crtanju. Da se racunao
+  // stalno, ekran bi odskocio sa porudzbina na profil tacno u trenutku kad pice
+  // stigne - a igrac tada bas gleda u taj spisak.
+  if (S.tab === "account" && !S.accSekcija) S.accSekcija = podrazumevanaSekcija();
   $$(".tab").forEach((x) => x.classList.toggle("active", x === t));
   renderContent();
   primeniPozadinu();
@@ -1180,12 +1211,20 @@ function prikaziPromo(i) {
 // prikaz je zaključan. Tako se izgled i pravila razvijaju odvojeno.
 function vipHtml() {
   const v = S.vip;
-  const ima = v && Number.isFinite(v.xpDo) && v.xpDo > 0;
-  const postotak = ima ? Math.max(0, Math.min(100, (v.xp / v.xpDo) * 100)) : 0;
+  // Tri stanja, ne dva:
+  //   nema podataka  - server je stariji ili igrac nije prijavljen -> "Uskoro!"
+  //   poslednji nivo - traka je puna i NE trazi jos, jer nema sta da trazi
+  //   sve ostalo     - napredak unutar tekuceg nivoa
+  const ima = !!v && Number.isFinite(v.nivo);
+  const naKraju = ima && v.poslednji;
+  const merljiv = ima && !naKraju && Number.isFinite(v.xpDo) && v.xpDo > 0;
+  const postotak = naKraju ? 100 : merljiv ? Math.max(0, Math.min(100, (v.xp / v.xpDo) * 100)) : 0;
   const nivo = ima ? `Nivo ${v.nivo}${v.naziv ? " - " + esc(v.naziv) : ""}` : "Nivo -";
-  const pod = ima
-    ? `${Math.round(v.xp)} / ${Math.round(v.xpDo)} XP do sledećeg nivoa`
-    : "Otključava se igranjem";
+  const pod = naKraju
+    ? "Najviši nivo - dalje se ne ide"
+    : merljiv
+      ? `${Math.round(v.xp)} / ${Math.round(v.xpDo)} XP do nivoa ${esc(v.sledeci || "")}`
+      : "Otključava se igranjem";
 
   // Zupci dele traku na nivoe - bez njih je to samo linija koja raste, a sa
   // njima se vidi DOKLE se stiglo i koliko je ostalo.
@@ -1197,7 +1236,7 @@ function vipHtml() {
   // Prva verzija VIP trake ga je izbacila - a bas preko klase `brand-logo`
   // primeniBrend menja logo po igraonici. Bez njega bi svaka igraonica gledala
   // tudji znak na svom najvidljivijem mestu.
-  return `<div class="vip ${ima ? "" : "zakljucan"}">
+  return `<div class="vip ${ima ? "" : "zakljucan"}${naKraju ? " vrh" : ""}">
     <img class="vip-kuca brand-logo" src="img/crit-logo.png" alt="${esc(S.settings.cafeName || "")}" draggable="false" />
     <div class="vip-znak" aria-hidden="true">
       <svg viewBox="0 0 44 48" fill="none">
@@ -1218,6 +1257,40 @@ function vipHtml() {
     </div>
     ${ima ? "" : `<div class="vip-pecat"><span>Uskoro!</span></div>`}
   </div>`;
+}
+
+// Osvežava SAMO traku, ne celu stranu.
+//
+// Iskustvo raste dok naplata teče - na svakih pet sekundi. Da se tada iscrtava
+// cela početna, police bi treperile, drag-to-scroll bi se prekidao, a igrač koji
+// prevlači korice bi to osetio kao trzanje.
+function osveziVip() {
+  const stara = $(".vip");
+  if (!stara) return;
+  const p = document.createElement("div");
+  p.innerHTML = vipHtml();
+  const nova = p.firstElementChild;
+  if (nova) stara.replaceWith(nova);
+  primeniBrend(S.brend);
+}
+
+// NOV NIVO SE VIDI I ČUJE, NE SAMO UPIŠE.
+//
+// Bez ovoga bi napredak postojao samo u bazi: igrač bi jednom slučajno primetio
+// da mu je traka drugačija, a otključana stvar bi stajala neiskorišćena jer niko
+// nije rekao da postoji. Zato preko ekrana ide obaveštenje sa onim ŠTA je dobio.
+function proslaviNivo(m) {
+  const dobio = (m.otkljucano || []).map((o) => o.naziv).filter(Boolean);
+  toast(`Nivo ${m.nivo} - ${m.naziv}${dobio.length ? ": " + dobio.join(", ") : ""}`, "nivo", 7000);
+  const el = $(".vip");
+  if (el) {
+    // Animacija se pokreće ponovo i kad klasa već stoji - inače drugi nivo
+    // zaredom ne bi bljesnuo.
+    el.classList.remove("slavi");
+    void el.offsetWidth;
+    el.classList.add("slavi");
+    setTimeout(() => el.classList.remove("slavi"), 2600);
+  }
 }
 
 // VRH POCETNE
@@ -1629,6 +1702,8 @@ function renderAccount() {
 // Sada je levo meni, desno jedan odeljak. Igrač bira šta gleda, svaki odeljak
 // ima mesta koliko mu treba, a dodavanje novog ne kvari raspored.
 const ACC_SEKCIJE = [
+  // Profil je prvi: nalog pocinje od toga KO si, pa tek onda od toga sta radis.
+  { kljuc: "profil", naziv: "Profil", ikona: "user" },
   { kljuc: "porudzbine", naziv: "Porudžbine", ikona: "cup" },
   { kljuc: "nagrade", naziv: "Nagrade", ikona: "gift" },
   { kljuc: "podesavanja", naziv: "Miš i zvuk", ikona: "mis" },
@@ -1636,7 +1711,7 @@ const ACC_SEKCIJE = [
   { kljuc: "lozinka", naziv: "Lozinka", ikona: "key" },
 ];
 function stavkaMenija(s) {
-  const aktivna = (S.accSekcija || "porudzbine") === s.kljuc;
+  const aktivna = (S.accSekcija || "profil") === s.kljuc;
   // Broj aktivnih porudžbina stoji uz stavku: igrač koji čeka piće ne mora da
   // ulazi u odeljak da bi video da li je stiglo.
   const cek = s.kljuc === "porudzbine" ? aktivnePorudzbine().length : 0;
@@ -1648,14 +1723,108 @@ function stavkaMenija(s) {
 const aktivnePorudzbine = () =>
   (S.porudzbine || []).filter((o) => o.status === "pending" || o.status === "preparing");
 
+// SA ČIM SE NALOG OTVARA KAD IGRAČ NIJE NIŠTA IZABRAO.
+//
+// Profil je prvi u meniju - nalog počinje od toga ko si. Ali igrač koji je
+// upravo poručio piće otvara Nalog iz jednog razloga: da vidi da li stiže.
+// Njemu profil u tom trenutku ne znači ništa.
+//
+// Zato: dok ima porudžbine u toku, otvara se na njima; inače na profilu. Kad
+// jednom klikne, važi njegov izbor - ovo je samo početno stanje.
+function podrazumevanaSekcija() {
+  return aktivnePorudzbine().length ? "porudzbine" : "profil";
+}
+
 function sadrzajSekcije() {
-  switch (S.accSekcija || "porudzbine") {
+  switch (S.accSekcija || "profil") {
+    case "profil": return sekcijaProfil();
+    case "porudzbine": return sekcijaPorudzbine();
     case "nagrade": return sekcijaNagrade();
     case "podesavanja": return sekcijaPodesavanja();
     case "pozadina": return panelMojaPozadina();
     case "lozinka": return sekcijaLozinka();
-    default: return sekcijaPorudzbine();
+    default: return sekcijaProfil();
   }
+}
+
+// PROFIL: KO SI, DOKLE SI STIGAO, ŠTA SI OSTAVIO ZA SOBOM
+//
+// Nalog je do sada bio spisak radnji - poruči, promeni lozinku, izaberi
+// pozadinu. Nigde nije pisalo KO je igrač ni šta je odigrao, pa nalog nije bio
+// njegov nego samo šalter.
+//
+// Ovde stoji sve što je njegovo: znak, ime u boji koju je izabrao, nivo i
+// traka, brojke koje je sam napravio, i spisak onoga što ga tek čeka. Poslednje
+// je namerno: nagrada koja se ne vidi unapred nije nagrada nego iznenađenje, a
+// iznenađenje ne motiviše da se dođe ponovo.
+function sekcijaProfil() {
+  const p = S.profil;
+  if (!p) {
+    return `<div class="acc-prazno">${icon("user", 34)}<div>Profil se učitava...</div></div>`;
+  }
+  const naKraju = !!p.poslednji;
+  const postotak = naKraju ? 100
+    : p.zaSledeci > 0 ? Math.max(0, Math.min(100, (p.uNivou / p.zaSledeci) * 100)) : 0;
+
+  const brojke = [
+    ["Sati igre", p.sati >= 10 ? Math.round(p.sati) : p.sati.toFixed(1)],
+    ["Poseta", p.poseta],
+    ["Poručeno", p.porudzbina],
+    ["Omiljena igra", p.omiljenaIgra || "-"],
+  ].map(([l, v]) => `<div class="pf-brojka"><div class="pf-bl">${l}</div><div class="pf-bv">${esc(String(v))}</div></div>`).join("");
+
+  const boje = Object.entries(p.boje || {}).map(([k, o]) => `
+    <button class="pf-boja ${p.izgled.boja === k ? "aktivna" : ""}" data-pf-boja="${k}"
+      style="--pf-c:${o.heks}" title="${esc(o.naziv)}" aria-label="${esc(o.naziv)}"></button>`).join("");
+  const okviri = Object.entries(p.okviri || {}).map(([k, o]) => `
+    <button class="pf-okvir ${p.izgled.okvir === k ? "aktivna" : ""}" data-pf-okvir="${k}">${esc(o.naziv)}</button>`).join("");
+
+  const sme = (sta) => (p.otkljucano || []).find((o) => o.kljuc === sta)?.otkljucano;
+  const zakljucaj = (sta) => {
+    const o = (p.otkljucano || []).find((x) => x.kljuc === sta);
+    return o && !o.otkljucano ? `<span class="pf-brava">${icon("key", 13)} nivo ${o.nivo}</span>` : "";
+  };
+
+  const nagrade = (p.otkljucano || []).map((o) => `
+    <div class="pf-nagrada ${o.otkljucano ? "ima" : ""}">
+      <span class="pf-n-nivo">${o.nivo}</span>
+      <span class="pf-n-tekst"><b>${esc(o.naziv)}</b>${esc(o.opis)}</span>
+      <span class="pf-n-stanje">${o.otkljucano ? icon("check", 15) : icon("key", 14)}</span>
+    </div>`).join("");
+
+  return `<div class="pf">
+    <div class="pf-glava">
+      <div class="pf-znak okvir-${esc(p.izgled.okvir)}">
+        <span>${esc((p.ime || "?").charAt(0).toUpperCase())}</span>
+      </div>
+      <div class="pf-ko">
+        <div class="pf-ime" style="color:${esc((p.boje[p.izgled.boja] || {}).heks || "#eef1f8")}">${esc(p.ime)}</div>
+        <div class="pf-titula">${esc(p.naziv)} &middot; nivo ${p.nivo}</div>
+      </div>
+      <div class="pf-xp">
+        <div class="pf-xp-broj">${Math.round(p.xp).toLocaleString("sr-Latn-RS")} <span>XP</span></div>
+        <div class="pf-xp-traka"><i style="width:${postotak.toFixed(1)}%"></i></div>
+        <div class="pf-xp-pod">${naKraju ? "Najviši nivo" : `još ${Math.round(p.doSledeceg).toLocaleString("sr-Latn-RS")} XP do nivoa ${esc(p.sledeciNaziv || "")}`}</div>
+      </div>
+    </div>
+
+    <div class="pf-brojke">${brojke}</div>
+
+    <div class="pf-odeljak">
+      <div class="pf-naslov">Boja imena ${zakljucaj("boja")}</div>
+      <div class="pf-boje ${sme("boja") ? "" : "zakljucano"}">${boje}</div>
+    </div>
+
+    <div class="pf-odeljak">
+      <div class="pf-naslov">Okvir oko znaka ${zakljucaj("okvir")}</div>
+      <div class="pf-okviri ${sme("okvir") ? "" : "zakljucano"}">${okviri}</div>
+    </div>
+
+    <div class="pf-odeljak">
+      <div class="pf-naslov">Šta te čeka</div>
+      <div class="pf-nagrade">${nagrade}</div>
+    </div>
+  </div>`;
 }
 
 // NAGRADE.
@@ -2178,6 +2347,23 @@ const MAX_QTY = 20; // server ograničava na 20 po artiklu - poštuj isto ovde
 $("#content").addEventListener("click", (e) => {
   // ako je upravo bilo prevlačenje slajdera, ne tretiraj kao klik
   if (_dragged) { _dragged = false; return; }
+
+  // Izgled profila: boja imena i okvir oko znaka.
+  //
+  // Zakljucano se ni ne salje - dugme je sivo i ne reaguje. Server svejedno
+  // proverava isto (vidi sacuvajProfilIgraca): launcher stoji na racunaru
+  // igraca, pa nije mesto na kom se odlucuje sta sme.
+  const pfB = e.target.closest("[data-pf-boja]");
+  const pfO = e.target.closest("[data-pf-okvir]");
+  if (pfB || pfO) {
+    const grupa = (pfB || pfO).parentElement;
+    if (grupa && grupa.classList.contains("zakljucano")) { sfx.error(); return; }
+    window.crit.toServer(pfB
+      ? { t: "moj_profil", boja: pfB.dataset.pfBoja }
+      : { t: "moj_profil", okvir: pfO.dataset.pfOkvir });
+    sfx.click();
+    return;
+  }
 
   // Meni na nalogu. Isti atribut nosi i traka u Shop-u, pa ona vodi pravo na
   // odeljak sa porudžbinama - bez drugog spiska.

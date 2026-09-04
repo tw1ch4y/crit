@@ -100,7 +100,9 @@ proveri("moze da se radi dalje", stanje() === 1000, `stanje ${stanje()}`);
 // ---- 5) prave putanje sa novcem koriste zajednicki posao ----
 const src = citajIzvor("server/src/service.js");
 for (const [gde, sablon] of [
-  ["porudzbina igraca", /orderId, newBal \} = uJednomPoslu/],
+  // Uz orderId i stanje, isti posao vraca i prelazak nivoa (XP se dodaje u
+  // ISTOM upisu kao kredit) - zato se ne trazi tacan spisak polja.
+  ["porudzbina igraca", /orderId, newBal[^}]*\} = uJednomPoslu/],
   ["racun na kasi", /orderId, javiIgracu \} = uJednomPoslu/],
   ["nagradni tocak", /bal = uJednomPoslu/],
   // Ove cetiri su bile propustene: svaka je pomerala novac u dva ili tri

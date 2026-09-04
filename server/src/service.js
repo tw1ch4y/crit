@@ -9,6 +9,7 @@ import { verifyPassword, hashPassword, rang } from "./auth.js";
 import { broadcastPanels, broadcastClients, sendClient, isClientOnline, izbaciPanel } from "./hub.js";
 import { banerIgre, promoCrit } from "./banner.js";
 import * as nad from "./nadogradnja.js";
+import { nivoZa, smeDa, otkljucanoZa, OTKLJUCAVANJA } from "./nivoi.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -457,6 +458,12 @@ const mapPlayer = (p) => ({
   username: p.username,
   displayName: p.display_name,
   balance: round2(p.balance),
+  // Nivo ide uz igraca svuda gde se igrac prikazuje. Osoblje tako vidi ko je
+  // stalan gost, a da ne otvara nista - to je jedini podatak o vernosti koji
+  // program uopste ima.
+  nivo: nivoZa(p.xp).nivo,
+  nivoNaziv: nivoZa(p.xp).naziv,
+  xp: Math.round(Number(p.xp) || 0),
   banned: !!p.banned,
   note: p.note,
   createdAt: p.created_at,
@@ -465,7 +472,7 @@ const mapPlayer = (p) => ({
 
 export function playersSnapshot() {
   return db
-    .prepare("SELECT id, username, display_name, balance, banned, note, created_at, last_login FROM players ORDER BY username")
+    .prepare("SELECT id, username, display_name, balance, banned, note, created_at, last_login, xp FROM players ORDER BY username")
     .all()
     .map(mapPlayer);
 }
@@ -479,7 +486,7 @@ export function playersPage({ page = 1, per = 25, search = "" } = {}) {
   const pages = Math.max(1, Math.ceil(total / per));
   page = Math.min(Math.max(1, Number(page) || 1), pages);
   const items = db
-    .prepare(`SELECT id, username, display_name, balance, banned, note, created_at, last_login FROM players ${cond} ORDER BY username LIMIT ? OFFSET ?`)
+    .prepare(`SELECT id, username, display_name, balance, banned, note, created_at, last_login, xp FROM players ${cond} ORDER BY username LIMIT ? OFFSET ?`)
     .all(...args, per, (page - 1) * per)
     .map(mapPlayer);
   return { items, total, page, pages, per };
@@ -816,6 +823,10 @@ function loginOkPayload(player, session) {
     porudzbine: igracevePorudzbine(player.id),
     // Igraceva sara ide odmah uz prijavu, da ne bljesne kucna pa se promeni.
     tekstura: teksturaZaRacunar(player.id),
+    // Nivo i iskustvo idu odmah: traka na vrhu pocetne se crta iz njih, a ako
+    // stignu naknadno, igrac vidi "Uskoro!" pa mu se promeni pred ocima.
+    vip: vipOd(player.xp),
+    profil: profilIgraca(player.id),
     // Sta je bas ovaj igrac izabrao; null znaci "kao u igraonici".
     mojaTekstura: (() => { const t = temaIgraca(player.id); return t ? { kljuc: t.kljuc, jacina: t.jacina, kretanje: t.kretanje } : null; })(),
     // Nagradni tocak: stanje bas za ovog igraca (koliko je potrosio, sme li da vrti).
@@ -985,6 +996,8 @@ export function handleClientMessage(computerId, msg) {
       return clientChangePassword(computerId, msg.oldPassword, msg.newPassword);
     case "moja_tekstura":
       return clientTekstura(computerId, msg);
+    case "moj_profil":
+      return clientProfil(computerId, msg);
     case "install_status":
       return clientInstallStatus(computerId, msg);
     case "nadogradnja_status":
@@ -1024,6 +1037,16 @@ function clientTekstura(computerId, msg) {
   });
   if (r.error) return sendClient(computerId, { t: "moja_tekstura_err", message: r.error });
   sendClient(computerId, { t: "tekstura", tekstura: r.tekstura, moja: r.tema });
+}
+
+// Igrac menja izgled svog profila (boja imena, okvir). Sve provere su na
+// serveru - vidi sacuvajProfilIgraca.
+function clientProfil(computerId, msg) {
+  const comp = computerById(computerId);
+  if (!comp?.current_player_id) return;
+  const r = sacuvajProfilIgraca(comp.current_player_id, { boja: msg.boja, okvir: msg.okvir });
+  if (r.error) return sendClient(computerId, { t: "profil_err", message: r.error });
+  sendClient(computerId, { t: "profil", profil: profilIgraca(comp.current_player_id) });
 }
 
 // Igrač zavrteo točak sa svog računara. Ishod bira server; klijent dobija indeks
@@ -1217,9 +1240,9 @@ function clientOrder(computerId, items, note, payment = "credit", poId = null) {
   // Porudžbina, stavke, zaliha i naplata su JEDAN posao. Nestanak struje između
   // skidanja zalihe i naplate bi ostavio piće skinuto sa stanja, a kredit
   // nenaplaćen - i to bi se otkrilo tek pri obračunu smene.
-  let orderId, newBal;
+  let orderId, newBal, prelaz;
   try {
-    ({ orderId, newBal } = uJednomPoslu(() => {
+    ({ orderId, newBal, prelaz } = uJednomPoslu(() => {
       const info = db
         .prepare("INSERT INTO orders (player_id, computer_id, total, status, note, payment, source, created_at) VALUES (?,?,?, 'pending', ?,?, 'client', ?)")
         .run(p.id, computerId, total, note, kes ? "cash" : "credit", now);
@@ -1229,18 +1252,29 @@ function clientOrder(computerId, items, note, payment = "credit", poId = null) {
       consumeStock(resolved);
 
       let bal = round2(p.balance);
+      let prelaz = null;
       if (!kes) {
+        // Pice placeno KREDITOM donosi iskustvo, kes ne. Ne zato sto je kes
+        // manje vredan, nego zato sto se za kes ne zna ciji je - na kasi ga
+        // moze platiti i neko ko nije prijavljen ni na jednom racunaru.
         bal = round2(p.balance - total);
-        db.prepare("UPDATE players SET balance=? WHERE id=?").run(bal, p.id);
+        const noviXp = round2((Number(p.xp) || 0) + total);
+        db.prepare("UPDATE players SET balance=?, xp=? WHERE id=?").run(bal, noviXp, p.id);
         addTransaction(p.id, "shop", -total, bal, null, `Porudžbina #${id}`);
+        const a = nivoZa(p.xp), b = nivoZa(noviXp);
+        if (b.nivo > a.nivo) prelaz = { nivoPre: a, nivoPosle: b };
       }
-      return { orderId: id, newBal: bal };
+      return { orderId: id, newBal: bal, prelaz };
     }));
   } catch (e) {
     logEvent({ category: "sistem", action: "greska", actor: "server",
       detail: `Porudžbina nije upisana: ${String(e?.message || e).slice(0, 150)}` });
     return sendClient(computerId, { t: "order_err", message: "Porudžbina nije prošla. Pokušaj ponovo ili pozovi osoblje." });
   }
+
+  // Nivo se javlja tek kad je porudzbina stvarno upisana - inace bi igrac dobio
+  // cestitku za nesto sto je u medjuvremenu puklo.
+  javiNivo(p.id, prelaz);
 
   sendClient(computerId, zapamtiOdgovor(poId, {
     t: "order_ok",
@@ -1406,12 +1440,22 @@ export function billingTick() {
     }
     // Stanje na nalogu i cena sesije moraju da se pomere zajedno: ako se skine
     // kredit a cena ne upiše, taj novac nestaje iz izveštaja i iz obračuna.
+    // Iskustvo ide u ISTI upis kao kredit, ne u zaseban.
+    //
+    // Naplata prolazi svakih pet sekundi za svaku sesiju; zaseban upis bi
+    // udvostrucio pisanje po bazi bez razloga. A i tacnije je: dinar koji je
+    // skinut i XP koji je zaradjen su isti dogadjaj i ne smeju da se raziđu.
+    const noviXp = round2((Number(p.xp) || 0) + charged);
     uJednomPoslu(() => {
-      db.prepare("UPDATE players SET balance=? WHERE id=?").run(newBal, p.id);
+      db.prepare("UPDATE players SET balance=?, xp=? WHERE id=?").run(newBal, noviXp, p.id);
       db.prepare("UPDATE sessions SET cost=? WHERE id=?").run(newCost, s.id);
     });
+    // Nivo se javlja tek posle upisa - da igrac ne dobije cestitku za nesto sto
+    // se nije sacuvalo.
+    const preNivo = nivoZa(p.xp), posleNivo = nivoZa(noviXp);
+    if (posleNivo.nivo > preNivo.nivo) javiNivo(p.id, { nivoPre: preNivo, nivoPosle: posleNivo });
     const preostalo = remainingSeconds(newBal);
-    sendClient(s.computer_id, { t: "balance", balance: round2(newBal), remainingSeconds: preostalo });
+    sendClient(s.computer_id, { t: "balance", balance: round2(newBal), remainingSeconds: preostalo, vip: vipOd(noviXp) });
     javiOsobljuPredIstek(s, p, preostalo);
   }
   if (active.length) pushComputers();
@@ -1900,10 +1944,13 @@ export function createPosOrder({ items, playerId, computerId, payment = "cash", 
 
       let javi = null;
       if (payment === "credit" && player) {
+        // Isto pravilo kao za porudzbinu sa racunara: kredit donosi iskustvo.
         const newBal = round2(player.balance - total);
-        db.prepare("UPDATE players SET balance=? WHERE id=?").run(newBal, player.id);
+        const noviXp = round2((Number(player.xp) || 0) + total);
+        db.prepare("UPDATE players SET balance=?, xp=? WHERE id=?").run(newBal, noviXp, player.id);
         addTransaction(player.id, "shop", -total, newBal, null, `POS porudžbina #${id}`);
-        javi = { newBal };
+        const a = nivoZa(player.xp), b = nivoZa(noviXp);
+        javi = { newBal, playerId: player.id, prelaz: b.nivo > a.nivo ? { nivoPre: a, nivoPosle: b } : null };
       }
       return { orderId: id, javiIgracu: javi };
     }));
@@ -1917,6 +1964,7 @@ export function createPosOrder({ items, playerId, computerId, payment = "cash", 
   if (javiIgracu && player) {
     const comp = db.prepare("SELECT id FROM computers WHERE current_player_id = ?").get(player.id);
     if (comp) sendClient(comp.id, { t: "balance", balance: javiIgracu.newBal, remainingSeconds: remainingSeconds(javiIgracu.newBal) });
+    javiNivo(player.id, javiIgracu.prelaz);
   }
 
   pushOrders();
@@ -2690,6 +2738,14 @@ export function sacuvajTemuIgraca(playerId, { kljuc, jacina, kretanje } = {}) {
     db.prepare("UPDATE players SET tema=NULL WHERE id=?").run(playerId);
     return { ok: true, tema: null, tekstura: teksturaObj() };
   }
+  // Svoja sara je NAGRADA za drugi nivo, i to se proverava OVDE.
+  //
+  // Launcher zakljucane stvari prikazuje sivo i ne da da se kliknu - ali
+  // launcher stoji na racunaru igraca. Ko posalje poruku mimo njega dobija isti
+  // odgovor kao da je kliknuo.
+  if (!smeDa(db.prepare("SELECT xp FROM players WHERE id=?").get(playerId)?.xp, "sara")) {
+    return { error: `Svoja šara se otključava na ${OTKLJUCAVANJA.sara.nivo}. nivou` };
+  }
   if (!TEKSTURE[kljuc]) return { error: "Nepoznata tekstura" };
   if (jacina != null && !JACINE[jacina]) return { error: "Nepoznata jačina" };
   if (kretanje != null && !KRETANJA[kretanje] && !STARA_KRETANJA[kretanje]) return { error: "Nepoznato kretanje" };
@@ -2884,6 +2940,172 @@ function clientInstallStatus(computerId, msg) {
   if (msg.state === "done" || msg.state === "error") {
     logEvent({ category: "racunar", action: "install_" + msg.state, actor: "sistem", target: compName(computerId), detail: `Instalacija "${msg.program}": ${msg.state === "done" ? "uspešno završena" : "greška - " + (msg.message || "")}` });
   }
+}
+
+// ---------- ISKUSTVO I PROFIL IGRAČA ----------
+//
+// Pravila nivoa su u nivoi.js - to je čist račun. Ovde je ono što se tiče
+// igraonice: KADA se iskustvo dodaje, KOME, i šta se time otključava.
+
+// Boje imena i okviri koje igrač bira. Namerno kratak spisak: petnaest nijansi
+// znači da niko ne bira, a i svaka mora da bude čitljiva na tamnoj podlozi.
+export const BOJE_IMENA = {
+  bela:     { naziv: "Bela",     heks: "#eef1f8" },
+  plava:    { naziv: "Plava",    heks: "#4da3ff" },
+  tirkizna: { naziv: "Tirkizna", heks: "#3fd0e0" },
+  zelena:   { naziv: "Zelena",   heks: "#3dc97e" },
+  zlatna:   { naziv: "Zlatna",   heks: "#ffb527" },
+  narandzasta: { naziv: "Narandžasta", heks: "#ff8a3c" },
+  ljubicasta: { naziv: "Ljubičasta", heks: "#a97bff" },
+  roze:     { naziv: "Roze",     heks: "#ff7ac0" },
+};
+export const OKVIRI = {
+  nema:   { naziv: "Bez okvira" },
+  tanki:  { naziv: "Tanki" },
+  dvojni: { naziv: "Dvojni" },
+  zlatni: { naziv: "Zlatni" },
+  puls:   { naziv: "Pulsirajući" },
+};
+
+const profilIzBaze = (red) => {
+  let p = {};
+  try { p = JSON.parse(red?.profil || "{}") || {}; } catch { p = {}; }
+  return {
+    boja: BOJE_IMENA[p.boja] ? p.boja : "bela",
+    okvir: OKVIRI[p.okvir] ? p.okvir : "nema",
+  };
+};
+
+// ISKUSTVO SE DODAJE KAD SE NEŠTO POTROŠI, NE KAD SE DOPUNI.
+//
+// Dopuna je obećanje, potrošnja je ono što se stvarno desilo. Ko dopuni 5000 i
+// ode kući nije igrao. Zato ovo zove naplata vremena i plaćanje pića kreditom -
+// a NE dopuna, poklonjen kredit ni nagrada sa točka: to je kuća dala, i inače
+// bi točak bio prečica do nivoa.
+//
+// Vraća { nivoPre, nivoPosle } kad se pređe nivo, inače null - da pozivalac zna
+// da li ima šta da javi igraču.
+export function dodajXp(playerId, iznos) {
+  const dodatak = Number(iznos);
+  if (!playerId || !Number.isFinite(dodatak) || dodatak <= 0) return null;
+  const red = db.prepare("SELECT xp FROM players WHERE id=?").get(playerId);
+  if (!red) return null;
+  const pre = nivoZa(red.xp);
+  const novo = round2((Number(red.xp) || 0) + dodatak);
+  db.prepare("UPDATE players SET xp=? WHERE id=?").run(novo, playerId);
+  const posle = nivoZa(novo);
+  return posle.nivo > pre.nivo ? { nivoPre: pre, nivoPosle: posle } : null;
+}
+
+// Novi nivo se javlja igraču ODMAH, na ekranu na kom sedi.
+//
+// Bez toga bi napredak postojao samo u bazi: igrač bi jednom u dve nedelje
+// slučajno primetio da mu je traka drugačija, a otključana stvar bi stajala
+// neiskorišćena jer niko nije rekao da postoji.
+function javiNivo(playerId, prelaz) {
+  if (!prelaz) return;
+  const comp = db.prepare("SELECT id FROM computers WHERE current_player_id=?").get(playerId);
+  if (comp) {
+    sendClient(comp.id, {
+      t: "nivo_gore",
+      nivo: prelaz.nivoPosle.nivo,
+      naziv: prelaz.nivoPosle.naziv,
+      otkljucano: otkljucanoZa(prelaz.nivoPosle.xp).filter((o) => o.nivo === prelaz.nivoPosle.nivo),
+    });
+    sendClient(comp.id, { t: "vip", vip: vipZaIgraca(playerId) });
+  }
+  const ime = db.prepare("SELECT username FROM players WHERE id=?").get(playerId)?.username || `#${playerId}`;
+  logEvent({ category: "igrac", action: "nivo", actor: "sistem", target: ime,
+    detail: `Nivo ${prelaz.nivoPosle.nivo} - ${prelaz.nivoPosle.naziv}` });
+}
+
+// Sve na jednom mestu: doda iskustvo i, ako je prešao nivo, javi mu.
+export function zaradiXp(playerId, iznos) {
+  javiNivo(playerId, dodajXp(playerId, iznos));
+}
+
+// Ono što launcher prikazuje u traci na vrhu početne.
+export function vipZaIgraca(playerId) {
+  const red = playerId ? db.prepare("SELECT xp FROM players WHERE id=?").get(playerId) : null;
+  return red ? vipOd(red.xp) : null;
+}
+
+// Isto, ali bez citanja iz baze - naplata prolazi svakih pet sekundi i vec drzi
+// xp u ruci; jos jedno citanje po sesiji po prolazu je uzalud.
+export function vipOd(xp) {
+  const n = nivoZa(xp);
+  return {
+    nivo: n.nivo, naziv: n.naziv,
+    // Traka meri napredak U NIVOU. Da meri od nule, igrač na devetom nivou bi
+    // gledao traku skoro punu koju nikad ne napuni - to je zid, ne napredak.
+    xp: n.uNivou, xpDo: n.poslednji ? null : n.zaSledeci,
+    poslednji: n.poslednji, sledeci: n.sledeciNaziv,
+    vip: smeDa(n.xp, "vip"),
+  };
+}
+
+// Profil: ko je, dokle je stigao i šta je za sobom ostavio.
+export function profilIgraca(playerId) {
+  const p = db.prepare("SELECT id, username, display_name, xp, profil, created_at FROM players WHERE id=?").get(playerId);
+  if (!p) return null;
+  const n = nivoZa(p.xp);
+  const jedan = (sql, ...a) => db.prepare(sql).get(...a) || {};
+
+  // Sati se računaju iz TROŠKA sesija podeljenog cenom po satu, a ne iz
+  // vremena: cena se u međuvremenu mogla promeniti, a i sesija koja je stala
+  // zbog nestanka struje nije naplaćena. Trošak je ono što se stvarno desilo.
+  const ukupno = jedan("SELECT COALESCE(SUM(cost),0) c, COUNT(*) n FROM sessions WHERE player_id=?", playerId);
+  const cena = rate();
+  const porudzbina = jedan("SELECT COUNT(*) n FROM orders WHERE player_id=? AND status<>'cancelled'", playerId);
+  const omiljena = jedan(
+    `SELECT g.name ime, COUNT(*) n FROM game_launches gl JOIN games g ON g.id=gl.game_id
+     WHERE gl.player_id=? GROUP BY gl.game_id ORDER BY n DESC LIMIT 1`, playerId);
+
+  return {
+    username: p.username,
+    ime: p.display_name || p.username,
+    clanOd: p.created_at,
+    nivo: n.nivo, naziv: n.naziv, xp: n.xp,
+    uNivou: n.uNivou, zaSledeci: n.zaSledeci, doSledeceg: n.doSledeceg,
+    poslednji: n.poslednji, sledeciNaziv: n.sledeciNaziv,
+    sati: cena > 0 ? round2(ukupno.c / cena) : 0,
+    poseta: ukupno.n || 0,
+    porudzbina: porudzbina.n || 0,
+    omiljenaIgra: omiljena.ime || null,
+    omiljenaPuta: omiljena.n || 0,
+    izgled: profilIzBaze(p),
+    otkljucano: otkljucanoZa(p.xp),
+    boje: BOJE_IMENA, okviri: OKVIRI,
+  };
+}
+
+// Izbor izgleda se PROVERAVA NA SERVERU, ne samo skriva u launcheru.
+//
+// Launcher zaključane stvari prikazuje sivo i ne da da se kliknu - ali launcher
+// je na računaru igrača. Ko pošalje poruku mimo njega, dobija isti odgovor kao
+// da je kliknuo: ne može dok ne stigne do nivoa.
+export function sacuvajProfilIgraca(playerId, { boja, okvir } = {}) {
+  const p = db.prepare("SELECT xp, profil FROM players WHERE id=?").get(playerId);
+  if (!p) return { error: "Nalog ne postoji" };
+  const sad = profilIzBaze(p);
+  const novo = { ...sad };
+
+  if (boja != null) {
+    if (!BOJE_IMENA[boja]) return { error: "Nepoznata boja" };
+    if (boja !== "bela" && !smeDa(p.xp, "boja")) {
+      return { error: `Boja imena se otključava na ${OTKLJUCAVANJA.boja.nivo}. nivou` };
+    }
+    novo.boja = boja;
+  }
+  if (okvir != null) {
+    if (!OKVIRI[okvir]) return { error: "Nepoznat okvir" };
+    if (okvir !== "nema" && !smeDa(p.xp, "okvir")) {
+      return { error: `Okvir se otključava na ${OTKLJUCAVANJA.okvir.nivo}. nivou` };
+    }
+    novo.okvir = okvir;
+  }
+  db.prepare("UPDATE players SET profil=? WHERE id=?").run(JSON.stringify(novo), playerId);
+  return { ok: true, izgled: novo };
 }
 
 // ---------- NADOGRADNJA LAUNCHERA ----------

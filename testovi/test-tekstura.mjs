@@ -243,7 +243,7 @@ proveri("launcher ne pusta besmislenu brzinu",
 // Igrac bira svoju saru na svom nalogu. Vazi dok je prijavljen; kad se odjavi,
 // racunar se vraca na ono sto je vlasnik podesio.
 await api("/api/tekstura", "POST", { kljuc: "tacke", jacina: "srednje", kretanje: "mirno" }); // kucna
-await api("/api/players", "POST", { username: "pera", password: "pera1234", balance: 500 });
+const igrac = (await api("/api/players", "POST", { username: "pera", password: "pera1234", balance: 6000 })).body;
 const racunari = (await api("/api/computers")).body;
 
 const poruke2 = [];
@@ -265,6 +265,28 @@ proveri("igrac bez svog izbora dobija kucnu saru", prvaPrijava?.tekstura?.kljuc 
 proveri("i javlja se da svoj izbor nema", prvaPrijava?.mojaTekstura === null, JSON.stringify(prvaPrijava?.mojaTekstura));
 
 poruke2.length = 0;
+// ---- SVOJA SARA JE NAGRADA, NE ZATECENO PRAVO ----
+//
+// Od uvodjenja nivoa, svoja sara se otkljucava na drugom nivou. Nov igrac je
+// nema - i to se PROVERAVA NA SERVERU, ne samo skriva dugme: launcher stoji na
+// racunaru igraca, a poruka moze da stigne i mimo njega.
+poruke2.length = 0;
+w.send(JSON.stringify({ t: "moja_tekstura", kljuc: "munje", jacina: "jako", kretanje: "talas" }));
+await cekaj(400);
+const odbijeno = [...poruke2].reverse().find((m) => m.t === "moja_tekstura_err");
+proveri("nov igrac ne moze da bira svoju saru", !!odbijeno, JSON.stringify(poruke2.map((m) => m.t)));
+proveri("i receno mu je na kom nivou dolazi", /nivou/.test(odbijeno?.message || ""), odbijeno?.message);
+
+// Iskustvo se ne upisuje rucno nego ZARADJUJE - kupovinom, kao u igraonici.
+// Tako se usput proverava i da potrosnja stvarno donosi XP.
+const pice = (await api("/api/shop")).body.find((x) => x.price > 0);
+const koliko = Math.ceil(1300 / pice.price);
+await api("/api/shift/open", "POST", { openingCash: 0 });
+const kupovina = await api("/api/pos", "POST",
+  { items: [{ id: pice.id, qty: koliko }], payment: "credit", playerId: igrac.id });
+proveri("kupovina je prosla", kupovina.status === 200, JSON.stringify(kupovina.body).slice(0, 120));
+await cekaj(400);
+
 w.send(JSON.stringify({ t: "moja_tekstura", kljuc: "munje", jacina: "jako", kretanje: "talas" }));
 await cekaj(500);
 const svoja = [...poruke2].reverse().find((m) => m.t === "tekstura");

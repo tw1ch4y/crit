@@ -922,6 +922,15 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .nad-fajl .mono { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nad-akcije { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 18px 16px; border-top: 1px solid var(--line); }
 
+/* Nivo igraca u spisku */
+.nivo-c { white-space: nowrap; }
+.nivo-znak {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px;
+  background: var(--locked-soft); color: var(--locked);
+  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; margin-right: 7px;
+}
+.nivo-c .faint { font-size: 12.5px; }
+
 /* Igre */
 /* Kolona mora da bude dovoljno siroka da se procita putanja. Na 300px je na ime
    i putanju ostajalo ~134px, pa je svaka putanja zavrsavala kao "C:/igre/Fort..."

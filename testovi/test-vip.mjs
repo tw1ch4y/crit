@@ -19,12 +19,16 @@ const css = citajIzvor("client/renderer/css/launcher.css");
 
 // ---- 1) bez podataka: zakljucano, i to se VIDI ----
 proveri("VIP traka postoji", /function vipHtml\(\)/.test(rend));
-proveri("bez podataka je zakljucana", /const ima = v && Number\.isFinite\(v\.xpDo\) && v\.xpDo > 0;/.test(rend),
-  "traka sme da se puni samo kad server posalje i xp i granicu");
+// Tri stanja, ne dva: nema podataka (stariji server ili neprijavljen igrac),
+// poslednji nivo (traka puna, nema sta da se trazi) i sve ostalo.
+proveri("bez podataka je zakljucana", /const ima = !!v && Number\.isFinite\(v\.nivo\);/.test(rend),
+  "traka se crta tek kad server posalje nivo");
+proveri("poslednji nivo nema laznu granicu", /const naKraju = ima && v\.poslednji;/.test(rend),
+  "inace bi svaki sledeci dinar izgledao kao napredak ka necemu cega nema");
 proveri("zakljucano stanje nosi pecat", /vip-pecat[\s\S]{0,120}Uskoro!/.test(rend),
   "prazna traka bez objasnjenja izgleda kao kvar, ne kao najava");
 proveri("pecat se sklanja cim podaci stignu", /\$\{ima \? "" : `<div class="vip-pecat"/.test(rend));
-proveri("bez podataka napredak je NULA", /const postotak = ima \? [^:]+ : 0;/.test(rend),
+proveri("bez podataka napredak je NULA", /: merljiv \? Math\.max\(0, Math\.min\(100,[\s\S]{0,40}: 0;/.test(rend),
   "izmisljen napredak je gori od nikakvog - igrac bi cekao nagradu koje nema");
 proveri("bez podataka se ne izmislja ni nivo", /: "Nivo -"/.test(rend));
 
@@ -34,7 +38,8 @@ proveri("bez podataka se ne izmislja ni nivo", /: "Nivo -"/.test(rend));
 // granice ili negativan; traka tada ne sme da izadje iz svog okvira.
 proveri("napredak se ograničava na 0-100", /Math\.max\(0, Math\.min\(100,/.test(rend),
   "xp veci od granice bi razvukao traku van okvira");
-proveri("prikazuje se koliko fali", /XP do sledećeg nivoa/.test(rend));
+proveri("prikazuje se koliko fali i do kog nivoa", /XP do nivoa \$\{esc\(v\.sledeci/.test(rend),
+  "broj bez imena nivoa ne kaze igracu sta dobija");
 
 // ---- 3) ugovor sa serverom je zapisan ----
 proveri("zapisano je sta server treba da posalje",
