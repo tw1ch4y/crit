@@ -7,11 +7,21 @@
 // kontekstu koji ne vidi @font-face sa strane. Zato ide sistemski bold, a
 // "gaming" osecaj nose velika slova, razmak medju slovima i d20 znak.
 
+// BOJE DOLAZE IZ ZNAKA KUĆE, NE IZ NAVIKE.
+//
+// Ranije je ovde bila crvena na skoro crnom. To je i bilo tačno dok se gledao
+// samo znak: "Crit!" je crvena reč. Ali na znaku crvena stoji na ŽUTOM prasku,
+// a sve to na PLAVOM - i tek zajedno to izgleda kao strip. Izvučena sama, na
+// crno, ista ta crvena izgleda kao horor, i vlasnik je to prvi primetio.
+//
+// Zato podloga sada nosi plavu sa znaka, a crvena se povukla tamo gde nešto
+// ZNAČI: zaključan ekran i vreme koje ističe. Zlatna ostaje nagrada.
 const PALETA = {
-  bgGore: "#14151c", bgDole: "#08080b",
-  crvena: "#ff2b2b", crvenaTamna: "#d81f24",
+  bgGore: "#131c3c", bgDole: "#070b1a",
+  brend: "#2f6ae8", brendTamna: "#2454c4",
+  ljubicasta: "#7a45c8",
   zlatna: "#ffb527",
-  tekst: "#eef0f6", tiho: "#7f8696", linija: "#242a35",
+  tekst: "#eef1f8", tiho: "#7d87a6", linija: "#20294a",
 };
 
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -29,7 +39,7 @@ function d20(cx, cy, r, boja, prozirnost, sirinaLinije = 2.4) {
 }
 
 // Zajednicka podloga: tamni preliv, tanka mreza, d20 znaci koji vire sa desne
-// strane, crvena nit uz donju ivicu.
+// strane, nit u boji kuce uz donju ivicu.
 function podloga(w, h, akcenat) {
   return `<defs>
     <linearGradient id="poz" x1="0" y1="0" x2="0.35" y2="1">
@@ -59,13 +69,13 @@ function podloga(w, h, akcenat) {
 // vrhu početne, ispisuje ime igre svojim slovima (levo). Kad bi i baner nosio
 // ime, dobila bi se ista reč dvaput jedna preko druge. Zato je ovo samo čista
 // CRIT atmosfera: preliv, d20 znaci gušće desno (gde natpis launchera ne ide),
-// i tanka crvena nit dole. Levo ostaje mirno da natpis bude čitljiv.
+// i tanka nit u boji kuce dole. Levo ostaje mirno da natpis bude čitljiv.
 export function banerIgre(_naziv) {
   const w = 2800, h = 400;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-  ${podloga(w, h, PALETA.crvena)}
+  ${podloga(w, h, PALETA.brend)}
   <ellipse cx="${w - 560}" cy="${h / 2}" rx="900" ry="360" fill="url(#sjaj)" opacity="0.55"/>
-  ${d20(w - 900, h * 0.32, 70, PALETA.crvena, 0.12)}
+  ${d20(w - 900, h * 0.32, 70, PALETA.brend, 0.12)}
   ${d20(w - 1180, h * 0.7, 46, PALETA.tekst, 0.06)}
   <text x="${w - 150}" y="${h - 54}" fill="${PALETA.tekst}" text-anchor="end" font-family="'Segoe UI', Arial, sans-serif"
     font-size="30" font-weight="800" letter-spacing="8" dominant-baseline="middle" opacity="0.14">CRIT</text>
@@ -90,10 +100,10 @@ const EKRANI = {
   // Prijava i zakljucan ekran su PRAZNI - preko njih ide samo jedna kartica, pa
   // svetlo sme da bude jako i tu se i vidi. Ekrani sa sadrzajem (pocetna, shop,
   // nalog) drze svetlo nisko, da korice i fotografije ostanu glavna stvar.
-  prijava:   { svetla: [[30, 58, 66, "#ff2b2b", 0.30], [78, 16, 54, "#2c3a58", 0.17], [56, 96, 46, "#ff8a2b", 0.09]], prelaz: 0.075, vinjeta: 0.60 },
-  pocetna:   { svetla: [[20, 16, 56, "#ff2b2b", 0.16], [88, 86, 46, "#26334d", 0.10]], prelaz: 0.045, vinjeta: 0.50 },
-  shop:      { svetla: [[80, 20, 52, "#ffb527", 0.13], [15, 80, 48, "#ff2b2b", 0.11]], prelaz: 0.040, vinjeta: 0.50 },
-  nalog:     { svetla: [[18, 74, 54, "#ff2b2b", 0.14], [84, 18, 46, "#26334d", 0.10]], prelaz: 0.040, vinjeta: 0.50 },
+  prijava:   { svetla: [[30, 58, 66, "#3d7cf0", 0.30], [78, 16, 54, "#7a45c8", 0.18], [56, 96, 46, "#ffb527", 0.08]], prelaz: 0.075, vinjeta: 0.60 },
+  pocetna:   { svetla: [[20, 16, 56, "#2f6ae8", 0.17], [88, 86, 46, "#5b3f9e", 0.11]], prelaz: 0.045, vinjeta: 0.50 },
+  shop:      { svetla: [[80, 20, 52, "#ffb527", 0.13], [15, 80, 48, "#2f6ae8", 0.12]], prelaz: 0.040, vinjeta: 0.50 },
+  nalog:     { svetla: [[18, 74, 54, "#7a45c8", 0.15], [84, 18, 46, "#26437d", 0.11]], prelaz: 0.040, vinjeta: 0.50 },
   // Zakljucan ekran je upozorenje: duboko crveno svetlo i jaka vinjeta.
   zakljucan: { svetla: [[50, 44, 70, "#d81f24", 0.34], [50, 100, 50, "#7a1418", 0.16]], prelaz: 0.030, vinjeta: 0.74 },
 };
@@ -110,11 +120,17 @@ export function pozadinaEkrana(kljuc) {
     </radialGradient>`).join("");
   const slojevi = o.svetla.map((_, i) => `<rect width="${w}" height="${h}" fill="url(#sv${i})"/>`).join("\n  ");
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-  <defs>
+  <defs>${/* SVETLA SU SE RAČUNALA, PA SE BACALA.
+    `defs` je bio izračunat i nigde ubačen, pa su `url(#sv0)` i ostali pokazivali
+    na gradijente kojih nema - a takva referenca u SVG-u ne puca nego se tiho
+    crta kao ništa. Rezultat: svaki ekran u launcheru je bio ravna skoro crna
+    ploča sa vinjetom, bez ijedne boje, iako je ovde pisalo drugačije.
+    To je i bio glavni razlog što je ceo program delovao sumorno. */""}
+    ${defs}
     <linearGradient id="baza" x1="0" y1="0" x2="0.22" y2="1">
-      <stop offset="0" stop-color="#101119"/>
-      <stop offset="0.5" stop-color="#0a0a10"/>
-      <stop offset="1" stop-color="#06060a"/>
+      <stop offset="0" stop-color="${PALETA.bgGore}"/>
+      <stop offset="0.5" stop-color="#0c1329"/>
+      <stop offset="1" stop-color="${PALETA.bgDole}"/>
     </linearGradient>
     <linearGradient id="prelaz" x1="0" y1="1" x2="1" y2="0">
       <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
@@ -144,15 +160,19 @@ export function promoCrit(nazivKuce) {
   // vrha, koji je isao preko cele sirine, pre nego sto je tocak dobio svoje
   // mesto sa desne strane.
   const w = 2200, h = 200;
-  const kuca = String(nazivKuce || "").trim().toUpperCase();
+  const kuca = String(nazivKuce || "").trim().toUpperCase().slice(0, 18);
+  // Ime kuce je bilo upisano ("CRIT"), pa bi tudja igraonica na vrhu pocetne
+  // imala tudje ime. Sada dolazi iz Podesavanja - a posto tamo moze da stoji i
+  // dugacko ime, slova se smanjuju da traka ostane cela.
+  const veliko = kuca.length <= 6 ? 104 : Math.max(52, Math.round(104 * 6 / kuca.length));
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-  ${podloga(w, h, PALETA.crvena)}
+  ${podloga(w, h, PALETA.brend)}
   <ellipse cx="540" cy="${h / 2}" rx="700" ry="170" fill="url(#sjaj)" opacity="0.8"/>
-  <rect x="104" y="${h / 2 - 48}" width="8" height="96" rx="4" fill="${PALETA.crvena}"/>
-  <text x="150" y="${h / 2 - 8}" fill="${PALETA.crvena}" font-family="'Segoe UI', Arial, sans-serif"
-    font-size="104" font-weight="800" letter-spacing="4" dominant-baseline="middle"
-    style="paint-order:stroke" stroke="${PALETA.crvenaTamna}" stroke-width="1.5">CRIT</text>
+  <rect x="104" y="${h / 2 - 48}" width="8" height="96" rx="4" fill="${PALETA.brend}"/>
+  <text x="150" y="${h / 2 - 8}" fill="${PALETA.brend}" font-family="'Segoe UI', Arial, sans-serif"
+    font-size="${veliko}" font-weight="800" letter-spacing="4" dominant-baseline="middle"
+    style="paint-order:stroke" stroke="${PALETA.brendTamna}" stroke-width="1.5">${esc(kuca || "IGRAONICA")}</text>
   <text x="156" y="${h / 2 + 56}" fill="${PALETA.tiho}" font-family="'Segoe UI', Arial, sans-serif"
-    font-size="21" font-weight="700" letter-spacing="8" dominant-baseline="middle">${esc(kuca && kuca !== "CRIT" ? kuca : "GAMING CENTAR")}</text>
+    font-size="21" font-weight="700" letter-spacing="8" dominant-baseline="middle">GAMING CENTAR</text>
 </svg>`;
 }

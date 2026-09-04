@@ -191,14 +191,19 @@ proveri("ime precice se ne lomi nasred reci", blok(".site-name {").includes("wor
 // da je bas ta figura zasvetlela, crvena mora da se poklopi sa belom ispod nje.
 const saIskrama = await api("/api/tekstura", "POST", { kljuc: "kockice", jacina: "srednje", kretanje: "iskre" });
 proveri("iskre saljemo kao svoje kretanje", saIskrama.body.kretanje === "iskre", JSON.stringify(saIskrama.body.kretanje));
-proveri("uz iskre stize crvena varijanta sare", /^url\("data:image/.test(saIskrama.body.iskra || ""), String(saIskrama.body.iskra).slice(0, 50));
-proveri("crvena varijanta nosi boju kuce", (saIskrama.body.iskra || "").includes("%23ff2b2b"));
-proveri("crvena varijanta je puna jacine", (saIskrama.body.iskra || "").includes("0.95"),
-  "prigusena crvena se ne bi videla preko bele");
-proveri("crvena je ISTI obris kao bela",
-  dekodiraj(saIskrama.body.iskra).replace(/#ff2b2b/g, "#fff").replace(/(fill|stroke)-opacity='[\d.]+'/g, "X")
+proveri("uz iskre stize varijanta sare u boji kuce", /^url\("data:image/.test(saIskrama.body.iskra || ""), String(saIskrama.body.iskra).slice(0, 50));
+// Iskra nosi BOJU KUCE - koja god da je. Ranije je ovde stajala upisana crvena,
+// pa bi provera prolazila i da iskra ignorise izbor vlasnika.
+const bojaKuce = (await api("/api/brend")).body.akcenat;
+const uAdresi = "%23" + bojaKuce.slice(1);
+proveri("iskra nosi boju kuce", (saIskrama.body.iskra || "").includes(uAdresi),
+  `${bojaKuce} nije u sari`);
+proveri("iskra je puna jacine", (saIskrama.body.iskra || "").includes("0.95"),
+  "prigusena iskra se ne bi videla preko bele");
+proveri("iskra je ISTI obris kao bela sara",
+  dekodiraj(saIskrama.body.iskra).split(bojaKuce).join("#fff").replace(/(fill|stroke)-opacity='[\d.]+'/g, "X")
   === dekodiraj(saIskrama.body.sara).replace(/(fill|stroke)-opacity='[\d.]+'/g, "X"),
-  "ako se obrisi razidju, crvena figura nece leci tacno preko bele");
+  "ako se obrisi razidju, figura u boji kuce nece leci tacno preko bele");
 proveri("uz druga kretanja se crvena ne salje",
   (await api("/api/tekstura", "POST", { kljuc: "kockice", kretanje: "talas" })).body.iskra === "",
   "welcome bi bez potrebe nosio dvostruko vise podataka");

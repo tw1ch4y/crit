@@ -1,29 +1,36 @@
 /* CRIT - Admin panel */
 :root {
-  --bg: #0b0c0f;
-  --surface: #111318;
-  --surface-2: #171a21;
-  --surface-3: #1f232b;
-  --input: #0d0f13;
+  /* Podloga je plava sa znaka igraonice, ne skoro crna - vidi launcher.css.
+     Panel i launcher se gledaju jedan pored drugog, pa moraju da budu iz iste
+     kuće. */
+  --bg: #070c1c;
+  --surface: #101a33;
+  --surface-2: #16213e;
+  --surface-3: #1e2b4c;
+  --input: #0a1124;
   --line: rgba(255, 255, 255, 0.06);
   --line-2: rgba(255, 255, 255, 0.1);
   --line-3: rgba(255, 255, 255, 0.16);
   --hair: rgba(255, 255, 255, 0.06);
-  --text: #eceef2;
-  --text-2: #9aa1ac;
-  --text-3: #676e7a;
-  --accent: #e23b34;
-  --accent-hover: #e94c42;
-  --accent-down: #cd3129;
-  --accent-soft: rgba(226, 59, 52, 0.12);
-  --accent-line: rgba(226, 59, 52, 0.45);
+  --text: #eceff6;
+  --text-2: #9aa5c4;
+  --text-3: #69728f;
+  /* Fabrička boja kuće. Vlasnik je menja iz panela (Izgled launchera). */
+  --accent: #2f6ae8;
+  --accent-hover: #4a80f2;
+  --accent-down: #2454c4;
+  --accent-soft: rgba(47, 106, 232, 0.14);
+  --accent-line: rgba(47, 106, 232, 0.45);
   --online: #3dc97e;
   --online-soft: rgba(61, 201, 126, 0.11);
-  --standby: #4da3ff;
-  --standby-soft: rgba(77, 163, 255, 0.11);
+  /* "Standby" je pomeren ka tirkiznoj otkad je boja kuće plava - dve plave,
+     jedna do druge, ne bi se razlikovale, a ovo je STANJE računara i mora da se
+     čita na prvi pogled. */
+  --standby: #3fc9e0;
+  --standby-soft: rgba(63, 201, 224, 0.13);
   --locked: #e0a23c;
   --locked-soft: rgba(224, 162, 60, 0.12);
-  --offline: #5a6170;
+  --offline: #5d6684;
   --danger: #e5484d;
   --danger-soft: rgba(229, 72, 77, 0.11);
   --r-sm: 8px;

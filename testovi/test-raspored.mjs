@@ -25,12 +25,12 @@ proveri("kolone su svuda iste sirine", /\.shop-grid \{[^}]*repeat\(auto-fill, mi
   "inace kategorija sa jednim picem daje karticu razvucenu preko celog reda");
 proveri("spisak se ne razvlaci u visinu", /\.shop-grid \{[^}]*align-content: start/.test(jedanRed));
 
-// ---- SHOP: kartica nema punu crvenu traku ----
-// Sedam crvenih dugmadi "Dodaj" jedno do drugog bilo je prvo sto se vidi na
-// ekranu. Crveno sada nosi samo "Poruci"; na kartici stoji mali krug.
+// ---- SHOP: kartica nema punu traku u boji kuce ----
+// Sedam punih dugmadi "Dodaj" u boji kuce, jedno do drugog, bilo je prvo sto se
+// vidi na ekranu. Punu boju sada nosi samo "Poruci"; na kartici stoji mali krug.
 proveri("kartica pica nema puno crveno dugme", !launcher.includes("pice-dodaj"));
 proveri("dodavanje ide malim okruglim dugmetom", launcher.includes('class="pice-plus"'));
-proveri("krug dobija crveno tek pod misem", /\.pice-plus:hover \{[^}]*background: var\(--red\)/.test(jedanRed));
+proveri("krug dobija boju kuce tek pod misem", /\.pice-plus:hover \{[^}]*background: var\(--brend\)/.test(jedanRed));
 
 // ---- SHOP: samo jedna linija dok nesto stize ----
 // Ceo spisak je ranije stajao i ovde i na nalogu. Igracu u Shop-u treba samo
@@ -88,7 +88,7 @@ proveri("slika precice prati velicinu logotipa", /\.site-card\.cover \.site-cove
 // odeljak.
 proveri("nalog ima meni i sadrzaj", /\.acc-telo \{[^}]*grid-template-columns: 216px minmax\(0, 1fr\)/.test(jedanRed));
 proveri("meni ima svoje stavke", /\.acc-mi \{/.test(jedanRed));
-proveri("izabrana stavka se jasno vidi", /\.acc-mi\.aktivna \{[^}]*box-shadow: inset 2px 0 0 var\(--red\)/.test(jedanRed),
+proveri("izabrana stavka se jasno vidi", /\.acc-mi\.aktivna \{[^}]*box-shadow: inset 2px 0 0 var\(--brend\)/.test(jedanRed),
   "bez oznake igrac ne zna gde je");
 proveri("skroluje se SADRZAJ, ne cela strana", /\.acc-sadrzaj \{[^}]*overflow-y: auto/.test(jedanRed) && !/\.account \{[^}]*overflow-y: auto/.test(jedanRed),
   "kad skroluje cela strana, zaglavlje sa kreditom odlazi sa ekrana");

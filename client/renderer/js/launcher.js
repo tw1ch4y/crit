@@ -274,22 +274,27 @@ function toast(msg, type = "info") {
 // zavrsi u polovicnom stanju.
 // BREND: ZNAK I BOJA IGRAONICE
 //
-// Launcher je crven zato što je Crit crven - ali sledeća igraonica nije. Dok su
+// Znak i boja su nekad stajali ušiveni u fajlove - ali sledeća igraonica nije
+// ista. Dok je tako bilo,
 // znak i boja stajali ušiveni u fajlove, svaka bi morala da dobije prepravljenu
 // kopiju programa, pa bi i svaka nadogradnja morala da se pravi posebno za
 // svakoga.
 //
-// Ovde se menja SAMO boja kuće (`--red*`). Zlatna, zelena i ostale ostaju:
+// Ovde se menja SAMO boja kuće (`--brend*`). Zlatna, zelena i ostale ostaju:
 // zelena je "ima kredita", crvena "ističe vreme" - to su značenja, ne ukras, i
 // ne smeju da zavise od toga koju je boju vlasnik izabrao.
 function primeniBrend(b) {
   if (!b) return;
   S.brend = b;
   const s = document.documentElement.style;
-  s.setProperty("--red", b.akcenat);
-  s.setProperty("--red-deep", b.down);
-  s.setProperty("--red-soft", `rgba(${b.rgb}, 0.14)`);
-  s.setProperty("--red-glow", `rgba(${b.rgb}, 0.6)`);
+  s.setProperty("--brend", b.akcenat);
+  // Odsjaji, senke i traka za pomeranje se pisu kao rgba(var(--brend-rgb), x).
+  // Dok je boja stajala upisana u CSS-u, izbor vlasnika je menjao samo pola
+  // ekrana - ostalo je ostajalo crveno.
+  s.setProperty("--brend-rgb", b.rgb);
+  s.setProperty("--brend-deep", b.down);
+  s.setProperty("--brend-soft", `rgba(${b.rgb}, 0.15)`);
+  s.setProperty("--brend-glow", `rgba(${b.rgb}, 0.55)`);
   // Znak na svim ekranima: podešavanje, prijava, gornja traka, zaključan ekran.
   if (b.logo) {
     const put = (S.host || "") + b.logo;

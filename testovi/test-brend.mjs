@@ -26,7 +26,9 @@ const api = (p, m = "GET", b, t = token) => fetch(BASE + p, { method: m,
 
 // ---- 1) fabricko stanje ----
 let b = (await api("/api/brend")).body;
-proveri("nova igraonica krece od fabricke boje", b.akcenat === "#e23b34", b.akcenat);
+// Fabricka boja je plava sa znaka. Crvena je ranije bila fabricka, pa je ceo
+// program delovao sumorno - vidi banner.js.
+proveri("nova igraonica krece od fabricke boje", b.akcenat === "#2f6ae8", b.akcenat);
 proveri("nema svog znaka dok ga ne okaci", b.logo === null, String(b.logo));
 proveri("iz jedne boje se izvode sve nijanse",
   !!b.hover && !!b.down && !!b.soft && !!b.line && !!b.rgb, JSON.stringify(b));
@@ -96,7 +98,11 @@ proveri("...ali sme da ga vidi", (await api("/api/brend", "GET", null, rt)).stat
 // vreme". Kad bi se sve to vezalo za boju kuce, igraonica sa zelenim logom bi
 // imala zeleno upozorenje - a to vise nista ne znaci.
 const rend = citajIzvor("client/renderer/js/launcher.js");
-proveri("launcher menja samo boju kuce", /s\.setProperty\("--red", b\.akcenat\)/.test(rend));
+proveri("launcher menja samo boju kuce", /s\.setProperty\("--brend", b\.akcenat\)/.test(rend));
+// Odsjaji i senke se pisu kao rgba(var(--brend-rgb), x). Dok je boja stajala
+// upisana u CSS-u, izbor vlasnika je menjao samo pola ekrana.
+proveri("i odsjaji prate boju kuce", /setProperty\("--brend-rgb", b\.rgb\)/.test(rend),
+  "inace bi senke i traka za pomeranje ostale u fabrickoj boji");
 proveri("zelena i zlatna se ne diraju",
   !/setProperty\("--(green|gold)/.test(rend),
   "zelena znaci 'ima kredita', zlatna 'nagrada' - to su znacenja, ne ukras");

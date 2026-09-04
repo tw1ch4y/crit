@@ -75,7 +75,7 @@ const STANJE = \`(() => {
     pomeraj: document.body.style.getPropertyValue("--par-x") + " " + document.body.style.getPropertyValue("--par-y"),
     trajanje: cs.animationDuration,
     iskri: iskre.length, naMrezi,
-    iskraCrvena: (document.body.style.getPropertyValue("--tekstura-iskra") || "").includes("ff2b2b"),
+    iskraStigla: !!(document.body.style.getPropertyValue("--tekstura-iskra") || "").startsWith("url("),
   };
 })()\`;
 
@@ -176,7 +176,7 @@ p.on("close", (kod) => {
       if (n.prvo.iskri) greske.push(`gori ${n.prvo.iskri} iskri iako je izabrano Mirno`);
     }
     if (n.kretanje === "iskre") {
-      if (!n.prvo.iskraCrvena) greske.push("crvena varijanta sare nije stigla");
+      if (!n.prvo.iskraStigla) greske.push("varijanta sare u boji kuce nije stigla");
       if (!n.prvo.iskri && !n.drugo.iskri) greske.push("nijedna iskra se nije upalila");
       if (n.prvo.naMrezi === false || n.drugo.naMrezi === false)
         greske.push("iskra ne stoji na koraku mreze - crvena figura se ne poklapa sa belom");
@@ -194,7 +194,7 @@ p.on("close", (kod) => {
     console.log(`         pozicija: ${n.prvo.poz}  ->  ${n.drugo.poz}`);
     if (n.prvo.maska) console.log(`         maska:    ${n.prvo.maska}  ->  ${n.drugo.maska}`);
     if (n.kretanje === "dubina") console.log(`         mis:      "${n.prvo.pomeraj}"  ->  "${n.pomerajPosle}"`);
-    if (n.kretanje === "iskre") console.log(`         iskri:    ${n.prvo.iskri}  ->  ${n.drugo.iskri}   na mrezi: ${n.prvo.naMrezi}   crvena: ${n.prvo.iskraCrvena}`);
+    if (n.kretanje === "iskre") console.log(`         iskri:    ${n.prvo.iskri}  ->  ${n.drugo.iskri}   na mrezi: ${n.prvo.naMrezi}   iskra: ${n.prvo.iskraStigla}`);
     for (const g of greske) console.log(`         -> ${g}`);
   }
   console.log(`\nslike: testovi/.slike-kretanje/  (po dve za svako kretanje)`);

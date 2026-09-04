@@ -2301,7 +2301,7 @@ export function pozadineObj() {
 // Naziv se već podešavao (`cafe_name`); ovde se dodaju znak i boja. Pozadine
 // ekrana i promo baneri su i ranije bili podesivi, pa je ovo poslednje što je
 // bilo ušiveno.
-export const AKCENAT_PODRAZUMEVANI = "#e23b34";
+export const AKCENAT_PODRAZUMEVANI = "#2f6ae8";
 const HEKS = /^#[0-9a-f]{6}$/i;
 
 // Iz jedne boje se izvode sve nijanse koje panel i launcher koriste. Vlasnik
@@ -2357,7 +2357,7 @@ export function obrisiLogo() {
 
 export function sacuvajAkcenat(heks) {
   const v = String(heks || "").trim();
-  if (!HEKS.test(v)) return { error: "Boja mora biti u obliku #RRGGBB (npr. #e23b34)" };
+  if (!HEKS.test(v)) return { error: "Boja mora biti u obliku #RRGGBB (npr. #2f6ae8)" };
   setSetting("brend_akcenat", v.toLowerCase());
   pushBrend();
   return { ok: true, ...brendObj() };
@@ -2438,13 +2438,17 @@ const escXml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;
 // Sluzi za kretanje "Iskre" - preko nasumicne plocice u mrezi legne ista figura
 // u crvenom, zasvetli i ugasi se. Zato mora da bude ISTI obris: da bi se crvena
 // figura poklopila sa belom ispod nje, ne sme da se crta posebno.
-const BOJA_ISKRE = "#ff2b2b";
+// Iskra nosi BOJU KUCE, a ne upisanu crvenu.
+//
+// Ovde je stajalo `#ff2b2b`. Dok je boja kuce i bila crvena, to se nije videlo -
+// a onda bi igraonica koja u panelu izabere svoju boju dobila saru koja iskri
+// tudjom. Boja se cita u trenutku crtanja, pa promena u panelu vazi odmah.
 const uIskru = (obris) => obris
-  .replace(/#fff\b/g, BOJA_ISKRE)
+  .replace(/#fff\b/g, getSetting("brend_akcenat", AKCENAT_PODRAZUMEVANI))
   .replace(/(fill|stroke)-opacity='[\d.]+'/g, "$1-opacity='0.95'");
 
-// Crvena varijanta se izvlaci iz vec napisane bele - sara se ne pise dvaput,
-// pa ne mogu da se raziđu.
+// Varijanta u boji kuce se izvlaci iz vec napisane bele - sara se ne pise
+// dvaput, pa ne mogu da se raziđu.
 const dekodiraj = (u) => String(u)
   .replace(/^url\("data:image\/svg\+xml,/, "").replace(/"\)$/, "")
   .replace(/%3C/g, "<").replace(/%3E/g, ">").replace(/%23/g, "#");
