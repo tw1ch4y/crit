@@ -104,8 +104,12 @@ proveri("radnik ne moze da obrise", (await apiRadnik(`/api/promo/${c.body.id}`, 
 const izvor = citajIzvor("client/renderer/js/launcher.js");
 // Okacen baner ide na mesto znaka kuce u vrhu pocetne; tocak ostaje desno.
 proveri("promo preuzima vrh pocetne", /lista\.length\s*\n?\s*\?\s*`<div class="hero-promo"/.test(izvor));
-proveri("bez banera u vrhu stoji znak kuce", izvor.includes('class="hb-logo brand-logo" src="img/crit-logo.png"'),
-  "klasa brand-logo je bitna: primeniBrend njome zamenjuje znak onim koji je okacila ta igraonica");
+// Trazi se KLASA, ne ime elementa: vrh pocetne je u medjuvremenu dobio VIP
+// traku, pa znak vise ne stoji u istom omotacu. Bitno je da je tu i da nosi
+// `brand-logo` - njome primeniBrend zamenjuje znak onim koji je okacila ta
+// igraonica.
+proveri("bez banera u vrhu stoji znak kuce", /class="[^"]*brand-logo"[^>]*src="img\/crit-logo\.png"/.test(izvor),
+  "bez toga svaka igraonica gleda tudji znak na svom najvidljivijem mestu");
 proveri("jedan baner se ne smenjuje", /lista\.length < 2/.test(izvor));
 proveri("smena se gasi van pocetne", /clearInterval\(promoTajmer\); promoTajmer = null;/.test(izvor));
 const css = citajIzvor("client/renderer/css/launcher.css");

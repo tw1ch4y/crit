@@ -2428,7 +2428,11 @@ export function teksturaSpisak() {
   return Object.fromEntries(Object.entries(TEKSTURE)
     .map(([k, o]) => [k, { naziv: o.naziv, opis: o.opis, korak: o.korak, sara: saraTeksture(o) }]));
 }
-const svg = (s) => `url("data:image/svg+xml,${s.replace(/</g, "%3C").replace(/>/g, "%3E").replace(/#/g, "%23")}")`;
+// Razmaci i prelomi reda se sklanjaju pre nego sto sara postane adresa.
+// CSS `url("...")` ne sme da sadrzi prelom reda - pravilo tada tiho otpadne i
+// pozadina ostane prazna, bez ijedne greske. Bez ovoga bi svaka sara morala
+// da se pise u jednom redu, a takve se ne mogu ni citati ni ispravljati.
+const svg = (s) => `url("data:image/svg+xml,${s.replace(/\s+/g, " ").trim().replace(/</g, "%3C").replace(/>/g, "%3E").replace(/#/g, "%23")}")`;
 // Naziv igraonice upisuje vlasnik i završava USRED SVG-a. Ime sa `&` ili `<`
 // pokvarilo bi celu sliku, a šara je pozadina svakog ekrana u launcheru - jedan
 // ampersand u nazivu i trinaest mašina ostane bez pozadine.
@@ -2457,25 +2461,66 @@ const iskraOd = (sara) => (sara ? svg(uIskru(dekodiraj(sara))) : "");
 export const TEKSTURE = {
   nema: { naziv: "Bez teksture", opis: "Čista pozadina, samo gradijent", sara: "", korak: 0 },
 
+  // PRAVI RASTER IZ STAMPE, NE DVE TACKE U POLJU.
+  //
+  // Ovde su stajala dva jednaka kruga u polju od 14px. To nije sara nego
+  // popuna: oko odmah uhvati resetku i vise ne vidi nista drugo.
+  //
+  // Raster se u stampi radi pod 45 stepeni i sa razlicitim precnikom tacke -
+  // odatle mu ton. Ovde su tri velicine: krupne nose sliku, srednje je vezuju,
+  // sitne popunjavaju medjuprostor. Tacke na ivici stoje i sa suprotne strane,
+  // pa se sav plocice ne vidi.
   tacke: {
-    naziv: "Tačkice", opis: "Rasterske tačke iz štampe stripa, najbliže logotipu", korak: 14,
-    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14'><circle cx='3.5' cy='3.5' r='1.15' fill='#fff' fill-opacity='0.17'/><circle cx='10.5' cy='10.5' r='1.15' fill='#fff' fill-opacity='0.17'/></svg>`),
+    naziv: "Raster", opis: "Rasterske tačke iz štampe stripa, tri veličine", korak: 48,
+    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48'><g fill='#fff'>
+      <circle cx='12' cy='12' r='2.1' fill-opacity='0.20'/><circle cx='36' cy='36' r='2.1' fill-opacity='0.20'/>
+      <circle cx='36' cy='12' r='1.25' fill-opacity='0.14'/><circle cx='12' cy='36' r='1.25' fill-opacity='0.14'/>
+      <circle cx='24' cy='0' r='0.75' fill-opacity='0.10'/><circle cx='24' cy='48' r='0.75' fill-opacity='0.10'/>
+      <circle cx='0' cy='24' r='0.75' fill-opacity='0.10'/><circle cx='48' cy='24' r='0.75' fill-opacity='0.10'/>
+      <circle cx='24' cy='24' r='0.75' fill-opacity='0.10'/></g></svg>`),
   },
+  // Iskre sa znaka: cetiri kraka, stranice UVUCENE. Prava zvezdica iz stripa
+  // nije mnogougao nego oblik koji se suzava ka sredini - zato krive, ne linije.
+  // Pet velicina, van resetke, da grupa deluje raspoređeno a ne poređano.
   zvezde: {
-    naziv: "Zvezdice", opis: "Sitne zvezde iz logotipa, poređane u red", korak: 58,
-    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='58' height='58'><path d='M14 4c1.1 6 2.9 7.8 8.9 8.9-6 1.1-7.8 2.9-8.9 8.9-1.1-6-2.9-7.8-8.9-8.9C11.1 11.8 12.9 10 14 4z' fill='#fff' fill-opacity='0.16'/><path d='M43 33c.75 4.1 1.98 5.33 6.08 6.08-4.1.75-5.33 1.98-6.08 6.08-.75-4.1-1.98-5.33-6.08-6.08C41.02 38.33 42.25 37.1 43 33z' fill='#fff' fill-opacity='0.12'/></svg>`),
+    naziv: "Iskre", opis: "Četvorokrake iskre sa znaka, pet veličina", korak: 88,
+    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='88' height='88'><g fill='#fff'>
+      <path d='M22 15C24.9 23.1 24.9 23.1 33 26C24.9 28.9 24.9 28.9 22 37C19.1 28.9 19.1 28.9 11 26C19.1 23.1 19.1 23.1 22 15z' fill-opacity='0.19'/>
+      <path d='M64 52.5C66 58 66 58 71.5 60C66 62 66 62 64 67.5C62 62 62 62 56.5 60C62 58 62 58 64 52.5z' fill-opacity='0.14'/>
+      <path d='M72 11.5C73.2 15 73.2 15 76.5 16C73.2 17 73.2 17 72 20.5C70.8 17 70.8 17 67.5 16C70.8 15 70.8 15 72 11.5z' fill-opacity='0.10'/>
+      <path d='M14 64.5C14.9 67.2 14.9 67.2 17.5 68C14.9 68.8 14.9 68.8 14 71.5C13.1 68.8 13.1 68.8 10.5 68C13.1 67.2 13.1 67.2 14 64.5z' fill-opacity='0.09'/>
+      <path d='M44 41.4C44.7 43.3 44.7 43.3 46.6 44C44.7 44.7 44.7 44.7 44 46.6C43.3 44.7 43.3 44.7 41.4 44C43.3 43.3 43.3 43.3 44 41.4z' fill-opacity='0.07'/>
+    </g></svg>`),
   },
+  // Prasak iz znaka. Krupan oblik u sredini polja se u ponavljanju cita kao red
+  // jednakih zvezda, pa je polje uvecano, glavni oblik pomeren iz sredine i
+  // prigusen, a oko njega idu sitniji pod razlicitim uglovima - oko tada vidi
+  // grupu, ne resetku. Zraci su naizmenicno duzi i kraci, kao u stripu.
   prasak: {
-    naziv: "Praskovi", opis: "Mali strip prasak, isti oblik kao logotip", korak: 52,
-    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='52' height='52'><path d='M28 10.2L19.5 15L27.3 19.5L19.1 18.5L20.7 24.9L15.9 19.8L12.7 28.3L12.7 19L4.4 23.9L10.8 16.5L1.9 15L9.9 13.2L6.2 7.6L12.5 10.8L12.6 1.7L15.8 10.5L21.9 3L18.5 12.1Z' fill='#fff' fill-opacity='0.14'/><path d='M45.9 42.3L39.8 40.3L40.4 46.2L37.6 41.5L34.4 44.5L35.5 40L29.6 40.5L35 37.7L30.1 33.7L36.2 35.7L35.6 29.8L38.4 34.5L41.6 31.5L40.5 36L46.4 35.5L41 38.3Z' fill='#fff' fill-opacity='0.1'/></svg>`),
+    naziv: "Praskovi", opis: "Strip prasak iz znaka, raspoređen bez reda", korak: 150,
+    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150'><g fill='none' stroke='#fff' stroke-linejoin='round'>
+      <path d='M54.8 46.4L44.1 51.4L45.6 63.1L37.4 54.7L27.2 60.7L31.5 49.7L21.2 43.9L33 43.3L34.9 31.6L40.5 42.1L51.4 37.6L44.4 46.9z' stroke-opacity='0.13' stroke-width='1.5'/>
+      <path d='M122.5 100.6L115.6 104L116.6 111.6L111.2 106.1L104.6 110L107.4 102.9L100.8 99.1L108.4 98.7L109.7 91.1L113.3 97.9L120.3 95z' stroke-opacity='0.10' stroke-width='1.2'/>
+      <path d='M124.3 24.3L120.5 26.2L121.1 30.4L118.1 27.4L114.5 29.5L116 25.6L112.4 23.5L116.6 23.3L117.3 19.1L119.3 22.8L123.2 21.2z' stroke-opacity='0.085' stroke-width='1'/>
+      <path d='M23.4 117.9L20.6 119.3L21 122.4L18.8 120.2L16.1 121.8L17.2 118.9L14.6 117.3L17.7 117.2L18.2 114.1L19.7 116.8L22.6 115.6z' stroke-opacity='0.075' stroke-width='0.9'/>
+    </g></svg>`),
   },
+  // Linije brzine, ZASILJENE. Prva verzija su bile tri prave crte jednake
+  // debljine - to nije brzina nego resetka. U stripu je linija brzine klin:
+  // debela odakle krece, u nulu gde se gubi.
+  //
+  // Nagib je tacno 45 stepeni, i to nije estetika nego uslov: samo pri tom nagibu
+  // ono sto izadje na desnu ivicu ulazi na levu u istoj visini, pa se sav ne vidi.
   kose: {
-    naziv: "Kose linije", opis: "Strip linije brzine, pod uglom", korak: 16,
-    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16'><path d='M-4 20L20 -4M-4 12L12 -4M4 20L20 4' stroke='#fff' stroke-opacity='0.09' stroke-width='1.3'/></svg>`),
+    naziv: "Brzina", opis: "Zašiljene linije brzine, kao iza figure u stripu", korak: 96,
+    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><g fill='#fff'>
+      <path d='M-16 20 l60 60 l0 -3.2 l-60 -60z' fill-opacity='0.16'/><path d='M80 20 l60 60 l0 -3.2 l-60 -60z' fill-opacity='0.16'/>
+      <path d='M10 62 l38 38 l0 -2 l-38 -38z' fill-opacity='0.11'/>
+      <path d='M44 8 l28 28 l0 -1.4 l-28 -28z' fill-opacity='0.09'/>
+      <path d='M-8 88 l34 34 l0 -1.8 l-34 -34z' fill-opacity='0.10'/><path d='M88 88 l34 34 l0 -1.8 l-34 -34z' fill-opacity='0.10'/>
+      <path d='M56 52 l22 22 l0 -1.1 l-22 -22z' fill-opacity='0.07'/>
+    </g></svg>`),
   },
-
-  // Kockica sa 20 strana je znak kritičnog pogotka - odatle i ime igraonice.
-  // Od svih šara ova jedina nešto ZNAČI, pa je i najbolji izbor za kuću.
   kockice: {
     naziv: "Kockice d20", opis: "Znak kritičnog pogotka iz stonih igara", korak: 64,
     sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><g fill='none' stroke='#fff' stroke-opacity='0.15' stroke-width='1.4' stroke-linejoin='round'><path d='M16 3L27.3 9.5L27.3 22.5L16 29L4.7 22.5L4.7 9.5Z'/><path d='M16 9.5L21.6 19.3L10.3 19.3Z'/><path d='M16 3L16 9.5M27.3 22.5L21.6 19.3M4.7 22.5L10.3 19.3'/></g><g transform='translate(32 32) scale(0.62)' fill='none' stroke='#fff' stroke-opacity='0.1' stroke-width='2.2' stroke-linejoin='round'><path d='M16 3L27.3 9.5L27.3 22.5L16 29L4.7 22.5L4.7 9.5Z'/><path d='M16 9.5L21.6 19.3L10.3 19.3Z'/></g></svg>`),
@@ -2483,8 +2528,11 @@ export const TEKSTURE = {
   // Sestougaona mreza - najmirnija od svih, dobra ispod okacene fotografije.
   // Kljuc je namerno bez nasih slova - ide kroz API i CSS.
   sace: {
-    naziv: "Saće", opis: "Šestougaona mreža, mirna i tehnička", korak: 56,
-    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='56' height='32'><g fill='none' stroke='#fff' stroke-opacity='0.1' stroke-width='1.1'><path d='M14 1L28 9L28 25L14 33L0 25L0 9Z'/><path d='M42 1L56 9L56 25L42 33L28 25L28 9Z'/></g></svg>`),
+    naziv: "Saće", opis: "Šestougaona mreža, krupna i sitna u njoj", korak: 84,
+    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='84' height='48'><g fill='none' stroke='#fff'>
+      <g stroke-opacity='0.12' stroke-width='1.2'><path d='M21 1L42 13v24L21 49L0 37V13z'/><path d='M63 1L84 13v24L63 49L42 37V13z'/></g>
+      <g stroke-opacity='0.055' stroke-width='0.9'><path d='M21 13L31 19v12l-10 6-10-6V19z'/><path d='M63 13L73 19v12l-10 6-10-6V19z'/></g>
+    </g></svg>`),
   },
   // Munje: energija, uz shop sa energetskim picima i uz gaming.
   munje: {
@@ -2517,6 +2565,31 @@ export const TEKSTURE = {
   romb: {
     naziv: "Rombovi", opis: "Mirna dijagonalna šara, najdiskretnija", korak: 34,
     sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='34' height='34'><path d='M17 2l15 15-15 15L2 17z' fill='none' stroke='#fff' stroke-opacity='0.11' stroke-width='1.1'/></svg>`),
+  },
+  // Ugljenicno tkanje - klasika na gaming opremi. Nije sahovnica: niti se
+  // SMENJUJU po pravcu (dva polja lezu vodoravno, dva uspravno), a svako nosi
+  // svetlu ivicu na strani odakle pada svetlo. Bez te ivice ostaje samo tabla.
+  ugljenik: {
+    naziv: "Ugljenik", opis: "Tkanje kao na gaming opremi, sitno i mirno", korak: 18,
+    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><g fill='#fff'>
+      <rect x='0' y='0' width='9' height='9' fill-opacity='0.055'/><rect x='9' y='9' width='9' height='9' fill-opacity='0.055'/>
+      <rect x='9' y='0' width='9' height='9' fill-opacity='0.028'/><rect x='0' y='9' width='9' height='9' fill-opacity='0.028'/>
+      <rect x='0' y='0' width='9' height='1.5' fill-opacity='0.075'/><rect x='9' y='9' width='9' height='1.5' fill-opacity='0.075'/>
+      <rect x='9' y='0' width='1.5' height='9' fill-opacity='0.06'/><rect x='0' y='9' width='1.5' height='9' fill-opacity='0.06'/>
+    </g></svg>`),
+  },
+  // Veze sa stampane ploce. Glavne linije prelaze CELU plocicu (vodoravna na
+  // y=34, uspravna na x=96), pa se sa susednom spajaju u istoj tacki - inace se
+  // u ponavljanju vide razbacani stapici umesto mreze.
+  kolo: {
+    naziv: "Kolo", opis: "Veze sa štampane ploče, tehnička i mirna", korak: 128,
+    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='128' height='128'>
+      <g fill='none' stroke='#fff' stroke-opacity='0.11' stroke-width='1.25' stroke-linecap='round' stroke-linejoin='round'>
+        <path d='M0 34h128'/><path d='M96 0v128'/><path d='M0 96h44l16-16h36'/>
+        <path d='M32 128V80l14-14h50'/><path d='M96 62l14-14h18'/><path d='M60 34v22'/>
+      </g>
+      <g fill='#fff' fill-opacity='0.15'><circle cx='96' cy='34' r='2.6'/><circle cx='60' cy='56' r='2'/>
+        <circle cx='96' cy='80' r='2'/><circle cx='46' cy='66' r='1.7'/></g></svg>`),
   },
 };
 export const JACINE = { slabo: "Slabo", srednje: "Srednje", jako: "Jako" };

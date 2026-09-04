@@ -56,8 +56,9 @@ proveri("traka stoji IZNAD mreze artikala",
 proveri("u baneru nema igara", !/hero-nastavi|hn-igra/.test(launcher),
   "baner nosi promo ili znak, ne pločice sa imenima igara");
 proveri("promo baner osoblja ima prednost nad znakom", /const lista = S\.promo \|\| \[\];/.test(launcher));
-proveri("kad promo nema, stoji znak igraonice", /: `<div class="hero-brend">/.test(launcher));
-proveri("znak u baneru prati brend igraonice", /class="hb-logo brand-logo"/.test(launcher),
+proveri("kad promo nema, stoji VIP traka", /: vipHtml\(\);/.test(launcher),
+  "prostor koji vlasnik nije prodao nosi VIP napredak, ne prazan znak");
+proveri("znak u baneru prati brend igraonice", /class="[^"]*brand-logo"/.test(launcher),
   "inace svaka igraonica gleda tudji logo usred svog banera");
 
 // ---- MREZE NE SMEJU DA SIRE EKRAN ----
@@ -147,7 +148,8 @@ proveri("greska je vidljivija od obicne poruke", /\.toast\.error \{[^}]*border-l
 // koricama. Polica je na 1080p gubila 163 px izmedju imena igara i alata.
 // Znak nosi i klasu "brand-logo", da ga primeniBrend zameni znakom te
 // igraonice - inace bi svaka gledala tudji logo usred svog banera.
-proveri("vrh pocetne nosi znak kuce", launcher.includes('class="hb-logo brand-logo" src="img/crit-logo.png"'));
+proveri("vrh pocetne nosi znak kuce", /class="[^"]*brand-logo"[^>]*src="img\/crit-logo\.png"/.test(launcher),
+  "trazi se klasa, ne ime omotaca - vrh je dobio VIP traku pa znak vise nije u istom elementu");
 proveri("tocak stoji u vrhu, kao deo trake", launcher.includes("heroTocakHtml()") && /\.hero-tocak \{[^}]*flex: 0 0 auto/.test(jedanRed));
 proveri("traka ima svoju visinu, ne odnos strana", /\.hero \{[^}]*height: clamp\(/.test(jedanRed));
 proveri("korice popunjavaju policu", /\.games-shelf \.tile \{[^}]*max-height: 505px/.test(jedanRed));

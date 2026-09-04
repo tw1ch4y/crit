@@ -1,0 +1,63 @@
+import { citajIzvor, brojac } from "./_okruzenje.mjs";
+// VIP TRAKA NA VRHU POCETNE
+//
+// Zamisljena je kao napredak iz igara: znak, nivo, traka koja se puni, nagrada
+// na kraju. Sam XP sistem jos ne postoji - pravila (sta daje iskustvo, koliko,
+// sta se otkljucava) tek treba da se osmisle.
+//
+// Zato ovde stoji ZAKLJUCANO stanje sa pecatom "Uskoro!". Ono sto se ovde cuva
+// je da traka NIKAD ne izmisli napredak: prazna traka bez objasnjenja je
+// obecanje koje program ne ispunjava, a lazno popunjena je gore od toga.
+//
+// Druga stvar koja se cuva je UGOVOR sa serverom. Kad XP sistem stigne, server
+// salje `vip: { nivo, naziv, xp, xpDo }` i traka se sama popuni - izgled se ne
+// prepravlja. Da ugovor nije zapisan ovde, prvi ko bude pravio XP ne bi znao
+// kako da ga ukljuci.
+const { proveri, kraj } = brojac();
+const rend = citajIzvor("client/renderer/js/launcher.js");
+const css = citajIzvor("client/renderer/css/launcher.css");
+
+// ---- 1) bez podataka: zakljucano, i to se VIDI ----
+proveri("VIP traka postoji", /function vipHtml\(\)/.test(rend));
+proveri("bez podataka je zakljucana", /const ima = v && Number\.isFinite\(v\.xpDo\) && v\.xpDo > 0;/.test(rend),
+  "traka sme da se puni samo kad server posalje i xp i granicu");
+proveri("zakljucano stanje nosi pecat", /vip-pecat[\s\S]{0,120}Uskoro!/.test(rend),
+  "prazna traka bez objasnjenja izgleda kao kvar, ne kao najava");
+proveri("pecat se sklanja cim podaci stignu", /\$\{ima \? "" : `<div class="vip-pecat"/.test(rend));
+proveri("bez podataka napredak je NULA", /const postotak = ima \? [^:]+ : 0;/.test(rend),
+  "izmisljen napredak je gori od nikakvog - igrac bi cekao nagradu koje nema");
+proveri("bez podataka se ne izmislja ni nivo", /: "Nivo -"/.test(rend));
+
+// ---- 2) sa podacima: racun je ogranicen ----
+//
+// Server je tudja strana. Pokvaren ili stariji server sme da posalje xp veci od
+// granice ili negativan; traka tada ne sme da izadje iz svog okvira.
+proveri("napredak se ograničava na 0-100", /Math\.max\(0, Math\.min\(100,/.test(rend),
+  "xp veci od granice bi razvukao traku van okvira");
+proveri("prikazuje se koliko fali", /XP do sledećeg nivoa/.test(rend));
+
+// ---- 3) ugovor sa serverom je zapisan ----
+proveri("zapisano je sta server treba da posalje",
+  /vip: \{ nivo: \d+, naziv: "[^"]+", xp: \d+, xpDo: \d+/.test(rend),
+  "bez zapisanog oblika, onaj ko bude pravio XP ne zna kako da ga ukljuci");
+
+// ---- 4) boja nosi znacenje, nije ukras ----
+//
+// Zlatna u celom programu znaci NAGRADU (nagradni tocak). VIP je nagrada, pa
+// nosi istu boju. Boja kuce se ovde ne koristi - VIP bi se izgubio medju
+// dugmadima, a ovo mora da se izdvoji.
+proveri("VIP nosi zlatnu, ne boju kuce", /\.vip-ime \{[^}]*color: var\(--gold\)/.test(css),
+  "zlatna znaci nagradu; boja kuce bi VIP izjednacila sa obicnim dugmetom");
+proveri("traka se puni zlatnom", /\.vip-traka i \{[^}]*var\(--gold\)/.test(css));
+proveri("zupci dele traku na nivoe", /\.vip-zub \{/.test(css),
+  "bez njih je to linija koja raste, a ne napredak kroz nivoe");
+
+// ---- 5) placeni prostor ima prednost ----
+//
+// Ako je vlasnik okacio promo banere, taj prostor je njegov. VIP traka se tada
+// sklanja - inace bi nova funkcija pojela oglasni prostor koji neko placa.
+proveri("promo baneri imaju prednost nad VIP trakom",
+  /const levo = lista\.length[\s\S]{0,600}: vipHtml\(\);/.test(rend),
+  "prostor koji je vlasnik platio ne sme da pojede nova funkcija");
+
+kraj();

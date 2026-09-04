@@ -109,5 +109,23 @@ proveri("svaka proba odgovara na sve kanale iz preload-a", nepokriveni.length ==
 const pokretac = fs.readFileSync(path.join(OVDE, "pokreni-sve.mjs"), "utf8");
 proveri("pokretač briše samo svoj radni folder", /\.radno/.test(pokretac) && !/server[\/\\]data/.test(pokretac));
 
+// ---- ALAT KOJI BRISE MORA DA SME DA SE PREUSMERI ----
+//
+// `postavi-bazu.mjs` radi DELETE nad igrama, alatima, promo banerima i
+// nagradama - a pisao je PRAVO u server/data, mimo CRIT_DATA_DIR koji postuje
+// sve ostalo. Ko ga pokrene misleci da radi nad probnom bazom, obrise prave
+// igre i alate iz razvojne. Skripta pri tom radi tacno ono sto treba, samo nad
+// pogresnim fajlom, pa greska ne izgleda kao greska nego kao uspeh.
+//
+// `napravi-paket.mjs` se NE trazi ovde: on bazu samo cita, i to bas onu pravu -
+// nju i pakuje.
+for (const alat of ["postavi-bazu.mjs"]) {
+  const t = fs.readFileSync(path.join(OVDE, "..", alat), "utf8");
+  const brise = t.includes("DELETE FROM");
+  proveri(`${alat}: postuje CRIT_DATA_DIR`,
+    !brise || t.includes("process.env.CRIT_DATA_DIR"),
+    "alat koji brise iz baze mora da moze da se preusmeri na probnu");
+}
+
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 process.exit(pao ? 1 : 0);

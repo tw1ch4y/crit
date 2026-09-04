@@ -1162,8 +1162,67 @@ function prikaziPromo(i) {
   $$(".promo-tacka").forEach((t, n) => t.classList.toggle("aktivna", n === promoIndeks));
 }
 
+// VIP TRAKA NA VRHU POČETNE
+//
+// Zamišljena je kao napredak iz igara: znak, nivo, traka koja se puni, i nagrada
+// na kraju. Sam XP sistem još ne postoji - pravila (šta daje iskustvo, koliko,
+// šta se otključava) tek treba da se osmisle.
+//
+// Zato ovde stoji ZAKLJUČANO stanje sa pečatom "USKORO!". To je namerno, i nije
+// isto što i prazna traka: prazna traka je obećanje koje program ne ispunjava, a
+// ovako igrač vidi da stvar POSTOJI i da tek dolazi.
+//
+// Kad XP sistem stigne, server šalje `vip` uz "welcome" i "balance":
+//
+//   vip: { nivo: 4, naziv: "Srebro", xp: 320, xpDo: 500, otkljucano: false }
+//
+// i traka se sama popuni - ništa se ovde ne prepravlja. Dok tog polja nema,
+// prikaz je zaključan. Tako se izgled i pravila razvijaju odvojeno.
+function vipHtml() {
+  const v = S.vip;
+  const ima = v && Number.isFinite(v.xpDo) && v.xpDo > 0;
+  const postotak = ima ? Math.max(0, Math.min(100, (v.xp / v.xpDo) * 100)) : 0;
+  const nivo = ima ? `Nivo ${v.nivo}${v.naziv ? " - " + esc(v.naziv) : ""}` : "Nivo -";
+  const pod = ima
+    ? `${Math.round(v.xp)} / ${Math.round(v.xpDo)} XP do sledećeg nivoa`
+    : "Otključava se igranjem";
+
+  // Zupci dele traku na nivoe - bez njih je to samo linija koja raste, a sa
+  // njima se vidi DOKLE se stiglo i koliko je ostalo.
+  const zupci = Array.from({ length: 9 }, (_, i) =>
+    `<span class="vip-zub" style="left:${((i + 1) * 10).toFixed(0)}%"></span>`).join("");
+
+  // ZNAK KUCE OSTAJE U VRHU POCETNE.
+  //
+  // Prva verzija VIP trake ga je izbacila - a bas preko klase `brand-logo`
+  // primeniBrend menja logo po igraonici. Bez njega bi svaka igraonica gledala
+  // tudji znak na svom najvidljivijem mestu.
+  return `<div class="vip ${ima ? "" : "zakljucan"}">
+    <img class="vip-kuca brand-logo" src="img/crit-logo.png" alt="${esc(S.settings.cafeName || "")}" draggable="false" />
+    <div class="vip-znak" aria-hidden="true">
+      <svg viewBox="0 0 44 48" fill="none">
+        <path class="vip-stit" d="M22 2l18 7v18c0 10-8 16-18 19C12 43 4 37 4 27V9z"/>
+        <path class="vip-zvezda" d="M22 13l3.2 6.9 7.3.9-5.4 5 1.5 7.2L22 29.4l-6.6 3.6 1.5-7.2-5.4-5 7.3-.9z"/>
+      </svg>
+    </div>
+    <div class="vip-telo">
+      <div class="vip-vrh">
+        <span class="vip-ime">VIP</span>
+        <span class="vip-nivo">${nivo}</span>
+      </div>
+      <div class="vip-traka">
+        <i style="width:${postotak.toFixed(1)}%"></i>
+        ${zupci}
+      </div>
+      <div class="vip-pod">${pod}</div>
+    </div>
+    ${ima ? "" : `<div class="vip-pecat"><span>Uskoro!</span></div>`}
+  </div>`;
+}
+
 // VRH POCETNE
-// Levo znak kuce (ili okaceni promo baneri ako ih osoblje ima), desno stanje
+// Levo VIP traka (ili okaceni promo baneri ako ih osoblje ima - to je prostor
+// koji je vlasnik platio i on ima prednost), desno stanje
 // nagradnog tocka kao traka napretka. Klik na tocak otvara pop-up sa vrtnjom -
 // ranije je ceo tocak stajao razvucen na strani Nalog i gusio je.
 function heroHtml() {
@@ -1175,13 +1234,7 @@ function heroHtml() {
         ${lista.length > 1 ? `<div class="promo-tacke">${lista.map((_, i) =>
           `<button class="promo-tacka ${i === 0 ? "aktivna" : ""}" data-promo-idi="${i}" aria-label="Baner ${i + 1}"></button>`).join("")}</div>` : ""}
       </div>`
-    : `<div class="hero-brend">
-        <img class="hb-logo brand-logo" src="img/crit-logo.png" alt="${esc(S.settings.cafeName || "")}" draggable="false" />
-        <div class="hb-tekst">
-          <div class="hb-ime">${esc(S.settings.cafeName || "Igraonica")}</div>
-          <div class="hb-pod">Gaming centar</div>
-        </div>
-      </div>`;
+    : vipHtml();
   // Kad je okačen promo baner, on je slika koju je osoblje napravilo i preko nje
   // ne sme ništa - ni šara ni crvena nit uz ivicu. Klasa "promo" ih gasi.
   return `<section class="hero ${lista.length ? "promo" : ""}">${levo}${heroTocakHtml()}</section>`;

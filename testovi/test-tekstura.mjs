@@ -26,7 +26,10 @@ const api = zovi(await prijava("admin", "admin"));
 // ---- spisak ----
 const spisak = (await api("/api/tekstura")).body;
 const kljucevi = Object.keys(spisak.spisak);
-proveri("nudi deset izbora", kljucevi.length === 10, JSON.stringify(kljucevi));
+// Broj se ne tvrdi napamet: dodavanje nove šare ne sme da obori proveru bez
+// razloga. Traži se da ih ima dosta, a niže se za svaku gleda da ima ime, opis
+// i ispravan oblik.
+proveri("nudi bar deset izbora", kljucevi.length >= 10, JSON.stringify(kljucevi));
 proveri("izbori su ocekivani",
   ["nema", "tacke", "zvezde", "prasak", "kose", "kockice", "sace", "munje", "crit", "romb"].every((k) => kljucevi.includes(k)),
   JSON.stringify(kljucevi));

@@ -100,12 +100,22 @@ const EKRANI = {
   // Prijava i zakljucan ekran su PRAZNI - preko njih ide samo jedna kartica, pa
   // svetlo sme da bude jako i tu se i vidi. Ekrani sa sadrzajem (pocetna, shop,
   // nalog) drze svetlo nisko, da korice i fotografije ostanu glavna stvar.
-  prijava:   { svetla: [[30, 58, 66, "#3d7cf0", 0.30], [78, 16, 54, "#7a45c8", 0.18], [56, 96, 46, "#ffb527", 0.08]], prelaz: 0.075, vinjeta: 0.60 },
-  pocetna:   { svetla: [[20, 16, 56, "#2f6ae8", 0.17], [88, 86, 46, "#5b3f9e", 0.11]], prelaz: 0.045, vinjeta: 0.50 },
-  shop:      { svetla: [[80, 20, 52, "#ffb527", 0.13], [15, 80, 48, "#2f6ae8", 0.12]], prelaz: 0.040, vinjeta: 0.50 },
-  nalog:     { svetla: [[18, 74, 54, "#7a45c8", 0.15], [84, 18, 46, "#26437d", 0.11]], prelaz: 0.040, vinjeta: 0.50 },
-  // Zakljucan ekran je upozorenje: duboko crveno svetlo i jaka vinjeta.
-  zakljucan: { svetla: [[50, 44, 70, "#d81f24", 0.34], [50, 100, 50, "#7a1418", 0.16]], prelaz: 0.030, vinjeta: 0.74 },
+  //
+  // DVE BOJE, NE JEDNA. Jedno plavo svetlo daje mirnu podlogu - lepu, ali blagu.
+  // Tek kad mu se sa druge strane suprotstavi ljubicasto ili tirkizno, ekran
+  // dobije dubinu i napetost, a to je ono sto se od igraonice i ocekuje.
+  // Zlatna ulazi samo tamo gde ima razloga (shop).
+  //
+  // `trake` su kose pruge svetla - brzina, isto ono sto u stripu rade linije iza
+  // figure. Sara odozgo nosi tacke i praskove, pa se ovde ne ponavljaju oblici,
+  // nego se dodaje samo pokret.
+  prijava:   { svetla: [[28, 56, 64, "#3d7cf0", 0.38], [80, 14, 52, "#a63fd6", 0.24], [58, 98, 44, "#2fd4e8", 0.13]], trake: 0.055, prelaz: 0.075, vinjeta: 0.62 },
+  pocetna:   { svetla: [[18, 14, 54, "#2f6ae8", 0.22], [90, 88, 48, "#8b3fd6", 0.15], [62, 6, 34, "#2fd4e8", 0.07]], trake: 0.030, prelaz: 0.045, vinjeta: 0.52 },
+  shop:      { svetla: [[80, 18, 50, "#ffb527", 0.17], [14, 82, 50, "#2f6ae8", 0.17], [46, 8, 34, "#a63fd6", 0.09]], trake: 0.032, prelaz: 0.040, vinjeta: 0.52 },
+  nalog:     { svetla: [[16, 72, 52, "#8b3fd6", 0.21], [86, 16, 48, "#2f6ae8", 0.16], [52, 100, 36, "#2fd4e8", 0.08]], trake: 0.030, prelaz: 0.040, vinjeta: 0.52 },
+  // Zakljucan ekran je upozorenje: duboko crveno svetlo i jaka vinjeta. Bez
+  // traka - upozorenje ne treba da izgleda zivo.
+  zakljucan: { svetla: [[50, 44, 70, "#d81f24", 0.34], [50, 100, 50, "#7a1418", 0.16]], trake: 0, prelaz: 0.030, vinjeta: 0.74 },
 };
 
 export function pozadinaEkrana(kljuc) {
@@ -119,6 +129,16 @@ export function pozadinaEkrana(kljuc) {
       <stop offset="1" stop-color="${boja}" stop-opacity="0"/>
     </radialGradient>`).join("");
   const slojevi = o.svetla.map((_, i) => `<rect width="${w}" height="${h}" fill="url(#sv${i})"/>`).join("\n  ");
+  // KOSE PRUGE SVETLA - brzina.
+  //
+  // Isto ono sto u stripu rade linije iza figure. Krajevi im se gase, pa se ne
+  // vidi gde pruga pocinje ni gde se zavrsava - inace bi izgledale kao stapici
+  // nalepljeni na ekran. Sirine su razlicite namerno: jednake pruge izgledaju
+  // kao tabela, ne kao pokret.
+  const trake = !o.trake ? "" : `<g transform="rotate(-19 ${w / 2} ${h / 2})" opacity="${o.trake}" mask="url(#maskaTrake)">
+    ${[[-0.06, 190], [0.20, 64], [0.34, 260], [0.61, 40], [0.78, 150]]
+      .map(([y, d]) => `<rect x="${-w * 0.3}" y="${h * y}" width="${w * 1.6}" height="${d}" fill="url(#trakaY)"/>`).join("")}
+  </g>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
   <defs>${/* SVETLA SU SE RAČUNALA, PA SE BACALA.
     `defs` je bio izračunat i nigde ubačen, pa su `url(#sv0)` i ostali pokazivali
@@ -132,6 +152,24 @@ export function pozadinaEkrana(kljuc) {
       <stop offset="0.5" stop-color="#0c1329"/>
       <stop offset="1" stop-color="${PALETA.bgDole}"/>
     </linearGradient>
+    ${/* Pruge se gase na SVE cetiri strane. Prvo su imale mek pocetak i kraj,
+        ali ostre gornje i donje ivice - i onda su izgledale kao dijagonalne
+        sipke nalepljene na ekran, kao greska u slici. Sada `trakaX` gasi
+        krajeve, a `trakaY` debljinu, pa od pruge ostane samo trag svetla. */""}
+    <linearGradient id="trakaX" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="0.35" stop-color="#fff" stop-opacity="1"/>
+      <stop offset="0.65" stop-color="#fff" stop-opacity="1"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="trakaY" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="maskaTrake">
+      <rect x="${-w}" y="${-h}" width="${w * 3}" height="${h * 3}" fill="url(#trakaX)"/>
+    </mask>
     <linearGradient id="prelaz" x1="0" y1="1" x2="1" y2="0">
       <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
       <stop offset="0.5" stop-color="#ffffff" stop-opacity="${o.prelaz}"/>
@@ -144,6 +182,7 @@ export function pozadinaEkrana(kljuc) {
   </defs>
   <rect width="${w}" height="${h}" fill="url(#baza)"/>
   ${slojevi}
+  ${trake}
   <rect width="${w}" height="${h}" fill="url(#prelaz)"/>
   <rect width="${w}" height="${h}" fill="url(#vinjeta)"/>
 </svg>`;

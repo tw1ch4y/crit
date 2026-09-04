@@ -11,7 +11,14 @@ import path from "node:path";
 import { pozadinaEkrana, POZADINE_EKRANI } from "./server/src/banner.js";
 
 const ROOT = import.meta.dirname;
-const DB = path.join(ROOT, "server", "data", "crit.db");
+// ODAKLE BAZA - ISTO PRAVILO KAO SVUDA U PROJEKTU.
+//
+// Ovo je pisalo pravo u `server/data`, mimo `CRIT_DATA_DIR` koji postuje sve
+// ostalo. Ko god pokrene ovu skriptu misleci da radi nad probnom bazom -
+// obrise prave igre, alate i nagrade iz razvojne. Skripta radi tacno ono sto
+// treba, samo nad pogresnim fajlom, pa greska ne izgleda kao greska.
+const DATA_DIR = process.env.CRIT_DATA_DIR || path.join(ROOT, "server", "data");
+const DB = path.join(DATA_DIR, "crit.db");
 const UPLOADS = path.join(ROOT, "server", "public", "uploads");
 const db = new DatabaseSync(DB);
 const log = (s) => console.log("  " + s);

@@ -25,6 +25,10 @@
      fabrička vrednost - plava sa znaka. Ime je `--brend`, ne `--red`: dok se
      zvala `--red` a držala plavu, svako čitanje ovog fajla je vodilo na pogrešan
      trag. */
+  /* Podloga i u brojevima: velovi i senke preko ekrana pisu se kao
+     rgba(var(--bg-rgb), x). Dok su bile upisane kao crna, one su preko plave
+     podloge radile tacno ono sto ne treba - obezbojile su je nazad ka sivom. */
+  --bg-rgb: 7, 12, 28;
   --brend-rgb: 47, 106, 232;
   --brend: #2f6ae8;
   --brend-deep: #2454c4;
@@ -193,12 +197,12 @@ body[data-kretanje="dubina"]::after {
    je izgledao kao ravna crna ploha. */
 .pozadina::after {
   content: ""; position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(7, 7, 10, 0.74) 0%, rgba(7, 7, 10, 0.5) 42%, rgba(7, 7, 10, 0.82) 100%);
+  background: linear-gradient(180deg, rgba(var(--bg-rgb), 0.74) 0%, rgba(var(--bg-rgb), 0.5) 42%, rgba(var(--bg-rgb), 0.82) 100%);
 }
 /* Na praznim ekranima (prijava, zakljucan) slika sme najjace da se vidi -
    tamo preko nje ide samo jedna kartica. */
 body.pozadina-prazna .pozadina::after {
-  background: linear-gradient(180deg, rgba(7, 7, 10, 0.42) 0%, rgba(7, 7, 10, 0.16) 45%, rgba(7, 7, 10, 0.55) 100%);
+  background: linear-gradient(180deg, rgba(var(--bg-rgb), 0.42) 0%, rgba(var(--bg-rgb), 0.16) 45%, rgba(var(--bg-rgb), 0.55) 100%);
 }
 
 /* Poruka na ekranu "povezivanje", samo kad je veza pukla USRED igranja.
@@ -220,7 +224,7 @@ body.pozadina-prazna .pozadina::after {
 /* Vinjeta: ivice ekrana tamnije da sadržaj u sredini dobije težinu. */
 .fx-scan {
   position: fixed; inset: 0; z-index: 500; pointer-events: none;
-  background: radial-gradient(140% 130% at 50% 45%, transparent 62%, rgba(2, 2, 5, 0.42));
+  background: radial-gradient(140% 130% at 50% 45%, transparent 62%, rgba(var(--bg-rgb), 0.42));
 }
 
 /* pun crveni edge-alarm kad vreme ističe (< 60s) */
@@ -348,8 +352,8 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .login-fon::after {
   content: ""; position: absolute; inset: 0;
   background:
-    radial-gradient(86% 70% at 50% 52%, rgba(7, 7, 10, 0.86), rgba(7, 7, 10, 0.5) 74%, rgba(7, 7, 10, 0.72)),
-    linear-gradient(180deg, rgba(7, 7, 10, 0.35), transparent 30%, transparent 72%, rgba(7, 7, 10, 0.45));
+    radial-gradient(86% 70% at 50% 52%, rgba(var(--bg-rgb), 0.86), rgba(var(--bg-rgb), 0.5) 74%, rgba(var(--bg-rgb), 0.72)),
+    linear-gradient(180deg, rgba(var(--bg-rgb), 0.35), transparent 30%, transparent 72%, rgba(var(--bg-rgb), 0.45));
 }
 /* Ekran prijave: znak kuce levo, forma desno, tanka nit izmedju. Prazan
    racunar ovako izgleda kao izlog, a ne kao mala kartica na crnom ekranu. */
@@ -431,7 +435,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .topbar {
   position: relative;
   display: flex; align-items: center; gap: 22px;
-  padding: 13px 26px; background: rgba(9, 9, 13, 0.85);
+  padding: 13px 26px; background: rgba(var(--bg-rgb), 0.85);
   border-bottom: 1px solid var(--line);
 }
 .topbar::after {
@@ -538,7 +542,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .tile-badge {
   position: absolute; bottom: 46px; left: 9px; z-index: 5;
   font-size: 9.5px; font-weight: 700; font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--gold); background: rgba(7, 7, 10, 0.72); padding: 4px 8px;
+  color: var(--gold); background: rgba(var(--bg-rgb), 0.72); padding: 4px 8px;
   clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
   backdrop-filter: blur(4px);
 }
@@ -550,7 +554,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .tile-hover {
   position: absolute; left: 0; right: 0; top: 0; bottom: 62px; z-index: 3;
   display: grid; place-content: center; justify-items: center;
-  background: linear-gradient(180deg, rgba(7, 7, 10, 0.1), rgba(7, 7, 10, 0.4));
+  background: linear-gradient(180deg, rgba(var(--bg-rgb), 0.1), rgba(var(--bg-rgb), 0.4));
   opacity: 0; transition: opacity 0.2s ease; pointer-events: none;
 }
 .tile-hover .play-btn {
@@ -581,7 +585,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 /* pločica dok se igra pokreće */
 .tile.launching { pointer-events: none; }
 .tile.launching .tile-media { box-shadow: inset 0 0 0 1px var(--gold); filter: drop-shadow(0 10px 26px var(--gold-glow)); }
-.tile.launching .tile-hover { opacity: 1; background: rgba(7, 7, 10, 0.78); }
+.tile.launching .tile-hover { opacity: 1; background: rgba(var(--bg-rgb), 0.78); }
 .tile.launching .tile-hover .play-btn {
   transform: scale(1); background: transparent; box-shadow: none;
   border: 3px solid rgba(255, 181, 39, 0.25); border-top-color: var(--gold);
@@ -603,7 +607,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   height: clamp(126px, 12.5vh, 168px);
   background:
     radial-gradient(120% 180% at 12% 50%, rgba(var(--brend-rgb), 0.14), transparent 62%),
-    linear-gradient(100deg, #16121a 0%, #0d0d13 46%, #0a0a0f 100%);
+    linear-gradient(100deg, #16121a 0%, #0d0d13 46%, var(--bg) 100%);
   clip-path: polygon(0 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%);
   box-shadow: inset 0 0 0 1px var(--line-2), 0 26px 60px -34px rgba(0, 0, 0, 0.95);
   animation: hero-in 0.5s var(--ease-out) both;
@@ -682,17 +686,17 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 }
 .hw-krug {
   width: 100%; height: 100%; display: block; border-radius: 50%;
-  box-shadow: 0 0 0 3px #0a0a0f, 0 0 0 4px rgba(var(--brend-rgb), 0.5), 0 8px 22px -8px rgba(0, 0, 0, 0.9);
+  box-shadow: 0 0 0 3px var(--bg), 0 0 0 4px rgba(var(--brend-rgb), 0.5), 0 8px 22px -8px rgba(0, 0, 0, 0.9);
 }
 .hw-krug .tocak-svg { width: 100%; height: 100%; display: block; border-radius: 50%; }
 /* Kad je spin spreman, prsten pulsira. Tocak se NE vrti u mestu - na 84px se
    vrtnja pretvara u mrlju i oblik prestaje da lici na tocak. */
 .hero-tocak.spreman .hw-krug {
-  box-shadow: 0 0 0 3px #0a0a0f, 0 0 0 4px var(--gold), 0 0 24px -4px var(--gold-glow);
+  box-shadow: 0 0 0 3px var(--bg), 0 0 0 4px var(--gold), 0 0 24px -4px var(--gold-glow);
   animation: hw-puls 2.4s ease-in-out infinite;
 }
 @keyframes hw-puls {
-  50% { box-shadow: 0 0 0 3px #0a0a0f, 0 0 0 4px var(--gold), 0 0 38px 0 var(--gold-glow); }
+  50% { box-shadow: 0 0 0 3px var(--bg), 0 0 0 4px var(--gold), 0 0 38px 0 var(--gold-glow); }
 }
 .hero-tocak.iskoriscen .hw-krug { filter: saturate(0.4) brightness(0.75); }
 .hero-tocak.iskoriscen .hw-kaz { border-top-color: var(--text-3); }
@@ -829,7 +833,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .statusbar {
   position: relative; flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
   padding: 0 20px; height: 38px;
-  background: rgba(9, 9, 13, 0.94);
+  background: rgba(var(--bg-rgb), 0.94);
   font-family: var(--font-ui); font-size: 12.5px; color: var(--text-3); font-weight: 500; letter-spacing: 0.03em;
 }
 .statusbar::before {
@@ -1590,7 +1594,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 /* Zakljucan ekran ima SVOJU pozadinu (duboko crveno svetlo). Ranije je preko
    svega isao jos i backdrop-filter: blur - a iza nema sta da se muti, jer je
    desktop sakriven; jedini efekat je bio da se pozadina razmaze u mrlju. */
-#lockedScreen { background: rgba(7, 7, 10, 0.28); }
+#lockedScreen { background: rgba(var(--bg-rgb), 0.28); }
 .lock-icon {
   width: 96px; height: 96px; margin-bottom: 28px;
   background: rgba(255, 181, 39, 0.1); color: var(--gold);
@@ -1739,4 +1743,93 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
    ostaju samo ulazne animacije kartica, koje nista ne znace ako izostanu. */
 @media (prefers-reduced-motion: reduce) {
   .tile, .pice, .hero { animation: none !important; }
+}
+
+/* ---------- VIP traka na vrhu početne ---------- */
+/*
+   Zlatna je ovde namerna: u celom programu ona znači NAGRADU (nagradni točak),
+   a VIP je nagrada. Boja kuće se ne koristi jer bi se VIP izgubio među ostalim
+   dugmadima - ovo mora da se izdvoji.
+
+   Zaključano stanje nije prazna traka nego traka sa pečatom: prazna traka je
+   obećanje koje program ne ispunjava, a pečat kaže da stvar tek dolazi.
+*/
+.vip {
+  position: relative; flex: 1; min-width: 0; height: 100%;
+  display: flex; align-items: center; gap: 20px; padding: 0 26px;
+  overflow: hidden;
+}
+.vip::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(120% 200% at 8% 50%, rgba(255, 181, 39, 0.10), transparent 58%),
+    linear-gradient(100deg, rgba(255, 181, 39, 0.05), transparent 60%);
+}
+/* Znak kuce, pa tanka pregrada, pa VIP. Dva znaka jedan do drugog moraju da
+   budu razdvojena - inace se citaju kao jedan zbrkan oblik. */
+.vip-kuca { flex: none; height: 46px; width: auto; display: block;
+  filter: drop-shadow(0 4px 16px rgba(var(--brend-rgb), 0.4)); }
+.vip-znak { flex: none; width: 52px; height: 56px; position: relative;
+  padding-left: 20px; margin-left: 2px; box-sizing: content-box;
+  border-left: 1px solid var(--line-2); }
+.vip-znak svg { margin-left: 0; }
+.vip-znak svg { width: 100%; height: 100%; display: block; }
+.vip-stit {
+  fill: rgba(255, 181, 39, 0.10); stroke: var(--gold); stroke-width: 2;
+  stroke-linejoin: round;
+}
+.vip-zvezda { fill: var(--gold); }
+.vip.zakljucan .vip-stit { stroke: rgba(255, 181, 39, 0.42); fill: rgba(255, 181, 39, 0.05); }
+.vip.zakljucan .vip-zvezda { fill: rgba(255, 181, 39, 0.34); }
+
+.vip-telo { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 9px; }
+.vip-vrh { display: flex; align-items: baseline; gap: 12px; }
+.vip-ime {
+  font-family: var(--font-display); font-size: 30px; font-weight: 700;
+  letter-spacing: 0.08em; color: var(--gold); line-height: 1;
+  text-shadow: 0 0 26px var(--gold-glow);
+}
+.vip.zakljucan .vip-ime { color: rgba(255, 181, 39, 0.55); text-shadow: none; }
+.vip-nivo {
+  font-family: var(--font-ui); font-size: 13px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3);
+}
+
+/* Traka: zupci je dele na nivoe, pa se vidi DOKLE se stiglo, ne samo da raste. */
+.vip-traka {
+  position: relative; height: 12px; border-radius: 3px;
+  background: rgba(var(--bg-rgb), 0.65);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  overflow: hidden;
+}
+.vip-traka i {
+  display: block; height: 100%; border-radius: 2px;
+  background: linear-gradient(90deg, var(--gold), #ffd97a);
+  box-shadow: 0 0 18px -2px var(--gold-glow);
+  transition: width 0.6s var(--tr);
+}
+.vip-zub {
+  position: absolute; top: 0; bottom: 0; width: 1px;
+  background: rgba(var(--bg-rgb), 0.9);
+}
+.vip-pod { font-size: 12.5px; color: var(--text-3); }
+
+/* Pečat: nakrivljen kao da je otisnut, ne kao dugme. */
+.vip-pecat {
+  position: absolute; right: 26px; top: 50%; z-index: 2;
+  transform: translateY(-50%) rotate(-8deg);
+  padding: 9px 18px 10px;
+  border: 3px solid rgba(255, 181, 39, 0.75); border-radius: 8px;
+  color: var(--gold);
+  font-family: var(--font-display); font-size: 25px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; line-height: 1;
+  box-shadow: 0 0 34px -8px var(--gold-glow), inset 0 0 22px -12px var(--gold-glow);
+}
+.vip-pecat span { display: block; }
+
+@media (max-width: 1180px) {
+  .vip { gap: 14px; padding: 0 18px; }
+  .vip-znak { width: 46px; height: 50px; }
+  .vip-ime { font-size: 24px; }
+  .vip-pecat { font-size: 19px; padding: 7px 13px 8px; right: 18px; }
 }
