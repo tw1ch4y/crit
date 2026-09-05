@@ -14,7 +14,10 @@
   --hair: rgba(255, 255, 255, 0.06);
   --text: #eceff6;
   --text-2: #9aa5c4;
-  --text-3: #69728f;
+  /* Treći stepen teksta mora da se čita: stara vrednost (#69728f) davala je
+     2.9-4.1:1 prema podlogama, ispod granice od 4.5:1. Ista vrednost stoji i u
+     launcheru - panel i launcher se gledaju jedan pored drugog. */
+  --text-3: #8c96b7;
   /* Fabrička boja kuće. Vlasnik je menja iz panela (Izgled launchera). */
   --accent: #2f6ae8;
   --accent-hover: #4a80f2;
@@ -183,7 +186,7 @@ label.lbl, .field label { display: block; font-size: 12px; color: var(--text-2);
 
 .nav { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
 .nav-sec {
-  font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--text-3); padding: 16px 12px 6px; user-select: none;
 }
 .nav-item {
@@ -330,7 +333,7 @@ label.lbl, .field label { display: block; font-size: 12px; color: var(--text-2);
 }
 .bar { width: 100%; max-width: 30px; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 2px; flex-shrink: 0; transition: height 0.4s var(--ease-out), background var(--tr); }
 .bar-peak { font-size: 11px; color: var(--text-2); font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.bar-lbl { text-align: center; font-size: 10.5px; color: var(--text-3); margin-top: 7px; white-space: nowrap; overflow: hidden; height: 14px; font-variant-numeric: tabular-nums; }
+.bar-lbl { text-align: center; font-size: 11px; color: var(--text-3); margin-top: 7px; white-space: nowrap; overflow: hidden; height: 14px; font-variant-numeric: tabular-nums; }
 .bar-col:hover .bar { background: var(--accent-hover); }
 
 /* Dashboard toolbar */
@@ -563,7 +566,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 /* Oznake stanja stoje u redu sa cenom, ne preko imena */
 .pi-malo, .pi-nema {
   flex: 0 0 auto;
-  font-size: 10px; font-weight: 700; letter-spacing: 0.03em;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.03em;
   padding: 2px 6px; border-radius: 5px;
 }
 .pi-malo { color: var(--locked); background: var(--locked-soft); }
@@ -673,7 +676,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .prod-info { padding: 12px 14px 11px; flex: 1; display: flex; flex-direction: column; gap: 8px; }
 .prod-name { font-weight: 600; font-size: 14px; line-height: 1.35; }
 .prod-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: auto; }
-.prod-cat { font-size: 10.5px; color: var(--text-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.prod-cat { font-size: 11px; color: var(--text-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
 .prod-price { font-weight: 650; font-size: 15px; letter-spacing: -0.01em; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .prod-foot { display: flex; align-items: center; gap: 6px; padding: 7px 8px; border-top: 1px solid rgba(255, 255, 255, 0.04); }
 .prod-foot .btn { flex: 1; background: transparent; border-color: transparent; color: var(--text-2); }
@@ -1010,7 +1013,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .slike-stanje { display: flex; gap: 7px; margin-top: 7px; flex-wrap: wrap; }
 .ss {
   display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
-  font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
   padding: 2px 7px; border-radius: 999px;
 }
 .ss svg { width: 11px; height: 11px; }
@@ -1036,7 +1039,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .slike-traka .st-mere b { color: var(--text-2); font-weight: 600; }
 
 /* mera ispod dugmeta za sliku u modalu */
-.mera { text-align: center; font-size: 10.5px; color: var(--text-3); margin-top: 5px; font-variant-numeric: tabular-nums; }
+.mera { text-align: center; font-size: 11px; color: var(--text-3); margin-top: 5px; font-variant-numeric: tabular-nums; }
 .mera-uz { color: var(--text-3); font-weight: 500; text-transform: none; letter-spacing: 0; margin-left: 6px; }
 
 /* Promo baneri */
@@ -1083,7 +1086,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .tex-nota { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); margin-bottom: 14px; }
 .tex-nota svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--text-3); }
 .tex-jacina { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.tex-grupa { margin-left: 8px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-3); }
+.tex-grupa { margin-left: 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-3); }
 .tex-grupa:first-child { margin-left: 0; }
 .tex-mreza { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(158px, 100%), 1fr)); gap: 12px; }
 .tex-kartica {
@@ -1332,6 +1335,9 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
   }
   @keyframes pf-in { from { opacity: 0; transform: translateY(-6px) scale(0.96); } }
   .nav { flex-direction: row; gap: 2px; width: 100%; overflow-y: visible; margin: 0; padding: 0; }
+  /* Jedini tekst u programu ispod 11px, i namerno: petnaest stavki mora da
+     stane u širinu telefona, a telefon se gleda iz ruke, ne iz stolice. Uz
+     natpis stoji i ikona, pa se stavka prepoznaje i pre nego što se pročita. */
   .nav-item { position: relative; flex-direction: column; gap: 3px; padding: 7px 6px; font-size: 10px; flex: 1; min-width: 58px; text-align: center; }
   .nav-item span.label { font-size: 10px; font-weight: 500; }
   .nav-item svg { width: 19px; height: 19px; }
@@ -1472,3 +1478,10 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 
 .bk-akcije { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
 .bk-nap { font-size: 11.5px; line-height: 1.4; }
+
+/* RAZDVAJANJE PODATAKA U REDU
+   "18:53 · sa kredita · 210 RSD" - tackica kao SLOVO menja velicinu sa fontom,
+   ne moze da se stisa, i zavrsi u tekstu koji neko kopira. Ovde je razmak, a
+   gde treba i NACRTANA tackica. Isto radi launcher (.por-meta u launcher.css). */
+.uz { display: inline-flex; align-items: center; gap: 8px; }
+.uz-tacka { width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: 0.5; flex: none; }

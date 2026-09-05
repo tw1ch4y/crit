@@ -9,6 +9,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { KOREN } from "./_okruzenje.mjs";
+// Nivoi, boje imena i okviri se UZIMAJU iz programa, ne prepisuju ovde. Da
+// pregled drzi svoju kopiju, pokazivao bi nivoe kojih vise nema - a bas se po
+// njemu ocenjuje kako izgleda.
+import { nivoZa, otkljucanoZa, BOJE_IMENA, OKVIRI } from "../server/src/nivoi.js";
 
 const IZVOR = path.join(KOREN, "client", "renderer");
 const CILJ = path.join(KOREN, "server", "public", "_proba");
@@ -40,6 +44,34 @@ const MOST = `// Lazni most ka Electronu, samo za pregled izgleda.
 })();
 `;
 
+// Iskustvo izmisljenog igraca. Namerno je u sredini nekog nivoa: prazna i puna
+// traka izgledaju dobro same po sebi, a greske se vide na pola.
+//
+//   node pregled-launchera.mjs --xp 0       zakljucano stanje ("Uskoro!")
+//   node pregled-launchera.mjs --xp 32400   poslednji nivo, traka puna
+const XP_PREGLED = (() => {
+  const i = process.argv.indexOf("--xp");
+  const v = i >= 0 ? Number(process.argv[i + 1]) : NaN;
+  return Number.isFinite(v) ? v : 4200;
+})();
+
+// Isti oblik koji server salje launcheru (vipOd / profilIgraca u service.js).
+// Racun nivoa se ne prepisuje - zove se onaj iz programa.
+const vipZa = (xp) => {
+  const n = nivoZa(xp);
+  return { nivo: n.nivo, naziv: n.naziv, xp: n.uNivou, xpDo: n.poslednji ? null : n.zaSledeci,
+    poslednji: n.poslednji, sledeci: n.sledeciNaziv, vip: n.nivo >= 5 };
+};
+const profilZa = (xp) => {
+  const n = nivoZa(xp);
+  return { username: "marko", ime: "Marko", clanOd: Date.now() - 240 * 24 * 3600 * 1000,
+    nivo: n.nivo, naziv: n.naziv, xp: n.xp, uNivou: n.uNivou, zaSledeci: n.zaSledeci,
+    doSledeceg: n.doSledeceg, poslednji: n.poslednji, sledeciNaziv: n.sledeciNaziv,
+    sati: 96.5, poseta: 41, porudzbina: 63, omiljenaIgra: "Counter-Strike 2", omiljenaPuta: 28,
+    izgled: { boja: "bela", okvir: "nema" }, otkljucano: otkljucanoZa(xp),
+    boje: BOJE_IMENA, okviri: OKVIRI };
+};
+
 const PODACI = `// Puni launcher pravim podacima sa servera, kao da je igrac prijavljen.
 (async () => {
   await new Promise((r) => setTimeout(r, 250));
@@ -54,7 +86,8 @@ const PODACI = `// Puni launcher pravim podacima sa servera, kao da je igrac pri
     settings: { cafeName: "Crit", currency: "RSD", ratePerHour: 120 }, shop, games, tools, pozadine: poz.slike || {},
     tekstura: tex.izbor, promo: (promo || []).filter((x) => x.available) });
   window.__salji({ t: "login_ok", player: { id: 1, username: "marko", displayName: "Marko" },
-    balance: 640, remainingSeconds: 19200, session: { id: 1, startedAt: Date.now() - 3600000 }, skoroIgrane: [] });
+    balance: 640, remainingSeconds: 19200, session: { id: 1, startedAt: Date.now() - 3600000 }, skoroIgrane: [],
+    vip: ${JSON.stringify(vipZa(XP_PREGLED))}, profil: ${JSON.stringify(profilZa(XP_PREGLED))} });
 })();
 `;
 

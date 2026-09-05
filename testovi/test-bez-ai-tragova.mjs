@@ -47,9 +47,22 @@ for (const [ime, izvor] of [["launcher.js", jsTekst], ["index.html", htmlTekst],
 
 // ---- tackica kao separator izmedju reci ----
 // "18:53 · sa kredita · 210 RSD" - razdvaja se razmakom, ne interpunkcijom.
-for (const [ime, izvor] of [["launcher.js", jsTekst], ["index.html", htmlTekst]]) {
-  const nadjeno = (izvor.match(/·/g) || []).length;
-  proveri(`${ime}: nema tackica kao separatora (·)`, nadjeno === 0, `${nadjeno} komada`);
+//
+// Gleda se i HTML zapis (&middot;, &bull;, &mdash;): u profilu je stajalo
+// "Srebro &middot; nivo 3" - na ekranu tackica, u fajlu nije, pa je proslo
+// pored pravila. Pravilo je o onome sto igrac VIDI.
+//
+// PANEL SE PROVERAVA ISTO. Isti covek gleda oba ekrana, cesto jedan pored
+// drugog; pravilo koje vazi samo za launcher deli program na dve kuce.
+const panelJs = bezKomentara(citajIzvor("server/public/js/app.js"));
+const panelHtml = bezKomentara(citajIzvor("server/public/index.html"));
+const ZNAKOVI = [["·", /·/g], ["&middot;", /&middot;|&bull;|&#183;|&#8226;/gi], ["— –", /[—–]|&mdash;|&ndash;/gi]];
+for (const [ime, izvor] of [["launcher.js", jsTekst], ["index.html", htmlTekst],
+                           ["panel app.js", panelJs], ["panel index.html", panelHtml]]) {
+  for (const [sta, uzorak] of ZNAKOVI) {
+    const nadjeno = (izvor.match(uzorak) || []).length;
+    proveri(`${ime}: nema "${sta}" kao separatora`, nadjeno === 0, `${nadjeno} komada`);
+  }
 }
 
 // ---- ukrasne strelice i kvacice u tekstu ----

@@ -19,7 +19,14 @@
   --line-2: rgba(255, 255, 255, 0.15);
   --text: #f1f4fb;
   --text-2: #a4adca;
-  --text-3: #626c8c;
+  /* TREĆI STEPEN TEKSTA MORA DA SE ČITA.
+     Bio je #626c8c: odnos prema podlozi 3.75:1, a na svetlijim pločama 2.6:1 -
+     ispod granice od 4.5:1 na kojoj se sitno slovo još čita. Njime su pisane
+     baš oznake koje kažu ŠTA je broj pored njih ("KREDIT", "PREOSTALO"), i to
+     na ekranu koji igrač gleda iz stolice, ne iz ruke. Ova vrednost daje
+     4.5-6.5:1 na svakoj podlozi u programu. Ista je i u panelu - jedna kuća,
+     jedna lestvica. */
+  --text-3: #8c96b7;
 
   /* Boja kuće. Menja je vlasnik iz panela (Izgled launchera), ovde je samo
      fabrička vrednost - plava sa znaka. Ime je `--brend`, ne `--red`: dok se
@@ -34,11 +41,20 @@
   --brend-deep: #2454c4;
   --brend-soft: rgba(47, 106, 232, 0.15);
   --brend-glow: rgba(47, 106, 232, 0.55);
+  /* ČETIRI BOJE KOJE NEŠTO ZNAČE. Ne biraju se i ne koriste se za ukras - po
+     njima igrač na prvi pogled zna šta gleda, pa svaka mora da znači jedno:
+       zlatna  nagrada (točak, VIP, prelazak nivoa, otključano)
+       zelena  ima kredita
+       žuta    pažnja: malo na stanju, uskoro ističe
+       crvena  ističe vreme, zaključano, nema na stanju
+     Boja kuće ne sme da im se približi - to čuva `zamerkeNaBoju` u service.js.
+     Žuta je dobila svoju vrednost: dok je bila ista kao zlatna, oznaka "malo na
+     stanju" je izgledala kao nagrada, a razlika je postojala samo u imenu. */
   --gold: #ffb527;
   --gold-glow: rgba(255, 181, 39, 0.55);
   --green: #33e284;
   --green-glow: rgba(51, 226, 132, 0.5);
-  --amber: #ffb527;
+  --amber: #ff7a26;
   --red-status: #ff3b3b;
   --red-status-rgb: 255, 59, 59;
 
@@ -381,7 +397,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 }
 .lb-pod {
   margin-top: 10px; font-family: var(--font-ui); font-weight: 700;
-  font-size: clamp(10px, 0.8vw, 12px); letter-spacing: 0.36em;
+  font-size: clamp(11px, 0.8vw, 12px); letter-spacing: 0.36em;
   text-transform: uppercase; color: var(--text-3);
 }
 /* Dva podatka koja gost sa ulice stvarno pita. Cena je krupna, jer je to prvo
@@ -389,7 +405,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .lb-cinjenice { display: flex; gap: 34px; margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
 .lb-c { display: flex; flex-direction: column; gap: 6px; }
 .lb-c-l {
-  font-family: var(--font-ui); font-size: 10px; font-weight: 700;
+  font-family: var(--font-ui); font-size: 11px; font-weight: 700;
   letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-3);
 }
 .lb-c-v {
@@ -473,7 +489,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
 }
 .hud-chip::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 0 1px var(--line); clip-path: inherit; pointer-events: none; }
-.hud-chip .hc-l { font-size: 9px; color: var(--text-3); font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.14em; font-weight: 700; }
+.hud-chip .hc-l { font-size: 11px; color: var(--text-3); font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.14em; font-weight: 700; }
 .hud-chip .hc-v { font-size: 15px; font-weight: 800; line-height: 1.15; white-space: nowrap; }
 .hud-chip.bal .hc-v { color: var(--green); font-variant-numeric: tabular-nums; text-shadow: 0 0 14px var(--green-glow); }
 .hud-chip.timer { padding-right: 17px; }
@@ -538,11 +554,15 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 }
 .tile-emoji { font-size: 64px; line-height: 1; opacity: 0.8; filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.5)); }
 /* Oznaka kategorije. Stoji DOLE levo, iznad imena - korice gotovo uvek nose
-   naziv igre pri vrhu, pa bi oznaka gore sekla logo. */
+   naziv igre pri vrhu, pa bi oznaka gore sekla logo.
+   Bila je zlatna. Zlatna u ovom programu znaci NAGRADU (tocak, VIP, prelazak
+   nivoa), a na polici je stajalo dvanaest zlatnih natpisa odmah ispod zlatne
+   VIP trake - oko je vukla kategorija igre, a ne ono sto se stvarno dobija.
+   Kategorija je podatak, ne nagrada, pa je i boja mirna. */
 .tile-badge {
   position: absolute; bottom: 46px; left: 9px; z-index: 5;
-  font-size: 9.5px; font-weight: 700; font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--gold); background: rgba(var(--bg-rgb), 0.72); padding: 4px 8px;
+  font-size: 11px; font-weight: 700; font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--text-2); background: rgba(var(--bg-rgb), 0.72); padding: 4px 8px;
   clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
   backdrop-filter: blur(4px);
 }
@@ -638,7 +658,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   text-transform: uppercase; line-height: 1; letter-spacing: 0.02em; color: var(--text);
 }
 .hb-pod {
-  margin-top: 9px; font-family: var(--font-ui); font-weight: 700; font-size: clamp(10px, 0.85vw, 13px);
+  margin-top: 9px; font-family: var(--font-ui); font-weight: 700; font-size: clamp(11px, 0.85vw, 13px);
   text-transform: uppercase; letter-spacing: 0.34em; color: var(--text-3);
 }
 @media (max-width: 1100px) { .hb-tekst { display: none; } }
@@ -783,7 +803,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .games-shelf .tile { flex: 0 0 auto; align-self: stretch; max-height: 505px; scroll-snap-align: start; }
 .games-shelf .tile-media { height: 100%; width: auto; }
 .games-shelf .tile-name { font-size: clamp(13px, 1vw, 16px); }
-.games-shelf .tile-badge { font-size: clamp(9px, 0.72vw, 11px); }
+.games-shelf .tile-badge { font-size: 11px; }
 
 /* fallback pozadina za igru bez cover slike - svoja boja iz imena */
 /* PLOCICA BEZ KORICA
@@ -939,7 +959,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .acc-user { color: var(--text-3); font-size: 14px; margin-top: 3px; }
 .acc-stats { margin-left: auto; display: flex; gap: 34px; }
 .acc-stat { text-align: right; }
-.as-l { font-size: 10px; font-weight: 700; font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3); }
+.as-l { font-size: 11px; font-weight: 700; font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3); }
 .as-v { font-family: var(--font-display); font-weight: 700; font-size: 24px; font-variant-numeric: tabular-nums; margin-top: 5px; }
 .as-v.pos { color: var(--green); text-shadow: 0 0 16px var(--green-glow); }
 
@@ -962,10 +982,10 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .por-meta { display: flex; align-items: center; gap: 9px; color: var(--text-3); font-size: 11.5px; margin-top: 6px; font-variant-numeric: tabular-nums; }
 .por-tacka { width: 3px; height: 3px; border-radius: 50%; background: var(--text-3); opacity: 0.6; }
 .por-cena { font-family: var(--font-display); font-size: 15px; font-weight: 700; }
-.por-cena i { font-style: normal; font-size: 10px; margin-left: 3px; color: var(--text-3); }
+.por-cena i { font-style: normal; font-size: 11px; margin-left: 3px; color: var(--text-3); }
 /* Razdelnik između onoga što stiže i onoga što je već doneto. */
 .por-razdeo {
-  margin: 14px 0 6px; font-family: var(--font-ui); font-size: 10.5px; font-weight: 700;
+  margin: 14px 0 6px; font-family: var(--font-ui); font-size: 11px; font-weight: 700;
   letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3);
 }
 /* Porudžbina koja je u toku diše, da se od donetih razlikuje na prvi pogled. */
@@ -993,7 +1013,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .pod-grupa { margin-bottom: 16px; }
 .pod-nas {
   display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
-  font-family: var(--font-ui); font-size: 10.5px; font-weight: 700;
+  font-family: var(--font-ui); font-size: 11px; font-weight: 700;
   letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3);
 }
 .pod-nas svg { color: var(--gold); }
@@ -1060,7 +1080,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .nag-traka { height: 7px; margin-top: 12px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
 .nag-traka i { display: block; height: 100%; background: linear-gradient(90deg, var(--brend), var(--gold)); transition: width 0.5s var(--ease-out); }
 .nag-spisak-h {
-  margin: 22px 0 10px; font-family: var(--font-ui); font-size: 10.5px; font-weight: 700;
+  margin: 22px 0 10px; font-family: var(--font-ui); font-size: 11px; font-weight: 700;
   letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3);
 }
 .nag-spisak { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1194,7 +1214,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 }
 .poz-uzorak.izabran .pu-ime { color: var(--text); }
 .poz-podesavanja { display: flex; flex-wrap: wrap; gap: 22px; margin-top: 16px; }
-.pp-l { display: block; margin-bottom: 7px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; font-family: var(--font-ui); text-transform: uppercase; color: var(--text-3); }
+.pp-l { display: block; margin-bottom: 7px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; font-family: var(--font-ui); text-transform: uppercase; color: var(--text-3); }
 .pp-dugmad { display: flex; gap: 6px; }
 
 /* Promena lozinke: dva polja i dugme u jednom redu. Panel je iste sirine kao
@@ -1350,12 +1370,14 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
   transition: background var(--tr), color var(--tr), box-shadow var(--tr);
 }
 .shop-cip span {
-  font-size: 10.5px; letter-spacing: 0; color: var(--text-3);
+  font-size: 11px; letter-spacing: 0; color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
 .shop-cip:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
 .shop-cip.aktivan { color: #fff; background: rgba(255, 255, 255, 0.07); box-shadow: inset 0 0 0 1px var(--line-2); }
-.shop-cip.aktivan span { color: var(--gold); }
+/* Broj artikala na izabranom cipu: cip je vec osvetljen, drugi signal na
+   istom mestu samo dodaje suma - a zlatna ovde nista ne znaci. */
+.shop-cip.aktivan span { color: var(--text); }
 
 .shop-grid {
   display: grid; gap: 16px; align-content: start;
@@ -1401,13 +1423,13 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .pice-malo {
   position: absolute; top: 10px; left: 10px; z-index: 2;
   padding: 3px 7px; border-radius: 2px;
-  font-family: var(--font-ui); font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+  font-family: var(--font-ui); font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--amber);
-  background: rgba(10, 10, 14, 0.62); box-shadow: inset 0 0 0 1px rgba(255, 181, 39, 0.28);
+  background: rgba(var(--bg-rgb), 0.72); box-shadow: inset 0 0 0 1px rgba(255, 122, 38, 0.32);
 }
 .pice-nema {
   position: absolute; inset: auto 0 0; z-index: 2; text-align: center; padding: 7px 4px;
-  font-family: var(--font-ui); font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+  font-family: var(--font-ui); font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
   text-transform: uppercase; color: var(--text-2);
   background: linear-gradient(transparent, rgba(6, 6, 10, 0.94) 55%);
 }
@@ -1430,7 +1452,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .pice-cena, .cr-cena, .ct-cena { display: inline-flex; align-items: baseline; gap: 3px; font-variant-numeric: tabular-nums; }
 .pice-cena b { font-family: var(--font-display); font-weight: 700; font-size: 16px; line-height: 1; color: #fff; }
 .pice-cena i {
-  font-style: normal; font-family: var(--font-ui); font-size: 9.5px; font-weight: 700;
+  font-style: normal; font-family: var(--font-ui); font-size: 11px; font-weight: 700;
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3);
 }
 
@@ -1513,7 +1535,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 }
 .cr-cena b { font-family: var(--font-display); font-weight: 700; font-size: 14px; color: #fff; }
 .cr-cena i {
-  font-style: normal; font-family: var(--font-ui); font-size: 9px; font-weight: 700;
+  font-style: normal; font-family: var(--font-ui); font-size: 11px; font-weight: 700;
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3);
 }
 
@@ -1556,7 +1578,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
   font-family: var(--font-ui); font-size: 12px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.06em;
 }
-.nacin .n-opis { font-size: 10.5px; color: var(--text-3); line-height: 1.3; }
+.nacin .n-opis { font-size: 11px; color: var(--text-3); line-height: 1.3; }
 .nacin.aktivan .n-opis { color: var(--text-2); }
 .nacin.nemoguc, .nacin:disabled { opacity: 0.4; cursor: not-allowed; }
 .nacin.nemoguc .n-opis { color: var(--red-status); }
@@ -1571,7 +1593,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 }
 .ct-cena b { font-family: var(--font-display); font-weight: 700; font-size: 24px; line-height: 1; color: var(--gold); }
 .ct-cena i {
-  font-style: normal; font-family: var(--font-ui); font-size: 10px; font-weight: 700;
+  font-style: normal; font-family: var(--font-ui); font-size: 11px; font-weight: 700;
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3);
 }
 .cart-note { margin-top: 11px; text-align: center; color: var(--text-3); font-size: 11px; line-height: 1.5; }

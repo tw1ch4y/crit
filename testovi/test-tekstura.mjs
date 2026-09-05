@@ -7,6 +7,9 @@ const WebSocket = await ucitajWebSocket();
 const BASE = "http://127.0.0.1:8113", WSB = "ws://127.0.0.1:8113";
 const DATA = radniFolder("tekstura-data");
 await podigniServer(DATA, 8113);
+// Vrednosti se ne prepisuju ovde - test koji ima svoju kopiju lestvice prolazi
+// i posle promene, pa ne cuva nista.
+const svc = await import("../server/src/service.js");
 
 let pao = 0, prosao = 0;
 const proveri = (n, u, d = "") => { if (u) { prosao++; console.log("  OK   " + n); } else { pao++; console.log("  PAO  " + n + (d ? "  -> " + d : "")); } };
@@ -55,7 +58,8 @@ for (const [k, o] of Object.entries(spisak.spisak)) {
 const r1 = await api("/api/tekstura", "POST", { kljuc: "zvezde", jacina: "jako" });
 proveri("izbor se pamti", r1.status === 200 && r1.body.kljuc === "zvezde" && r1.body.jacina === "jako", JSON.stringify(r1.body));
 proveri("odgovor nosi saru i prozirnost",
-  /^url\("data:image/.test(r1.body.sara || "") && r1.body.prozirnost === 1, JSON.stringify({ p: r1.body.prozirnost }));
+  /^url\("data:image/.test(r1.body.sara || "") && r1.body.prozirnost === svc.PROZIRNOSTI.jako,
+  JSON.stringify({ p: r1.body.prozirnost }));
 
 const posle = (await api("/api/tekstura")).body;
 proveri("izbor prezivi novo citanje", posle.izbor.kljuc === "zvezde" && posle.izbor.jacina === "jako", JSON.stringify(posle.izbor));
@@ -101,7 +105,7 @@ await api("/api/tekstura", "POST", { kljuc: "romb", jacina: "slabo" });
 await cekaj(600);
 const push = [...poruke].reverse().find((m) => m.t === "tekstura");
 proveri("promena stize launcheru bez restarta", !!push, JSON.stringify(poruke.map((m) => m.t)));
-proveri("push nosi novu saru", push?.tekstura?.kljuc === "romb" && push?.tekstura?.prozirnost === 0.45, JSON.stringify(push?.tekstura));
+proveri("push nosi novu saru", push?.tekstura?.kljuc === "romb" && push?.tekstura?.prozirnost === svc.PROZIRNOSTI.slabo, JSON.stringify(push?.tekstura));
 ws.close();
 
 // ---- jedna definicija, bez kopija ----

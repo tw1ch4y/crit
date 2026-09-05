@@ -1799,7 +1799,11 @@ function sekcijaProfil() {
       </div>
       <div class="pf-ko">
         <div class="pf-ime" style="color:${esc((p.boje[p.izgled.boja] || {}).heks || "#eef1f8")}">${esc(p.ime)}</div>
-        <div class="pf-titula">${esc(p.naziv)} &middot; nivo ${p.nivo}</div>
+        ${/* Isto se cita i u VIP traci gore ("Nivo 3 - Srebro"). Dok je ovde
+             pisalo obrnuto i sa tackicom, ista stvar je na dva mesta izgledala
+             kao dve. Tackica je bila upisana kao &middot;, pa je prosla pored
+             pravila koje trazi sam znak. */ ""}
+        <div class="pf-titula">Nivo ${p.nivo} - ${esc(p.naziv)}</div>
       </div>
       <div class="pf-xp">
         <div class="pf-xp-broj">${Math.round(p.xp).toLocaleString("sr-Latn-RS")} <span>XP</span></div>

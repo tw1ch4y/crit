@@ -9,7 +9,7 @@ import { verifyPassword, hashPassword, rang } from "./auth.js";
 import { broadcastPanels, broadcastClients, sendClient, isClientOnline, izbaciPanel } from "./hub.js";
 import { banerIgre, promoCrit } from "./banner.js";
 import * as nad from "./nadogradnja.js";
-import { nivoZa, smeDa, otkljucanoZa, OTKLJUCAVANJA } from "./nivoi.js";
+import { nivoZa, smeDa, otkljucanoZa, OTKLJUCAVANJA, BOJE_IMENA, OKVIRI } from "./nivoi.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -2744,7 +2744,14 @@ export const TEKSTURE = {
   },
 };
 export const JACINE = { slabo: "Slabo", srednje: "Srednje", jako: "Jako" };
-export const PROZIRNOSTI = { slabo: 0.45, srednje: 0.75, jako: 1 };
+// KOLIKO SE ŠARA VIDI.
+//
+// Lestvica je bila 0.45 / 0.75 / 1: i najtiša postavka se čitala kao vodeni žig
+// preko celog ekrana, pa vlasnik nije imao izbor između "šara" i "bez šare".
+// Naslovi police ("IGRE", "INTERNET I ALATI") stoje na goloj šari, a reč koja
+// se ponavlja ispod naslova tuče se sa samim naslovom. Sada "jako" nosi ono
+// što je ranije bilo "srednje", a ispod toga postoje dve stvarno tiše.
+export const PROZIRNOSTI = { slabo: 0.22, srednje: 0.42, jako: 0.7 };
 
 // KRETANJE SARE
 // Sara moze polako da klizi. Namerno je SPORO: ovo stoji ceo dan iza igara i
@@ -3052,23 +3059,10 @@ function clientInstallStatus(computerId, msg) {
 
 // Boje imena i okviri koje igrač bira. Namerno kratak spisak: petnaest nijansi
 // znači da niko ne bira, a i svaka mora da bude čitljiva na tamnoj podlozi.
-export const BOJE_IMENA = {
-  bela:     { naziv: "Bela",     heks: "#eef1f8" },
-  plava:    { naziv: "Plava",    heks: "#4da3ff" },
-  tirkizna: { naziv: "Tirkizna", heks: "#3fd0e0" },
-  zelena:   { naziv: "Zelena",   heks: "#3dc97e" },
-  zlatna:   { naziv: "Zlatna",   heks: "#ffb527" },
-  narandzasta: { naziv: "Narandžasta", heks: "#ff8a3c" },
-  ljubicasta: { naziv: "Ljubičasta", heks: "#a97bff" },
-  roze:     { naziv: "Roze",     heks: "#ff7ac0" },
-};
-export const OKVIRI = {
-  nema:   { naziv: "Bez okvira" },
-  tanki:  { naziv: "Tanki" },
-  dvojni: { naziv: "Dvojni" },
-  zlatni: { naziv: "Zlatni" },
-  puls:   { naziv: "Pulsirajući" },
-};
+// Boje imena i okviri žive uz nivoe (nivoi.js) - to su nagrade, ne podaci o
+// igraču. Odavde se samo prosleđuju dalje, da ostatak programa ne mora da zna
+// odakle dolaze.
+export { BOJE_IMENA, OKVIRI };
 
 const profilIzBaze = (red) => {
   let p = {};

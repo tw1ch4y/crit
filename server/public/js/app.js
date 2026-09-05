@@ -1049,7 +1049,7 @@ function stationCard(c) {
         <span class="st-timer ${low ? "low" : ""}" data-rem="${rem ?? ""}">${dur(rem)}</span>
         <span class="st-bal">${money(c.player.balance)}</span>
       </div>
-      <div class="st-sub">Prijava ${clock(c.session?.startedAt)} &middot; igra <span data-since="${c.session?.startedAt ?? ""}">${c.session?.startedAt ? dur((Date.now() - c.session.startedAt) / 1000) : "-"}</span></div>`;
+      <div class="st-sub uz">Prijava ${clock(c.session?.startedAt)}<i class="uz-tacka"></i>igra <span data-since="${c.session?.startedAt ?? ""}">${c.session?.startedAt ? dur((Date.now() - c.session.startedAt) / 1000) : "-"}</span></div>`;
   } else {
     const txt = si.key === "locked" ? "Zaključan - čeka osoblje" : si.key === "offline" ? "Ugašen / nije povezan" : "Slobodan za prijavu";
     const ic = si.key === "locked" ? "lock" : si.key === "offline" ? "power" : "monitor";
@@ -1337,7 +1337,7 @@ function procesiModal(c) {
             <tbody>${vid.slice(0, 200).map((p) => `<tr>
               <td>
                 <b>${esc(p.ime)}</b>
-                <div class="faint" style="font-size:11.5px">PID ${p.pid}${p.putanja ? " &middot; " + esc(p.putanja) : ""}</div>
+                <div class="faint uz" style="font-size:11.5px">PID ${p.pid}${p.putanja ? `<i class="uz-tacka"></i>${esc(p.putanja)}` : ""}</div>
               </td>
               <td class="mono">${mem(p.memorija)}</td>
               <td style="text-align:right">${p.zasticen
@@ -3140,7 +3140,7 @@ function nadogradnjaHtml(n) {
     <div class="nad-vrh">
       <div><div class="faint" style="font-size:12px">Na serveru</div>
         <div style="font-size:20px;font-weight:700">${esc(n.verzija)}</div>
-        <div class="faint mono" style="font-size:12px">${esc(n.fajl)} · ${velicinaFajla(n.velicina)}</div></div>
+        <div class="faint mono uz" style="font-size:12px">${esc(n.fajl)}<i class="uz-tacka"></i>${velicinaFajla(n.velicina)}</div></div>
       <div><div class="faint" style="font-size:12px">Zaostaje</div>
         <div style="font-size:20px;font-weight:700">${n.zaostalih} ${n.zaostalih === 1 ? "računar" : "računara"}</div>
         <div class="faint" style="font-size:12px">od ${n.racunari.length}</div></div>

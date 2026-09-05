@@ -92,3 +92,26 @@ export function otkljucanoZa(xpSirovo) {
     kljuc, naziv: o.naziv, opis: o.opis, nivo: o.nivo, otkljucano: n >= o.nivo,
   }));
 }
+
+// ŠTA SE OTKLJUČAVA: BOJA IMENA I OKVIR
+//
+// Stoji ovde, uz nivoe, a ne uz bazu - to su same nagrade, ne podaci o igraču.
+// Tako do njih može i alat koji ne sme da otvori bazu (pregled izgleda), pa
+// pregled ne mora da drži svoju kopiju spiska koja bi se s vremenom razišla.
+export const BOJE_IMENA = {
+  bela:     { naziv: "Bela",     heks: "#eef1f8" },
+  plava:    { naziv: "Plava",    heks: "#4da3ff" },
+  tirkizna: { naziv: "Tirkizna", heks: "#3fd0e0" },
+  zelena:   { naziv: "Zelena",   heks: "#3dc97e" },
+  zlatna:   { naziv: "Zlatna",   heks: "#ffb527" },
+  narandzasta: { naziv: "Narandžasta", heks: "#ff8a3c" },
+  ljubicasta: { naziv: "Ljubičasta", heks: "#a97bff" },
+  roze:     { naziv: "Roze",     heks: "#ff7ac0" },
+};
+export const OKVIRI = {
+  nema:   { naziv: "Bez okvira" },
+  tanki:  { naziv: "Tanki" },
+  dvojni: { naziv: "Dvojni" },
+  zlatni: { naziv: "Zlatni" },
+  puls:   { naziv: "Pulsirajući" },
+};
