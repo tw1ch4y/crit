@@ -2187,7 +2187,7 @@ function shopModal(item) {
         <div class="field"><label>Naziv</label><input id="siName" value="${esc(it.name)}" autofocus /></div>
         <div class="form-row">
           <div class="field"><label>Cena (${cur()})</label><input id="siPrice" type="number" value="${it.price}" /></div>
-          <div class="field"><label>Kategorija</label><input id="siCat" value="${esc(it.category)}" /></div></div>
+          <div class="field"><label>Kategorija</label><input id="siCat" list="siCatLista" value="${esc(it.category)}" />${ponudaKategorija(state.shop, "siCatLista")}</div></div>
         <div class="field"><label>Stanje (zaliha)</label><input id="siStock" type="number" value="${it.stock == null ? "" : it.stock}" placeholder="prazno = neograniceno" /></div>
       </div>
     </div>
@@ -2319,6 +2319,23 @@ document.addEventListener("click", async (e) => {
     }
   }
 });
+// KATEGORIJA SE NUDI, NE PAMTI SE NAPAMET
+//
+// Polje ostaje polje za kucanje - niko ne zna unapred šta će igraonica prodavati.
+// Ali čovek koji u utorak upiše "Piće" u četvrtak upiše "Pića", pa u launcheru
+// stoje dve police za istu stvar, obe sa po tri artikla. Ispod polja stoji ono
+// što već postoji, pa je lakše kliknuti nego se setiti kako je bilo napisano.
+//
+// Server uz to sam poklapa iste reči koje se razlikuju samo po velikom slovu,
+// razmaku ili kvačici (vidi `uskladiKategoriju` u service.js) - to je ono što
+// se sa sigurnošću zna da je ista stvar.
+function ponudaKategorija(spisak, id) {
+  const kat = [...new Set((spisak || []).map((x) => String(x.category || "").trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "sr-Latn-RS"));
+  if (!kat.length) return "";
+  return `<datalist id="${id}">${kat.map((k) => `<option value="${esc(k)}"></option>`).join("")}</datalist>`;
+}
+
 function gameModal(game) {
   const g = game || { name: "", path: "", args: "", emoji: "", category: "Igre", image: null, banner: null };
   let picked = null, removeImg = false;      // cover (3:4)
@@ -2335,7 +2352,7 @@ function gameModal(game) {
       <div style="flex:1;display:grid;gap:13px">
         <div class="field"><label>Naziv</label><input id="giName" value="${esc(g.name)}" autofocus /></div>
         <div class="form-row">
-          <div class="field"><label>Kategorija</label><input id="giCat" value="${esc(g.category)}" /></div></div>
+          <div class="field"><label>Kategorija</label><input id="giCat" list="giCatLista" value="${esc(g.category)}" />${ponudaKategorija(window._games, "giCatLista")}</div></div>
       </div>
     </div>
     <div class="field"><label>Putanja do .exe ili internet adresa</label><input id="giPath" value="${esc(g.path)}" placeholder="C:\\Games\\igra.exe" /></div>

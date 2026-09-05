@@ -97,6 +97,30 @@ await cekaj(400);
 proveri("podrazumevana boja se uvek sme", !!poruke.find((m) => m.t === "profil"),
   JSON.stringify(poruke.map((m) => m.t)));
 
+// ---- 5b) PROFIL SE MOZE I ZATRAZITI ----
+//
+// Profil stize uz prijavu. Ako bas tada pukne veza, launcher je ostajao sa
+// natpisom "Profil se ucitava..." koji nije bio istinit - niko nista nije
+// trazio, pa nista nikad ne bi ni stiglo.
+poruke.length = 0;
+w.send(JSON.stringify({ t: "moj_profil" }));
+await cekaj(400);
+const vracen = poruke.find((m) => m.t === "profil");
+proveri("poruka bez izmene vraca profil", !!vracen?.profil?.otkljucano,
+  JSON.stringify(poruke.map((m) => m.t)));
+// Trazenje nije izmena. Dok se za svako trazenje upisivalo "isto sto je vec
+// tu", profil je u bazi dobijao nov zapis pri svakom otvaranju stranice.
+const logPre = (await api("/api/logs")).body?.length ?? 0;
+const izgledPre = JSON.stringify(vracen.profil.izgled);
+poruke.length = 0;
+w.send(JSON.stringify({ t: "moj_profil" }));
+await cekaj(400);
+const opet = poruke.find((m) => m.t === "profil");
+proveri("trazenje ne menja izgled", JSON.stringify(opet?.profil?.izgled) === izgledPre,
+  `${izgledPre} -> ${JSON.stringify(opet?.profil?.izgled)}`);
+proveri("trazenje ne pravi zapis u logovima", ((await api("/api/logs")).body?.length ?? 0) === logPre,
+  "izmena koju igrac nije napravio ne sme da stoji u logovima");
+
 // ---- 6) PRELAZAK NIVOA SE JAVLJA ODMAH ----
 //
 // Bez toga bi napredak postojao samo u bazi: igrac bi jednom slucajno primetio

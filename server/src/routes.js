@@ -498,7 +498,7 @@ router.post("/shop", requireOwner, (req, res) => {
   if (!name || price == null) return res.status(400).json({ error: "Naziv i cena su obavezni" });
   if (!cenaOk(price)) return res.status(400).json({ error: "Cena mora biti broj veći ili jednak nuli" });
   const info = db.prepare("INSERT INTO shop_items (name, category, price, emoji, stock) VALUES (?,?,?,?,?)")
-    .run(name, category || "Ostalo", Number(price), emoji || "", parseStock(stock));
+    .run(name, svc.uskladiKategoriju(category, svc.kategorije("shop")) || "Ostalo", Number(price), emoji || "", parseStock(stock));
   svc.logEvent({ category: "podesavanja", action: "shop_add", actor: req.admin.username, target: name, detail: `Dodat artikal, cena ${Number(price)}` });
   svc.pushCatalog();
   res.json({ ok: true, id: info.lastInsertRowid });
@@ -513,7 +513,7 @@ router.put("/shop/:id", requireOwner, (req, res) => {
   const cena = price == null ? it.price : Number(price);
   if (!cenaOk(cena)) return res.status(400).json({ error: "Cena mora biti broj veći ili jednak nuli" });
   db.prepare("UPDATE shop_items SET name=?, category=?, price=?, emoji=?, available=?, stock=? WHERE id=?")
-    .run(name, category ?? it.category ?? "Ostalo", cena, emoji ?? it.emoji ?? "",
+    .run(name, category == null ? (it.category || "Ostalo") : (svc.uskladiKategoriju(category, svc.kategorije("shop")) || "Ostalo"), cena, emoji ?? it.emoji ?? "",
       available === undefined ? it.available : (available ? 1 : 0),
       stock === undefined ? it.stock : parseStock(stock), id);
   svc.logEvent({ category: "podesavanja", action: "shop_edit", actor: req.admin.username, target: name, detail: `Izmenjen artikal, cena ${cena}` });
@@ -580,7 +580,7 @@ router.post("/games", requireOwner, (req, res) => {
   const name = ocistiIme(req.body?.name);
   if (!name || !p) return res.status(400).json({ error: "Naziv i putanja su obavezni" });
   const info = db.prepare("INSERT INTO games (name, path, args, emoji, category, available) VALUES (?,?,?,?,?,?)")
-    .run(name, p, args || "", emoji || "", category || "Igre", available === false ? 0 : 1);
+    .run(name, p, args || "", emoji || "", svc.uskladiKategoriju(category, svc.kategorije("igre")) || "Igre", available === false ? 0 : 1);
   svc.logEvent({ category: "podesavanja", action: "game_add", actor: req.admin.username, target: name, detail: "Dodata igra" });
   svc.pushCatalog();
   res.json({ ok: true, id: info.lastInsertRowid });
@@ -597,7 +597,7 @@ router.put("/games/:id", requireOwner, (req, res) => {
   if (!name) return res.status(400).json({ error: "Naziv je obavezan" });
   if (!p) return res.status(400).json({ error: "Putanja je obavezna" });
   db.prepare("UPDATE games SET name=?, path=?, args=?, emoji=?, category=?, available=? WHERE id=?")
-    .run(name, p, iliStaro(args, g.args), iliStaro(emoji, g.emoji), iliStaro(category, g.category, "Igre"),
+    .run(name, p, iliStaro(args, g.args), iliStaro(emoji, g.emoji), svc.uskladiKategoriju(iliStaro(category, g.category, "Igre"), svc.kategorije("igre")) || "Igre",
       vidljivost(available, g.available), id);
   svc.logEvent({ category: "podesavanja", action: "game_edit", actor: req.admin.username, target: name, detail: `Izmenjena igra${available === false ? " (sakrivena)" : ""}` });
   svc.pushCatalog();

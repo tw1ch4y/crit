@@ -512,6 +512,9 @@ function handleMsg(m) {
       S.mojaTekstura = m.mojaTekstura || null;
       S.vip = m.vip || null;
       S.profil = m.profil || null;
+      // Sledeći igrač ne nasleđuje ni tuđi profil ni tuđe čekanje na njega.
+      clearTimeout(profilTajmer);
+      profilStanje = S.profil ? "stigao" : "nije";
       S.accSekcija = null; // sledeci igrac ne nasledjuje odeljak koji je prethodni gledao
       S.tocak = m.tocak || null;
       osveziZnackuNaloga();
@@ -648,6 +651,8 @@ function handleMsg(m) {
       break;
     case "profil":
       S.profil = m.profil || null;
+      clearTimeout(profilTajmer);
+      profilStanje = S.profil ? "stigao" : "palo";
       if (S.tab === "account") renderContent();
       break;
     case "profil_err":
@@ -1757,10 +1762,38 @@ function sadrzajSekcije() {
 // traka, brojke koje je sam napravio, i spisak onoga što ga tek čeka. Poslednje
 // je namerno: nagrada koja se ne vidi unapred nije nagrada nego iznenađenje, a
 // iznenađenje ne motiviše da se dođe ponovo.
+// KAD PROFILA NEMA, ONDA GA NEKO I TRAŽI.
+//
+// Profil stiže uz prijavu. Ako baš tada pukne veza, ostao bi prazan ekran sa
+// natpisom "Profil se učitava..." - a niko ništa nije tražio, pa se ništa nikad
+// ne bi ni učitalo. Natpis koji nije istinit gori je od poruke o grešci: igrač
+// čeka nešto što ne dolazi.
+// Tri stanja, ne jedno: "nije traženo", "traži se", "nije stiglo".
+let profilStanje = "nije";
+let profilTajmer = null;
+function traziProfil() {
+  if (S.profil) return;
+  clearTimeout(profilTajmer);
+  profilStanje = "ceka";
+  window.crit.toServer({ t: "moj_profil" });   // bez izmene znači "pošalji mi profil"
+  profilTajmer = setTimeout(() => {
+    if (S.profil) return;
+    profilStanje = "palo";
+    if (S.tab === "account") renderContent();
+  }, 6000);
+}
+
 function sekcijaProfil() {
   const p = S.profil;
   if (!p) {
-    return `<div class="acc-prazno">${icon("user", 34)}<div>Profil se učitava...</div></div>`;
+    if (profilStanje === "nije") traziProfil();
+    return profilStanje === "palo"
+      ? `<div class="acc-prazno">${icon("user", 34)}
+          <div class="ap-t">Profil nije stigao</div>
+          <div class="ap-o">Veza sa serverom je prekinuta dok se profil učitavao.</div>
+          <button class="btn" data-profil-ponovo style="margin-top:14px">Pokušaj ponovo</button>
+        </div>`
+      : `<div class="acc-prazno">${icon("user", 34)}<div class="ap-t">Učitavam profil</div></div>`;
   }
   const naKraju = !!p.poslednji;
   const postotak = naKraju ? 100
@@ -2357,6 +2390,13 @@ $("#content").addEventListener("click", (e) => {
   // Zakljucano se ni ne salje - dugme je sivo i ne reaguje. Server svejedno
   // proverava isto (vidi sacuvajProfilIgraca): launcher stoji na racunaru
   // igraca, pa nije mesto na kom se odlucuje sta sme.
+  if (e.target.closest("[data-profil-ponovo]")) {
+    traziProfil();
+    renderContent();
+    sfx.click();
+    return;
+  }
+
   const pfB = e.target.closest("[data-pf-boja]");
   const pfO = e.target.closest("[data-pf-okvir]");
   if (pfB || pfO) {

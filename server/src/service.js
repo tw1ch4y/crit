@@ -570,6 +570,37 @@ export function shopList() {
 export function gamesList() {
   return db.prepare("SELECT * FROM games ORDER BY sort, name").all();
 }
+
+// KATEGORIJA SE PIŠE JEDNOM, PA SE PONAVLJA
+//
+// Polje za kategoriju je obično polje za kucanje, i tako mora da ostane - niko
+// ne zna unapred šta će igraonica prodavati. Ali čovek koji u utorak upiše
+// "Piće" u četvrtak upiše "piće" ili "Pice", pa u launcheru stoje dve police za
+// istu stvar, obe sa po tri artikla.
+//
+// Ovde se hvata ono što je SIGURNO ista reč: razmak, veliko/malo slovo i
+// kvačice (ko kuca "pice" misli "Piće"). Kad se poklopi, uzima se POSTOJEĆI
+// zapis - onaj koji je vlasnik već video u launcheru.
+//
+// Stvarno različit zapis ("Piće" i "Pića", "Toplo" i "Topli napici") se odavde
+// ne može razlikovati od namere, pa se ne dira. Tu pomaže spisak postojećih
+// ispod polja u panelu: lakše je kliknuti na ono što već postoji nego kucati.
+const golo = (s) => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")   // kvacice: pisu se kodovima, jer su same po sebi nevidljive u fajlu
+  .replace(/[đĐ]/g, "d").toLowerCase().replace(/\s+/g, " ").trim();
+
+export function uskladiKategoriju(novo, postojece) {
+  const cisto = String(novo ?? "").replace(/\s+/g, " ").trim();
+  if (!cisto) return "";
+  const isto = (postojece || []).find((k) => golo(k) === golo(cisto));
+  return isto || cisto;
+}
+
+// Sve kategorije koje se već koriste, po abecedi. Panel ih nudi ispod polja.
+export function kategorije(sta) {
+  const red = sta === "igre" ? gamesList() : shopList();
+  return [...new Set(red.map((r) => String(r.category || "").trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "sr-Latn-RS"));
+}
 // samo dostupne igre (za launcher - sakrivene se ne šalju igraču)
 export function gamesForClient() {
   return db.prepare("SELECT * FROM games WHERE available = 1 ORDER BY sort, name").all();
@@ -1044,6 +1075,14 @@ function clientTekstura(computerId, msg) {
 function clientProfil(computerId, msg) {
   const comp = computerById(computerId);
   if (!comp?.current_player_id) return;
+  // Poruka bez ijedne izmene znaci "posalji mi profil". Profil inace stize uz
+  // prijavu; ovo je za slucaj kad je veza pukla bas tada, pa je launcher ostao
+  // sa praznim ekranom i natpisom da se ucitava - a niko nista nije trazio.
+  // Ne upisuje se nista: upis "istih vrednosti" izgleda kao izmena u bazi i u
+  // logovima, a nije.
+  if (msg.boja == null && msg.okvir == null) {
+    return sendClient(computerId, { t: "profil", profil: profilIgraca(comp.current_player_id) });
+  }
   const r = sacuvajProfilIgraca(comp.current_player_id, { boja: msg.boja, okvir: msg.okvir });
   if (r.error) return sendClient(computerId, { t: "profil_err", message: r.error });
   sendClient(computerId, { t: "profil", profil: profilIgraca(comp.current_player_id) });
