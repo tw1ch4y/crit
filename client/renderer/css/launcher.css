@@ -319,7 +319,7 @@ svg { display: block; }
   font-family: var(--font-ui); font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;
 }
 input {
-  width: 100%; background: rgba(6, 6, 10, 0.7); border: 1px solid var(--line-2);
+  width: 100%; background: rgba(var(--bg-rgb), 0.7); border: 1px solid var(--line-2);
   border-left: 2px solid var(--line-2);
   border-radius: 0; padding: 13px 15px; font-size: 15px; color: var(--text); outline: none;
   font-family: var(--font-ui); font-weight: 500; letter-spacing: 0.02em;
@@ -329,7 +329,7 @@ input {
 input[type="password"] { letter-spacing: 0.16em; }
 input::placeholder { color: var(--text-3); }
 input:hover { border-color: var(--line-2); border-left-color: var(--text-3); }
-input:focus { border-color: var(--brend); border-left-color: var(--brend); box-shadow: 0 0 0 3px var(--brend-soft), 0 0 26px -6px var(--brend-glow); background: rgba(6, 6, 10, 0.9); }
+input:focus { border-color: var(--brend); border-left-color: var(--brend); box-shadow: 0 0 0 3px var(--brend-soft), 0 0 26px -6px var(--brend-glow); background: rgba(var(--bg-rgb), 0.9); }
 
 /* Dugmad (iskošena, glow) */
 .btn {
@@ -431,7 +431,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .login-box {
   grid-column: 3; grid-row: 1;
   width: clamp(330px, 27vw, 400px); max-width: 92vw; padding: 32px 32px 28px;
-  background: linear-gradient(160deg, rgba(22, 22, 31, 0.92), rgba(16, 16, 23, 0.92));
+  background: linear-gradient(160deg, rgba(var(--bg-rgb), 0.86), rgba(var(--bg-rgb), 0.94));
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   clip-path: polygon(0 0, calc(100% - var(--cut-lg)) 0, 100% var(--cut-lg), 100% 100%, var(--cut-lg) 100%, 0 calc(100% - var(--cut-lg)));
   box-shadow: inset 0 0 0 1px var(--line-2), 0 30px 70px -30px rgba(0, 0, 0, 0.95);
@@ -500,7 +500,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   position: relative;
   display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
   padding: 7px 15px 8px; min-width: 92px;
-  background: rgba(16, 16, 23, 0.9);
+  background: rgba(var(--bg-rgb), 0.9);
   clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
 }
 .hud-chip::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 0 1px var(--line); clip-path: inherit; pointer-events: none; }
@@ -582,7 +582,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   backdrop-filter: blur(4px);
 }
 /* ime na dnu preko slike (scrim) */
-.tile-scrim { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; padding: 34px 13px 13px; background: linear-gradient(transparent, rgba(5, 5, 9, 0.94) 60%); transition: background var(--tr); }
+.tile-scrim { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; padding: 34px 13px 13px; background: linear-gradient(transparent, rgba(var(--bg-rgb), 0.94) 60%); transition: background var(--tr); }
 .tile-name { font-weight: 700; font-size: 15px; font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.02em; line-height: 1.2; }
 /* Dugme za pokretanje izlazi IZNAD imena, ime ostaje na svom mestu.
    Igrac na hover mora i dalje da vidi koju igru pokrece. */
@@ -612,7 +612,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .tile:active { transform: translateY(-2px); }
 .tile:hover .tile-media { box-shadow: inset 0 0 0 1.5px var(--brend), 0 22px 42px -16px rgba(0, 0, 0, 0.95), 0 0 34px -10px var(--brend-glow); }
 .tile:hover .tile-media img { transform: scale(1.07); }
-.tile:hover .tile-scrim { background: linear-gradient(transparent, rgba(5, 5, 9, 0.97) 55%); }
+.tile:hover .tile-scrim { background: linear-gradient(transparent, rgba(var(--bg-rgb), 0.97) 55%); }
 .tile:hover .tile-hover { opacity: 1; }
 .tile:hover .tile-hover .play-btn { transform: scale(1) translateY(0); }
 .tile:hover .tile-hover .play-label { opacity: 1; transform: none; }
@@ -831,7 +831,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   position: absolute; inset: 0; display: grid; place-items: center;
   background:
     radial-gradient(130% 78% at 50% 0%, hsl(var(--h) 58% 34% / 0.34), transparent 66%),
-    linear-gradient(160deg, #16161d, #0b0b10 72%);
+    linear-gradient(160deg, var(--panel), var(--bg-2) 72%);
 }
 .tile-fallback::after {
   content: ""; position: absolute; inset: 0;
@@ -885,7 +885,12 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .sb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); flex-shrink: 0; }
 .sb-item.ok { color: var(--text-2); }
 .sb-item.ok .sb-dot { background: var(--green); box-shadow: 0 0 7px var(--green-glow); }
-#sbNet:not(.ok) .sb-dot, #sbInet:not(.ok) .sb-dot { background: var(--red-status); box-shadow: 0 0 7px var(--brend-glow); }
+/* Crveno znaci NE RADI. Kad se ne zna (server ne javlja, pa launcher nema
+   odakle da sazna kakav je internet), tacka ostaje siva - crvena tacka pored
+   crtice bi rekla "nema interneta", a to niko nije proverio. Traka onda salje
+   igraca da trazi kvar tamo gde ga mozda nema. */
+#sbNet:not(.ok) .sb-dot, #sbInet.nema .sb-dot { background: var(--red-status); box-shadow: 0 0 7px var(--red-status); }
+#sbInet:not(.ok):not(.nema) .sb-dot { background: var(--text-3); box-shadow: none; }
 #sbClock .sb-txt, #sbPc .sb-txt { color: var(--text-2); }
 .sb-item.hot { color: var(--red-status); }
 .sb-item.hot .sb-txt, .sb-item.hot svg { color: var(--red-status); }
@@ -940,7 +945,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .acc-sek-h { margin-bottom: 18px; }
 .acc-sek-h h3 {
   font-family: var(--font-display); font-weight: 700; font-size: 17px;
-  text-transform: uppercase; letter-spacing: 0.05em; color: var(--gold); margin: 0;
+  text-transform: uppercase; letter-spacing: 0.05em; color: var(--text); margin: 0;
 }
 .acc-sek-h p { margin: 5px 0 0; color: var(--text-3); font-size: 13px; }
 /* Prazan odeljak govori šta da se uradi, ne samo da je prazno. */
@@ -992,8 +997,11 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
    zarezima: "2x Coca-Cola" se pročita odjednom, a spisak od tri pića se ne
    slije u rečenicu. */
 .por-stavke { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; line-height: 1.3; }
-.por-st { color: var(--text); }
-.por-st b { color: var(--gold); font-weight: 700; margin-right: 2px; }
+/* Kolicina je masna i bela, naziv mirniji: oko prvo uhvati KOLIKO, pa onda
+   cita STA. Kolicina je bila zlatna - a zlatna u ovom programu znaci nagradu,
+   pa je "1x" izgledalo kao da se nesto dobija. */
+.por-st { color: var(--text-2); }
+.por-st b { color: var(--text); font-weight: 700; margin-right: 2px; }
 .por-meta { display: flex; align-items: center; gap: 9px; color: var(--text-3); font-size: 12px; margin-top: 6px; font-variant-numeric: tabular-nums; }
 .por-tacka { width: 3px; height: 3px; border-radius: 50%; background: var(--text-3); opacity: 0.6; }
 .por-cena { font-family: var(--font-display); font-size: 15px; font-weight: 700; }
@@ -1004,19 +1012,24 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3);
 }
 /* Porudžbina koja je u toku diše, da se od donetih razlikuje na prvi pogled. */
-.por-red.u-toku { background: rgba(255, 181, 39, 0.05); }
+.por-red.u-toku { background: rgba(var(--brend-rgb), 0.06); }
 .por-red.u-toku .por-status { animation: por-disi 2.2s ease-in-out infinite; }
 @keyframes por-disi { 50% { opacity: 0.55; } }
 .por-status {
   flex-shrink: 0; font-size: 11px; font-weight: 700; font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.08em;
   padding: 6px 12px; color: var(--text-2); background: rgba(255, 255, 255, 0.05);
 }
-.por-red.ceka { box-shadow: inset 0 0 0 1px rgba(255, 181, 39, 0.3); }
-.por-red.ceka .por-status { color: var(--gold); background: rgba(255, 181, 39, 0.13); }
-/* "Sprema se" je zlatno, ne crveno. Crveno na ekranu znaci da nesto ne valja;
-   porudzbina koja se sprema je dobra vest i ne sme da lici na upozorenje. */
-.por-red.sprema { box-shadow: inset 0 0 0 1px rgba(255, 181, 39, 0.34); }
-.por-red.sprema .por-status { color: var(--gold); background: rgba(255, 181, 39, 0.13); }
+.por-red.ceka { box-shadow: inset 0 0 0 1px rgba(var(--brend-rgb), 0.42); }
+.por-red.ceka .por-status { color: var(--brend); background: rgba(var(--brend-rgb), 0.16); }
+/* Zivotni vek porudzbine ima svoje tri boje, i nijedna nije zlatna:
+     ceka / sprema se   boja kuce - posao je u toku, program radi na tome
+     doneto             zelena - gotovo
+     otkazano           precrtano i sivo
+   Crveno se ne koristi: crveno znaci da nesto ne valja, a porudzbina koja se
+   sprema je dobra vest. Zlatna se ne koristi jer znaci nagradu - a stajala je
+   na istom ekranu na kom stoji i pravi nagradni tocak. */
+.por-red.sprema { box-shadow: inset 0 0 0 1px rgba(var(--brend-rgb), 0.5); }
+.por-red.sprema .por-status { color: var(--brend); background: rgba(var(--brend-rgb), 0.18); }
 .por-red.gotovo { opacity: 0.6; }
 .por-red.gotovo .por-status { color: var(--green); background: rgba(51, 226, 132, 0.12); }
 .por-red.otkazano { opacity: 0.55; }
@@ -1446,7 +1459,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
   position: absolute; inset: auto 0 0; z-index: 2; text-align: center; padding: 7px 4px;
   font-family: var(--font-ui); font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
   text-transform: uppercase; color: var(--text-2);
-  background: linear-gradient(transparent, rgba(6, 6, 10, 0.94) 55%);
+  background: linear-gradient(transparent, rgba(var(--bg-rgb), 0.94) 55%);
 }
 .pice.nema { opacity: 0.5; }
 .pice.nema .pice-slika img { opacity: 0.4; filter: grayscale(1); }
@@ -1503,18 +1516,18 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .shop-traka {
   width: 100%; margin-bottom: 14px; padding: 13px 16px; cursor: pointer;
   display: flex; align-items: center; gap: 12px; text-align: left;
-  background: rgba(255, 181, 39, 0.07); border: 0;
-  box-shadow: inset 0 0 0 1px rgba(255, 181, 39, 0.28);
+  background: rgba(var(--brend-rgb), 0.09); border: 0;
+  box-shadow: inset 0 0 0 1px rgba(var(--brend-rgb), 0.4);
   clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 11px 100%, 0 calc(100% - 11px));
   transition: background var(--t-brzo);
 }
-.shop-traka:hover { background: rgba(255, 181, 39, 0.12); }
+.shop-traka:hover { background: rgba(var(--brend-rgb), 0.15); }
 .st-tacka {
-  width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex-shrink: 0;
-  box-shadow: 0 0 0 4px rgba(255, 181, 39, 0.16); animation: st-kuc 1.8s ease-in-out infinite;
+  width: 8px; height: 8px; border-radius: 50%; background: var(--brend); flex-shrink: 0;
+  box-shadow: 0 0 0 4px rgba(var(--brend-rgb), 0.2); animation: st-kuc 1.8s ease-in-out infinite;
 }
-@keyframes st-kuc { 50% { box-shadow: 0 0 0 8px rgba(255, 181, 39, 0.05); } }
-.st-t { font-weight: 700; font-size: 14px; color: var(--gold); }
+@keyframes st-kuc { 50% { box-shadow: 0 0 0 8px rgba(var(--brend-rgb), 0.06); } }
+.st-t { font-weight: 700; font-size: 14px; color: var(--brend); }
 .st-o { font-size: 12px; color: var(--text-3); }
 .st-vise { margin-left: auto; display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text-2); }
 .st-vise svg { color: var(--text-3); }
@@ -1587,8 +1600,8 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 }
 .nacin svg { color: var(--text-3); margin-bottom: 3px; transition: color var(--tr); }
 .nacin:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); color: var(--text); }
-.nacin.aktivan { background: rgba(255, 255, 255, 0.06); color: #fff; box-shadow: inset 0 0 0 1px rgba(255, 181, 39, 0.5); }
-.nacin.aktivan svg { color: var(--gold); }
+.nacin.aktivan { background: rgba(255, 255, 255, 0.06); color: #fff; box-shadow: inset 0 0 0 1px rgba(var(--brend-rgb), 0.6); }
+.nacin.aktivan svg { color: var(--brend); }
 .nacin .n-ime {
   font-family: var(--font-ui); font-size: 12px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.06em;
@@ -1660,7 +1673,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .overlay {
   position: fixed; inset: 0; z-index: 300; display: none;
   align-items: center; justify-content: center;
-  background: rgba(4, 4, 7, 0.78); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  background: rgba(var(--bg-rgb), 0.78); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
 .overlay.active { display: flex; animation: screen-in 0.2s ease; }
 .dialog {
@@ -1694,7 +1707,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .toasts { position: fixed; bottom: 56px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 10px; z-index: 400; align-items: center; max-width: min(760px, 88vw); }
 .toast {
   display: flex; align-items: center; gap: 11px;
-  background: rgba(16, 16, 23, 0.96); backdrop-filter: blur(12px);
+  background: rgba(var(--bg-rgb), 0.96); backdrop-filter: blur(12px);
   border-left: 3px solid var(--brend);
   padding: 13px 20px; font-size: 14px; font-weight: 700;
   clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);

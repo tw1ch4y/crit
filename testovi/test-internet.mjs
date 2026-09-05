@@ -44,6 +44,14 @@ proveri("nepoznato se ne prikazuje kao 'nema'", /const zna = S\.wsOk && typeof S
 proveri("pad veze osvezi i traku interneta",
   /updateServerStatus\(connected\);[\s\S]{0,220}updateInternet\(\);/.test(rend),
   "inace bi poslednji odgovor stajao kao da jos vazi");
+// I TACKA MORA DA IMA TRI STANJA.
+//
+// Tekst je pisao "Internet: -", a tacka pored njega je bila CRVENA - jer je bilo
+// samo "ok" i "nije ok". Igrac ne cita crticu, vidi crveno i trazi kvar na mrezi
+// koju niko nije proverio.
+proveri("tačka ne crveni kad se ne zna", /classList\.toggle\("nema", zna && !S\.internet\)/.test(rend),
+  "crveno znaci NE RADI; nepoznato je siva");
+proveri("i CSS to poštuje", /#sbInet\.nema \.sb-dot/.test(citajIzvor("client/renderer/css/launcher.css")));
 
 // ---- 3) SERVER PROVERAVA, I NE OSLANJA SE NA JEDNO MESTO ----
 proveri("server ima proveru", typeof net.proveri === "function");

@@ -76,6 +76,52 @@ proveri("oznaka kategorije igre nije zlatna",
 proveri("broj na izabranom čipu nije zlatan",
   !/var\(--gold\)/.test(red(".shop-cip.aktivan span")),
   "cip je vec osvetljen; druga oznaka na istom mestu je sum, a zlatna tu nista ne znaci");
+proveri("naslov odeljka na Nalogu nije zlatan",
+  !/var\(--gold\)/.test(red("text-transform: uppercase; letter-spacing: 0.05em; color:")),
+  "odeljak se vec vidi izabran u meniju levo, a na istom ekranu stoji i prava zlatna nagrada");
+proveri("količina u porudžbini nije zlatna", !/var\(--gold\)/.test(red(".por-st b {")),
+  "\"1x\" je podatak, ne nagrada");
+
+// ---- 5) ISTO STANJE, ISTA BOJA NA SVAKOM EKRANU ----
+//
+// "Porudzbina stize" postoji na dva mesta: kao traka u Shop-u i kao red na
+// Nalogu. Dok je jedno bilo zlatno a drugo plavo, isti podatak je na dva ekrana
+// izgledao kao dve razlicite stvari.
+//
+// Zivotni vek porudzbine ima svoje boje, i nijedna nije zlatna:
+//   ceka / sprema se  boja kuce (posao je u toku)
+//   doneto            zelena (gotovo)
+//   otkazano          precrtano i sivo
+for (const [sta, uzorak] of [
+  ["red \"sprema se\" na Nalogu", ".por-red.sprema .por-status"],
+  ["traka \"stize\" u Shop-u", ".st-t {"],
+  ["izabran način plaćanja", ".nacin.aktivan svg"],
+]) {
+  proveri(`${sta} nosi boju kuće, ne zlatnu`, /var\(--brend\)/.test(red(uzorak)), red(uzorak).trim().slice(0, 90));
+}
+proveri("doneto ostaje zeleno", /var\(--green\)/.test(red(".por-red.gotovo .por-status")),
+  "zelena znaci gotovo; to se ne menja");
+
+// ---- 6) PUNE PLOČE NOSE PODLOGU PROGRAMA ----
+//
+// Podloga je plava sa znaka, ne skoro crna. Ali velovi i ploce iz starije verzije
+// ostali su upisani kao crna: rgba(5,5,9,.94) preko imena igre, rgba(16,16,23,.96)
+// ispod obavestenja, #16161d na plocici bez korice. Svaka od njih je PUNA (ne
+// senka), pa preko plave podloge radi tacno ono sto ne treba - obezbojava je
+// nazad ka sivom, i to bas na mestima koja igrac gleda najduze.
+//
+// Dve stvari NISU ovo pravilo i ostaju:
+//   cista crna (rgba(0,0,0,...)) - to su senke, i senka i treba da je crna
+//   obojena ploca (npr. tamnocrvena ispod poruke o gresci) - ona nesto ZNACI
+const cssKod = css.replace(/\/\*[\s\S]*?\*\//g, " ");
+const skoroCrne = [...cssKod.matchAll(/rgba\((\d{1,3}),\s*(\d{1,3}),\s*(\d{1,3}),\s*([\d.]+)\)/g)]
+  .filter((m) => Number(m[4]) >= 0.5)                              // veo, ne senka
+  .filter((m) => Math.max(+m[1], +m[2], +m[3]) <= 40)              // tamna
+  .filter((m) => Math.max(+m[1], +m[2], +m[3]) - Math.min(+m[1], +m[2], +m[3]) <= 8) // siva, bez tona
+  .filter((m) => !(+m[1] === 0 && +m[2] === 0 && +m[3] === 0))     // ciste senke
+  .map((m) => m[0]);
+proveri("nema punih ploča u staroj skoro crnoj", skoroCrne.length === 0,
+  [...new Set(skoroCrne)].slice(0, 5).join(", "));
 
 // ---- 5) BOJA KUĆE IM SE NE PRIBLIŽAVA ----
 //

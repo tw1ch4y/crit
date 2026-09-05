@@ -15,6 +15,25 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+// Nivoi i nagrade se UZIMAJU iz programa, ne prepisuju ovde. Dok pregled nije
+// slao VIP i profil, slike sa kojih se ocenjuje izgled su pokazivale zakljucanu
+// traku sa pecatom "Uskoro!" i vecno "Profil se ucitava..." - dakle bas ono sto
+// je novo nije se videlo ni na jednoj slici.
+import { nivoZa, otkljucanoZa, BOJE_IMENA, OKVIRI } from "../server/src/nivoi.js";
+
+// Iskustvo izmisljenog igraca. Namerno je u sredini nivoa: prazna i puna traka
+// izgledaju dobro same po sebi, greske se vide na pola.
+const XP_PREGLED = 4200;
+const vipZa = (xp) => { const n = nivoZa(xp);
+  return { nivo: n.nivo, naziv: n.naziv, xp: n.uNivou, xpDo: n.poslednji ? null : n.zaSledeci,
+    poslednji: n.poslednji, sledeci: n.sledeciNaziv, vip: n.nivo >= 5 }; };
+const profilZa = (xp) => { const n = nivoZa(xp);
+  return { username: "marko", ime: "Marko", clanOd: Date.now() - 240 * 24 * 3600 * 1000,
+    nivo: n.nivo, naziv: n.naziv, xp: n.xp, uNivou: n.uNivou, zaSledeci: n.zaSledeci,
+    doSledeceg: n.doSledeceg, poslednji: n.poslednji, sledeciNaziv: n.sledeciNaziv,
+    sati: 96.5, poseta: 41, porudzbina: 63, omiljenaIgra: "Counter-Strike 2", omiljenaPuta: 28,
+    izgled: { boja: "bela", okvir: "nema" }, otkljucano: otkljucanoZa(xp),
+    boje: BOJE_IMENA, okviri: OKVIRI }; };
 
 const OVDE = path.dirname(fileURLToPath(import.meta.url));
 const KOREN = path.join(OVDE, "..");
@@ -132,8 +151,15 @@ const EKRANI = [
       await cekaj(400);
       await klik(win, '.tab[data-tab="account"]'); await cekaj(800);
     } },
-  // Nalog je meni sa cetiri odeljka. Svaki mora da se pogleda posebno - dok se
+  // Nalog je meni sa sest odeljaka. Svaki mora da se pogleda posebno - dok se
   // gledao samo prvi, u ostalima je moglo da stoji bilo sta.
+  { ime: "4a-nalog-profil", opis: "Nalog > Profil (nivo, brojke, boja imena, okvir)", ocekivan: "desktopScreen",
+    do: async (win, p) => {
+      posalji(win, p.login); await sacekajPozdrav(win);
+      await cekaj(400);
+      await klik(win, '.tab[data-tab="account"]'); await cekaj(500);
+      await klik(win, '[data-acc-sekcija="profil"]'); await cekaj(700);
+    } },
   { ime: "4b-nalog-nagrade", opis: "Nalog > Nagrade (tocak, napredak, spisak)", ocekivan: "desktopScreen",
     do: async (win, p) => {
       posalji(win, p.login); await sacekajPozdrav(win);
@@ -342,6 +368,10 @@ app.whenReady().then(async () => {
       // Igrac koji je vec igrao - da se na pocetnoj vidi "Nastavi gde si stao".
       // Prazan spisak pokazuje samo znak igraonice i ne kaze nista o rasporedu.
       skoroIgrane: [3, 1, 2],
+      // VIP traka i profil - inace se na slikama vidi samo zakljucano stanje.
+      // Racuna se OVDE, u omotacu: glavni proces Electrona je zaseban fajl koji
+      // se sklapa iz ovog teksta, pa u njemu nema ni nivoi.js ni ovih funkcija.
+      vip: ${JSON.stringify(vipZa(XP_PREGLED))}, profil: ${JSON.stringify(profilZa(XP_PREGLED))},
       // Nagradni tocak u stanju "sme da vrti" - da se na slici Naloga vidi tocak.
       tocak: { ukljucen: true, prag: 1200, potroseno: 1450, ispunjava: true, moze: true, sledeciSpin: null,
         nagrade: [{ naziv: "30 din", kredit: 30 }, { naziv: "Ništa", kredit: 0 }, { naziv: "60 din", kredit: 60 },

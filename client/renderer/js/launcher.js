@@ -789,6 +789,9 @@ function updateInternet() {
   const el = $("#sbInet"); if (!el) return;
   const zna = S.wsOk && typeof S.internet === "boolean";
   el.classList.toggle("ok", zna && S.internet);
+  // Crvena tačka znači NE RADI, i samo to. Dok se ne zna, tačka je siva - inače
+  // bi crveno pored crtice reklo "nema interneta", a to niko nije proverio.
+  el.classList.toggle("nema", zna && !S.internet);
   el.querySelector(".sb-txt").textContent = !zna ? "Internet: -" : S.internet ? "Internet: OK" : "Internet: nema";
 }
 function startStatusBar() {

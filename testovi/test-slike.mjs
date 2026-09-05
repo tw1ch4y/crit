@@ -161,9 +161,18 @@ proveri("igra preko steam:// se ne pita za ikonu",
   "za steam:// putanju nema fajla na disku, pa nema ni ikone");
 proveri("spisak ikona je zajednicki za igre i precice",
   launcher.includes("IKONE_PROGRAMA") && !launcher.includes("IKONE_ALATA"));
+// Plocica bez korice mora da bude MIRNA (jak obojen blok bi u polici vikao
+// glasnije od prave korice) ali i da bude iz iste kuce: bila je skoro crna
+// (#16161d) jos od stare palete, pa je u plavom programu izgledala kao da se
+// nesto nije ucitalo. Sada nosi podlogu programa, i to preko tokena - da se pri
+// sledecoj promeni boje ne zaostane opet.
+const plocica = css.split("\n").find((r) => /linear-gradient\(160deg,.*72%\)/.test(r)) || "";
 proveri("plocica bez korice je smirena, ne obojen blok",
-  css.includes(".tile-fallback") && /linear-gradient\(160deg, #16161d/.test(css),
-  "jak obojen blok bi u polici vikao glasnije od prave korice");
+  css.includes(".tile-fallback") && /var\(--panel\)/.test(plocica) && !/var\(--brend\)/.test(plocica),
+  plocica.trim().slice(0, 90));
+proveri("i nosi podlogu programa, ne staru skoro crnu",
+  !/#16161d|#0b0b10/.test(css),
+  "siva ploca u plavom programu izgleda kao da nesto nije ucitano");
 proveri("dva slova stoje na istom mestu kao ikona",
   /\.tile-fallback \.tile-emoji \{ margin-bottom: 26px; \}/.test(css),
   "inace red poskakuje kad neka igra ima ikonu a neka nema");
