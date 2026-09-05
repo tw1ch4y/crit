@@ -111,7 +111,11 @@ const app = citajIzvor("server/public/js/app.js");
 proveri("panel primenjuje brend bez osvezavanja strane", /function primeniBrend\(b\)/.test(app));
 proveri("brend stize i kroz snapshot i kroz zivu poruku",
   /primeniBrend\(d\.brend\)/.test(app) && /m\.t === "brend"\) primeniBrend/.test(app));
-proveri("panel ima gde da se okaci znak", /id="brendFile"/.test(app) && /id="brendBoja"/.test(app));
+// Znak se okacuje, boja se bira sa spiska. Sistemski birac boje je ostao, ali
+// sklopljen pod "Svoja boja" - zato se ovde vise ne trazi on, nego spisak i
+// dugme za primenu. Sta taj izbor mora da radi cuva test-boja-kuce.mjs.
+proveri("panel ima gde da se okaci znak", /id="brendFile"/.test(app));
+proveri("panel ima gde da se izabere boja", /data-bk="/.test(app) && /id="bkPrimeni"/.test(app));
 
 ws.close();
 console.log(`\n${prosao}/${prosao + pao} proslo`);

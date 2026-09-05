@@ -950,6 +950,16 @@ router.get("/report", (req, res) => {
 // kopiju programa - pa bi svaka nadogradnja morala da se pravi posebno za
 // svakoga. Ovako se program izdaje jedan, a izgled se podesava odavde.
 router.get("/brend", (req, res) => res.json(svc.brendObj()));
+// Zamerke na boju racuna SERVER, i to je namerno: pravilo (koja boja se mesa sa
+// kojim znacenjem, sta je pretamno, sta presvetlo) sme da postoji samo na jednom
+// mestu. Da panel racuna sam, dve kopije bi se razisle - a razisle bi se tiho,
+// jer obe "rade".
+//
+// Uz zamerke idu i izvedene nijanse (svetlija, tamnija, providne) - iste one
+// koje ce dobiti launcher. Da ih panel racuna sam, proba bi pokazivala jednu
+// boju a trinaest masina drugu.
+router.get("/brend/provera", requireOwner, (req, res) =>
+  res.json({ zamerke: svc.zamerkeNaBoju(req.query?.heks), nijanse: svc.nijanse(req.query?.heks) }));
 router.post("/brend/logo", requireOwner, (req, res) => {
   const r = svc.sacuvajLogo(req.body?.image);
   if (r.error) return res.status(400).json(r);

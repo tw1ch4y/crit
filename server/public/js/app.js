@@ -2473,19 +2473,36 @@ document.addEventListener("click", async (e) => {
 // ZNAK I BOJA IGRAONICE
 //
 // Program se izdaje jedan, a svaka igraonica ima svoje ime, znak i boju. Dok su
-// logo i crvena stajali ušiveni u fajlove, druga igraonica je morala da dobije
+// logo i boja stajali ušiveni u fajlove, druga igraonica je morala da dobije
 // prepravljenu kopiju - pa bi i svaka nadogradnja morala da se pravi posebno.
+//
+// Izbor boje je bio polje za heks i sistemski birač. To radi, ali traži da
+// vlasnik ZNA koja boja valja, a nema kako da zna: boja mora da se čita na
+// tamnoj podlozi, da nosi belo slovo na dugmetu i da se ne pomeša sa bojama
+// koje ovde nešto znače. Zato sada ide spisak gotovih, proba pre primene i
+// upozorenje kad izabrana boja upadne u tuđe značenje.
+let bkBrend = null;      // poslednje što je server rekao
+let bkIzbor = null;      // boja koja se PROBA (još nije primenjena)
+let bkSvoja = false;     // je li otvoreno polje za svoju boju
+let bkZamerke = [];
+let bkTajmer = null;
+
 async function ucitajBrend() {
   const telo = $("#brendTelo");
   if (!telo) return;
   let b;
   try { b = await api("/brend"); } catch { telo.innerHTML = '<div class="faint">Nije učitano</div>'; return; }
   if (!$("#brendTelo")) return;
+  // Proba se resetuje na ono što je stvarno primenjeno. Da ostane od prošlog
+  // puta, vlasnik bi se vratio na stranicu i video boju koju nikad nije potvrdio.
+  bkBrend = b;
+  bkIzbor = b.akcenat;
+  bkZamerke = [];
 
   telo.innerHTML = `
     <div class="poz-uputstvo" style="margin-bottom:16px">
       <div><b>Znak</b><span>PNG sa providnošću</span><i>Stoji na prijavi, u bočnoj traci panela i na svim ekranima launchera. Najbolje radi širi nego viši, oko 600x200 px. Najviše 3 MB.</i></div>
-      <div><b>Boja</b><span>jedna, ostalo se izvodi</span><i>Iz nje se prave svetlija i tamnija nijansa za dugmad i okvire. Zelena i zlatna se ne diraju - one znače "ima kredita" i "nagrada", to su značenja a ne ukras.</i></div>
+      <div><b>Boja</b><span>jedna, ostalo se izvodi</span><i>Iz nje se prave svetlija i tamnija nijansa za dugmad i okvire. Zelena, zlatna i crvena se ne diraju - one znače "ima kredita", "nagrada" i "ističe vreme", to su značenja a ne ukras.</i></div>
     </div>
     <div class="brend-red">
       <div class="brend-logo-box">
@@ -2497,35 +2514,182 @@ async function ucitajBrend() {
         ${b.logo ? `<button class="btn btn-danger" id="brendSkini">${icon("trash")} Vrati ugrađeni</button>` : ""}
       </div>
     </div>
-    <div class="card-sub" style="margin:16px -18px 0">Boja igraonice</div>
-    <div class="brend-boje">
-      <input type="color" id="brendBoja" value="${esc(b.akcenat)}" />
-      <input id="brendHeks" value="${esc(b.akcenat)}" maxlength="7" spellcheck="false" />
-      <button class="btn btn-primary" id="brendSacuvaj">Primeni boju</button>
-      <button class="btn btn-ghost" id="brendVrati" title="Vrati fabričku crvenu">Fabrička</button>
+    <div class="card-sub" style="margin:18px -18px 0">Boja igraonice</div>
+    <div id="bkTelo"></div>`;
+
+  crtajBoju();
+  osveziProveru(true);
+  vezeZnak();
+}
+
+// Crta se samo deo sa bojom, ne cela kartica - da izbor boje ne prerisava i
+// znak iznad njega (pa da polje za fajl izgubi vezu).
+function crtajBoju() {
+  const cilj = $("#bkTelo");
+  if (!cilj || !bkBrend) return;
+  cilj.innerHTML = bkHtml(bkBrend);
+  vezeBoju();
+}
+
+function zamerkeHtml(z) {
+  if (!z || !z.length) return "";
+  return z.map((x) => `<div class="bk-zamerka">${icon("alert")}<span>${esc(x.tekst)}</span></div>`).join("") +
+    // Poslednja rečenica je namerna: vlasnik odlučuje kako mu izgleda igraonica.
+    // Bez nje upozorenje liči na kvar, pa se ljudi vrte u krug tražeći "ispravnu" boju.
+    `<div class="bk-zamerka-pod">Boja se ipak može primeniti - ovo je upozorenje, ne zabrana.</div>`;
+}
+
+function bkHtml(b) {
+  const izabrana = bkIzbor;
+  const drugacija = String(izabrana).toLowerCase() !== String(b.akcenat).toLowerCase();
+  const uzorci = (b.gotove || []).map((g) => `
+    <button class="bk-uzorak${g.heks.toLowerCase() === String(izabrana).toLowerCase() ? " aktivna" : ""}" type="button"
+      data-bk="${esc(g.heks)}" style="--bk:${esc(g.heks)}" title="${esc(g.heks)}">
+      <span class="bk-krug"></span><span class="bk-ime">${esc(g.naziv)}</span>
+    </button>`).join("");
+
+  return `
+    <div class="bk-proba" id="bkProba" style="--accent:${esc(izabrana)}">
+      <div class="bk-proba-vrh">
+        <span class="bk-proba-tab aktivna">Početna</span>
+        <span class="bk-proba-tab">Shop</span>
+        <span class="bk-proba-tab">Nalog</span>
+        <span class="bk-proba-kredit">640 RSD</span>
+      </div>
+      <div class="bk-proba-telo">
+        <span class="bk-proba-dugme">Poruči</span>
+        <span class="bk-proba-traka"><i></i></span>
+        <span class="bk-proba-vip">${icon("gift")} VIP</span>
+        <span class="bk-proba-kraj">${icon("clock")} 12 min</span>
+      </div>
+      <div class="bk-proba-nota">Ovako to vidi igrač. Zelena, zlatna i crvena su ovde namerno - da se vidi da li im se boja kuće približila.</div>
+    </div>
+
+    <div class="bk-uzorci">${uzorci}</div>
+
+    <button class="bk-svoja-x" id="bkSvojaX" type="button" aria-expanded="${bkSvoja ? "true" : "false"}">
+      ${icon(bkSvoja ? "chevUp" : "chevDown")} Svoja boja
+    </button>
+    ${bkSvoja ? `
+      <div class="bk-svoja">
+        <input type="color" id="bkBiras" value="${esc(izabrana)}" aria-label="Izbor boje" />
+        <input id="bkHeks" value="${esc(izabrana)}" maxlength="7" spellcheck="false" aria-label="Boja u heks obliku" />
+        <span class="faint">ako imaš tačnu boju iz svog znaka</span>
+      </div>` : ""}
+
+    <div class="bk-zamerke" id="bkZamerke">${zamerkeHtml(bkZamerke)}</div>
+
+    <div class="bk-akcije">
+      <button class="btn btn-primary" id="bkPrimeni"${drugacija ? "" : " disabled"}>
+        ${drugacija ? "Primeni na sve računare" : "Ovo je trenutna boja"}
+      </button>
+      ${String(b.akcenat).toLowerCase() !== String(b.fabricki).toLowerCase()
+        ? `<button class="btn btn-ghost" id="bkFabricka">Vrati fabričku</button>` : ""}
+      <span class="faint bk-nap">Boja se menja na svih ${state.computers.length || "13"} računara odjednom, čim se primeni.</span>
     </div>
     <div class="err-msg" id="brendErr"></div>`;
+}
 
-  const heks = $("#brendHeks"), boja = $("#brendBoja");
-  // Dva polja za istu stvar: birač boje za one koji biraju okom, i tekst za
-  // one koji imaju tačnu boju iz svog logotipa.
-  boja.addEventListener("input", () => { heks.value = boja.value; });
-  heks.addEventListener("input", () => { if (/^#[0-9a-f]{6}$/i.test(heks.value)) boja.value = heks.value; });
+function vezeBoju() {
+  $$("#bkTelo [data-bk]").forEach((el) => el.addEventListener("click", () => postaviProbu(el.dataset.bk)));
 
-  const primeni = async (v) => {
-    try { const r = await api("/brend/boja", "POST", { akcenat: v }); primeniBrend(r); toast("Boja je primenjena", "success"); ucitajBrend(); }
-    catch (e) { $("#brendErr").textContent = e.message; }
+  const x = $("#bkSvojaX");
+  if (x) x.addEventListener("click", () => { bkSvoja = !bkSvoja; crtajBoju(); if (bkSvoja) $("#bkHeks")?.focus(); });
+
+  const biras = $("#bkBiras"), heks = $("#bkHeks");
+  if (biras) biras.addEventListener("input", () => {
+    if (heks) heks.value = biras.value.toLowerCase();
+    postaviProbu(biras.value, true);
+  });
+  if (heks) heks.addEventListener("input", () => {
+    // Dok vlasnik kuca, vrednost je pola gotova ("#2f6"). Proba se ne pomera dok
+    // ne postane cela boja - inače bi treperila na svaki otkucaj.
+    const v = heks.value.trim();
+    if (!/^#[0-9a-f]{6}$/i.test(v)) return;
+    // Birač mora da prati upisano. Dok nije, pokazivao je staru boju pored nove
+    // - pa je izgledalo kao da polje i birač govore o dve različite stvari.
+    if (biras) biras.value = v;
+    postaviProbu(v, true);
+  });
+
+  const primeni = $("#bkPrimeni");
+  if (primeni) primeni.addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
+    try {
+      const r = await api("/brend/boja", "POST", { akcenat: bkIzbor });
+      primeniBrend(r);
+      bkBrend = { ...bkBrend, ...r };
+      toast("Boja je primenjena na sve računare", "success");
+      crtajBoju();
+    } catch (e) { const el = $("#brendErr"); if (el) el.textContent = e.message; }
+  }, "Primenjujem..."));
+
+  const fab = $("#bkFabricka");
+  // Fabrička boja stiže sa servera. Dok ju je panel držao kao svoju kopiju, ovo
+  // dugme je vraćalo staru boju i pošto je fabrička promenjena.
+  if (fab) fab.addEventListener("click", () => postaviProbu(bkBrend.fabricki));
+}
+
+// Proba se menja ODMAH, ali se ne čuva. Primena ide na svih trinaest mašina
+// odjednom, pa vlasnik prvo mora da vidi šta bira.
+function postaviProbu(heks, uzivo) {
+  const v = String(heks || "").trim().toLowerCase();
+  if (!/^#[0-9a-f]{6}$/.test(v)) return;
+  bkIzbor = v;
+  if (uzivo) {
+    // Vučenje po biraču boje poziva ovo na svaki pomeraj miša. Prerisati celo
+    // polje značilo bi da birač u tom trenutku izgubi fokus, pa se menjaju samo
+    // proba, dugme i oznaka izabranog uzorka.
+    obeleziProbu();
+  } else {
+    crtajBoju();
+  }
+  osveziProveru();
+}
+
+function obeleziProbu() {
+  const proba = $("#bkProba");
+  if (proba) proba.style.setProperty("--accent", bkIzbor);
+  const dug = $("#bkPrimeni");
+  if (dug) {
+    const drugacija = bkIzbor !== String(bkBrend?.akcenat).toLowerCase();
+    dug.disabled = !drugacija;
+    dug.textContent = drugacija ? "Primeni na sve računare" : "Ovo je trenutna boja";
+  }
+  $$("#bkTelo [data-bk]").forEach((el) => el.classList.toggle("aktivna", el.dataset.bk.toLowerCase() === bkIzbor));
+}
+
+// Zamerke i izvedene nijanse računa SERVER - isto ono što će dobiti launcher.
+// Da panel računa svoje, proba bi pokazivala jednu boju a mašine drugu.
+// Pitanje se odlaže da vučenje po biraču ne pošalje stotinu zahteva.
+function osveziProveru(odmah) {
+  clearTimeout(bkTajmer);
+  const trazi = async () => {
+    const za = bkIzbor;
+    let r;
+    try { r = await api(`/brend/provera?heks=${encodeURIComponent(za)}`); } catch { return; }
+    if (za !== bkIzbor) return;   // vlasnik je u međuvremenu izabrao drugu
+    bkZamerke = r.zamerke || [];
+    const okvir = $("#bkZamerke");
+    if (okvir) okvir.innerHTML = zamerkeHtml(bkZamerke);
+    const proba = $("#bkProba");
+    if (proba && r.nijanse) {
+      for (const [ime, vred] of Object.entries({
+        "--accent": r.nijanse.akcenat, "--accent-hover": r.nijanse.hover,
+        "--accent-down": r.nijanse.down, "--accent-soft": r.nijanse.soft, "--accent-line": r.nijanse.line,
+      })) proba.style.setProperty(ime, vred);
+    }
   };
-  $("#brendSacuvaj").addEventListener("click", (ev) => jednomKlik(ev.currentTarget, () => primeni(heks.value.trim()), "Primenjujem..."));
-  $("#brendVrati").addEventListener("click", (ev) => jednomKlik(ev.currentTarget, () => primeni("#e23b34"), "Vraćam..."));
+  if (odmah) trazi(); else bkTajmer = setTimeout(trazi, 200);
+}
 
+function vezeZnak() {
   $("#brendOkaci").addEventListener("click", () => $("#brendFile").click());
   $("#brendFile").addEventListener("change", async (e) => {
     const f = e.target.files?.[0]; if (!f) return;
     const čitač = new FileReader();
     čitač.onload = async () => {
       try { const r = await api("/brend/logo", "POST", { image: čitač.result }); primeniBrend(r); toast("Znak je postavljen", "success"); ucitajBrend(); }
-      catch (err) { $("#brendErr").textContent = err.message; }
+      catch (err) { const el = $("#brendErr"); if (el) el.textContent = err.message; }
     };
     čitač.readAsDataURL(f);
     e.target.value = "";
@@ -2534,7 +2698,7 @@ async function ucitajBrend() {
   if (skini) skini.addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
     if (!(await confirmDialog("Vraća se ugrađeni znak programa.", { title: "Uklanjanje znaka", ok: "Vrati ugrađeni" }))) return;
     try { const r = await api("/brend/logo", "DELETE"); primeniBrend(r); toast("Vraćen ugrađeni znak", "success"); ucitajBrend(); }
-    catch (e) { $("#brendErr").textContent = e.message; }
+    catch (e) { const el = $("#brendErr"); if (el) el.textContent = e.message; }
   }, "Uklanjam..."));
 }
 

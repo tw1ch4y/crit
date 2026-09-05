@@ -1382,9 +1382,93 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 }
 .brend-logo-box img { max-width: 100%; max-height: 84px; object-fit: contain; }
 .brend-akcije { display: flex; flex-direction: column; gap: 8px; min-width: 190px; }
-.brend-boje { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
-.brend-boje input[type="color"] {
-  width: 52px; height: 38px; padding: 3px; cursor: pointer;
-  background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--r);
+
+/* BOJA KUĆE: proba, pa tek onda primena.
+   Sve unutar .bk-proba nosi svoj --accent, pa proba menja SAMO sebe. Da se
+   postavlja na koren, panel bi ostao prefarban i kad vlasnik ode sa stranice
+   bez potvrde - a boja nije primenjena. */
+.bk-proba {
+  margin-top: 14px; border: 1px solid var(--line-2); border-radius: var(--r-lg); overflow: hidden;
+  background: linear-gradient(180deg, var(--surface-2), var(--bg));
 }
-.brend-boje #brendHeks { width: 110px; font-family: var(--mono, monospace); text-transform: lowercase; }
+.bk-proba-vrh {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  padding: 11px 16px; border-bottom: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.22);
+}
+.bk-proba-tab { font-size: 13px; font-weight: 600; color: var(--text-3); }
+.bk-proba-tab.aktivna { color: var(--accent); position: relative; }
+.bk-proba-tab.aktivna::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -12px; height: 2px;
+  border-radius: 2px; background: var(--accent);
+}
+/* Kredit je zelen zato što zelena u celom programu znači "ima kredita". Stoji
+   ovde namerno: ako se boja kuće približi zelenoj, vlasnik to vidi na probi, a
+   ne tek kad trinaest igrača pomeša stanje naloga sa bojom kuće. */
+.bk-proba-kredit { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--online); font-variant-numeric: tabular-nums; }
+.bk-proba-telo { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 16px; }
+.bk-proba-dugme {
+  padding: 8px 18px; border-radius: var(--r-sm); font-size: 13px; font-weight: 650; color: #fff;
+  background: var(--accent); box-shadow: 0 6px 18px -8px var(--accent);
+}
+.bk-proba-traka { flex: 1 1 120px; min-width: 90px; height: 7px; border-radius: 99px; background: var(--accent-soft); overflow: hidden; }
+.bk-proba-traka i { display: block; width: 62%; height: 100%; border-radius: 99px; background: var(--accent); }
+.bk-proba-vip, .bk-proba-kraj { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 650; }
+.bk-proba-vip { color: var(--locked); }
+.bk-proba-kraj { color: var(--danger); }
+.bk-proba-vip svg, .bk-proba-kraj svg { width: 14px; height: 14px; }
+.bk-proba-nota { padding: 0 16px 13px; font-size: 11.5px; line-height: 1.5; color: var(--text-3); }
+
+.bk-uzorci {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(112px, 100%), 1fr));
+  gap: 8px; margin-top: 16px;
+}
+.bk-uzorak {
+  display: flex; align-items: center; gap: 9px; padding: 8px 10px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface);
+  color: var(--text-2); font: inherit; font-size: 12.5px; text-align: left;
+  transition: border-color var(--tr), background var(--tr), color var(--tr);
+}
+.bk-uzorak:hover { border-color: var(--line-3); color: var(--text); }
+/* Izabrani se poznaje po SVOJOJ boji, ne po boji kuće: dok se bira, boja kuće
+   je još stara, pa bi oznaka govorila o pogrešnoj boji. */
+.bk-uzorak.aktivna { border-color: var(--bk); background: var(--surface-3); color: var(--text); font-weight: 650; }
+.bk-krug {
+  width: 18px; height: 18px; border-radius: 50%; flex: none; background: var(--bk);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  display: grid; place-items: center;
+}
+/* Kvačica u krugu, a ne samo okvir: srebro i čelik su bledi, pa se na tamnoj
+   podlozi okvir te boje jedva vidi i ne zna se šta je izabrano. */
+.bk-krug::after { content: ""; width: 7px; height: 4px; border: 2px solid #fff; border-top: 0; border-right: 0; transform: rotate(-45deg) translate(1px, -1px); opacity: 0; }
+.bk-uzorak.aktivna .bk-krug { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5); }
+.bk-uzorak.aktivna .bk-krug::after { opacity: 1; }
+.bk-ime { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Svoja boja je izuzetak, ne prvi izbor: ko ima tačnu boju iz svog znaka
+   otvori ovo, ostali biraju sa spiska i ne moraju da znaju šta je heks. */
+.bk-svoja-x {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 6px 2px;
+  background: none; border: 0; cursor: pointer; color: var(--text-2); font: inherit; font-size: 12.5px; font-weight: 600;
+}
+.bk-svoja-x:hover { color: var(--text); }
+.bk-svoja { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+.bk-svoja input[type="color"] {
+  width: 52px; height: 38px; padding: 3px; cursor: pointer;
+  background: var(--input); border: 1px solid var(--line); border-radius: var(--r);
+}
+.bk-svoja #bkHeks { width: 110px; font-family: var(--mono, monospace); text-transform: lowercase; }
+
+.bk-zamerke:not(:empty) { margin-top: 14px; }
+.bk-zamerka {
+  display: flex; gap: 9px; align-items: flex-start; padding: 9px 12px; margin-bottom: 6px;
+  border: 1px solid var(--locked-soft); border-left: 3px solid var(--locked); border-radius: var(--r-sm);
+  background: var(--locked-soft); color: var(--text); font-size: 12.5px; line-height: 1.5;
+}
+.bk-zamerka svg { flex: none; margin-top: 1px; color: var(--locked); }
+/* Bez ove rečenice upozorenje liči na kvar i vlasnik se vrti u krug tražeći
+   "ispravnu" boju. Igraonica je njegova; program kaže šta ga izbor košta. */
+.bk-zamerka-pod { font-size: 11.5px; color: var(--text-3); padding-left: 3px; }
+
+.bk-akcije { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
+.bk-nap { font-size: 11.5px; line-height: 1.4; }

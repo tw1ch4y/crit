@@ -2350,6 +2350,104 @@ export function pozadineObj() {
 // ekrana i promo baneri su i ranije bili podesivi, pa je ovo poslednje što je
 // bilo ušiveno.
 export const AKCENAT_PODRAZUMEVANI = "#2f6ae8";
+
+// GOTOVE BOJE KUĆE
+//
+// Do sada je izbor boje bio polje za heks i sistemski birač. To radi, ali traži
+// da vlasnik ZNA koja boja valja - a ne zna, i nema kako da zna: boja mora da
+// se čita na tamnoj podlozi, da nosi belo slovo na dugmetu, i da se ne pomeša
+// sa bojama koje u ovom programu NEŠTO ZNAČE.
+//
+// Zato ide spisak gotovih, svaka proverena za sve troje. Polje za heks ostaje
+// za onoga ko ima tačnu boju iz svog znaka - ali kao izuzetak, ne kao jedini put.
+//
+// U spisku NEMA crvene, narandžaste ni zelene, i to nije previd. Te tri porodice
+// su zauzete značenjima ("ističe vreme", "nagrada", "ima kredita"), pa bi kuća
+// koja uzme neku od njih igraču pomešala boju kuće sa stanjem naloga. Ko baš
+// hoće takvu boju može je upisati ručno - ali će mu program reći šta to znači.
+//
+// Nijedna iz ovog spiska ne sme sama da nosi zamerku: spisak gotovih koji nudi
+// ono na šta isti program upozorava sam sebi protivreči. To čuva provera.
+export const BOJE_KUCE = [
+  { kljuc: "plava",       naziv: "Plava",       heks: "#2f6ae8" },
+  { kljuc: "indigo",      naziv: "Indigo",      heks: "#5145d8" },
+  { kljuc: "ljubicasta",  naziv: "Ljubičasta",  heks: "#8a45d6" },
+  { kljuc: "magenta",     naziv: "Magenta",     heks: "#c2398f" },
+  { kljuc: "roze",        naziv: "Roze",        heks: "#e0568f" },
+  { kljuc: "sljiva",      naziv: "Šljiva",      heks: "#9c3fb0" },
+  { kljuc: "nebo",        naziv: "Nebo",        heks: "#2f9fe8" },
+  { kljuc: "tirkiz",      naziv: "Tirkiz",      heks: "#1aa5bd" },
+  { kljuc: "celik",       naziv: "Čelik",       heks: "#64789c" },
+  { kljuc: "srebro",      naziv: "Srebro",      heks: "#c3c9dc" },
+];
+
+// Boje koje u programu NEŠTO ZNAČE. Ne biraju se - one su tu da bi igrač na
+// prvi pogled znao šta gleda, pa boja kuće ne sme da bude previše blizu njima.
+const ZNACENJA = [
+  { heks: "#3dc97e", sta: "„ima kredita“" },
+  { heks: "#ffb527", sta: "„nagrada“" },
+  { heks: "#ff3b3b", sta: "„ističe vreme“" },
+];
+
+const uRgb = (h) => {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(h || ""));
+  return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : null;
+};
+
+// Ton (hue) u stepenima. Poredi se TON, ne cela boja: svetlija ili tamnija
+// zelena je i dalje zelena, a igrač je vidi kao istu stvar.
+function ton(heks) {
+  const rgb = uRgb(heks);
+  if (!rgb) return null;
+  const [r, g, b] = rgb.map((x) => x / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  if (d === 0) return null; // siva nema ton - i ne može da se pomeša ni sa čim
+  let h;
+  if (max === r) h = ((g - b) / d) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  return (h * 60 + 360) % 360;
+}
+
+// Koliko je boja svetla. Pretamna na tamnoj podlozi se ne vidi, a presvetla ne
+// nosi belo slovo na dugmetu.
+function svetlina(heks) {
+  const rgb = uRgb(heks);
+  if (!rgb) return null;
+  const [r, g, b] = rgb.map((x) => {
+    const v = x / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+// Šta ne valja sa izabranom bojom. Prazan spisak = sve je u redu.
+//
+// Ovo UPOZORAVA, ne zabranjuje. Vlasnik je taj koji odlučuje kako mu izgleda
+// igraonica; program samo mora da kaže šta ga to košta pre nego što potvrdi.
+export function zamerkeNaBoju(heks) {
+  const t = ton(heks), s = svetlina(heks);
+  const lista = [];
+  if (s == null) return lista;
+
+  // 0.03 je otprilike tamnoća na kojoj se dugme gubi u podlozi (#070c1c),
+  // 0.62 je granica preko koje belo slovo na dugmetu prestaje da se čita.
+  if (s < 0.045) lista.push({ vrsta: "tamna", tekst: "Ova boja je pretamna - dugmad se gube u podlozi." });
+  if (s > 0.62) lista.push({ vrsta: "svetla", tekst: "Ova boja je presvetla - belo slovo na dugmetu se slabo čita." });
+
+  if (t != null) {
+    for (const z of ZNACENJA) {
+      const tz = ton(z.heks);
+      if (tz == null) continue;
+      const razlika = Math.min(Math.abs(t - tz), 360 - Math.abs(t - tz));
+      if (razlika < 22) {
+        lista.push({ vrsta: "znacenje", tekst: `Vrlo je blizu boje koja znači ${z.sta} - igraču će se te dve stvari mešati.` });
+      }
+    }
+  }
+  return lista;
+}
+
 const HEKS = /^#[0-9a-f]{6}$/i;
 
 // Iz jedne boje se izvode sve nijanse koje panel i launcher koriste. Vlasnik
@@ -2374,6 +2472,11 @@ export function brendObj() {
     naziv: getSetting("cafe_name", "Crit"),
     logo: getSetting("brend_logo", "") || null,
     ...nijanse(getSetting("brend_akcenat", AKCENAT_PODRAZUMEVANI)),
+    // Fabricku boju i spisak gotovih salje SERVER. Dok je panel drzao svoju
+    // kopiju, dugme "Fabricka" je vracalo staru crvenu i posle promene fabricke
+    // - pa se ista vrednost drzala na dva mesta i razisla se.
+    fabricki: AKCENAT_PODRAZUMEVANI,
+    gotove: BOJE_KUCE,
   };
 }
 
