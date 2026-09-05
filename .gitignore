@@ -10,6 +10,9 @@ server/data/crit.db-shm
 server/data/crit.db-wal
 server/data/backups/
 
+# kopija launchera za pregled u pregledacu (pravi je pregled-launchera.mjs)
+server/public/_proba/
+
 # scratch baza i snimci ekrana koje prave alati u testovi/ (pregled-*.mjs i slicni)
 testovi/_radno/
 testovi/.slike*/
