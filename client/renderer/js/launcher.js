@@ -16,6 +16,9 @@ const S = {
   teksture: null,   // spisak sara za biranje, stize uz welcome
   mojaTekstura: null, // izbor ovog igraca; null znaci "kao u igraonici"
   promo: [],
+  // Ima li kuća internet. Proverava server i javlja svima; `null` znači "ne zna
+  // se" (server jos nije javio ili veza ne radi) i NIJE isto što i "nema".
+  internet: null,
   balance: 0,
   remaining: null,
   tocak: null,        // nagradni tocak: stanje za ovog igraca (prag, sme li da vrti)
@@ -239,6 +242,9 @@ function toast(msg, type = "info", trajanje = 3000) {
     // Stanje veze igrac vidi u donjoj traci dok radi, i na ekranu "Povezivanje"
     // kad veza pukne. Plutajuca oznaka preko ekrana prijave je bila visak.
     updateServerStatus(connected);
+    // Kad veza padne, launcher vise ne moze da zna kakav je internet - traka to
+    // i kaze umesto da zadrzi poslednji odgovor kao da jos vazi.
+    updateInternet();
     if (!connected && !$("#setupScreen").classList.contains("active")) {
       // Točak koji čeka odgovor se otpušta odmah: preko puknute veze ishod
       // ionako više ne može da stigne, a dok "vrtnja traje" launcher odbacuje
@@ -476,6 +482,8 @@ function handleMsg(m) {
       S.pozadine = m.pozadine || {};
       S.promo = m.promo || [];
       S.teksture = m.teksture || null;
+      S.internet = typeof m.internet === "boolean" ? m.internet : null;
+      updateInternet();
       primeniBrend(m.brend);
       primeniPozadinu();
       primeniTeksturu(m.tekstura);
@@ -484,6 +492,10 @@ function handleMsg(m) {
       $("#loginKuca").textContent = S.settings.cafeName || "Igraonica";
       $("#loginCena").textContent = S.settings.ratePerHour > 0 ? money(S.settings.ratePerHour) : "-";
       postaviPozadinuPrijave();
+      break;
+    case "internet":
+      S.internet = typeof m.ok === "boolean" ? m.ok : null;
+      updateInternet();
       break;
     case "catalog": {
       // osoblje je izmenilo shop/igre/alate - osveži i izbaci iz korpe što više nije dostupno
@@ -762,25 +774,29 @@ async function pollSys() {
     if (t) { t.querySelector(".sb-txt").textContent = s.temp != null ? `${s.temp}°C` : "temp -"; t.classList.toggle("hot", s.temp != null && s.temp >= 80); }
   } catch {}
 }
-let _inetT = null;
-function checkInternet() {
+// INTERNET PROVERAVA SERVER, NE SVAKI RAČUNAR ZA SEBE
+//
+// Ovde je stajala provera koja je svakih 30 sekundi učitavala
+// `google.com/favicon.ico`. Trinaest mašina, oko 37.000 poziva dnevno ka
+// Google-u iz igraonice - a odgovor na pitanje "ima li kuća internet" je isti
+// za sve njih. Uz to je lagala kad je baš Google nedostupan (filter na ruteru,
+// odvojena gostinska mreža): internet radi, a na svih trinaest ekrana piše da
+// ga nema. Sada proverava server i javlja svima (server/src/internet.js).
+//
+// Tri stanja, ne dva: kad server ne radi, launcher NE ZNA kakav je internet i
+// tako i piše. Izmišljen odgovor bi poslao igrača da traži kvar tamo gde ga nema.
+function updateInternet() {
   const el = $("#sbInet"); if (!el) return;
-  clearTimeout(_inetT);
-  let settled = false;
-  const done = (ok) => { if (settled) return; settled = true; el.classList.toggle("ok", ok); el.querySelector(".sb-txt").textContent = ok ? "Internet: OK" : "Internet: nema"; };
-  const img = new Image();
-  img.onload = () => done(true);
-  img.onerror = () => done(false);
-  img.src = "https://www.google.com/favicon.ico?ts=" + Date.now();
-  _inetT = setTimeout(() => done(false), 5000);
+  const zna = S.wsOk && typeof S.internet === "boolean";
+  el.classList.toggle("ok", zna && S.internet);
+  el.querySelector(".sb-txt").textContent = !zna ? "Internet: -" : S.internet ? "Internet: OK" : "Internet: nema";
 }
 function startStatusBar() {
   setSb("#sbPc", S.computer?.name || "PC");
   updateServerStatus(S.wsOk);
-  updateClock(); pollSys(); checkInternet(); upisiVerziju();
+  updateClock(); pollSys(); updateInternet(); upisiVerziju();
   clearInterval(startStatusBar._clk); startStatusBar._clk = setInterval(updateClock, 1000);
   clearInterval(startStatusBar._sys); startStatusBar._sys = setInterval(pollSys, 3000);
-  clearInterval(startStatusBar._net); startStatusBar._net = setInterval(checkInternet, 30000);
 }
 function applyTimerState() {
   const r = S.remaining;

@@ -10,6 +10,7 @@ import { broadcastPanels, broadcastClients, sendClient, isClientOnline, izbaciPa
 import { banerIgre, promoCrit } from "./banner.js";
 import * as nad from "./nadogradnja.js";
 import { nivoZa, smeDa, otkljucanoZa, OTKLJUCAVANJA, BOJE_IMENA, OKVIRI } from "./nivoi.js";
+import { stanjeInterneta } from "./internet.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -758,6 +759,12 @@ export function zaliheNaIzmaku() {
 
 // Osoblje je izmenilo shop/igre - pošalji svež katalog svim launcherima,
 // da igrač ne gleda zastareo spisak i ne pokušava da poruči skriven artikal.
+// Internet je promenio stanje - javi svim launcherima odjednom. Šalje se samo
+// na promenu; poruka svakih minut, uvek ista, bila bi saobraćaj bez sadržaja.
+export function javiInternet(ok) {
+  broadcastClients({ t: "internet", ok: !!ok });
+}
+
 export function pushCatalog() {
   broadcastClients({ t: "catalog", shop: shopList(), games: gamesForClient(), tools: toolsForClient() });
 }
@@ -813,6 +820,9 @@ export function sendWelcomeState(computerId) {
     tools: toolsForClient(),
     pozadine: pozadineObj(),
     tekstura: teksturaObj(),
+    // Ima li kuca internet. null znaci "jos nije provereno" i NIJE isto sto i
+    // "nema" - launcher tada pise da ne zna, umesto da izmisli.
+    internet: stanjeInterneta(),
     // Spisak sara ide klijentu da bi igrac mogao da bira svoju na svom nalogu.
     // Sve sare zajedno su oko 4 KB - salje se jednom, pri povezivanju.
     teksture: {

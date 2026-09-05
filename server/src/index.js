@@ -12,6 +12,7 @@ import { router } from "./routes.js";
 import * as nadg from "./nadogradnja.js";
 import { initWs, setHandlers, broadcastPanels } from "./hub.js";
 import * as svc from "./service.js";
+import * as internet from "./internet.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8095;
@@ -176,6 +177,14 @@ setInterval(() => {
 setInterval(() => {
   try { svc.nadogradnjaTick(); } catch (e) { console.error("nadogradnja:", e.message); }
 }, 60 * 1000);
+
+// ---- Ima li igraonica internet ----
+//
+// Proverava SERVER, jednom, i javlja svima. Ranije je to radio svaki launcher
+// za sebe, svakih 30 sekundi, ucitavanjem google.com/favicon.ico - trinaest
+// masina, oko 37.000 poziva dnevno, i pogresan odgovor cim bas Google negde
+// zapne. Objasnjenje je u internet.js.
+internet.pokreni((ok) => svc.javiInternet(ok));
 
 setInterval(() => checkpoint(), 2 * 60 * 1000);
 setInterval(() => backupDb(), 15 * 60 * 1000);
