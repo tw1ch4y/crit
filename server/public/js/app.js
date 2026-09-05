@@ -418,7 +418,7 @@ function closeShiftModal() {
   modal("Zatvaranje smene", `
     <div class="muted">Smenu otvorio: <b>${esc(s?.admin || "")}</b></div>
     <div class="field"><label>Prebrojano stanje kase (${cur()})</label><input id="csCash" type="number" placeholder="koliko para je stvarno u kasi" autofocus /></div>
-    <div class="faint" style="font-size:12.5px">Ostavi prazno ako ne prebrojavaš - obračun radi i bez toga.</div>
+    <div class="faint" style="font-size:13px">Ostavi prazno ako ne prebrojavaš - obračun radi i bez toga.</div>
     ${state.vanSmene > 0 ? `<div class="upozorenje-fabricko" style="margin:12px 0 0"><div>
       <b>Danas je ${money(state.vanSmene)} naplaćeno dok smena nije bila otvorena.</b>
       <span>Taj novac je u kasi, ali ne ulazi u ovaj obračun. Ako brojiš kasu, računaj sa tim - inače će izgledati kao višak.</span>
@@ -504,7 +504,7 @@ async function renderReports() {
       <div class="stat"><div class="k">Novi igrači</div><div class="v">${d.newPlayers || 0}</div></div>
     </div>
     <div class="card" style="margin-bottom:16px"><div class="card-head"><h2>Promet ${period === "today" ? "po satu" : "po danima"}</h2>
-      ${peakStr || prosekStr ? `<span class="faint" style="font-size:12.5px">${[peakStr, prosekStr].filter(Boolean).join(", ")}</span>` : ""}</div>
+      ${peakStr || prosekStr ? `<span class="faint" style="font-size:13px">${[peakStr, prosekStr].filter(Boolean).join(", ")}</span>` : ""}</div>
       <div class="card-body">${barChart(chart)}</div></div>
     <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px">
       <div class="card"><div class="card-head"><h2>Najaktivniji igrači</h2></div>
@@ -601,8 +601,8 @@ async function renderShifts() {
   const rows = list.map((s) => `<tr data-shiftrow="${s.id}" style="cursor:pointer">
     <td><b>#${s.id}</b>${s.note ? ` <span title="${esc(s.note)}">${icon("message")}</span>` : ""}</td>
     <td>${esc(s.admin || "")}</td>
-    <td class="mono faint" style="font-size:12.5px">${dt(s.openedAt)}</td>
-    <td class="mono faint" style="font-size:12.5px">${s.closedAt ? dt(s.closedAt) : "-"}</td>
+    <td class="mono faint" style="font-size:13px">${dt(s.openedAt)}</td>
+    <td class="mono faint" style="font-size:13px">${s.closedAt ? dt(s.closedAt) : "-"}</td>
     <td class="mono">${money(s.openingCash)}</td>
     <td class="mono ${s.revenue ? "pos" : ""}">${s.revenue != null ? money(s.revenue) : "-"}</td>
     <td>${razlikaHtml(s)}</td>
@@ -1337,7 +1337,7 @@ function procesiModal(c) {
             <tbody>${vid.slice(0, 200).map((p) => `<tr>
               <td>
                 <b>${esc(p.ime)}</b>
-                <div class="faint uz" style="font-size:11.5px">PID ${p.pid}${p.putanja ? `<i class="uz-tacka"></i>${esc(p.putanja)}` : ""}</div>
+                <div class="faint uz" style="font-size:12px">PID ${p.pid}${p.putanja ? `<i class="uz-tacka"></i>${esc(p.putanja)}` : ""}</div>
               </td>
               <td class="mono">${mem(p.memorija)}</td>
               <td style="text-align:right">${p.zasticen
@@ -1446,7 +1446,7 @@ async function refreshPlayers() {
   }
   state.playersPage = d;
   const rows = d.items.map((p) => `<tr data-prow="${p.id}" style="cursor:pointer">
-    <td><b>${esc(p.username)}</b>${p.displayName && p.displayName !== p.username ? `<div class="faint" style="font-size:12.5px">${esc(p.displayName)}</div>` : ""}</td>
+    <td><b>${esc(p.username)}</b>${p.displayName && p.displayName !== p.username ? `<div class="faint" style="font-size:13px">${esc(p.displayName)}</div>` : ""}</td>
     ${/* Nivo je jedini podatak o vernosti koji program ima: ko je stalan gost
          vidi se odavde, bez otvaranja ijedne strane. */ ""}
     <td class="nivo-c"><span class="nivo-znak">${p.nivo || 1}</span><span class="faint">${esc(p.nivoNaziv || "")}</span></td>
@@ -1782,7 +1782,7 @@ async function renderOrders() {
     historyRows = done.map((o) => {
       const [lbl, col] = ORDER_STATUS[o.status] || [o.status, "gray"];
       return `<tr>
-        <td class="mono faint" style="font-size:12.5px;white-space:nowrap">${dt(o.createdAt)}</td>
+        <td class="mono faint" style="font-size:13px;white-space:nowrap">${dt(o.createdAt)}</td>
         <td><b>#${o.id}</b></td>
         <td>${o.player ? esc(o.player) : '<span class="faint">keš</span>'}${o.payment === "cash" && o.player ? ' <span class="faint">(keš)</span>' : ""}${o.computer ? ` <span class="faint">${esc(o.computer)}</span>` : ""}</td>
         <td class="muted" style="max-width:340px">${o.items.map((i) => `${i.qty}x ${esc(i.name)}`).join(", ")}</td>
@@ -1874,7 +1874,7 @@ document.addEventListener("click", async (e) => {
 function playerComboHtml(sel) {
   if (sel) {
     return `<div class="combo-sel">${icon("user")}<b>${esc(sel.username)}</b>
-      <span class="${sel.balance > 0 ? "pos" : "zero"}" style="margin-left:auto;font-size:12.5px">${money(sel.balance)}</span>
+      <span class="${sel.balance > 0 ? "pos" : "zero"}" style="margin-left:auto;font-size:13px">${money(sel.balance)}</span>
       <button type="button" class="btn btn-ghost ic-btn" data-combo-clear title="Promeni igrača">${icon("x")}</button></div>`;
   }
   return `<div class="combo">${icon("search")}<input data-combo-input placeholder="Ukucaj korisničko ime..." autocomplete="off" /><div class="combo-list hidden" data-combo-list></div></div>`;
@@ -2191,7 +2191,7 @@ function shopModal(item) {
         <div class="field"><label>Stanje (zaliha)</label><input id="siStock" type="number" value="${it.stock == null ? "" : it.stock}" placeholder="prazno = neograniceno" /></div>
       </div>
     </div>
-    <label class="cbx"><input type="checkbox" id="siAvail" ${it.available ? "checked" : ""}><span class="box"></span> <span style="font-size:13.5px">Dostupno igračima u launcheru</span></label>
+    <label class="cbx"><input type="checkbox" id="siAvail" ${it.available ? "checked" : ""}><span class="box"></span> <span style="font-size:14px">Dostupno igračima u launcheru</span></label>
     <div class="err-msg" id="siErr"></div>
     <button class="btn btn-primary btn-block" id="siSave">Sačuvaj</button>`, (root, close) => {
     const fi = $("#imgFile", root);
@@ -2357,7 +2357,7 @@ function gameModal(game) {
     </div>
     <div class="field"><label>Putanja do .exe ili internet adresa</label><input id="giPath" value="${esc(g.path)}" placeholder="C:\\Games\\igra.exe" /></div>
     <div class="field"><label>Argumenti (nije obavezno)</label><input id="giArgs" value="${esc(g.args)}" /></div>
-    <label class="cbx"><input type="checkbox" id="giAvail" ${g.available === 0 ? "" : "checked"}><span class="box"></span> <span style="font-size:13.5px">Prikaži igru u launcheru (igrači je vide)</span></label>
+    <label class="cbx"><input type="checkbox" id="giAvail" ${g.available === 0 ? "" : "checked"}><span class="box"></span> <span style="font-size:14px">Prikaži igru u launcheru (igrači je vide)</span></label>
     <div class="field">
       <label>Baner igre <span class="mera-uz">2800 x 400 px (7:1)</span></label>
       <div class="banner-picker">
@@ -3000,7 +3000,7 @@ function toolModal(tool) {
       <div class="field"><label>Putanja do .exe ili protokol</label><input id="tlPath" value="${kind === "app" ? esc(t.target) : ""}" placeholder="C:\\Program Files\\Steam\\steam.exe  ili  steam://" /></div>
       <div class="field"><label>Argumenti (nije obavezno)</label><input id="tlArgs" value="${esc(t.args || "")}" /></div>
     </div>
-    <label class="cbx"><input type="checkbox" id="tlAvail" ${t.available === 0 ? "" : "checked"}><span class="box"></span> <span style="font-size:13.5px">Prikaži u launcheru (igrači je vide)</span></label>
+    <label class="cbx"><input type="checkbox" id="tlAvail" ${t.available === 0 ? "" : "checked"}><span class="box"></span> <span style="font-size:14px">Prikaži u launcheru (igrači je vide)</span></label>
     <div class="err-msg" id="tlErr"></div>
     <button class="btn btn-primary btn-block" id="tlSave">Sačuvaj</button>`, (root, close) => {
     // tip prečice
@@ -3052,10 +3052,10 @@ async function renderComputers() {
   };
   const rows = comps.map((c) => `<tr><td><b>${esc(c.name)}</b></td>
     <td><span class="pill ${c.status === "in_use" ? "green" : c.status === "locked" ? "amber" : c.status === "idle" ? "blue" : "gray"}">${{ in_use: "Online", idle: "Standby", locked: "Zaključan", offline: "Offline" }[c.status] || c.status}</span></td>
-    <td class="mono" style="font-size:12.5px;white-space:nowrap">${verzijaCel(c)}</td>
-    <td class="mono ${c.ip ? "" : "faint"}" style="font-size:12.5px">${c.ip ? esc(c.ip) : "-"}</td>
-    <td class="mono faint" style="font-size:12.5px;white-space:nowrap">${c.online ? '<span class="pos">sada</span>' : c.lastSeen ? timeAgo(c.lastSeen) : "-"}</td>
-    <td class="mono faint" style="font-size:12.5px;white-space:nowrap">${esc(c.token)} <button class="btn btn-sm btn-ghost ic-btn" data-copy="${esc(c.token)}" title="Kopiraj token">${icon("copy")}</button></td>
+    <td class="mono" style="font-size:13px;white-space:nowrap">${verzijaCel(c)}</td>
+    <td class="mono ${c.ip ? "" : "faint"}" style="font-size:13px">${c.ip ? esc(c.ip) : "-"}</td>
+    <td class="mono faint" style="font-size:13px;white-space:nowrap">${c.online ? '<span class="pos">sada</span>' : c.lastSeen ? timeAgo(c.lastSeen) : "-"}</td>
+    <td class="mono faint" style="font-size:13px;white-space:nowrap">${esc(c.token)} <button class="btn btn-sm btn-ghost ic-btn" data-copy="${esc(c.token)}" title="Kopiraj token">${icon("copy")}</button></td>
     <td style="text-align:right;white-space:nowrap"><button class="btn btn-sm" data-comp="rename" data-id="${c.id}" data-name="${esc(c.name)}">${icon("edit")}</button>
       <button class="btn btn-sm btn-danger" data-comp="del" data-id="${c.id}">${icon("trash")}</button></td></tr>`).join("");
   $("#main").innerHTML = `
@@ -3156,10 +3156,10 @@ function nadogradnjaHtml(n) {
       <span class="pill ${n.pusteno ? "green" : "amber"}">${n.pusteno ? "Puštena u rad" : "Nije puštena"}</span></div>
     <div class="nad-vrh">
       <div><div class="faint" style="font-size:12px">Na serveru</div>
-        <div style="font-size:20px;font-weight:700">${esc(n.verzija)}</div>
+        <div style="font-size:19px;font-weight:700">${esc(n.verzija)}</div>
         <div class="faint mono uz" style="font-size:12px">${esc(n.fajl)}<i class="uz-tacka"></i>${velicinaFajla(n.velicina)}</div></div>
       <div><div class="faint" style="font-size:12px">Zaostaje</div>
-        <div style="font-size:20px;font-weight:700">${n.zaostalih} ${n.zaostalih === 1 ? "računar" : "računara"}</div>
+        <div style="font-size:19px;font-weight:700">${n.zaostalih} ${n.zaostalih === 1 ? "računar" : "računara"}</div>
         <div class="faint" style="font-size:12px">od ${n.racunari.length}</div></div>
     </div>
     ${n.pusteno ? `<div class="nad-nota">Računari je preuzimaju sami, čim se oslobode. Onaj na kom neko igra se ne dira.</div>`
@@ -3397,7 +3397,7 @@ function installTargets(prog) {
     <input type="checkbox" class="inst-t" data-id="${c.id}" ${c.online ? "checked" : "disabled"}><span class="box"></span>
     <span style="margin-left:2px">${esc(c.name)} ${c.online ? "" : '<span class="faint">(offline)</span>'}</span></label>`).join("");
   modal("Instaliraj: " + esc(prog.name || "program"), `
-    <div class="muted" style="font-size:13.5px">Izaberi računare (offline ne mogu da prime instalaciju):</div>
+    <div class="muted" style="font-size:14px">Izaberi računare (offline ne mogu da prime instalaciju):</div>
     <div style="max-height:300px;overflow-y:auto">${rows}</div>
     <div class="err-msg" id="itErr"></div>
     <button class="btn btn-primary btn-block" id="itSend">Pošalji instalaciju</button>`, (root, close) => {
@@ -3985,7 +3985,7 @@ async function ucitajKopije() {
   // Pet poslednjih je dovoljno da se vidi da kopije rade; red iznad kaze koliko
   // ih se ukupno cuva, a osam redova je samo produzavalo stranu.
   tb.innerHTML = spisak.slice(0, 5).map((k) => `<tr>
-    <td class="mono faint" style="font-size:12.5px;white-space:nowrap">${dt(k.vreme)}</td>
+    <td class="mono faint" style="font-size:13px;white-space:nowrap">${dt(k.vreme)}</td>
     <td class="faint">${fmtBytes(k.velicina)}</td>
     <td style="text-align:right"><button class="btn btn-sm btn-ghost" data-kopija="${esc(k.fajl)}">${icon("download")} Preuzmi</button></td>
   </tr>`).join("");

@@ -72,6 +72,21 @@
   --font-ui: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
 }
 
+
+/* LESTVICA VELICINA SLOVA:  11 12 13 14 15 17 19 24 30 36 44 64
+
+   Nije ukras nego pravilo. Ranije je bilo 23 razlicite velicine (11, 11.5, 12,
+   12.5, 13, 13.5 ...) - nijedna od tih razlika se ne vidi kao greska, ali se
+   vidi kao NEUREDNOST: dve oznake istog reda, jedna 11 a druga 11.5, i strana
+   izgleda kao da je pravljena u vise navrata.
+
+   Svaki korak postoji zato sto je u programu vec bio potreban; medjukoraci su
+   spusteni na najblizi. Nova vrednost van lestvice znaci ili da treba nov
+   korak - pa se dodaje ovde i u test-citljivost.mjs, svesno - ili da je neko
+   meruckao dok mu ne legne. Od ovog drugog se lestvica i raspala.
+
+   Donja granica je 11px: launcher se gleda iz stolice. Jedini izuzetak je
+   donja navigacija panela na telefonu, i to pise uz nju. */
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
 html, body { height: 100%; overflow: hidden; }
 body {
@@ -234,8 +249,8 @@ body.pozadina-prazna .pozadina::after {
   width: 9px; height: 9px; margin-top: 5px; flex: 0 0 auto; border-radius: 50%;
   background: var(--green, #3dc97e); box-shadow: 0 0 10px 1px rgba(61, 201, 126, 0.7);
 }
-.conn-sesija b { display: block; color: #d7f5e5; font-size: 13.5px; font-weight: 800; }
-.conn-sesija span { display: block; margin-top: 3px; color: var(--text-3); font-size: 12.5px; line-height: 1.5; }
+.conn-sesija b { display: block; color: #d7f5e5; font-size: 14px; font-weight: 800; }
+.conn-sesija span { display: block; margin-top: 3px; color: var(--text-3); font-size: 13px; line-height: 1.5; }
 
 /* Vinjeta: ivice ekrana tamnije da sadržaj u sredini dobije težinu. */
 .fx-scan {
@@ -306,7 +321,7 @@ svg { display: block; }
 input {
   width: 100%; background: rgba(6, 6, 10, 0.7); border: 1px solid var(--line-2);
   border-left: 2px solid var(--line-2);
-  border-radius: 0; padding: 13px 15px; font-size: 15.5px; color: var(--text); outline: none;
+  border-radius: 0; padding: 13px 15px; font-size: 15px; color: var(--text); outline: none;
   font-family: var(--font-ui); font-weight: 500; letter-spacing: 0.02em;
   transition: border-color var(--tr), box-shadow var(--tr), background var(--tr);
 }
@@ -320,7 +335,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .btn {
   position: relative;
   display: inline-flex; align-items: center; justify-content: center; gap: 9px;
-  padding: 13px 22px; font-family: var(--font-ui); font-weight: 700; font-size: 14.5px; letter-spacing: 0.06em;
+  padding: 13px 22px; font-family: var(--font-ui); font-weight: 700; font-size: 15px; letter-spacing: 0.06em;
   text-transform: uppercase;
   background: var(--panel-3); color: var(--text);
   clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
@@ -347,7 +362,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .btn-block { width: 100%; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
 .btn:disabled:hover { background: linear-gradient(135deg, var(--brend) 0%, var(--brend-deep) 100%); }
-.err { color: var(--red-status); font-size: 13.5px; min-height: 20px; margin-bottom: 4px; font-weight: 600; }
+.err { color: var(--red-status); font-size: 14px; min-height: 20px; margin-bottom: 4px; font-weight: 600; }
 
 /* Setup / login */
 .login-hint { margin-top: 20px; color: var(--text-3); font-size: 12px; text-align: center; line-height: 1.6; letter-spacing: 0.02em; }
@@ -392,7 +407,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   filter: drop-shadow(0 10px 34px rgba(var(--brend-rgb), 0.38));
 }
 .lb-ime {
-  font-family: var(--font-display); font-weight: 700; font-size: clamp(30px, 3.2vw, 46px);
+  font-family: var(--font-display); font-weight: 700; font-size: clamp(30px, 3.2vw, 44px);
   line-height: 1; letter-spacing: 0.02em; text-transform: uppercase; color: var(--text);
 }
 .lb-pod {
@@ -409,7 +424,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-3);
 }
 .lb-c-v {
-  font-family: var(--font-display); font-size: clamp(17px, 1.5vw, 22px); font-weight: 700;
+  font-family: var(--font-display); font-size: clamp(17px, 1.5vw, 24px); font-weight: 700;
   color: var(--text); font-variant-numeric: tabular-nums; line-height: 1;
 }
 
@@ -493,7 +508,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .hud-chip .hc-v { font-size: 15px; font-weight: 800; line-height: 1.15; white-space: nowrap; }
 .hud-chip.bal .hc-v { color: var(--green); font-variant-numeric: tabular-nums; text-shadow: 0 0 14px var(--green-glow); }
 .hud-chip.timer { padding-right: 17px; }
-.hud-chip.timer .hc-v { font-variant-numeric: tabular-nums; font-size: 18px; letter-spacing: 0.01em; }
+.hud-chip.timer .hc-v { font-variant-numeric: tabular-nums; font-size: 17px; letter-spacing: 0.01em; }
 .hud-chip.timer.low { background: var(--brend-soft); }
 .hud-chip.timer.low::after { box-shadow: inset 0 0 0 1px var(--brend); }
 .hud-chip.timer.low .hc-v { color: var(--red-status); text-shadow: 0 0 16px var(--brend-glow); animation: timer-low 1.1s ease-in-out infinite; }
@@ -533,8 +548,8 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .empty-view { min-height: 52vh; display: grid; place-items: center; }
 .empty-view .ev-in { text-align: center; display: grid; justify-items: center; gap: 6px; max-width: 400px; }
 .empty-view svg { width: 60px; height: 60px; color: var(--brend); opacity: 0.35; stroke-width: 1.4; margin-bottom: 10px; filter: drop-shadow(0 0 18px var(--brend-glow)); }
-.empty-view .ev-t { font-family: var(--font-display); font-weight: 700; font-size: 18px; text-transform: uppercase; letter-spacing: 0.04em; }
-.empty-view .ev-s { font-size: 13.5px; color: var(--text-3); }
+.empty-view .ev-t { font-family: var(--font-display); font-weight: 700; font-size: 17px; text-transform: uppercase; letter-spacing: 0.04em; }
+.empty-view .ev-s { font-size: 14px; color: var(--text-3); }
 
 /* IGRE - library cover kartice */
 .tile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(190px, 100%), 1fr)); gap: 18px; }
@@ -654,7 +669,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 
 .hb-logo { height: 76%; max-height: 116px; width: auto; display: block; filter: drop-shadow(0 8px 26px rgba(var(--brend-rgb), 0.45)); }
 .hb-ime {
-  font-family: var(--font-display); font-weight: 700; font-size: clamp(28px, 3vw, 44px);
+  font-family: var(--font-display); font-weight: 700; font-size: clamp(30px, 3vw, 44px);
   text-transform: uppercase; line-height: 1; letter-spacing: 0.02em; color: var(--text);
 }
 .hb-pod {
@@ -802,7 +817,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
    praznine ispod korica. Na 505 se u red i dalje vidi pet igara. */
 .games-shelf .tile { flex: 0 0 auto; align-self: stretch; max-height: 505px; scroll-snap-align: start; }
 .games-shelf .tile-media { height: 100%; width: auto; }
-.games-shelf .tile-name { font-size: clamp(13px, 1vw, 16px); }
+.games-shelf .tile-name { font-size: clamp(13px, 1vw, 15px); }
 .games-shelf .tile-badge { font-size: 11px; }
 
 /* fallback pozadina za igru bez cover slike - svoja boja iz imena */
@@ -826,7 +841,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
    to je oznaka da slika fali, ne ukras. */
 .tile-fallback .tile-emoji {
   position: relative; font-family: var(--font-display);
-  font-size: clamp(20px, 2vw, 30px); font-weight: 700; letter-spacing: 0.1em;
+  font-size: clamp(19px, 2vw, 30px); font-weight: 700; letter-spacing: 0.1em;
   color: rgba(255, 255, 255, 0.24);
 }
 /* Prava ikona igre, izvucena iz njenog .exe fajla. Ikona je 48 px pa se ne
@@ -854,7 +869,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   position: relative; flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
   padding: 0 20px; height: 38px;
   background: rgba(var(--bg-rgb), 0.94);
-  font-family: var(--font-ui); font-size: 12.5px; color: var(--text-3); font-weight: 500; letter-spacing: 0.03em;
+  font-family: var(--font-ui); font-size: 13px; color: var(--text-3); font-weight: 500; letter-spacing: 0.03em;
 }
 .statusbar::before {
   content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px;
@@ -900,7 +915,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .acc-mi {
   display: flex; align-items: center; gap: 11px; padding: 13px 15px;
   background: transparent; border: 0; cursor: pointer; text-align: left;
-  color: var(--text-2); font-family: var(--font-ui); font-size: 14.5px; font-weight: 600;
+  color: var(--text-2); font-family: var(--font-ui); font-size: 15px; font-weight: 600;
   clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 0 100%);
   transition: background var(--t-brzo), color var(--t-brzo);
 }
@@ -912,7 +927,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .acc-mi-broj {
   margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px;
   display: grid; place-items: center; border-radius: 10px;
-  background: var(--gold); color: #111; font-size: 11.5px; font-weight: 700; font-style: normal;
+  background: var(--gold); color: #111; font-size: 12px; font-weight: 700; font-style: normal;
 }
 .acc-sadrzaj {
   min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden;
@@ -955,7 +970,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   box-shadow: 0 0 30px -6px var(--brend-glow);
 }
 .acc-id { min-width: 0; }
-.acc-name { font-family: var(--font-display); font-size: 26px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; }
+.acc-name { font-family: var(--font-display); font-size: 24px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; }
 .acc-user { color: var(--text-3); font-size: 14px; margin-top: 3px; }
 .acc-stats { margin-left: auto; display: flex; gap: 34px; }
 .acc-stat { text-align: right; }
@@ -979,7 +994,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .por-stavke { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; line-height: 1.3; }
 .por-st { color: var(--text); }
 .por-st b { color: var(--gold); font-weight: 700; margin-right: 2px; }
-.por-meta { display: flex; align-items: center; gap: 9px; color: var(--text-3); font-size: 11.5px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.por-meta { display: flex; align-items: center; gap: 9px; color: var(--text-3); font-size: 12px; margin-top: 6px; font-variant-numeric: tabular-nums; }
 .por-tacka { width: 3px; height: 3px; border-radius: 50%; background: var(--text-3); opacity: 0.6; }
 .por-cena { font-family: var(--font-display); font-size: 15px; font-weight: 700; }
 .por-cena i { font-style: normal; font-size: 11px; margin-left: 3px; color: var(--text-3); }
@@ -1057,7 +1072,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .prekidac.ugasen .pr-kugla { left: 3px; }
 
 .pod-dno { display: flex; align-items: center; gap: 14px; margin-top: 4px; }
-.pod-poruka { font-size: 12.5px; color: var(--red-status); }
+.pod-poruka { font-size: 13px; color: var(--red-status); }
 
 /* Igrač koji je ugasio animacije ne dobija nijednu - ni šaru, ni prelaze. */
 body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after {
@@ -1074,9 +1089,9 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
   clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
 }
 .nag-spreman { background: rgba(255, 181, 39, 0.07); box-shadow: inset 0 0 0 1px rgba(255, 181, 39, 0.3); display: flex; align-items: center; gap: 20px; }
-.nag-spreman .ns-t { flex: 1; font-family: var(--font-display); font-weight: 700; font-size: 18px; color: var(--gold); text-transform: uppercase; letter-spacing: 0.04em; }
+.nag-spreman .ns-t { flex: 1; font-family: var(--font-display); font-weight: 700; font-size: 17px; color: var(--gold); text-transform: uppercase; letter-spacing: 0.04em; }
 .ns-t { font-weight: 700; font-size: 15px; }
-.ns-o { margin-top: 7px; color: var(--text-3); font-size: 12.5px; }
+.ns-o { margin-top: 7px; color: var(--text-3); font-size: 13px; }
 .nag-traka { height: 7px; margin-top: 12px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
 .nag-traka i { display: block; height: 100%; background: linear-gradient(90deg, var(--brend), var(--gold)); transition: width 0.5s var(--ease-out); }
 .nag-spisak-h {
@@ -1151,7 +1166,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
    međuvremenu promenila. */
 .leti-kredit {
   position: fixed; z-index: 90; pointer-events: none;
-  font-family: var(--font-naslov); font-weight: 700; font-size: 26px;
+  font-family: var(--font-naslov); font-weight: 700; font-size: 24px;
   color: var(--gold); text-shadow: 0 2px 10px rgba(0,0,0,0.6);
   transform: translate(-50%, -50%);
   animation: leti-kredit 1100ms cubic-bezier(.4,.02,.2,1) forwards;
@@ -1191,7 +1206,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .tocak-napredak { margin: 4px 0 0; }
 .tocak-napredak .tn-bar { height: 9px; border-radius: 999px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
 .tocak-napredak .tn-fill { height: 100%; background: linear-gradient(90deg, var(--brend-deep), var(--brend)); border-radius: 999px; transition: width 0.5s var(--ease-out); }
-.tocak-napredak .tn-tekst { font-size: 12.5px; color: var(--text-2); margin-top: 10px; }
+.tocak-napredak .tn-tekst { font-size: 13px; color: var(--text-2); margin-top: 10px; }
 .tocak-dobitak { font-family: var(--font-display); font-weight: 700; font-size: 19px; color: var(--text-2); display: flex; align-items: center; justify-content: center; gap: 10px; }
 .tocak-dobitak.win { color: var(--gold); text-shadow: 0 0 20px var(--gold-glow); }
 .tocak-dobitak svg { width: 21px; height: 21px; }
@@ -1209,7 +1224,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
   background-color: #101018; background-repeat: repeat; border-bottom: 1px solid var(--line);
 }
 .pu-ime {
-  padding: 0 10px; font-size: 11.5px; font-weight: 700; text-align: left; color: var(--text-2);
+  padding: 0 10px; font-size: 12px; font-weight: 700; text-align: left; color: var(--text-2);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .poz-uzorak.izabran .pu-ime { color: var(--text); }
@@ -1298,7 +1313,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 
 .site-name {
   position: relative; z-index: 1; min-width: 0;
-  font-weight: 700; font-size: clamp(11px, 0.88vw, 13.5px);
+  font-weight: 700; font-size: clamp(11px, 0.88vw, 14px);
   font-family: var(--font-ui);
   text-transform: uppercase; letter-spacing: 0.04em; color: #eceef4;
   line-height: 1.22;
@@ -1326,7 +1341,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
    boji, da kartica izgleda namerno a ne kao propust. */
 .site-card.letter .site-logo { background: linear-gradient(150deg, var(--glow), rgba(0, 0, 0, 0.45)); }
 .site-card.letter .tool-letter {
-  font-family: var(--font-display); font-weight: 700; font-size: clamp(19px, 1.5vw, 25px);
+  font-family: var(--font-display); font-weight: 700; font-size: clamp(19px, 1.5vw, 24px);
   color: #fff; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 /* Google je izuzetak: njihov "G" se po pravilima ne preboji, pa ide u svoje
@@ -1364,7 +1379,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .shop-cip {
   display: inline-flex; align-items: center; gap: 7px;
   height: 32px; padding: 0 14px; border-radius: 999px;
-  font-family: var(--font-ui); font-size: 11.5px; font-weight: 700;
+  font-family: var(--font-ui); font-size: 12px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-2);
   background: rgba(255, 255, 255, 0.03); box-shadow: inset 0 0 0 1px var(--line);
   transition: background var(--tr), color var(--tr), box-shadow var(--tr);
@@ -1416,7 +1431,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .pice:hover .pice-slika img { transform: translateY(-4px) scale(1.05); }
 .pice-mono {
   position: absolute; inset: 0; z-index: 1; display: grid; place-items: center;
-  font-family: var(--font-display); font-size: 34px; font-weight: 700;
+  font-family: var(--font-display); font-size: 36px; font-weight: 700;
   letter-spacing: 0.04em; color: rgba(255, 255, 255, 0.16);
 }
 
@@ -1441,7 +1456,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 /* Ime ide malim slovima. VELIKA SLOVA na svakoj kartici su činila da ceo
    spisak viče, a i brend se čita tačnije: "Coca-Cola Zero", ne "COCA-COLA ZERO". */
 .pice-ime {
-  font-family: var(--font-ui); font-size: 12.5px; font-weight: 600; line-height: 1.32;
+  font-family: var(--font-ui); font-size: 13px; font-weight: 600; line-height: 1.32;
   letter-spacing: 0.01em; color: var(--text);
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   min-height: 2.64em;
@@ -1450,7 +1465,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 
 /* Cena: broj nosi, oznaka valute je sitna uz njega. */
 .pice-cena, .cr-cena, .ct-cena { display: inline-flex; align-items: baseline; gap: 3px; font-variant-numeric: tabular-nums; }
-.pice-cena b { font-family: var(--font-display); font-weight: 700; font-size: 16px; line-height: 1; color: #fff; }
+.pice-cena b { font-family: var(--font-display); font-weight: 700; font-size: 15px; line-height: 1; color: #fff; }
 .pice-cena i {
   font-style: normal; font-family: var(--font-ui); font-size: 11px; font-weight: 700;
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3);
@@ -1499,7 +1514,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
   box-shadow: 0 0 0 4px rgba(255, 181, 39, 0.16); animation: st-kuc 1.8s ease-in-out infinite;
 }
 @keyframes st-kuc { 50% { box-shadow: 0 0 0 8px rgba(255, 181, 39, 0.05); } }
-.st-t { font-weight: 700; font-size: 13.5px; color: var(--gold); }
+.st-t { font-weight: 700; font-size: 14px; color: var(--gold); }
 .st-o { font-size: 12px; color: var(--text-3); }
 .st-vise { margin-left: auto; display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text-2); }
 .st-vise svg { color: var(--text-3); }
@@ -1530,7 +1545,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .cr-slika img { max-width: 80%; max-height: 84%; object-fit: contain; }
 .cr-tekst { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
 .cr-ime {
-  max-width: 100%; font-size: 12.5px; font-weight: 600; line-height: 1.25;
+  max-width: 100%; font-size: 13px; font-weight: 600; line-height: 1.25;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .cr-cena b { font-family: var(--font-display); font-weight: 700; font-size: 14px; color: #fff; }
@@ -1557,7 +1572,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
   gap: 5px; padding: 20px; text-align: center;
 }
 .ce-t { font-family: var(--font-ui); font-size: 13px; font-weight: 700; color: var(--text-2); }
-.ce-s { font-size: 11.5px; color: var(--text-3); }
+.ce-s { font-size: 12px; color: var(--text-3); }
 
 .cart-foot { padding: 15px 19px 17px; border-top: 1px solid var(--line); }
 /* Izbor plaćanja: dve jednake ponude, ne padajući meni - igrač bira jednim
@@ -1629,8 +1644,8 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .lock-icon svg { width: 42px; height: 42px; stroke-width: 1.7; }
 /* Zakljucan zbog isteklog vremena - crveno, jer to ZNACI, i ne menja se sa bojom kuce. */
 .lock-icon.time { background: rgba(var(--red-status-rgb), 0.14); color: var(--red-status); box-shadow: 0 0 44px -6px rgba(var(--red-status-rgb), 0.5), inset 0 0 0 1px rgba(var(--red-status-rgb), 0.4); }
-.lock-title { font-family: var(--font-display); font-size: 34px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
-.lock-sub { color: var(--text-2); font-size: 15.5px; margin-top: 12px; text-align: center; max-width: 460px; line-height: 1.6; }
+.lock-title { font-family: var(--font-display); font-size: 36px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
+.lock-sub { color: var(--text-2); font-size: 15px; margin-top: 12px; text-align: center; max-width: 460px; line-height: 1.6; }
 .lock-pin { margin-top: 34px; width: 280px; }
 .lock-pin input { text-align: center; letter-spacing: 8px; font-size: 19px; font-weight: 800; }
 .lock-foot {
@@ -1737,7 +1752,7 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
 .boot .brand-logo { width: 260px; max-width: 60vw; animation: boot-logo 0.6s var(--tr) both; }
 @keyframes boot-logo { 0% { opacity: 0; transform: scale(1.3); } 55% { opacity: 1; transform: scale(0.95); } 100% { transform: scale(1); } }
 .boot-line {
-  margin-top: 22px; font-family: var(--font-display); font-weight: 700; font-size: 16px;
+  margin-top: 22px; font-family: var(--font-display); font-weight: 700; font-size: 15px;
   text-transform: uppercase; letter-spacing: 0.3em; color: var(--gold);
   text-shadow: 0 0 18px var(--gold-glow); opacity: 0; animation: boot-line 0.4s ease 0.35s both;
 }
@@ -1834,7 +1849,7 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
   position: absolute; top: 0; bottom: 0; width: 1px;
   background: rgba(var(--bg-rgb), 0.9);
 }
-.vip-pod { font-size: 12.5px; color: var(--text-3); }
+.vip-pod { font-size: 13px; color: var(--text-3); }
 
 /* Pečat: nakrivljen kao da je otisnut, ne kao dugme. */
 .vip-pecat {
@@ -1843,7 +1858,7 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
   padding: 9px 18px 10px;
   border: 3px solid rgba(255, 181, 39, 0.75); border-radius: 8px;
   color: var(--gold);
-  font-family: var(--font-display); font-size: 25px; font-weight: 700;
+  font-family: var(--font-display); font-size: 24px; font-weight: 700;
   letter-spacing: 0.1em; text-transform: uppercase; line-height: 1;
   box-shadow: 0 0 34px -8px var(--gold-glow), inset 0 0 22px -12px var(--gold-glow);
 }
@@ -1886,7 +1901,7 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
   text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold);
 }
 .pf-xp { flex: none; width: 260px; max-width: 100%; }
-.pf-xp-broj { font-family: var(--font-display); font-size: 22px; font-weight: 700; }
+.pf-xp-broj { font-family: var(--font-display); font-size: 24px; font-weight: 700; }
 .pf-xp-broj span { font-size: 12px; color: var(--text-3); letter-spacing: 0.1em; }
 .pf-xp-traka {
   height: 9px; border-radius: 3px; margin: 7px 0 5px; overflow: hidden;
@@ -1905,15 +1920,15 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
   background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--cut);
   padding: 12px 14px; min-width: 0;
 }
-.pf-bl { font-family: var(--font-ui); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+.pf-bl { font-family: var(--font-ui); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
 .pf-bv {
-  font-family: var(--font-display); font-size: 20px; font-weight: 700; margin-top: 3px;
+  font-family: var(--font-display); font-size: 19px; font-weight: 700; margin-top: 3px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 .pf-odeljak { display: flex; flex-direction: column; gap: 10px; }
 .pf-naslov {
-  font-family: var(--font-ui); font-size: 12.5px; font-weight: 700;
+  font-family: var(--font-ui); font-size: 13px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-2);
   display: flex; align-items: center; gap: 10px;
 }

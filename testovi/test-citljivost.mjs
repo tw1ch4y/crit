@@ -74,7 +74,52 @@ for (const [gde, putanja, podloge] of [
     klampe.filter((v) => v < 11).join(", "));
 }
 
-// ---- 3) PANEL I LAUNCHER GOVORE ISTIM JEZIKOM ----
+// ---- 3) LESTVICA VELIČINA ----
+//
+// Launcher je nosio 23 razlicite velicine slova: 11, 11.5, 12, 12.5, 13, 13.5,
+// 14, 14.5, 15, 15.5, 16, 17, 18, 19, 20, 22, 24, 25, 26, 30, 34, 36, 64. Panel
+// 19 svojih. Nista od toga se ne vidi kao greska, ali se vidi kao razlika: dve
+// oznake istog reda, jedna 11 a druga 11.5, i cela strana izgleda kao da je
+// pravljena u vise navrata. To je razlika izmedju "radi" i "uradjeno".
+//
+// Lestvica: 11 12 13 14 15 17 19 24 30 36 44 64. Nije proizvoljna - svaki korak
+// postoji zato sto je u programu vec bio potreban, samo su medjukoraci spusteni
+// na najblizi (najvise 2px razlike). Nova vrednost van lestvice znaci ili da
+// treba novi korak (pa se dodaje ovde, svesno), ili da je neko meruckao dok mu
+// ne "legne" - a od toga se lestvica i raspala.
+const LESTVICA = [11, 12, 13, 14, 15, 17, 19, 24, 30, 36, 44, 64];
+const IZUZECI = [
+  // Donja navigacija panela na telefonu: petnaest stavki u sirinu ekrana.
+  // Objasnjeno uz samo pravilo u style.css.
+  { velicina: 10, gde: /\.nav-item/ },
+];
+for (const [gde, ...putanje] of [
+  ["launcher", "client/renderer/css/launcher.css"],
+  ["panel", "server/public/css/style.css", "server/public/js/app.js"],
+]) {
+  const van = [];
+  for (const putanja of putanje) {
+    citajIzvor(putanja).split("\n").forEach((r, i) => {
+      for (const m of r.matchAll(/font-size:\s*(\d+(?:\.\d+)?)px/g)) {
+        const v = parseFloat(m[1]);
+        if (LESTVICA.includes(v)) continue;
+        if (IZUZECI.some((x) => x.velicina === v && x.gde.test(r))) continue;
+        van.push(`${putanja}:${i + 1} ${v}px`);
+      }
+      // I granice u clamp() moraju da budu sa lestvice - clamp je ista velicina
+      // slova, samo zavisi od sirine ekrana.
+      for (const m of r.matchAll(/clamp\(\s*(\d+(?:\.\d+)?)px[^)]*?(\d+(?:\.\d+)?)px\s*\)/g)) {
+        if (!/font-size/.test(r)) continue;
+        for (const v of [parseFloat(m[1]), parseFloat(m[2])]) {
+          if (!LESTVICA.includes(v)) van.push(`${putanja}:${i + 1} clamp ${v}px`);
+        }
+      }
+    });
+  }
+  proveri(`${gde}: sve veličine su sa lestvice`, van.length === 0, van.slice(0, 6).join(" | "));
+}
+
+// ---- 4) PANEL I LAUNCHER GOVORE ISTIM JEZIKOM ----
 //
 // Vlasnik ih gleda jedan pored drugog - panel na telefonu, launcher na masini.
 // Dva razlicita siva na istom mestu izgledaju kao greska u stampi.

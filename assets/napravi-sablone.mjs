@@ -8,13 +8,16 @@ const OVDE = import.meta.dirname;
 const IZLAZ = path.join(OVDE, "sabloni");
 fs.mkdirSync(IZLAZ, { recursive: true });
 
+// Iste boje koje nosi launcher (client/renderer/css/launcher.css). Dok je ovde
+// stajala stara crvena podloga, dizajner je crtao sliku za jedan program a
+// ubacivao je u drugi - pa se tek na ekranu videlo da se ne uklapa.
 const BOJA = {
-  papir: "#0f1116",
-  ivica: "#2a2f3a",
-  zauzeto: "#e23b34",
-  mirno: "#3dc97e",
-  tekst: "#e8eaf0",
-  slabo: "#8b91a0",
+  papir: "#070c1c",
+  ivica: "#1f2d54",
+  zauzeto: "#2f6ae8",   // boja kuce: tu ide sadrzaj, ne slika
+  mirno: "#33e284",     // slobodno
+  tekst: "#f1f4fb",
+  slabo: "#8c96b7",
 };
 
 // zona: procenti u odnosu na platno

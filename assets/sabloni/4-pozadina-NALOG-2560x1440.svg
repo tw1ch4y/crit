@@ -1,37 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2560" height="1440" viewBox="0 0 2560 1440">
-  <rect width="2560" height="1440" fill="#0f1116"/>
-  <line x1="853.2" y1="0" x2="853.2" y2="1440" stroke="#2a2f3a" stroke-width="2.9" stroke-opacity="0.7"/><line x1="0" y1="480" x2="2560" y2="480" stroke="#2a2f3a" stroke-width="2.9" stroke-opacity="0.7"/><line x1="1706.5" y1="0" x2="1706.5" y2="1440" stroke="#2a2f3a" stroke-width="2.9" stroke-opacity="0.7"/><line x1="0" y1="959.9" x2="2560" y2="959.9" stroke="#2a2f3a" stroke-width="2.9" stroke-opacity="0.7"/>
-  <rect x="2.9" y="2.9" width="2554.2" height="1434.2" fill="none" stroke="#2a2f3a" stroke-width="5.8"/>
+  <rect width="2560" height="1440" fill="#070c1c"/>
+  <line x1="853.2" y1="0" x2="853.2" y2="1440" stroke="#1f2d54" stroke-width="2.9" stroke-opacity="0.7"/><line x1="0" y1="480" x2="2560" y2="480" stroke="#1f2d54" stroke-width="2.9" stroke-opacity="0.7"/><line x1="1706.5" y1="0" x2="1706.5" y2="1440" stroke="#1f2d54" stroke-width="2.9" stroke-opacity="0.7"/><line x1="0" y1="959.9" x2="2560" y2="959.9" stroke="#1f2d54" stroke-width="2.9" stroke-opacity="0.7"/>
+  <rect x="2.9" y="2.9" width="2554.2" height="1434.2" fill="none" stroke="#1f2d54" stroke-width="5.8"/>
 
   <g>
     <rect x="0" y="0" width="2560" height="103.7"
-      fill="#e23b34" fill-opacity="0.14" stroke="#e23b34" stroke-opacity="0.55"
+      fill="#2f6ae8" fill-opacity="0.14" stroke="#2f6ae8" stroke-opacity="0.55"
       stroke-width="5.8" stroke-dasharray="28.8 20.2"/>
-    <text x="40.3" y="74.9" fill="#e23b34" font-family="Segoe UI, sans-serif"
+    <text x="40.3" y="74.9" fill="#2f6ae8" font-family="Segoe UI, sans-serif"
       font-size="49" font-weight="700" letter-spacing="2.9">GORNJA TRAKA</text>
   </g>
   <g>
     <rect x="560.6" y="410.4" width="1441.3" height="676.8"
-      fill="#e23b34" fill-opacity="0.14" stroke="#e23b34" stroke-opacity="0.55"
+      fill="#2f6ae8" fill-opacity="0.14" stroke="#2f6ae8" stroke-opacity="0.55"
       stroke-width="5.8" stroke-dasharray="28.8 20.2"/>
-    <text x="600.9" y="485.29999999999995" fill="#e23b34" font-family="Segoe UI, sans-serif"
+    <text x="600.9" y="485.29999999999995" fill="#2f6ae8" font-family="Segoe UI, sans-serif"
       font-size="49" font-weight="700" letter-spacing="2.9">PODACI I PORUDŽBINE</text>
   </g>
   <g>
     <rect x="0" y="1389.6" width="2560" height="50.4"
-      fill="#e23b34" fill-opacity="0.14" stroke="#e23b34" stroke-opacity="0.55"
+      fill="#2f6ae8" fill-opacity="0.14" stroke="#2f6ae8" stroke-opacity="0.55"
       stroke-width="5.8" stroke-dasharray="28.8 20.2"/>
-    <text x="40.3" y="1464.5" fill="#e23b34" font-family="Segoe UI, sans-serif"
+    <text x="40.3" y="1464.5" fill="#2f6ae8" font-family="Segoe UI, sans-serif"
       font-size="49" font-weight="700" letter-spacing="2.9">DONJA TRAKA</text>
   </g>
   <g>
     <rect x="0" y="0" width="2560" height="276.5" fill="#05060a" fill-opacity="0.93"/>
-    <text x="80.6" y="115.2" fill="#e8eaf0" font-family="Segoe UI, sans-serif" font-size="72" font-weight="800" letter-spacing="2.9">POZADINA - NALOG</text>
-    <text x="80.6" y="207.4" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="49">Podaci igrača, porudžbine, promena lozinke.</text>
-    <text x="2479.4" y="132.5" fill="#e8eaf0" text-anchor="end" font-family="Segoe UI, sans-serif" font-size="80.6" font-weight="800">2560 x 1440 px</text>
+    <text x="80.6" y="115.2" fill="#f1f4fb" font-family="Segoe UI, sans-serif" font-size="72" font-weight="800" letter-spacing="2.9">POZADINA - NALOG</text>
+    <text x="80.6" y="207.4" fill="#8c96b7" font-family="Segoe UI, sans-serif" font-size="49">Podaci igrača, porudžbine, promena lozinke.</text>
+    <text x="2479.4" y="132.5" fill="#f1f4fb" text-anchor="end" font-family="Segoe UI, sans-serif" font-size="80.6" font-weight="800">2560 x 1440 px</text>
 
     <rect x="0" y="1261.4" width="2560" height="178.6" fill="#05060a" fill-opacity="0.93"/>
-    <text x="80.6" y="1336.3000000000002" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="46.1">Sadržaj je u sredini ekrana. Levo i desno od njega slika se lepo vidi.</text>
-    <text x="80.6" y="1405.4" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="43.2">crvena zona = sadrzaj launchera stoji preko slike   ·   zelena zona = tu stavi ono sto mora da se vidi</text>
+    <text x="80.6" y="1336.3000000000002" fill="#8c96b7" font-family="Segoe UI, sans-serif" font-size="46.1">Sadržaj je u sredini ekrana. Levo i desno od njega slika se lepo vidi.</text>
+    <text x="80.6" y="1405.4" fill="#8c96b7" font-family="Segoe UI, sans-serif" font-size="43.2">crvena zona = sadrzaj launchera stoji preko slike   ·   zelena zona = tu stavi ono sto mora da se vidi</text>
   </g>
 </svg>

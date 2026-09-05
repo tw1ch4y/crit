@@ -1,23 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <rect width="256" height="256" fill="#0f1116"/>
-  <line x1="85.3" y1="0" x2="85.3" y2="256" stroke="#2a2f3a" stroke-width="0.5" stroke-opacity="0.7"/><line x1="0" y1="85.3" x2="256" y2="85.3" stroke="#2a2f3a" stroke-width="0.5" stroke-opacity="0.7"/><line x1="170.6" y1="0" x2="170.6" y2="256" stroke="#2a2f3a" stroke-width="0.5" stroke-opacity="0.7"/><line x1="0" y1="170.6" x2="256" y2="170.6" stroke="#2a2f3a" stroke-width="0.5" stroke-opacity="0.7"/>
-  <rect x="0.5" y="0.5" width="255" height="255" fill="none" stroke="#2a2f3a" stroke-width="1"/>
+  <rect width="256" height="256" fill="#070c1c"/>
+  <line x1="85.3" y1="0" x2="85.3" y2="256" stroke="#1f2d54" stroke-width="0.5" stroke-opacity="0.7"/><line x1="0" y1="85.3" x2="256" y2="85.3" stroke="#1f2d54" stroke-width="0.5" stroke-opacity="0.7"/><line x1="170.6" y1="0" x2="170.6" y2="256" stroke="#1f2d54" stroke-width="0.5" stroke-opacity="0.7"/><line x1="0" y1="170.6" x2="256" y2="170.6" stroke="#1f2d54" stroke-width="0.5" stroke-opacity="0.7"/>
+  <rect x="0.5" y="0.5" width="255" height="255" fill="none" stroke="#1f2d54" stroke-width="1"/>
 
   <g>
     <rect x="38.4" y="38.4" width="179.2" height="179.2"
-      fill="#3dc97e" fill-opacity="0.06" stroke="#3dc97e" stroke-opacity="0.6"
+      fill="#33e284" fill-opacity="0.06" stroke="#33e284" stroke-opacity="0.6"
       stroke-width="1" stroke-dasharray="5.1 3.6"/>
-    <text x="45.6" y="51.7" fill="#3dc97e" font-family="Segoe UI, sans-serif"
+    <text x="45.6" y="51.7" fill="#33e284" font-family="Segoe UI, sans-serif"
       font-size="8.7" font-weight="700" letter-spacing="0.5">LOGO U OVOM KRUGU</text>
   </g>
   <g>
     <rect x="0" y="0" width="256" height="49.2" fill="#05060a" fill-opacity="0.93"/>
-    <text x="14.3" y="20.5" fill="#e8eaf0" font-family="Segoe UI, sans-serif" font-size="12.8" font-weight="800" letter-spacing="0.5">SLIKA PREČICE - internet alati</text>
-    <text x="14.3" y="36.9" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="8.7">Logo aplikacije, odnos 1:1.</text>
-    <text x="241.7" y="23.6" fill="#e8eaf0" text-anchor="end" font-family="Segoe UI, sans-serif" font-size="14.3" font-weight="800">256 x 256 px</text>
+    <text x="14.3" y="20.5" fill="#f1f4fb" font-family="Segoe UI, sans-serif" font-size="12.8" font-weight="800" letter-spacing="0.5">SLIKA PREČICE - internet alati</text>
+    <text x="14.3" y="36.9" fill="#8c96b7" font-family="Segoe UI, sans-serif" font-size="8.7">Logo aplikacije, odnos 1:1.</text>
+    <text x="241.7" y="23.6" fill="#f1f4fb" text-anchor="end" font-family="Segoe UI, sans-serif" font-size="14.3" font-weight="800">256 x 256 px</text>
 
     <rect x="0" y="224.3" width="256" height="31.7" fill="#05060a" fill-opacity="0.93"/>
-    <text x="14.3" y="237.60000000000002" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="8.2">U launcheru se crta na 34 px. Samo logo, bez sitnog teksta. Providna pozadina (PNG) izgleda najbolje.</text>
-    <text x="14.3" y="249.9" fill="#8b91a0" font-family="Segoe UI, sans-serif" font-size="7.7">crvena zona = sadrzaj launchera stoji preko slike   ·   zelena zona = tu stavi ono sto mora da se vidi</text>
+    <text x="14.3" y="237.60000000000002" fill="#8c96b7" font-family="Segoe UI, sans-serif" font-size="8.2">U launcheru se crta na 34 px. Samo logo, bez sitnog teksta. Providna pozadina (PNG) izgleda najbolje.</text>
+    <text x="14.3" y="249.9" fill="#8c96b7" font-family="Segoe UI, sans-serif" font-size="7.7">crvena zona = sadrzaj launchera stoji preko slike   ·   zelena zona = tu stavi ono sto mora da se vidi</text>
   </g>
 </svg>
