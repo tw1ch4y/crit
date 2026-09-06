@@ -1496,19 +1496,36 @@ ipcMain.handle("podesavanja-citaj", async () => {
   try { return await winPod.procitajSve(); }
   catch (e) { return { greska: String(e?.message || e).slice(0, 200) }; }
 });
+// I OVDE IGRAČU IDE PORUKA, NE SISTEMSKA GREŠKA.
+//
+// Isto pravilo koje važi za pokretanje igara (vidi objasniGresku) ovde nije
+// važilo: kad podešavanje miša ne prođe, igraču je stizalo sirovo "Miš: " plus
+// 300 znakova PowerShell greške na engleskom. To mu ne kaže ni šta se desilo ni
+// šta da radi, a izgleda kao da je program pukao.
+// Tačan razlog i dalje ide osoblju, kroz `klijent_problem` - isto kao kod igara.
+const podesiIliJavi = async (sta, radi, imenica) => {
+  const r = await radi(sta);
+  if (r.ok) return null;
+  javiProblem("podesavanja", `${imenica}: ${r.greska}`);
+  return { ok: false, error: `${imenica} nije mogao da se podesi na ovom računaru. Osoblje je obavešteno.` };
+};
+
 ipcMain.handle("podesavanja-primeni", async (e, sta) => {
   try {
-    if (!sesijaAktivna) return { ok: false, error: "Nisi prijavljen." };
+    if (!sesijaAktivna) return { ok: false, error: "Prijavi se pa probaj ponovo." };
     if (sta?.mis) {
-      const r = await winPod.primeniMis(sta.mis);
-      if (!r.ok) return { ok: false, error: "Miš: " + r.greska };
+      const pao = await podesiIliJavi(sta.mis, (x) => winPod.primeniMis(x), "Miš");
+      if (pao) return pao;
     }
     if (sta?.zvuk && sta.zvuk.jacina != null) {
-      const r = await winPod.primeniZvuk(sta.zvuk);
-      if (!r.ok) return { ok: false, error: "Zvuk: " + r.greska };
+      const pao = await podesiIliJavi(sta.zvuk, (x) => winPod.primeniZvuk(x), "Zvuk");
+      if (pao) return pao;
     }
     return { ok: true, stanje: await winPod.procitajSve() };
-  } catch (err) { return { ok: false, error: String(err?.message || err).slice(0, 200) }; }
+  } catch (err) {
+    javiProblem("podesavanja", String(err?.message || err).slice(0, 200));
+    return { ok: false, error: "Podešavanje nije prošlo na ovom računaru. Osoblje je obavešteno." };
+  }
 });
 
 ipcMain.handle("sys-stats", async () => {

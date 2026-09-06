@@ -57,8 +57,14 @@ for (const [ime, izvor] of [["launcher.js", jsTekst], ["index.html", htmlTekst],
 const panelJs = bezKomentara(citajIzvor("server/public/js/app.js"));
 const panelHtml = bezKomentara(citajIzvor("server/public/index.html"));
 const ZNAKOVI = [["·", /·/g], ["&middot;", /&middot;|&bull;|&#183;|&#8226;/gi], ["— –", /[—–]|&mdash;|&ndash;/gi]];
+// GLAVNI PROCES TAKODJE PRICA SA IGRACEM.
+// Poruke o pokretanju igre, o programu iz Preuzimanja i o podesavanjima nastaju
+// u client/main.js, a ne u launcher.js - pa je pravilo do sada preskakalo bas
+// ono sto igrac procita kad nesto ne radi.
+const glavni = bezKomentara(citajIzvor("client/main.js"));
 for (const [ime, izvor] of [["launcher.js", jsTekst], ["index.html", htmlTekst],
-                           ["panel app.js", panelJs], ["panel index.html", panelHtml]]) {
+                           ["panel app.js", panelJs], ["panel index.html", panelHtml],
+                           ["main.js", glavni]]) {
   for (const [sta, uzorak] of ZNAKOVI) {
     const nadjeno = (izvor.match(uzorak) || []).length;
     proveri(`${ime}: nema "${sta}" kao separatora`, nadjeno === 0, `${nadjeno} komada`);

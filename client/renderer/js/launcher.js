@@ -1978,8 +1978,14 @@ function sekcijaNagrade() {
 function sekcijaPodesavanja() {
   const p = S.winPodesavanja;
   if (!p) {
+    if (podesavanjaStanje === "nije") ucitajWinPodesavanja();
     return `<div class="acc-sek"><div class="acc-sek-h"><h3>Miš i zvuk</h3>
-      <p>Učitavam podešavanja računara...</p></div></div>`;
+      <p>${podesavanjaStanje === "palo"
+        ? "Podešavanja ovog računara nisu pročitana."
+        : "Učitavam podešavanja računara..."}</p></div>
+      ${podesavanjaStanje === "palo"
+        ? policaPrazno("mis", "Nije pročitano", "Osoblje je obavešteno. Miš i zvuk se i dalje menjaju u samom Windows-u.")
+        : ""}</div>`;
   }
   const mis = p.mis || { brzina: 10, ubrzanje: false };
   const imaZvuk = p.zvuk && p.zvuk.jacina != null;
@@ -2096,12 +2102,24 @@ function primeniIzborLaunchera() {
 
 // Miš i zvuk se čitaju sa računara tek kad igraču zatrebaju - čitanje ide preko
 // PowerShell-a i traje oko sekundu, pa ne sme na svaku prijavu.
+//
+// Tri ishoda, ne dva. Ranije je svaki neuspeh zavrsavao isto: "Učitavam
+// podešavanja računara..." koje nikad ne prestane. Gore od toga: kad citanje
+// vrati gresku, odgovor je i dalje objekat pa se smatrao uspehom - i igracu bi
+// se prikazao klizac na vrednosti 10, kao da je to stvarno stanje njegovog misa.
+// Izmisljena vrednost je gora od poruke: igrac je pomeri, nista se ne desi, i ne
+// zna da li je do njega ili do racunara.
+let podesavanjaStanje = "nije";   // nije | ceka | stiglo | palo
 async function ucitajWinPodesavanja() {
-  if (S.winPodesavanja || !window.crit?.podesavanjaCitaj) return;
+  if (S.winPodesavanja || podesavanjaStanje === "ceka" || !window.crit?.podesavanjaCitaj) return;
+  podesavanjaStanje = "ceka";
+  const gotovo = () => { if (S.tab === "account" && S.accSekcija === "podesavanja") renderContent(); };
   try {
-    S.winPodesavanja = await window.crit.podesavanjaCitaj();
-    if (S.tab === "account" && S.accSekcija === "podesavanja") renderContent();
-  } catch {}
+    const r = await window.crit.podesavanjaCitaj();
+    if (r && !r.greska && (r.mis || r.zvuk)) { S.winPodesavanja = r; podesavanjaStanje = "stiglo"; }
+    else podesavanjaStanje = "palo";
+  } catch { podesavanjaStanje = "palo"; }
+  gotovo();
 }
 
 function sekcijaLozinka() {

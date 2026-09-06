@@ -73,6 +73,32 @@ proveri("zauzeta igra ne salje po osoblje",
   main.includes("Igra je trenutno zauzeta. Sačekaj koji trenutak pa probaj ponovo."),
   "zvati radnika zbog necega sto prodje samo od sebe je gubljenje i njegovog i igracevog vremena");
 
+// ISTO PRAVILO VAZI I ZA MIS I ZVUK.
+//
+// Kad podesavanje ne prodje, igracu je stizalo sirovo "Miš: " plus 300 znakova
+// PowerShell greske na engleskom - u istom fajlu koji za igre izricito kaze da
+// sistemska poruka igracu ne ide.
+proveri("greska podesavanja ne ide igracu sirova",
+  !/error: "Miš: " \+ r\.greska/.test(main) && !/error: "Zvuk: " \+ r\.greska/.test(main),
+  "igracu to ne kaze ni sta se desilo ni sta da radi");
+proveri("umesto nje ide poruka na srpskom",
+  /nije mogao da se podesi na ovom računaru/.test(main));
+proveri("tacan razlog i dalje ide osoblju",
+  /javiProblem\("podesavanja"/.test(main),
+  "bez toga vlasnik ne bi znao da se na nekoj masini podesavanja ne primaju");
+
+// IZMISLJENA VREDNOST JE GORA OD PORUKE.
+//
+// Citanje koje vrati gresku i dalje vraca objekat, pa se smatralo uspehom -
+// igracu bi se prikazao klizac na vrednosti 10 kao da je to stanje njegovog
+// misa. Pomeri ga, nista se ne desi, i ne zna je li do njega ili do racunara.
+// A kad citanje pukne, ekran je zauvek stajao na "Ucitavam podesavanja...".
+proveri("procitana greska se ne prikazuje kao stanje",
+  /if \(r && !r\.greska && \(r\.mis \|\| r\.zvuk\)\)/.test(launcher));
+proveri("neuspelo citanje ne visi na 'Ucitavam'",
+  /podesavanjaStanje === "palo"/.test(launcher),
+  "ekran koji zauvek nesto ucitava je gori od poruke o gresci");
+
 proveri("osoblje i dalje dobija tacan razlog",
   main.includes('javiDaNeRadi(') && /razlog/.test(main));
 
