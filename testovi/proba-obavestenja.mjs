@@ -1,7 +1,7 @@
 import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
-import { KOREN, radniFolder, ugasiLaunchere } from "./_okruzenje.mjs";
+import { KOREN, radniFolder, ugasiLaunchere, putanjaElektrona } from "./_okruzenje.mjs";
 // OBAVESTENJE PREKO IGRE
 //
 // Igrac je skoro uvek u punom ekranu i ne vidi launcher. Zato launcher pravi
@@ -90,8 +90,8 @@ setInterval(() => {
 `, "utf8");
 fs.writeFileSync(path.join(RADNO, "package.json"), JSON.stringify({ name: "proba-obavestenja", version: "1.0.0", main: "main.js" }), "utf8");
 
-const electron = path.join(KOREN, "client", "node_modules", ".bin", process.platform === "win32" ? "electron.cmd" : "electron");
-const klijent = spawn(electron, [RADNO], { shell: process.platform === "win32", stdio: "ignore" });
+const electron = putanjaElektrona();
+const klijent = spawn(electron, [RADNO], { stdio: "ignore" });
 
 const procitaj = () => { try { return JSON.parse(fs.readFileSync(IZLAZ, "utf8")); } catch { return []; } };
 const sveVidjeno = () => procitaj().map((x) => x.tekst || "").join(" || ");
@@ -163,7 +163,7 @@ try { klijent.kill(); } catch {}
 ugasiLaunchere();
 await cekaj(1500);
 try { fs.unlinkSync(IZLAZ); } catch {}
-const klijent2 = spawn(electron, [RADNO], { shell: process.platform === "win32", stdio: "ignore" });
+const klijent2 = spawn(electron, [RADNO], { stdio: "ignore" });
 for (let i = 0; i < 60; i++) { if (fs.existsSync(IZLAZ2)) break; await cekaj(500); }
 const prijava = (() => { try { return JSON.parse(fs.readFileSync(IZLAZ2, "utf8")); } catch { return {}; } })();
 proveri("igrac se prijavio kroz sam launcher", prijava.stanje === "desktopScreen",

@@ -1,7 +1,7 @@
 import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
-import { KOREN, radniFolder } from "./_okruzenje.mjs";
+import { KOREN, radniFolder, putanjaElektrona } from "./_okruzenje.mjs";
 // DALJINSKI TASK MANAGER
 // Pusta pravi launcher, trazi spisak procesa sa panela i gasi PRAVI program
 // koji je za tu priliku pokrenut. Ovo se ne moze proveriti iz koda: mora da
@@ -47,8 +47,8 @@ require(${JSON.stringify(path.join(KOREN, "client", "main.js").replace(/\\/g, "/
 `, "utf8");
 fs.writeFileSync(path.join(RADNO, "package.json"), JSON.stringify({ name: "proba-procesa", version: "1.0.0", main: "main.js" }), "utf8");
 
-const electron = path.join(KOREN, "client", "node_modules", ".bin", process.platform === "win32" ? "electron.cmd" : "electron");
-const klijent = spawn(electron, [RADNO], { shell: process.platform === "win32", stdio: "ignore" });
+const electron = putanjaElektrona();
+const klijent = spawn(electron, [RADNO], { stdio: "ignore" });
 
 // sacekaj da se launcher poveze
 let povezan = false;

@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { putanjaElektrona } from "./_okruzenje.mjs";
 
 const OVDE = path.dirname(fileURLToPath(import.meta.url));
 const KOREN = path.join(OVDE, "..");
@@ -150,9 +151,8 @@ fs.writeFileSync(path.join(RADNO, "package.json"), JSON.stringify({ name: "proba
 
 // --reduced pokrece istu probu na Windows-u sa iskljucenim animacijama.
 const REDUCED = process.argv.includes("--reduced");
-const electron = path.join(KOREN, "client", "node_modules", ".bin", process.platform === "win32" ? "electron.cmd" : "electron");
+const electron = putanjaElektrona();
 const p = spawn(electron, [RADNO], {
-  shell: process.platform === "win32",
   env: { ...process.env, ...(REDUCED ? { CRIT_REDUCED: "1" } : {}) },
 });
 let izlaz = "";

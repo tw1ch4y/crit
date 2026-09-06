@@ -10,6 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { putanjaElektrona } from "./_okruzenje.mjs";
 
 const OVDE = path.dirname(fileURLToPath(import.meta.url));
 const KOREN = path.join(OVDE, "..");
@@ -88,8 +89,8 @@ app.whenReady().then(async () => {
 fs.writeFileSync(path.join(RADNO, "main.js"), MAIN, "utf8");
 fs.writeFileSync(path.join(RADNO, "package.json"), JSON.stringify({ name: "proba-precica", version: "1.0.0", main: "main.js" }, null, 2), "utf8");
 
-const electron = path.join(KOREN, "client", "node_modules", ".bin", process.platform === "win32" ? "electron.cmd" : "electron");
-const p = spawn(electron, [RADNO], { shell: process.platform === "win32" });
+const electron = putanjaElektrona();
+const p = spawn(electron, [RADNO]);
 let izlaz = "";
 p.stdout.on("data", (d) => (izlaz += d));
 p.stderr.on("data", (d) => (izlaz += d));

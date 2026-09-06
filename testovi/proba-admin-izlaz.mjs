@@ -1,7 +1,7 @@
 import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
-import { KOREN, radniFolder, ugasiLaunchere } from "./_okruzenje.mjs";
+import { KOREN, radniFolder, ugasiLaunchere, putanjaElektrona } from "./_okruzenje.mjs";
 // OTKLJUCAVANJE NE SME DA UGASI LAUNCHER
 //
 // Osoblje ima dve prece: Ctrl+Alt+U otkljucava racunar, a Ctrl+Alt+Shift+Q
@@ -112,8 +112,8 @@ app.whenReady().then(async () => {
 `, "utf8");
 fs.writeFileSync(path.join(RADNO, "package.json"), JSON.stringify({ name: "proba-admin-izlaz", version: "1.0.0", main: "main.js" }), "utf8");
 
-const electron = path.join(KOREN, "client", "node_modules", ".bin", process.platform === "win32" ? "electron.cmd" : "electron");
-const klijent = spawn(electron, [RADNO], { shell: process.platform === "win32", stdio: "ignore" });
+const electron = putanjaElektrona();
+const klijent = spawn(electron, [RADNO], { stdio: "ignore" });
 
 const gotov = () => { try { const t = fs.readFileSync(IZLAZ, "utf8"); return t.includes("posle-pravog-izlaza") || t.includes("GASI-SE"); } catch { return false; } };
 for (let i = 0; i < 300; i++) {

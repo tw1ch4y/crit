@@ -2,7 +2,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
-import { KOREN, radniFolder, ugasiLaunchere } from "./_okruzenje.mjs";
+import { KOREN, radniFolder, ugasiLaunchere, putanjaElektrona } from "./_okruzenje.mjs";
 // MIS I ZVUK: DA SE STVARNO PROMENI I DA SE STVARNO VRATI
 //
 // Igrac sme da namesti mis i zvuk sa svog naloga, jer su Windows podesavanja u
@@ -159,8 +159,8 @@ app.whenReady().then(async () => {
 `, "utf8");
 fs.writeFileSync(path.join(RADNO, "package.json"), JSON.stringify({ name: "proba-podesavanja", version: "1.0.0", main: "main.js" }), "utf8");
 
-const electron = path.join(KOREN, "client", "node_modules", ".bin", process.platform === "win32" ? "electron.cmd" : "electron");
-const klijent = spawn(electron, [RADNO], { shell: process.platform === "win32", stdio: "ignore" });
+const electron = putanjaElektrona();
+const klijent = spawn(electron, [RADNO], { stdio: "ignore" });
 for (let i = 0; i < 160; i++) { if (fs.existsSync(IZLAZ)) break; await cekaj(500); }
 const nalaz = (() => { try { return JSON.parse(fs.readFileSync(IZLAZ, "utf8")); } catch { return null; } })();
 

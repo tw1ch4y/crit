@@ -1,7 +1,7 @@
 import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
-import { KOREN, radniFolder } from "./_okruzenje.mjs";
+import { KOREN, radniFolder, putanjaElektrona } from "./_okruzenje.mjs";
 // SERVISNI PIN PREZIVLJAVA NADOGRADNJU
 //
 // podesavanja.json stoji u resources/ pored programa i instaler ga pri
@@ -84,8 +84,8 @@ app.whenReady().then(async () => {
 });
 `, "utf8");
 
-  const electron = path.join(KOREN, "client", "node_modules", ".bin", process.platform === "win32" ? "electron.cmd" : "electron");
-  const p = spawn(electron, [RADNO], { shell: process.platform === "win32", stdio: "ignore" });
+  const electron = putanjaElektrona();
+  const p = spawn(electron, [RADNO], { stdio: "ignore" });
   for (let i = 0; i < 80; i++) { if (fs.existsSync(ODGOVOR)) break; await cekaj(300); }
   try { p.kill(); } catch {}
   await cekaj(500);

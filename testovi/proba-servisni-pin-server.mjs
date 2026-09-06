@@ -1,7 +1,7 @@
 import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
-import { KOREN, radniFolder, ugasiLaunchere } from "./_okruzenje.mjs";
+import { KOREN, radniFolder, ugasiLaunchere, putanjaElektrona } from "./_okruzenje.mjs";
 // SERVISNI PIN SE UPISUJE JEDNOM, U PANELU, I STIZE NA SVE RACUNARE
 //
 // Taj PIN cuva ulaz u podesavanja launchera i izlaz iz kioska KAD SERVER NE
@@ -91,10 +91,10 @@ app.whenReady().then(async () => {
 `, "utf8");
 fs.writeFileSync(path.join(RADNO, "package.json"), JSON.stringify({ name: "proba-spin", version: "1.0.0", main: "main.js" }), "utf8");
 
-const electron = path.join(KOREN, "client", "node_modules", ".bin", process.platform === "win32" ? "electron.cmd" : "electron");
+const electron = putanjaElektrona();
 
 // ---- prvi zivot: server radi, vlasnik upisuje PIN ----
-const k1 = spawn(electron, [RADNO], { shell: process.platform === "win32", stdio: "ignore", env: { ...process.env, CRIT_FAZA: "prva" } });
+const k1 = spawn(electron, [RADNO], { stdio: "ignore", env: { ...process.env, CRIT_FAZA: "prva" } });
 for (let i = 0; i < 250; i++) {
   if (fs.existsSync(IZLAZ + ".postavi")) {
     await api("/api/settings", "POST", { servisniPin: NOV_PIN });
@@ -111,7 +111,7 @@ await cekaj(800);
 // ---- server GINE, pa launcher krece iznova ----
 try { server.kill(); } catch {}
 await cekaj(1200);
-const k2 = spawn(electron, [RADNO], { shell: process.platform === "win32", stdio: "ignore", env: { ...process.env, CRIT_FAZA: "druga" } });
+const k2 = spawn(electron, [RADNO], { stdio: "ignore", env: { ...process.env, CRIT_FAZA: "druga" } });
 for (let i = 0; i < 200; i++) {
   try { if (fs.readFileSync(IZLAZ, "utf8").includes("bez-servera")) break; } catch {}
   await cekaj(300);

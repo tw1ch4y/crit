@@ -129,6 +129,17 @@ if (server) { try { server.kill(); } catch {} await cekaj(400); }
 // ostavi Electron da radi, a on onda kvari sledece pokretanje.
 ugasiLaunchere();
 
+// ALATI KOJI MERE ISPISUJU I KAD PROĐU.
+//
+// `pregled-*` nisu testovi nego merenja: koliko je hero traka visoka, koliko je
+// u polici viška, koliko praznine ostaje do alata. Dok se ispis pokazivao samo
+// kad nešto PADNE, ti brojevi se nisu videli nikad - a baš po njima se odlučuje
+// kako ekran izgleda. Vraćali su se tako što se alat ručno pušta iznova.
+for (const n of nalazi.filter((x) => x.ok && x.naziv.startsWith("pregled-"))) {
+  const redovi = n.izlaz.split("\n").filter((l) => l.trim());
+  if (redovi.length) console.log(`\n--- ${n.naziv} ---\n${redovi.join("\n")}`);
+}
+
 const pali = nalazi.filter((n) => !n.ok);
 for (const n of pali) {
   console.log(`\n--- ${n.naziv} ---`);

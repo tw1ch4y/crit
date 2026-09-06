@@ -1,7 +1,7 @@
 import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
-import { KOREN, radniFolder, ugasiLaunchere } from "./_okruzenje.mjs";
+import { KOREN, radniFolder, ugasiLaunchere, putanjaElektrona } from "./_okruzenje.mjs";
 // TOCAK KOJI SE ZAVRTEO A ODGOVOR NIJE STIGAO
 //
 // Klik na "Zavrti" odmah postavlja da vrtnja traje, a ODGOVOR SE CEKA SA
@@ -140,8 +140,8 @@ app.whenReady().then(async () => {
 `, "utf8");
 fs.writeFileSync(path.join(RADNO, "package.json"), JSON.stringify({ name: "proba-tocak-zaglavljen", version: "1.0.0", main: "main.js" }), "utf8");
 
-const electron = path.join(KOREN, "client", "node_modules", ".bin", process.platform === "win32" ? "electron.cmd" : "electron");
-const klijent = spawn(electron, [RADNO], { shell: process.platform === "win32", stdio: "ignore" });
+const electron = putanjaElektrona();
+const klijent = spawn(electron, [RADNO], { stdio: "ignore" });
 
 // Launcher trazi gasenje/dizanje servera preko fajlova - on sam to ne moze.
 const gotov = () => fs.existsSync(IZLAZ) && fs.readFileSync(IZLAZ, "utf8").includes("posle-dopune");

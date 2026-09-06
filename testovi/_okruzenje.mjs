@@ -41,10 +41,36 @@ export function radniFolder(ime) {
   }
 }
 
+// GDE JE ELECTRON.
+//
+// Alati su ga pokretali preko `node_modules/.bin/electron.cmd`, a `.cmd` na
+// Windows-u trazi `shell: true`. To donosi tri stvari, sve tri lose:
+//
+//   1. spawn vraca cmd.exe, ne electron.exe - pa kill() ubije samo omotac, a
+//      launcher nastavi da radi i udje u sledecu probu (vidi ugasiLaunchere)
+//   2. Node na svaki takav poziv ispise DeprecationWarning, koji onda stoji u
+//      ispisu svake probe i navikne coveka da preskace redove
+//   3. argumenti se nadovezuju kao tekst umesto da se prosledjuju - putanja sa
+//      razmakom bi se raspala
+//
+// Prava izvrsna datoteka stoji u `electron/dist`, a njeno ime pise u `path.txt`
+// koji sam paket ostavlja. Odatle se pokrece bez ijednog omotaca.
+export function putanjaElektrona() {
+  const dir = path.join(KOREN, "client", "node_modules", "electron");
+  try {
+    const ime = fs.readFileSync(path.join(dir, "path.txt"), "utf8").trim();
+    const puna = path.join(dir, "dist", ime);
+    if (fs.existsSync(puna)) return puna;
+  } catch {}
+  // Rezerva: stari nacin. Bolje da alat radi uz upozorenje nego da ne radi.
+  return path.join(KOREN, "client", "node_modules", ".bin",
+    process.platform === "win32" ? "electron.cmd" : "electron");
+}
+
 // GASI LAUNCHERE KOJE JE PROBA POKRENULA.
 //
-// spawn(..., { shell: true }) na Windows-u vraca cmd.exe, a ne electron.exe.
-// Zato kill() nad tim procesom ubije samo omotac, dok launcher nastavi da radi.
+// Ranije se pokretalo preko cmd.exe omotaca, pa je kill() ubijao samo omotac a
+// launcher je nastavljao da radi.
 // Dva launchera sa istim tokenom se onda otimaju o vezu: server zatvori stariju,
 // a onaj kome je zatvorena se za tri sekunde vrati i zatvori drugu. Proba to
 // vidi kao "veza stalno puca" iako je kriva samo proba.

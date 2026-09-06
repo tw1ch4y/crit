@@ -20,6 +20,7 @@ import { fileURLToPath } from "node:url";
 // traku sa pecatom "Uskoro!" i vecno "Profil se ucitava..." - dakle bas ono sto
 // je novo nije se videlo ni na jednoj slici.
 import { nivoZa, otkljucanoZa, BOJE_IMENA, OKVIRI } from "../server/src/nivoi.js";
+import { putanjaElektrona } from "./_okruzenje.mjs";
 
 // Iskustvo izmisljenog igraca. Namerno je u sredini nivoa: prazna i puna traka
 // izgledaju dobro same po sebi, greske se vide na pola.
@@ -304,14 +305,20 @@ const MERE = \`(() => {
     const plocica = document.querySelector(".tile")?.getBoundingClientRect();
     return {
       hero: Math.round(hb.height),
+      // KOLIKO JE GORNJE TRAKE PRAZNO.
+      //
+      // Merilo se preko ".hero-title" i ".hero-poster" - elemenata kojih u ovoj
+      // verziji nema otkad je gore VIP traka. Rezultat je bio prazan, a prazan
+      // se u izvestaju ispisivao kao "(null)": merenje koje CUTI izgleda isto
+      // kao merenje koje kaze "sve je u redu", i tako je ostalo neprimeceno.
+      //
+      // Sada se mere STVARNA deca trake: levi blok (VIP ili promo baner) i
+      // tocak desno. Prazno je ono sto nije nijedno od to dvoje.
       heroPrazno: (() => {
-        // sirina hero trake minus ono sto je u njoj popunjeno
-        const t = document.querySelector(".hero-title")?.getBoundingClientRect();
-        const poster = document.querySelector(".hero-poster, .hero-art")?.getBoundingClientRect();
-        if (!t) return null;
-        const levo = t.right - hb.left;
-        const desno = poster ? hb.right - poster.left : 0;
-        return Math.round(100 * (hb.width - levo - desno) / hb.width) + "% sredine prazno";
+        const deca = [...h.children].map((e) => e.getBoundingClientRect()).filter((b) => b.width > 0);
+        if (!deca.length) return "traka je prazna";
+        const zauzeto = deca.reduce((z, b) => z + b.width, 0);
+        return Math.round(100 * (hb.width - zauzeto) / hb.width) + "% sirine prazno";
       })(),
       izmedjuPoliceIAlata: Math.round(nb.top - pb.bottom),
       plocicaVisina: plocica ? Math.round(plocica.height) : null,
@@ -451,13 +458,13 @@ app.whenReady().then(async () => {
 fs.writeFileSync(path.join(RADNO, "main.js"), MAIN, "utf8");
 fs.writeFileSync(path.join(RADNO, "package.json"), JSON.stringify({ name: "crit-pregled", version: "1.0.0", main: "main.js" }, null, 2), "utf8");
 
-const electron = path.join(KOREN, "client", "node_modules", ".bin", process.platform === "win32" ? "electron.cmd" : "electron");
+const electron = putanjaElektrona();
 if (!fs.existsSync(electron)) {
   console.error("Electron nije nadjen. Pokreni prvo: cd client && npm install");
   process.exit(1);
 }
 
-const p = spawn(electron, [RADNO], { shell: process.platform === "win32" });
+const p = spawn(electron, [RADNO]);
 let izlaz = "";
 p.stdout.on("data", (d) => (izlaz += d));
 p.stderr.on("data", (d) => (izlaz += d));
