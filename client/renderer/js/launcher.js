@@ -676,7 +676,14 @@ function handleMsg(m) {
     case "moje_porudzbine":
       S.porudzbine = Array.isArray(m.porudzbine) ? m.porudzbine : [];
       osveziZnackuNaloga();
-      if (S.tab === "account") renderContent();
+      // I SHOP, NE SAMO NALOG.
+      //
+      // Porudžbine se vide na dva mesta: kao spisak na Nalogu i kao jedna linija
+      // u vrhu Shop-a ("Porudžbina se sprema"). Dok se crtao samo Nalog, igrač
+      // koji je poručio i ostao u Shop-u - a to je upravo ono što radi - gledao
+      // je "sprema se" i pošto mu je piće doneto. Linija bi se ispravila tek kad
+      // izađe sa strane i vrati se na nju.
+      if (S.tab === "account" || S.tab === "shop") renderContent();
       break;
     case "pw_ok":
       toast("Lozinka je promenjena", "success"); if (S.tab === "account") renderContent();

@@ -192,6 +192,21 @@ app.whenReady().then(async () => {
   const korpaPosle = await vidi(\`document.querySelectorAll(".cart-row").length\`);
   beleska("korpa se ispraznila posle slanja", korpaPosle === 0, String(korpaPosle));
 
+  // ---- TRAKA U SHOP-U PRATI STVARNO STANJE ----
+  //
+  // Igrac koji poruci obicno OSTANE u Shop-u. Dok se na promenu statusa crtao
+  // samo Nalog, traka je i posle donetog pica pisala "sprema se", a ispravila bi
+  // se tek kad igrac izadje sa strane i vrati se. Ekran koji lazi o necemu sto
+  // igrac ceka je gori od ekrana bez podatka.
+  const trakaPosle = await vidi(\`document.querySelector(".shop-traka")?.textContent?.replace(/\\\\s+/g," ").trim()\`);
+  beleska("traka u Shop-u se pojavila posle porudzbine", /primljena|sprema/i.test(trakaPosle || ""), String(trakaPosle));
+  if (moja) {
+    await api(\`/api/orders/\${moja.id}/status\`, "POST", { status: "preparing" });
+    await cekaj(900);
+    const uToku = await vidi(\`document.querySelector(".shop-traka")?.textContent?.replace(/\\\\s+/g," ").trim()\`);
+    beleska("traka prati promenu statusa BEZ izlaska sa strane", /sprema/i.test(uToku || ""), String(uToku));
+  }
+
   await klik('.tab[data-tab="account"]');
   await cekaj(900);
   const naNalogu = await vidi(\`(() => ({

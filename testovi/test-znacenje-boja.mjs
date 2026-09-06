@@ -96,8 +96,13 @@ for (const [sta, uzorak] of [
   ["red \"sprema se\" na Nalogu", ".por-red.sprema .por-status"],
   ["traka \"stize\" u Shop-u", ".st-t {"],
   ["izabran način plaćanja", ".nacin.aktivan svg"],
+  ["artikal koji je u korpi", ".pice.izabrano {"],
 ]) {
-  proveri(`${sta} nosi boju kuće, ne zlatnu`, /var\(--brend\)/.test(red(uzorak)), red(uzorak).trim().slice(0, 90));
+  // Boja kuce se pise i kao `var(--brend)` i kao `rgba(var(--brend-rgb), x)`
+  // (kad treba providna). Oba su ista boja; zlatne ne sme da bude ni u jednom.
+  proveri(`${sta} nosi boju kuće, ne zlatnu`,
+    /var\(--brend(-rgb)?\)/.test(red(uzorak)) && !/var\(--gold\)|255, 181, 39/.test(red(uzorak)),
+    red(uzorak).trim().slice(0, 90));
 }
 proveri("doneto ostaje zeleno", /var\(--green\)/.test(red(".por-red.gotovo .por-status")),
   "zelena znaci gotovo; to se ne menja");

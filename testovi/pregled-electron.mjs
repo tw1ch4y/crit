@@ -332,11 +332,35 @@ const MERE = \`(() => {
     naslov: fontOd(".hero-title, .acc-name, .ev-t, .brand-tag"), traka: fontOd(".statusbar"),
   };
 
+  // SHOP: DVA REDA MORAJU DA STANU.
+  //
+  // Kartica nosi cenu i dugme "+" na dnu. Ako drugi red zavrsi ispod ivice,
+  // igrac mora da skroluje da bi uopste video sta kosta - a i da bi kupio.
+  // Ranije se racunalo na prazan Shop; cim igrac ima porudzbinu u toku, traka
+  // "Porudzbina se sprema" pojede pedesetak piksela i drugi red se preseca.
+  // Bas tada igrac i gleda Shop: porucio je i ceka.
+  const shop = (() => {
+    const g = document.querySelector(".shop-grid");
+    const k = g && g.querySelector(".pice");
+    if (!g || !k) return null;
+    const rod = g.parentElement.getBoundingClientRect();
+    const gb = g.getBoundingClientRect(), kb = k.getBoundingClientRect();
+    const raspolozivo = Math.round(rod.bottom - gb.top);
+    const dvaReda = Math.round(kb.height * 2 + 16);
+    return {
+      kartica: Math.round(kb.height),
+      slika: Math.round(k.querySelector(".pice-slika")?.getBoundingClientRect().height || 0),
+      raspolozivo, dvaReda,
+      fali: Math.max(0, dvaReda - raspolozivo),
+      traka: !!document.querySelector(".shop-traka"),
+    };
+  })();
+
   return {
     ekran: aktivan,
     preliv: Math.round(document.documentElement.scrollHeight - innerHeight),
     podTrakom: traka && sadrzaj ? Math.max(0, Math.round(sadrzaj.dno - traka.vrh)) : 0,
-    viri, secen, fontovi, razmaci,
+    viri, secen, fontovi, razmaci, shop,
   };
 })()\`;
 
@@ -486,6 +510,7 @@ p.on("close", (kod) => {
     if (n.podTrakom > 1) greske.push(`ulazi ${n.podTrakom}px pod donju traku`);
     if (n.viri?.length) greske.push(`viri: ${n.viri.join(", ")}`);
     if (n.secen?.length) greske.push(`odsecen tekst: ${n.secen.join(" | ")}`);
+    if (n.shop?.fali) greske.push(`drugi red artikala fali ${n.shop.fali}px - cena i "+" su ispod ivice`);
     // Font se proverava svuda gde je predvidjen - ne sme da izostane na jednom
     // ekranu a bude na drugom.
     const bezFonta = Object.entries(n.fontovi || {})
@@ -500,6 +525,11 @@ p.on("close", (kod) => {
       const r = n.razmaci;
       console.log(`            hero ${r.hero}px (${r.heroPrazno})   polica ${r.policaVisina}px, plocica ${r.plocicaVisina}px`
         + `   visak u polici ${r.policaPrazno}px   praznina do alata ${r.izmedjuPoliceIAlata}px`);
+    }
+    if (n.shop) {
+      const s = n.shop;
+      console.log(`            kartica ${s.kartica}px (slika ${s.slika}px)   za dva reda treba ${s.dvaReda}px, ima ${s.raspolozivo}px`
+        + `${s.traka ? "   (uz traku o porudzbini)" : ""}`);
     }
   }
   console.log(`\nslike: testovi/.slike/  (${nalazi.length} komada)`);
