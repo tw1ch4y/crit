@@ -133,10 +133,31 @@ proveri("poruka nestaje kad se veza vrati", /if \(connected\) \$\("#connSesija"\
 // objasnjenje, pa mora i ovo.
 proveri("prazan shop ima ikonu i objasnjenje", launcher.includes("Shop je prazan"));
 proveri("poruka praznog shopa stoji u sredini",
-  /\.shop-products \.empty-view \{[^}]*flex: 1/.test(jedanRed),
+  /\.shop-products \.polica-prazno\.veliko \{[^}]*flex: 1/.test(jedanRed),
   "bez toga bi se zalepila uz vrh prazne strane");
-proveri("korpa ne salje igraca na praznu stranu", launcher.includes("Trenutno nema šta da se poruči"),
-  'inace bi pisalo "izaberi sa leve strane" a tamo nema niceg');
+
+// KORPE NEMA KAD NEMA STA DA SE STAVI U NJU.
+//
+// Ranije je prazan shop pokazivao DVE prazne poruke jednu pored druge: veliku
+// levo ("Shop je prazan") i visoku praznu kolonu desno sa "Trenutno nema sta da
+// se poruci". Ista stvar dvaput, i cetvrtina ekrana na kolonu koja ne moze
+// nista da primi. Sada se korpa i ne crta, a poruka uzima celu sirinu.
+proveri("prazan shop nema korpu", /\$\{dostupni\.length \? `<div class="cart"/.test(launcher),
+  "dve prazne poruke jedna pored druge govore istu stvar dvaput");
+proveri("bez korpe poruka uzima celu sirinu", /\.shop\.bez-korpe \{[^}]*grid-template-columns: minmax\(0, 1fr\)/.test(jedanRed));
+proveri("nema vise poruke koja salje na praznu stranu", !launcher.includes("Trenutno nema šta da se poruči"),
+  "korpe u tom slucaju nema, pa ni poruka ne treba");
+
+// PRAZNA STANJA GOVORE ISTIM JEZIKOM.
+//
+// Bilo ih je cetiri i sva cetiri razlicita: velika poruka za igre, go red teksta
+// za precice, drugi go red za korpu, i treci oblik za prazan shop. Prvog dana u
+// novoj igraonici igrac i vlasnik vide bas ta stanja.
+proveri("postoji jedno prazno stanje za sve", /const policaPrazno = \(/.test(launcher));
+for (const gde of ["Još nema igara", "Još nema prečica", "Shop je prazan", "Korpa je prazna"]) {
+  const red = launcher.split("\n").find((r) => r.includes(gde)) || "";
+  proveri(`"${gde}" koristi zajednicko prazno stanje`, /policaPrazno\(/.test(red), red.trim().slice(0, 80));
+}
 
 // Poruke su stajale 28 px od dna, a donja traka je 38 px - preklapale su se.
 // Bas poruka o gresci zavrsavala je poluprekrivena.

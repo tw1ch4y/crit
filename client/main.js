@@ -381,6 +381,12 @@ function handleServerMsg(msg) {
   if (msg.t === "welcome" && "servisniPin" in msg) zapamtiServisniPin(msg.servisniPin);
   // Spisak onoga što se sme pokrenuti - vidi zapamtiDozvoljeno.
   if (msg.t === "welcome" || msg.t === "catalog") zapamtiDozvoljeno(msg);
+  // Boja kuće za obaveštenja preko igre. Ona su zaseban prozor i ne vide CSS
+  // launchera, pa su do sada nosila plavu upisanu u sam fajl - istu u svakoj
+  // igraonici. Baš tu se boja najviše i vidi: to je jedino što igrač gleda dok
+  // je u igri. Stiže uz "welcome" i uz "brend" kad je vlasnik promeni.
+  if (msg.t === "welcome" && msg.brend?.akcenat) zapamtiBojuKuce(msg.brend.akcenat);
+  if (msg.t === "brend" && msg.brend?.akcenat) zapamtiBojuKuce(msg.brend.akcenat);
   if (msg.t === "servisni_pin") {
     zapamtiServisniPin(msg.pin);
     // Panel odmah vidi da je ova mašina primila nov PIN.
@@ -465,6 +471,13 @@ function podesavanje(kljuc, podrazumevano) {
 // pa upozorenje o vremenu i poruke osoblja moraju da idu iznad svega.
 let overlay = null;
 let overlayTajmer = null;
+// Fabrička boja kuće - ista kao u launcher.css. Vlasnikova stiže sa servera pri
+// prvom povezivanju; do tada važi ova, da prvo obaveštenje ne bude bezbojno.
+let bojaKuce = "#2f6ae8";
+function zapamtiBojuKuce(heks) {
+  if (/^#[0-9a-f]{6}$/i.test(String(heks || ""))) bojaKuce = String(heks).toLowerCase();
+}
+
 function createOverlay() {
   if (DEV) return null;
   if (overlay && !overlay.isDestroyed()) return overlay;
@@ -487,7 +500,7 @@ function prikaziObavestenje({ naslov, opis = "", vrsta = "vreme", boja = "", tra
   const o = createOverlay();
   if (!o || o.isDestroyed()) return;
   const posalji = () => {
-    o.webContents.send("overlay-prikazi", { naslov, opis, vrsta, boja });
+    o.webContents.send("overlay-prikazi", { naslov, opis, vrsta, boja, kuca: bojaKuce });
     o.showInactive(); // nikad ne otima fokus igri
     o.setAlwaysOnTop(true, "screen-saver");
     clearTimeout(overlayTajmer);

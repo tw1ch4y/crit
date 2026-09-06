@@ -15,9 +15,9 @@
 
     .kartica {
       display: flex; align-items: center; gap: 14px;
-      background: rgba(14, 14, 20, 0.94);
+      background: rgba(7, 12, 28, 0.94);
       border: 1px solid rgba(255, 255, 255, 0.12);
-      border-left: 4px solid #ff2b2b;
+      border-left: 4px solid #ff3b3b;
       border-radius: 12px;
       padding: 14px 22px 14px 18px;
       box-shadow: 0 18px 50px -12px rgba(0, 0, 0, 0.85);
@@ -27,7 +27,7 @@
     }
     @keyframes ulaz { from { opacity: 0; transform: translateY(-18px); } }
     .kartica.zuta { border-left-color: #ffb527; }
-    .kartica.plava { border-left-color: #4aa3ff; }
+    .kartica.plava { border-left-color: var(--kuca, #2f6ae8); }
 
     .ikona { width: 30px; height: 30px; flex-shrink: 0; }
     .tekst { min-width: 0; }
@@ -37,7 +37,7 @@
 </head>
 <body>
   <div class="kartica" id="kartica">
-    <svg class="ikona" id="ikona" viewBox="0 0 24 24" fill="none" stroke="#ff2b2b" stroke-width="1.8"
+    <svg class="ikona" id="ikona" viewBox="0 0 24 24" fill="none" stroke="#ff3b3b" stroke-width="1.8"
          stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
     </svg>
@@ -51,12 +51,16 @@
       vreme: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
       poruka: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/>',
     };
-    window.critOverlay && window.critOverlay.naPrikaz(({ naslov, opis, vrsta, boja }) => {
+    window.critOverlay && window.critOverlay.naPrikaz(({ naslov, opis, vrsta, boja, kuca }) => {
       document.getElementById("naslov").textContent = naslov || "";
       document.getElementById("opis").textContent = opis || "";
       const ik = document.getElementById("ikona");
       ik.innerHTML = IKONE[vrsta] || IKONE.vreme;
-      ik.setAttribute("stroke", boja === "zuta" ? "#ffb527" : boja === "plava" ? "#4aa3ff" : "#ff2b2b");
+      // Boja kuce stize uz poruku (main.js je pamti iz "welcome"). Obavestenje
+      // je zaseban prozor i ne vidi CSS launchera, pa bi bez ovoga svaka
+      // igraonica imala istu plavu - bas na mestu gde se boja najvise vidi.
+      if (kuca) document.documentElement.style.setProperty("--kuca", kuca);
+      ik.setAttribute("stroke", boja === "zuta" ? "#ffb527" : boja === "plava" ? (kuca || "#2f6ae8") : "#ff3b3b");
       const k = document.getElementById("kartica");
       k.className = "kartica " + (boja || "");
       // ponovo pokreni animaciju pri svakom prikazu

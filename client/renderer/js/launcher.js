@@ -1506,13 +1506,17 @@ function renderShop() {
   // traka i postoji - odgovor na prvi pogled.
   const telo = dostupni.length
     ? `${traka}${shopPorudzbine()}<div class="shop-grid">${vidljivi.map(shopCardHtml).join("")}</div>`
-    : `<div class="empty-view"><div class="ev-in">${icon("cup", 56)}
-        <div class="ev-t">Shop je prazan</div>
-        <div class="ev-s">Osoblje dodaje pića i grickalice u panelu.</div></div></div>`;
+    : policaPrazno("cup", "Shop je prazan", "Osoblje dodaje pića i grickalice u panelu.", true);
 
-  return `<div class="shop">
+  // KORPE NEMA KAD NEMA STA DA SE STAVI U NJU.
+  //
+  // Prazan shop je pokazivao DVE prazne poruke jednu pored druge: veliku levo
+  // ("Shop je prazan") i visoku praznu kolonu desno sa "Trenutno nema šta da se
+  // poruči". Ista stvar, dvaput, i jedna četvrtina ekrana potrošena na kolonu
+  // koja ne može ništa da primi.
+  return `<div class="shop${dostupni.length ? "" : " bez-korpe"}">
     <div class="shop-products">${telo}</div>
-    <div class="cart" id="cartBox">${renderCart()}</div>
+    ${dostupni.length ? `<div class="cart" id="cartBox">${renderCart()}</div>` : ""}
   </div>`;
 }
 
@@ -1579,14 +1583,12 @@ function shopCardHtml(i) {
 
 function renderCart() {
   if (!S.cart.size) {
-    // Kad shop nema nijedan artikal, ne salji igraca "na levu stranu" - tamo
-    // nema niceg. Dve poruke na istom ekranu ne smeju da se protivrece.
-    const imaSta = S.shop.some((i) => i.available);
+    // Korpa se crta samo kad u shopu IMA sta da se stavi u nju (vidi renderShop),
+    // pa ovde ne postoji stanje "nema sta da se poruci".
+    // Prazna korpa govori istim jezikom kao prazna polica na pocetnoj i prazan
+    // shop - isti znak, isti naslov, isto objasnjenje.
     return `<div class="cart-head"><h3>Korpa</h3></div>
-      <div class="cart-empty">
-        <span class="ce-t">${imaSta ? "Korpa je prazna" : "Trenutno nema šta da se poruči"}</span>
-        ${imaSta ? '<span class="ce-s">Dodaj piće sa spiska</span>' : ""}
-      </div>`;
+      ${policaPrazno("cup", "Korpa je prazna", "Dodaj piće sa spiska levo.")}`;
   }
   let rows = "", total = 0, komada = 0;
   for (const [id, qty] of S.cart) {

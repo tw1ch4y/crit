@@ -76,12 +76,17 @@ setInterval(() => {
     if (w.isDestroyed()) continue;
     const url = w.webContents.getURL() || "";
     if (!url.includes("overlay")) continue;
-    w.webContents.executeJavaScript("document.body.innerText")
-      .then((t) => {
-        const tekst = String(t || "").replace(/\\s+/g, " ").trim();
+    // Uz tekst se cita i BOJA leve ivice. Obavestenje je zaseban prozor i ne
+    // vidi CSS launchera, pa je ovo jedini nacin da se proveri da li je boja
+    // kuce stvarno stigla do njega - ili je ostala ona upisana u sam fajl.
+    w.webContents.executeJavaScript(
+      'JSON.stringify({ t: document.body.innerText, b: getComputedStyle(document.getElementById("kartica")).borderLeftColor })')
+      .then((sirovo) => {
+        let o = {}; try { o = JSON.parse(sirovo); } catch { return; }
+        const tekst = String(o.t || "").replace(/\\s+/g, " ").trim();
         if (!tekst) return;
         const zadnji = vidjeno[vidjeno.length - 1];
-        if (!zadnji || zadnji.tekst !== tekst) vidjeno.push({ tekst, vidljiv: w.isVisible() });
+        if (!zadnji || zadnji.tekst !== tekst || zadnji.ivica !== o.b) vidjeno.push({ tekst, ivica: o.b, vidljiv: w.isVisible() });
       })
       .catch(() => {});
   }
@@ -105,6 +110,14 @@ for (let i = 0; i < 40; i++) {
 proveri("launcher se povezao", povezan);
 
 // ---- 1) PORUKA OSOBLJA STIZE PREKO IGRE ----
+//
+// Pre slanja se menja BOJA KUCE, na neku koja se ne moze pomesati sa fabrickom.
+// Obavestenje je zaseban prozor i ne vidi CSS launchera, pa je do sada nosilo
+// plavu upisanu u sam fajl - istu u svakoj igraonici, bez obzira sta je vlasnik
+// izabrao. A to je jedino sto igrac gleda dok je u igri.
+await api("/api/brend/boja", "POST", { akcenat: "#8a45d6" });
+await cekaj(1200);
+
 // Radnik salje poruku sa panela dok je igrac u igri.
 await api(`/api/computers/${pc.id}/message`, "POST", { text: "Dođi na šank, čeka te sok." });
 await cekaj(3000);
@@ -113,6 +126,13 @@ proveri("prozor iznad igre je napravljen", procitaj().some((x) => x.dogadjaj ===
 proveri("poruka osoblja se pojavila", /Poruka od osoblja/i.test(sveVidjeno()), sveVidjeno().slice(0, 160));
 proveri("tekst poruke je bas onaj koji je radnik ukucao", /Dođi na šank/.test(sveVidjeno()),
   sveVidjeno().slice(0, 160));
+
+// #8a45d6 = rgb(138, 69, 214). Fabricka je rgb(47, 106, 232) - ako se pojavi
+// ona, boja nije stigla nego stoji ona iz fajla.
+const ivice = procitaj().map((x) => x.ivica).filter(Boolean);
+proveri("obavestenje nosi BOJU KUCE, ne onu iz fajla",
+  ivice.some((b) => /138,\s*69,\s*214/.test(b)),
+  `videne ivice: ${[...new Set(ivice)].join(" | ") || "nijedna"}`);
 
 // ---- 2) UPOZORENJE DA VREME ISTICE ----
 //

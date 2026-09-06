@@ -1414,6 +1414,13 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
   display: flex; flex-direction: column;
 }
 .shop-products .empty-view { flex: 1; }
+/* Prazan shop nema korpu (vidi renderShop), pa poruka uzima celu sirinu -
+   inace bi stajala u levoj trecini a desno bi zjapila kolona koja ne moze nista
+   da primi. */
+.shop.bez-korpe { grid-template-columns: minmax(0, 1fr); }
+.shop-products .polica-prazno.veliko { flex: 1; align-content: center; }
+/* Prazna korpa: znak i tekst po sredini kolone, kao i ostale prazne police. */
+.cart .polica-prazno { flex: 1; align-content: center; padding: 24px 14px; }
 
 /* Traka kategorija stoji iznad jednog jedinog spiska. Ranije je svaka
    kategorija imala svoj red kartica, pa je sa sedam artikala svaki red bio
