@@ -1110,10 +1110,17 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
   font: inherit; color: inherit; transition: border-color 0.15s ease, transform 0.15s ease;
 }
 .tex-kartica:hover { border-color: var(--line-2); transform: translateY(-2px); }
-.tex-kartica.izabrana { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
+/* Boja kuce se ovde zove --accent. Dok je pisalo var(--brand) - promenljive
+   koja ne postoji - izabrana sara nije imala vidljiv okvir, pa se nije videlo
+   sta je izabrano. */
+.tex-kartica.izabrana { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+/* Uzorak stoji na PODLOZI LAUNCHERA, ne na crnoj. Vlasnik po ovim sličicama
+   bira šta će igračima ceo dan stajati iza igara; podloga koja nije ona prava
+   pokazuje drugu šaru nego što će se videti. Ista vrednost stoji i u
+   launcher.css (.pu-slika) - to su dva pregleda iste stvari. */
 .tex-uzorak {
   display: grid; place-items: center; height: 92px; margin-bottom: 8px;
-  background-color: #101018; background-repeat: repeat; border-bottom: 1px solid var(--line);
+  background-color: var(--bg); background-repeat: repeat; border-bottom: 1px solid var(--line);
 }
 .tex-nista { font-style: normal; font-size: 11px; color: var(--text-3); }
 .tex-ime { padding: 0 11px; font-size: 13px; font-weight: 650; }

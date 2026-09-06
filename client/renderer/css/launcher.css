@@ -61,6 +61,16 @@
   --cut: 13px;
   --cut-lg: 18px;
   --tr: 0.16s cubic-bezier(0.22, 0.8, 0.3, 1);
+  /* KRIVA I KRATKO VREME - ZASEBNO.
+     --tr nosi i trajanje i krivu zajedno, pa se ne može upotrebiti tamo gde
+     treba samo jedno. Zato su se u fajlu pojavili --ease-out (kriva) i --t-brzo
+     (kratko trajanje) - ali nikad nisu bili definisani.
+     CSS na nepoznatu promenljivu bez rezerve odbaci CELO pravilo: deset
+     animacija i pet prelaza jednostavno nisu radili, a nigde nije bilo greške.
+     Stajali su mrtvi: ulazna animacija početne, ulaz odeljka na Nalogu i
+     pomeranje trake nagradnog točka. */
+  --ease-out: cubic-bezier(0.22, 0.8, 0.3, 1);
+  --t-brzo: 0.12s;
   /* Chakra Petch ide na naslove, brojke i sve po cemu se klikce (tabovi,
      dugmad, polja za unos) - tu se vidi karakter. Duza objasnjenja i uputstva
      ostaju u sistemskom fontu, koji je citljiviji u sitnom.
@@ -932,9 +942,10 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .acc-mi-broj {
   margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px;
   display: grid; place-items: center; border-radius: 10px;
-  background: var(--gold); color: #111; font-size: 12px; font-weight: 700; font-style: normal;
+  background: var(--brend); color: #fff; font-size: 12px; font-weight: 700; font-style: normal;
 }
 .acc-sadrzaj {
+  align-self: start; max-height: 100%;
   min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden;
   background: linear-gradient(150deg, var(--panel-2), var(--panel)); box-shadow: inset 0 0 0 1px var(--line);
   clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
@@ -1044,7 +1055,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   font-family: var(--font-ui); font-size: 11px; font-weight: 700;
   letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3);
 }
-.pod-nas svg { color: var(--gold); }
+.pod-nas svg { color: var(--text-3); }
 .pod-red {
   display: flex; align-items: center; gap: 22px; padding: 11px 16px;
   background: rgba(255, 255, 255, 0.035); box-shadow: inset 0 0 0 1px var(--line);
@@ -1067,7 +1078,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 }
 .pk-vred {
   min-width: 44px; text-align: right; font-family: var(--font-display);
-  font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; color: var(--gold);
+  font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; color: var(--text);
 }
 
 /* Prekidač: ugašen je siv i kugla je levo, upaljen je crven i kugla desno.
@@ -1179,7 +1190,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
    međuvremenu promenila. */
 .leti-kredit {
   position: fixed; z-index: 90; pointer-events: none;
-  font-family: var(--font-naslov); font-weight: 700; font-size: 24px;
+  font-family: var(--font-display); font-weight: 700; font-size: 24px;
   color: var(--gold); text-shadow: 0 2px 10px rgba(0,0,0,0.6);
   transform: translate(-50%, -50%);
   animation: leti-kredit 1100ms cubic-bezier(.4,.02,.2,1) forwards;
@@ -1232,9 +1243,13 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 }
 .poz-uzorak:hover { transform: translateY(-3px); box-shadow: inset 0 0 0 1px var(--line-2); }
 .poz-uzorak.izabran { box-shadow: inset 0 0 0 1.5px var(--brend), 0 12px 26px -14px var(--brend-glow); }
+/* Uzorak se gleda na PODLOZI PROGRAMA, ne na crnoj.
+   Stajao je na #101018 - skoro crnoj iz stare palete - pa je pokazivao kako bi
+   sara izgledala u nekom drugom programu. Igrac po ovim slicicama bira sta ce
+   mu ceo dan stajati iza igara; ako slicica laze o podlozi, laze i o sari. */
 .pu-slika {
   display: block; height: 62px; margin-bottom: 8px;
-  background-color: #101018; background-repeat: repeat; border-bottom: 1px solid var(--line);
+  background-color: var(--bg); background-repeat: repeat; border-bottom: 1px solid var(--line);
 }
 .pu-ime {
   padding: 0 10px; font-size: 12px; font-weight: 700; text-align: left; color: var(--text-2);
