@@ -555,6 +555,24 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .content .section-title { animation: sec-in 0.42s var(--tr) both; }
 @keyframes sec-in { from { opacity: 0; transform: translateX(-14px) skewX(-7deg); } to { opacity: 1; transform: skewX(-7deg); } }
 
+/* PRAZNA POLICA - jedan izgled, dve velicine.
+   Bez igara i bez precica su ranije izgledale kao dve razlicite stvari: jedna je
+   imala znak i naslov, druga go red teksta u stilu pozajmljenom od prazne korpe.
+   Prvog dana u novoj igraonici obe police su prazne i to je prvo sto se vidi. */
+.polica-prazno {
+  display: grid; justify-items: center; gap: 4px; text-align: center;
+  padding: 26px 16px; color: var(--text-3);
+}
+.polica-prazno.veliko { padding: 56px 16px; align-content: center; min-height: 220px; }
+.polica-prazno svg { color: var(--brend); opacity: 0.35; stroke-width: 1.4; margin-bottom: 8px; filter: drop-shadow(0 0 18px var(--brend-glow)); }
+.polica-prazno .pp-t { font-family: var(--font-display); font-weight: 700; font-size: 15px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-2); }
+.polica-prazno.veliko .pp-t { font-size: 17px; }
+.polica-prazno .pp-s { font-size: 13px; }
+.polica-prazno.veliko .pp-s { font-size: 14px; }
+/* Prazna polica igara i dalje uzima prostor koji bi imala i puna - da strana ne
+   skoci kad osoblje doda prvu igru. */
+.games-shelf.prazna { justify-content: center; }
+
 .empty-view { min-height: 52vh; display: grid; place-items: center; }
 .empty-view .ev-in { text-align: center; display: grid; justify-items: center; gap: 6px; max-width: 400px; }
 .empty-view svg { width: 60px; height: 60px; color: var(--brend); opacity: 0.35; stroke-width: 1.4; margin-bottom: 10px; filter: drop-shadow(0 0 18px var(--brend-glow)); }
@@ -1755,7 +1773,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
   box-shadow: 0 0 10px var(--gold-glow);
   animation: coin-fly 0.9s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
 }
-.coin.red { background: radial-gradient(circle at 35% 30%, #ff9a9a, var(--brend)); box-shadow: 0 0 10px var(--brend-glow); }
+.coin.kuca { background: radial-gradient(circle at 35% 30%, #9ec2ff, var(--brend)); box-shadow: 0 0 10px var(--brend-glow); }
 @keyframes coin-fly {
   0% { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
   15% { opacity: 1; transform: translate(-50%, -50%) scale(1); }

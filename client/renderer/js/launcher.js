@@ -166,7 +166,10 @@ function burstCoins(x, y, n = 16) {
   if (!layer) return;
   for (let i = 0; i < n; i++) {
     const p = document.createElement("i");
-    p.className = "coin" + (Math.random() < 0.4 ? " red" : "");
+    // Deo novcica ide u boji kuce, ostali su zlatni. Klasa se zvala "red"
+    // jos od stare palete - ime je govorilo crveno, vrednost je bila plava, pa
+    // je svako citanje vodilo na pogresan trag.
+    p.className = "coin" + (Math.random() < 0.4 ? " kuca" : "");
     const ang = (Math.PI * 2 * i) / n + Math.random() * 0.6;
     const dist = 60 + Math.random() * 130;
     p.style.left = x + "px"; p.style.top = y + "px";
@@ -1413,28 +1416,47 @@ function poredakIgara() {
   return skoro.concat(ostale);
 }
 
+// PRAZNA POLICA IZGLEDA ISTO NA OBA MESTA.
+//
+// Bile su dve različite: bez igara je nestajao i naslov "Igre" pa se cela strana
+// prerasporedi, a umesto police je stajao veliki znak sa naslovom i objašnjenjem;
+// bez alata je naslov ostajao, a ispod njega go red teksta u stilu pozajmljenom
+// od prazne korpe u Shop-u. Prvog dana u novoj igraonici obe police su prazne, i
+// to je prvo što vlasnik vidi - dve različite prazne police izgledaju kao da je
+// jedna od njih pokvarena.
+//
+// Sada: naslov police uvek stoji (strana ne skače kad osoblje doda prvu igru), a
+// unutra ide isti znak, isti naslov i isto objašnjenje - samo je za igre veći,
+// jer je i mesto veće.
+const policaPrazno = (ikona, naslov, opis, veliko) => `
+  <div class="polica-prazno${veliko ? " veliko" : ""}">
+    ${icon(ikona, veliko ? 56 : 30)}
+    <div class="pp-t">${esc(naslov)}</div>
+    <div class="pp-s">${esc(opis)}</div>
+  </div>`;
+
 function renderHome() {
-  const gamesShelf = S.games.length
-    ? `<section class="shelf games-shelf">
-        <div class="shelf-head">
-          <h2 class="shelf-title">Igre</h2>
-          <span class="razmak"></span>
-          <div class="shelf-arrows">
-            <button class="shelf-arr" data-arr="prev" aria-label="Levo">${icon("chev", 18)}</button>
-            <button class="shelf-arr" data-arr="next" aria-label="Desno">${icon("chev", 18)}</button>
-          </div>
-        </div>
-        <div class="shelf-track games" data-track>${poredakIgara().map((g, i) => gameCardHtml(g, i)).join("")}</div>
-      </section>`
-    : `<div class="empty-view"><div class="ev-in">${icon("gamepad", 56)}
-        <div class="ev-t">Još nema igara</div>
-        <div class="ev-s">Osoblje dodaje igre u panelu.</div></div></div>`;
+  const gamesShelf = `<section class="shelf games-shelf${S.games.length ? "" : " prazna"}">
+      <div class="shelf-head">
+        <h2 class="shelf-title">Igre</h2>
+        <span class="razmak"></span>
+        ${S.games.length ? `<div class="shelf-arrows">
+          <button class="shelf-arr" data-arr="prev" aria-label="Levo">${icon("chev", 18)}</button>
+          <button class="shelf-arr" data-arr="next" aria-label="Desno">${icon("chev", 18)}</button>
+        </div>` : ""}
+      </div>
+      ${S.games.length
+        ? `<div class="shelf-track games" data-track>${poredakIgara().map((g, i) => gameCardHtml(g, i)).join("")}</div>`
+        : policaPrazno("gamepad", "Još nema igara", "Osoblje dodaje igre u panelu.", true)}
+    </section>`;
   return `<div class="home">
     ${heroHtml()}
     ${gamesShelf}
-    <section class="shelf net-shelf">
+    <section class="shelf net-shelf${S.tools.length ? "" : " prazna"}">
       <div class="shelf-head"><h2 class="shelf-title">Internet i alati</h2></div>
-      <div class="net-row">${(S.tools.length ? S.tools : []).map(toolCardHtml).join("") || '<div class="cart-empty" style="padding:20px">Osoblje dodaje prečice u panelu.</div>'}</div>
+      ${S.tools.length
+        ? `<div class="net-row">${S.tools.map(toolCardHtml).join("")}</div>`
+        : policaPrazno("globe", "Još nema prečica", "Osoblje dodaje prečice u panelu.")}
     </section>
   </div>`;
 }

@@ -56,6 +56,23 @@ proveri("nijedna sirova poruka ne ide igracu", !/game-error", \{ name: [^}]*mess
 proveri("obe putanje pokretanja idu kroz prevod",
   (main.match(/message: objasniGresku\(/g) || []).length === 2,
   `nadjeno ${(main.match(/message: objasniGresku\(/g) || []).length}`);
+// SVAKA PORUKA KAZE I STA SAD.
+//
+// Provere PRE pokretanja odavno zavrsavaju sa "Pozovite osoblje"; poruke koje
+// nastanu kad pokretanje stvarno pukne nisu, pa je isti kvar davao dve razlicite
+// poruke - jedna kaze sta da se radi, druga ostavi igraca da gleda u ekran.
+// Igrac ne zna da je "nije pronadjena" nesto sto osoblje popravi za pola minuta;
+// on samo predje na drugu igru i niko ne sazna da precica fali.
+for (const [slucaj, tekst] of [
+  ["fajl ne postoji", "Igra nije pronađena na ovom računaru. Pozovite osoblje."],
+  ["nema dozvole", "Windows nije dozvolio pokretanje. Pozovite osoblje."],
+  ["nepoznato", "Igra ne može da se pokrene. Pozovite osoblje."],
+]) proveri(`poruka kaze i sta sad: ${slucaj}`, main.includes(tekst), tekst);
+// Zauzeta igra je izuzetak: tu osoblje ne treba, treba sacekati.
+proveri("zauzeta igra ne salje po osoblje",
+  main.includes("Igra je trenutno zauzeta. Sačekaj koji trenutak pa probaj ponovo."),
+  "zvati radnika zbog necega sto prodje samo od sebe je gubljenje i njegovog i igracevog vremena");
+
 proveri("osoblje i dalje dobija tacan razlog",
   main.includes('javiDaNeRadi(') && /razlog/.test(main));
 

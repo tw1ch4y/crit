@@ -1116,17 +1116,26 @@ function javiProblem(vrsta, opis) {
 // "spawn C:\games\cs2.lnk ENOENT" ili "Access is denied" - to je engleski,
 // tehnicki, i igracu ne kaze ni sta se desilo ni sta da radi. Osoblje i dalje
 // dobija tacan razlog kroz "igra_ne_radi", pa se ovde ne gubi nista.
+//
+// SVAKA PORUKA KAŽE I ŠTA SAD.
+//
+// Provere pre pokretanja odavno završavaju sa "Pozovite osoblje." Poruke odavde
+// - one koje nastanu kad pokretanje STVARNO pukne - nisu, pa je isti kvar davao
+// dve različite poruke: jedna kaže šta da se radi, druga ostavi igrača da gleda
+// u ekran. Igrač ne zna da je "nije pronađena" nešto što osoblje popravlja za
+// pola minuta; on samo pređe na drugu igru i niko ne sazna da prečica fali.
+// Zauzeta igra je izuzetak: tu osoblje ne treba, treba sačekati.
 function objasniGresku(greska) {
   const kod = String(greska?.code || "");
   const tekst = String(greska?.message ?? greska ?? "");
   const kaze = (re) => re.test(tekst);
   if (kod === "ENOENT" || kaze(/ENOENT|cannot find|could not find|not found|ne mo\w+ da (se )?(na[đd]e|prona[đd]e)/i))
-    return "Igra nije pronađena na ovom računaru.";
+    return "Igra nije pronađena na ovom računaru. Pozovite osoblje.";
   if (kod === "EACCES" || kod === "EPERM" || kaze(/EACCES|EPERM|access is denied|denied|pristup je odbijen/i))
-    return "Windows nije dozvolio pokretanje.";
+    return "Windows nije dozvolio pokretanje. Pozovite osoblje.";
   if (kod === "EBUSY" || kaze(/EBUSY|being used by another|zauzet/i))
-    return "Igra je trenutno zauzeta.";
-  return "Igra ne može da se pokrene.";
+    return "Igra je trenutno zauzeta. Sačekaj koji trenutak pa probaj ponovo.";
+  return "Igra ne može da se pokrene. Pozovite osoblje.";
 }
 
 // TRAZENJE PRAVE PUTANJE

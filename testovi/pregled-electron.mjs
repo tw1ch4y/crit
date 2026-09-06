@@ -224,7 +224,7 @@ const EKRANI = [
       // Isti tekst koji main.js stvarno posalje (objasniGresku). Ranije je ovde
       // stajala lepsa poruka nego u stvarnosti, pa je slika krila da igrac
       // dobija sirovu Windows gresku.
-      win.webContents.send("game-error", { name: "Counter-Strike 2", message: "Igra nije pronađena na ovom računaru." });
+      win.webContents.send("game-error", { name: "Counter-Strike 2", message: "Igra nije pronađena na ovom računaru. Pozovite osoblje." });
       await cekaj(700);
     } },
 ];
