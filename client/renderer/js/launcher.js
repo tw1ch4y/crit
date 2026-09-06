@@ -2119,9 +2119,26 @@ function sekcijaLozinka() {
 // NAGRADNI TOČAK
 // Jednom nedeljno može da zavrti svako ko je za tih 7 dana potrošio bar prag.
 // Ishod bira server; ovde se samo prikazuje stanje i animira rezultat.
-// Boje polja. Namerno se NE ponavlja ista boja na 120 stepeni - takav raspored
-// je na malom tocku davao oblik znaka za radijaciju.
-const TOCAK_BOJE = ["#d81f24", "#1c2029", "#ffb527", "#151821", "#8e1b20", "#262b36"];
+// BOJE POLJA - IZ ISTE KUĆE KAO I OSTATAK PROGRAMA.
+//
+// Bile su crvena, tamnocrvena, dve skoro crne, siva i zlatna - iz palete koja je
+// odavno zamenjena. Točak je zbog toga bio jedino mesto u launcheru koje ne liči
+// na ostatak: crven i crn usred plavog i zlatnog programa. A crvena ovde još i
+// protivreči sama sebi - u ostatku programa znači "ističe vreme" i "zaključano",
+// dok je točak jedina prava nagrada.
+//
+// Sada: zlatna (nagrada), boja kuće, i dve mirne tamne za "Ništa". Ista boja se
+// NAMERNO ne ponavlja na 120 stepeni - takav raspored je na malom točku u vrhu
+// početne davao oblik znaka za radijaciju.
+//
+// Boja kuće se čita u trenutku crtanja, ne upisuje ovde: vlasnik je menja iz
+// panela i točak mora da je prati kao i sve ostalo.
+function tocakBoje() {
+  const st = getComputedStyle(document.documentElement);
+  const kuca = (st.getPropertyValue("--brend") || "#2f6ae8").trim();
+  const kucaDublja = (st.getPropertyValue("--brend-deep") || "#2454c4").trim();
+  return ["#ffb527", "#1b2440", kuca, "#243154", "#e8941f", kucaDublja];
+}
 // POP-UP sa točkom. Otvara se klikom na widget u baneru.
 function otvoriTocak() {
   const t = S.tocak;
@@ -2166,14 +2183,15 @@ function tocakAkcijaHtml() {
 // točak.
 function tocakSVG(nagrade, velicina = 200) {
   const n = nagrade.length, seg = 360 / n, cx = 100, cy = 100, r = 96;
+  const BOJE = tocakBoje();
   const mali = velicina < 130;
   const tacka = (ug, rr) => [cx + rr * Math.sin(ug * Math.PI / 180), cy - rr * Math.cos(ug * Math.PI / 180)];
   let s = `<svg viewBox="0 0 200 200" class="tocak-svg">`;
   for (let i = 0; i < n; i++) {
     const a0 = i * seg, a1 = (i + 1) * seg, am = a0 + seg / 2;
     const [x0, y0] = tacka(a0, r), [x1, y1] = tacka(a1, r);
-    const boja = TOCAK_BOJE[i % TOCAK_BOJE.length];
-    s += `<path d="M${cx} ${cy} L${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)} Z" fill="${boja}" stroke="#05060a" stroke-width="${mali ? 1.6 : 1}"/>`;
+    const boja = BOJE[i % BOJE.length];
+    s += `<path d="M${cx} ${cy} L${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)} Z" fill="${boja}" stroke="#070c1c" stroke-width="${mali ? 1.6 : 1}"/>`;
     if (mali) continue; // na 84px natpisi bi bili mrlje
     // Natpis stoji USPRAVNO. Radijalno okrenut tekst se na donjoj polovini cita
     // ukoso i deluje aljkavo; ovako je svaki iznos citljiv bez naginjanja glave.

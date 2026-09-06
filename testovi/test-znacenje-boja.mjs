@@ -107,6 +107,21 @@ for (const [sta, uzorak] of [
 proveri("doneto ostaje zeleno", /var\(--green\)/.test(red(".por-red.gotovo .por-status")),
   "zelena znaci gotovo; to se ne menja");
 
+// ---- 7) NAGRADNI TOČAK JE IZ ISTE KUĆE ----
+//
+// Polja tocka su bila crvena, tamnocrvena, dve skoro crne, siva i zlatna - iz
+// palete koja je odavno zamenjena. Tocak je zbog toga bio jedino mesto u
+// launcheru koje ne lici na ostatak: crven i crn usred plavog i zlatnog
+// programa. A crvena tu jos i protivreci sama sebi: u ostatku programa znaci
+// "istice vreme" i "zakljucano", dok je tocak jedina prava nagrada.
+const rend = citajIzvor("client/renderer/js/launcher.js");
+proveri("boje točka se čitaju iz boje kuće, ne upisuju u kod", /function tocakBoje\(\)/.test(rend) &&
+  /getPropertyValue\("--brend"\)/.test(rend),
+  "vlasnik menja boju iz panela; tocak mora da je prati kao i sve ostalo");
+const tocakBlok = rend.slice(rend.indexOf("function tocakBoje()"), rend.indexOf("function tocakBoje()") + 700);
+proveri("u točku nema stare crvene", !/#d81f24|#8e1b20|#e23b34/.test(tocakBlok), tocakBlok.match(/#[0-9a-f]{6}/gi)?.join(" "));
+proveri("nagrada u točku je zlatna", /#ffb527/.test(tocakBlok));
+
 // ---- 6) PUNE PLOČE NOSE PODLOGU PROGRAMA ----
 //
 // Podloga je plava sa znaka, ne skoro crna. Ali velovi i ploce iz starije verzije
