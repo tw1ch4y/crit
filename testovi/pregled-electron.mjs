@@ -20,6 +20,8 @@ import { fileURLToPath } from "node:url";
 // traku sa pecatom "Uskoro!" i vecno "Profil se ucitava..." - dakle bas ono sto
 // je novo nije se videlo ni na jednoj slici.
 import { nivoZa, otkljucanoZa, BOJE_IMENA, OKVIRI } from "../server/src/nivoi.js";
+import { znackeZa, GRUPE } from "../server/src/znacke.js";
+import { VIP_BOJE, VIP_OKVIRI, POGODNOSTI } from "../server/src/vip.js";
 import { putanjaElektrona } from "./_okruzenje.mjs";
 
 // Iskustvo izmisljenog igraca. Namerno je u sredini nivoa: prazna i puna traka
@@ -34,7 +36,19 @@ const profilZa = (xp) => { const n = nivoZa(xp);
     doSledeceg: n.doSledeceg, poslednji: n.poslednji, sledeciNaziv: n.sledeciNaziv,
     sati: 96.5, poseta: 41, porudzbina: 63, omiljenaIgra: "Counter-Strike 2", omiljenaPuta: 28,
     izgled: { boja: "bela", okvir: "nema" }, otkljucano: otkljucanoZa(xp),
-    boje: BOJE_IMENA, okviri: OKVIRI }; };
+    boje: { ...BOJE_IMENA, ...VIP_BOJE }, okviri: { ...OKVIRI, ...VIP_OKVIRI },
+    // Znacke, rekordi i ponuda VIP-a - inace slike sa kojih se ocenjuje izgled
+    // ne pokazuju bas ono sto je novo.
+    znacke: znackeZa({ sati: 96, poseta: 41, porudzbina: 63, najduzaSesijaMin: 340,
+      ranoSesija: 1, kasnaSesija: 2, razlicitihIgara: 7, pokretanja: 210,
+      najvisePutaIgra: 62, igaraUKatalogu: 12, najvisePutaArtikal: 24,
+      spinova: 12, dobitakUkupno: 340, nedeljaZaredom: 5, danaOdUpisa: 240 }),
+    grupeZnacaka: GRUPE,
+    rekordi: { najduzaSesijaMin: 340, najboljiDan: { datum: "2026-08-14", iznos: 2400 },
+      omiljenDan: 6, razlicitihIgara: 7, spinova: 12, dobitakUkupno: 340,
+      nedeljaZaredom: 5, omiljenoPice: "Coca-Cola 0.5", omiljenoPicePuta: 24 },
+    clanarina: { ukljucen: true, jeVip: false, dana: 0, cena: 1500, trajanje: 30,
+      mnozilac: 2, tocakPrag: 700, pogodnosti: POGODNOSTI } }; };
 
 const OVDE = path.dirname(fileURLToPath(import.meta.url));
 const KOREN = path.join(OVDE, "..");

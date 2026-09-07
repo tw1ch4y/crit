@@ -670,6 +670,15 @@ function handleMsg(m) {
       profilStanje = S.profil ? "stigao" : "palo";
       if (S.tab === "account") renderContent();
       break;
+    case "vip_ok":
+      clearTimeout(kupiVip._t); kupiVip._otkljucaj?.();
+      S.balance = m.balance; updateHud();
+      toast(`VIP je aktivan - još ${m.dana} dana`, "success", 6000);
+      break;
+    case "vip_err":
+      clearTimeout(kupiVip._t); kupiVip._otkljucaj?.();
+      toast(m.message || "Kupovina nije prošla.", "error", 6000);
+      break;
     case "profil_err":
       toast(m.message || "Ne mogu da promenim profil.", "error");
       break;
@@ -1876,10 +1885,10 @@ function sekcijaProfil() {
   ].map(([l, v]) => `<div class="pf-brojka"><div class="pf-bl">${l}</div><div class="pf-bv">${esc(String(v))}</div></div>`).join("");
 
   const boje = Object.entries(p.boje || {}).map(([k, o]) => `
-    <button class="pf-boja ${p.izgled.boja === k ? "aktivna" : ""}" data-pf-boja="${k}"
-      style="--pf-c:${o.heks}" title="${esc(o.naziv)}" aria-label="${esc(o.naziv)}"></button>`).join("");
+    <button class="pf-boja ${p.izgled.boja === k ? "aktivna" : ""}" data-pf-boja="${k}"${o.vip ? " data-vip" : ""}
+      style="--pf-c:${o.heks}" title="${esc(o.naziv)}${o.vip ? " (VIP)" : ""}" aria-label="${esc(o.naziv)}"></button>`).join("");
   const okviri = Object.entries(p.okviri || {}).map(([k, o]) => `
-    <button class="pf-okvir ${p.izgled.okvir === k ? "aktivna" : ""}" data-pf-okvir="${k}">${esc(o.naziv)}</button>`).join("");
+    <button class="pf-okvir ${p.izgled.okvir === k ? "aktivna" : ""}" data-pf-okvir="${k}"${o.vip ? " data-vip" : ""}>${esc(o.naziv)}</button>`).join("");
 
   const sme = (sta) => (p.otkljucano || []).find((o) => o.kljuc === sta)?.otkljucano;
   const zakljucaj = (sta) => {
@@ -1926,9 +1935,111 @@ function sekcijaProfil() {
       <div class="pf-okviri ${sme("okvir") ? "" : "zakljucano"}">${okviri}</div>
     </div>
 
+    ${vipPonudaHtml(p.clanarina)}
+
+    ${znackeHtml(p)}
+
+    ${rekordiHtml(p.rekordi)}
+
     <div class="pf-odeljak">
       <div class="pf-naslov">Šta te čeka</div>
       <div class="pf-nagrade">${nagrade}</div>
+    </div>
+  </div>`;
+}
+
+// VIP: PONUDA KOJA KAŽE ŠTA SE DOBIJA, PA TEK ONDA KOLIKO KOŠTA.
+//
+// Rang se zarađuje igranjem i besplatan je; VIP se kupuje. Zato ovo nije
+// "zaključano dok ne stigneš do petog nivoa" nego ponuda - i mora da izgleda
+// kao ponuda: prvo pogodnosti, pa cena, pa dugme.
+//
+// Kad je već kupljen, na istom mestu stoji koliko još traje. Gost koji ne zna
+// dokle mu važi ne obnavlja - obnavlja onaj koji vidi da mu ističe.
+function vipPonudaHtml(c) {
+  if (!c || !c.ukljucen) return "";
+  if (c.jeVip) {
+    return `<div class="pf-odeljak">
+      <div class="pf-vip ima">
+        <div class="pf-vip-znak">${icon("gift", 22)}</div>
+        <div class="pf-vip-tekst">
+          <b>VIP je aktivan</b>
+          <span>Još ${c.dana} ${c.dana === 1 ? "dan" : "dana"}. Iskustvo ti ide x${c.mnozilac}, a točak ti se otvara na ${c.tocakPrag}.</span>
+        </div>
+        <button class="btn btn-ghost" id="vipObnovi">Produži za ${c.cena}</button>
+      </div>
+    </div>`;
+  }
+  return `<div class="pf-odeljak">
+    <div class="pf-vip">
+      <div class="pf-vip-glava">
+        <div class="pf-vip-znak">${icon("gift", 22)}</div>
+        <div class="pf-vip-tekst"><b>Postani VIP</b><span>${c.cena} za ${c.trajanje} dana, skida se sa kredita</span></div>
+        <button class="btn btn-primary" id="vipKupi">Uzmi VIP</button>
+      </div>
+      <div class="pf-vip-spisak">
+        ${(c.pogodnosti || []).map((x) => `
+          <div class="pf-vip-red">${icon("check", 14)}<span><b>${esc(x.naziv)}</b>${esc(x.opis)}</span></div>`).join("")}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ZNAČKE: ono po čemu se jedan profil razlikuje od drugog.
+//
+// Nivo je jedan broj koji svi imaju. Značka kaže ŠTA je neko radio, i to je ono
+// što se prepričava. Zaključane se PRIKAZUJU, sa trakom napretka: nagrada koja
+// se ne vidi unapred nije nagrada nego iznenađenje.
+function znackeHtml(p) {
+  const spisak = p.znacke || [];
+  if (!spisak.length) return "";
+  const grupe = p.grupeZnacaka || {};
+  const zaradjenih = spisak.filter((z) => z.zaradjena).length;
+  const poGrupi = {};
+  for (const z of spisak) (poGrupi[z.grupa] ||= []).push(z);
+
+  const komad = (z) => `
+    <div class="zn ${z.zaradjena ? "ima" : ""}" title="${esc(z.opis)}">
+      <span class="zn-znak">${z.zaradjena ? icon("check", 15) : icon("key", 13)}</span>
+      <span class="zn-tekst">
+        <b>${esc(z.naziv)}</b>
+        <i>${esc(z.opis)}</i>
+        ${z.zaradjena ? "" : `<span class="zn-traka"><em style="width:${z.postotak}%"></em></span>
+          <span class="zn-broj">${z.dokle} / ${z.cilj}</span>`}
+      </span>
+    </div>`;
+
+  return `<div class="pf-odeljak">
+    <div class="pf-naslov">Značke <span class="pf-broj">${zaradjenih} od ${spisak.length}</span></div>
+    ${Object.entries(poGrupi).map(([kljuc, lista]) => `
+      <div class="zn-grupa">
+        <div class="zn-g-ime">${esc(grupe[kljuc]?.naziv || kljuc)}</div>
+        <div class="zn-mreza">${lista.map(komad).join("")}</div>
+      </div>`).join("")}
+  </div>`;
+}
+
+// LIČNI REKORDI: brojke koje gost sam ispriča.
+//
+// Prikazuje se samo ono što STVARNO postoji - prazan rekord se izostavlja, a ne
+// prikazuje kao crtica. Red crtica izgleda kao da program nešto ne ume.
+function rekordiHtml(r) {
+  if (!r) return "";
+  const DANI = ["nedeljom", "ponedeljkom", "utorkom", "sredom", "četvrtkom", "petkom", "subotom"];
+  const stavke = [
+    r.najduzaSesijaMin >= 60 && ["Najduža sesija", `${Math.floor(r.najduzaSesijaMin / 60)}h ${r.najduzaSesijaMin % 60}min`],
+    r.najboljiDan && ["Najveći dan", money(r.najboljiDan.iznos)],
+    r.omiljenDan != null && ["Najčešće dolaziš", DANI[r.omiljenDan]],
+    r.omiljenoPice && ["Omiljeno piće", `${r.omiljenoPice} (${r.omiljenoPicePuta}x)`],
+    r.razlicitihIgara > 0 && ["Različitih igara", String(r.razlicitihIgara)],
+    r.nedeljaZaredom > 1 && ["Nedelja zaredom", String(r.nedeljaZaredom)],
+    r.spinova > 0 && ["Spinova", `${r.spinova}${r.dobitakUkupno > 0 ? ` (${money(r.dobitakUkupno)})` : ""}`],
+  ].filter(Boolean);
+  if (!stavke.length) return "";
+  return `<div class="pf-odeljak">
+    <div class="pf-naslov">Tvoji rekordi</div>
+    <div class="pf-rekordi">
+      ${stavke.map(([l, v]) => `<div class="pf-rek"><span>${esc(l)}</span><b>${esc(String(v))}</b></div>`).join("")}
     </div>
   </div>`;
 }
@@ -2615,6 +2726,8 @@ $("#content").addEventListener("click", (e) => {
     return;
   }
 
+  const vipBtn = e.target.closest("#vipKupi") || e.target.closest("#vipObnovi");
+  if (vipBtn) return kupiVip(vipBtn);
   if (e.target.closest("#orderBtn")) return sendOrder();
   if (e.target.closest("#accSave")) return saveAccountPassword();
   if (e.target.closest("#heroTocak")) return otvoriTocak();
@@ -2684,6 +2797,26 @@ function osveziPice(id) {
   const pom = document.createElement("div");
   pom.innerHTML = shopCardHtml(it);
   stara.replaceWith(pom.firstElementChild);
+}
+
+// ---- Kupovina VIP-a (zaključano dok server ne odgovori) ----
+//
+// Dira novac, pa važi isto pravilo kao za porudžbinu: dupli klik na sporoj
+// mreži bi naplatio dvaput. Dugme se otključava i kad server zaćuti, da gost ne
+// ostane zarobljen - server u međuvremenu odbija drugu kupovinu jer je kredit
+// već skinut, pa se dvostruka naplata ne može desiti ni tada.
+let vipUToku = false;
+function kupiVip(btn) {
+  if (vipUToku) return;
+  vipUToku = true;
+  const stari = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Kupujem...";
+  const otkljucaj = () => { vipUToku = false; btn.disabled = false; btn.textContent = stari; };
+  clearTimeout(kupiVip._t);
+  kupiVip._t = setTimeout(otkljucaj, 8000);
+  kupiVip._otkljucaj = otkljucaj;
+  window.crit.toServer({ t: "kupi_vip" });
 }
 
 // ---- Slanje porudžbine (zaključano dok server ne odgovori) ----
