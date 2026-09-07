@@ -292,6 +292,15 @@ function migrate() {
   // dva sitna izbora koja se ne pretrazuju. Odvojeno od `tema` (sara) da se
   // citanje sare ne kvari kad se doda jos nesto na profil.
   if (!columnExists("players", "profil")) db.exec("ALTER TABLE players ADD COLUMN profil TEXT");
+  // TOČAK: koliko puta je vrteo i koliko je ukupno dobio.
+  //
+  // `last_spin_at` pamti samo POSLEDNJI spin, a značke traže broj. Broj se ne
+  // može izvući ni iz `transactions` (spin bez dobitka ne upisuje ništa) ni iz
+  // logova (održavanje ih seče po starosti, pa bi značka "10 spinova" jednog
+  // dana tiho nestala sa profila gosta koji je stvarno vrteo trideset puta).
+  // Zato stoji na igraču, kao i XP, i iz istog razloga.
+  if (!columnExists("players", "spinova")) db.exec("ALTER TABLE players ADD COLUMN spinova INTEGER NOT NULL DEFAULT 0");
+  if (!columnExists("players", "spin_dobitak")) db.exec("ALTER TABLE players ADD COLUMN spin_dobitak REAL NOT NULL DEFAULT 0");
 }
 migrate();
 

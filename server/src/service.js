@@ -11,6 +11,7 @@ import { banerIgre, promoCrit } from "./banner.js";
 import * as nad from "./nadogradnja.js";
 import { nivoZa, smeDa, otkljucanoZa, OTKLJUCAVANJA, BOJE_IMENA, OKVIRI } from "./nivoi.js";
 import { stanjeInterneta } from "./internet.js";
+import { znackeZa, GRUPE } from "./znacke.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1870,7 +1871,10 @@ export function zavrtiTocak(playerId) {
   try {
     bal = uJednomPoslu(() => {
       // Prvo upiši da je vrteo - da dupli klik ili puknuta veza ne daju drugi spin.
-      db.prepare("UPDATE players SET last_spin_at=? WHERE id=?").run(now, playerId);
+      // Broj spinova i ukupan dobitak idu u ISTOM upisu: značke ih traže, a iz
+      // logova se ne mogu izvući jer održavanje seče stare zapise.
+      db.prepare("UPDATE players SET last_spin_at=?, spinova=COALESCE(spinova,0)+1, spin_dobitak=COALESCE(spin_dobitak,0)+? WHERE id=?")
+        .run(now, dobit.kredit > 0 ? dobit.kredit : 0, playerId);
       let b = round2(Number(p.balance) || 0);
       if (dobit.kredit > 0) {
         b = round2(b + dobit.kredit);
@@ -3192,7 +3196,7 @@ export function vipOd(xp) {
 
 // Profil: ko je, dokle je stigao i šta je za sobom ostavio.
 export function profilIgraca(playerId) {
-  const p = db.prepare("SELECT id, username, display_name, xp, profil, created_at FROM players WHERE id=?").get(playerId);
+  const p = db.prepare("SELECT id, username, display_name, xp, profil, created_at, spinova, spin_dobitak FROM players WHERE id=?").get(playerId);
   if (!p) return null;
   const n = nivoZa(p.xp);
   const jedan = (sql, ...a) => db.prepare(sql).get(...a) || {};
@@ -3207,6 +3211,9 @@ export function profilIgraca(playerId) {
     `SELECT g.name ime, COUNT(*) n FROM game_launches gl JOIN games g ON g.id=gl.game_id
      WHERE gl.player_id=? GROUP BY gl.game_id ORDER BY n DESC LIMIT 1`, playerId);
 
+  const sati = cena > 0 ? round2(ukupno.c / cena) : 0;
+  const stat = statistikaIgraca(p, { sati, poseta: ukupno.n || 0, porudzbina: porudzbina.n || 0 });
+
   return {
     username: p.username,
     ime: p.display_name || p.username,
@@ -3214,7 +3221,7 @@ export function profilIgraca(playerId) {
     nivo: n.nivo, naziv: n.naziv, xp: n.xp,
     uNivou: n.uNivou, zaSledeci: n.zaSledeci, doSledeceg: n.doSledeceg,
     poslednji: n.poslednji, sledeciNaziv: n.sledeciNaziv,
-    sati: cena > 0 ? round2(ukupno.c / cena) : 0,
+    sati,
     poseta: ukupno.n || 0,
     porudzbina: porudzbina.n || 0,
     omiljenaIgra: omiljena.ime || null,
@@ -3222,6 +3229,102 @@ export function profilIgraca(playerId) {
     izgled: profilIzBaze(p),
     otkljucano: otkljucanoZa(p.xp),
     boje: BOJE_IMENA, okviri: OKVIRI,
+    // Značke i lični rekordi - vidi znacke.js i statistikaIgraca.
+    znacke: znackeZa(stat),
+    grupeZnacaka: GRUPE,
+    rekordi: {
+      najduzaSesijaMin: stat.najduzaSesijaMin,
+      najboljiDan: stat.najboljiDan,
+      omiljenDan: stat.omiljenDan,
+      razlicitihIgara: stat.razlicitihIgara,
+      spinova: stat.spinova,
+      dobitakUkupno: stat.dobitakUkupno,
+      nedeljaZaredom: stat.nedeljaZaredom,
+      omiljenoPice: stat.omiljenoPice,
+      omiljenoPicePuta: stat.omiljenoPicePuta,
+    },
+  };
+}
+
+// STATISTIKA ZA ZNAČKE - jedan prolaz, ne upit po znački.
+//
+// Značke se računaju pri svakom otvaranju profila (vidi znacke.js zašto se ne
+// pamte). Da svaka od dvadeset pet radi svoj upit, otvaranje profila bi bilo
+// dvadeset pet upita - a profil se otvara i pri svakoj prijavi. Zato sve što
+// značkama treba stiže odavde, iz nekoliko upita nad indeksiranim kolonama.
+function statistikaIgraca(p, vec) {
+  const jedan = (sql, ...a) => db.prepare(sql).get(...a) || {};
+  const id = p.id;
+
+  // Najduža sesija i doba dana. `started_at` je milisekunda, pa se sat vadi
+  // preko SQLite-ovog datetime - i to u LOKALNOM vremenu, jer "posle 23h" znači
+  // po satu na zidu igraonice, ne po UTC.
+  const sesije = jedan(`
+    SELECT
+      MAX(COALESCE(ended_at, started_at) - started_at) najduza,
+      SUM(CASE WHEN CAST(strftime('%H', started_at/1000, 'unixepoch', 'localtime') AS INTEGER) < 10 THEN 1 ELSE 0 END) rano,
+      SUM(CASE WHEN CAST(strftime('%H', started_at/1000, 'unixepoch', 'localtime') AS INTEGER) >= 23 THEN 1 ELSE 0 END) kasno
+    FROM sessions WHERE player_id=?`, id);
+
+  // Dan u nedelji sa najviše poseta. 0 = nedelja, kao u strftime('%w').
+  const dan = jedan(`
+    SELECT strftime('%w', started_at/1000, 'unixepoch', 'localtime') d, COUNT(*) n
+    FROM sessions WHERE player_id=? GROUP BY d ORDER BY n DESC LIMIT 1`, id);
+
+  // Najveća potrošnja u jednom danu - lični rekord koji gost sam ispriča.
+  const najboljiDan = jedan(`
+    SELECT strftime('%Y-%m-%d', created_at/1000, 'unixepoch', 'localtime') d, SUM(-amount) iznos
+    FROM transactions WHERE player_id=? AND amount < 0
+    GROUP BY d ORDER BY iznos DESC LIMIT 1`, id);
+
+  const igre = jedan(`
+    SELECT COUNT(DISTINCT game_id) razlicitih, COUNT(*) ukupno FROM game_launches WHERE player_id=?`, id);
+  const najviseIgra = jedan(`
+    SELECT COUNT(*) n FROM game_launches WHERE player_id=? GROUP BY game_id ORDER BY n DESC LIMIT 1`, id);
+  const uKatalogu = jedan("SELECT COUNT(*) n FROM games");
+
+  const najvisePice = jedan(`
+    SELECT oi.name ime, SUM(oi.qty) n FROM order_items oi JOIN orders o ON o.id=oi.order_id
+    WHERE o.player_id=? AND o.status<>'cancelled' GROUP BY oi.name ORDER BY n DESC LIMIT 1`, id);
+
+  // NEDELJA ZAREDOM: koliko je uzastopnih nedelja gost bio bar jednom.
+  // Broji se unazad od tekuće nedelje - prekid od jedne nedelje prekida niz.
+  const nedelje = db.prepare(`
+    SELECT DISTINCT strftime('%Y-%W', started_at/1000, 'unixepoch', 'localtime') w
+    FROM sessions WHERE player_id=? ORDER BY w DESC`).all(id).map((r) => r.w);
+  const nedeljaSad = new Date();
+  const kljucNedelje = (d) => {
+    const t = new Date(d);
+    const prva = new Date(t.getFullYear(), 0, 1);
+    const dana = Math.floor((t - prva) / 86400000);
+    const w = String(Math.floor((dana + prva.getDay()) / 7)).padStart(2, "0");
+    return `${t.getFullYear()}-${w}`;
+  };
+  let zaredom = 0;
+  for (let i = 0; i < 520; i++) {
+    const d = new Date(nedeljaSad.getTime() - i * 7 * 86400000);
+    if (!nedelje.includes(kljucNedelje(d))) { if (i === 0) continue; break; }
+    zaredom++;
+  }
+
+  return {
+    sati: vec.sati, poseta: vec.poseta, porudzbina: vec.porudzbina,
+    najduzaSesijaMin: Math.round((Number(sesije.najduza) || 0) / 60000),
+    ranoSesija: Number(sesije.rano) || 0,
+    kasnaSesija: Number(sesije.kasno) || 0,
+    omiljenDan: dan.d != null ? Number(dan.d) : null,
+    najboljiDan: najboljiDan.iznos ? { datum: najboljiDan.d, iznos: round2(najboljiDan.iznos) } : null,
+    razlicitihIgara: Number(igre.razlicitih) || 0,
+    pokretanja: Number(igre.ukupno) || 0,
+    najvisePutaIgra: Number(najviseIgra.n) || 0,
+    igaraUKatalogu: Number(uKatalogu.n) || 0,
+    najvisePutaArtikal: Number(najvisePice.n) || 0,
+    omiljenoPice: najvisePice.ime || null,
+    omiljenoPicePuta: Number(najvisePice.n) || 0,
+    spinova: Number(p.spinova) || 0,
+    dobitakUkupno: round2(Number(p.spin_dobitak) || 0),
+    nedeljaZaredom: zaredom,
+    danaOdUpisa: Math.floor((Date.now() - (Number(p.created_at) || Date.now())) / 86400000),
   };
 }
 
