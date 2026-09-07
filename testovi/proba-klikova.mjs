@@ -109,8 +109,89 @@ const PREGLED = \`(() => {
       });
     }
   }
-  return { van, slusalaca: window.__slusaoci ? window.__slusaoci.size : -1, crit: typeof window.crit, ekranAktivan: ([...document.querySelectorAll(".screen")].find((e) => e.classList.contains("active")) || {}).id, skenirano: document.querySelectorAll(\${JSON.stringify(KLIKABILNO)}).length, tocakOtvoren: document.querySelector("#tocakOverlay").classList.contains("active") };
+  return { van, bezStanja: stanjaVan(), slusalaca: window.__slusaoci ? window.__slusaoci.size : -1, crit: typeof window.crit, ekranAktivan: ([...document.querySelectorAll(".screen")].find((e) => e.classList.contains("active")) || {}).id, skenirano: document.querySelectorAll(\${JSON.stringify(KLIKABILNO)}).length, tocakOtvoren: document.querySelector("#tocakOverlay").classList.contains("active") };
 })()\`;
+
+// TRI STANJA NA SVEMU STO SE KLIKCE.
+//
+// Klik koji stize do koda jos ne znaci da se od njega nesto VIDI. Kiosk radi na
+// jeftinim misevima i na mrezi koja ume da zastane; kad se pritisak ne vidi,
+// igrac klikne drugi put. A fokusa nije imao NIJEDAN element: igrac se prijavljuje
+// tastaturom (ime, Tab, lozinka, Enter) i nije video gde je, a kad mis zataji
+// usred smene, radnik nije mogao da dodje ni do "Odjava".
+//
+// Pravila se citaju iz STVARNIH stilova ucitanih u prozoru, ne iz izvora - tako
+// se hvata i ono sto je pravilom prekriveno ili pogresno napisano.
+const STANJA = \`
+window.stanjaVan = function () {
+  const pravila = { hover: [], pritisak: [], fokus: [] };
+  for (const ss of document.styleSheets) {
+    let rr; try { rr = ss.cssRules; } catch (e) { continue; }
+    for (const r of rr) {
+      const s = r.selectorText; if (!s) continue;
+      // Uzima se DEO SELEKTORA DO stanja, ne ceo selektor.
+      //
+      // ".hero-tocak:active .hw-tocak" znaci da tocak REAGUJE na pritisak - samo
+      // se pomera njegovo dete. Kad se iz celog selektora samo izbaci ":active",
+      // ostane ".hero-tocak .hw-tocak", sto ne odgovara samom tocku, pa bi alat
+      // prijavio da pritisak ne postoji iako se lepo vidi.
+      const nosilac = function (d, stanje) {
+        const i = d.indexOf(stanje);
+        if (i < 0) return null;
+        // sve do stanja je element koji ga NOSI; ostala stanja na njemu se skidaju
+        return d.slice(0, i).replace(/:(hover|active|focus-visible|focus|not\\([^)]*\\))/g, "").trim() || "*";
+      };
+      for (const deo of s.split(",")) {
+        const d = deo.trim();
+        const h = nosilac(d, ":hover"); if (h) pravila.hover.push(h);
+        const a = nosilac(d, ":active"); if (a) pravila.pritisak.push(a);
+        const f = nosilac(d, ":focus-visible") || nosilac(d, ":focus"); if (f) pravila.fokus.push(f);
+      }
+    }
+  }
+  const ima = function (el, lista) {
+    for (const sel of lista) { try { if (el.matches(sel)) return true; } catch (e) {} }
+    return false;
+  };
+  const jeKlik = function (el) {
+    if (el.namespaceURI === "http://www.w3.org/2000/svg") return false;
+    if (["BUTTON", "A", "INPUT", "SELECT", "TEXTAREA"].indexOf(el.tagName) >= 0) return true;
+    return getComputedStyle(el).cursor === "pointer";
+  };
+  const van = [];
+  for (const el of document.querySelectorAll("body *")) {
+    if (!el.offsetParent && el.tagName !== "INPUT") continue;
+    if (!jeKlik(el)) continue;
+    // Racuna se samo NAJVISI klikabilni element: deca naslede pokazivac, a igrac
+    // klikce na celu plocicu, ne na natpis u njoj.
+    let pokriven = false;
+    for (let r = el.parentElement; r; r = r.parentElement) if (jeKlik(r)) { pokriven = true; break; }
+    if (pokriven) continue;
+    // Kartica koja U SEBI ima svoje dugme ne mora sama da prima fokus - tastatura
+    // do nje stize kroz to dugme (kartica pica i njeno "+"). Dugme u dugmetu nije
+    // ispravno, pa se ovde i ne trazi.
+    const svojeDugme = !!el.querySelector("button, a[href], input");
+    const fali = [];
+    if (!ima(el, pravila.hover)) fali.push("hover");
+    if (el.tagName !== "INPUT" && !ima(el, pravila.pritisak)) fali.push("pritisak");
+    if (!svojeDugme && !ima(el, pravila.fokus)) fali.push("fokus");
+    if (fali.length) {
+      const kls = typeof el.className === "string" ? el.className.trim().split(/\\\\s+/).filter(Boolean).join(".") : "";
+      van.push({ znak: el.tagName.toLowerCase() + (kls ? "." + kls : ""), fali: fali.join("+") });
+    }
+  }
+  // Isti oblik se javlja jednom, sa brojem - inace bi sedamnaest kartica pica
+  // dalo sedamnaest istih redova.
+  const grupe = {};
+  for (const v of van) { const k = v.znak + " [" + v.fali + "]"; grupe[k] = (grupe[k] || 0) + 1; }
+  return Object.keys(grupe).map(function (k) { return k + " x" + grupe[k]; });
+};
+// Poslednja vrednost mora da bude prenosiva. Bez ovoga se vraca sama funkcija,
+// koju Electron ne ume da prenese iz prozora - executeJavaScript odbije obecanje,
+// lanac se prekine PRE nego sto se postavi cuvar vremena, i alat visi zauvek sa
+// otvorenim prozorom, bez ijednog reda ispisa.
+true;
+\`;
 
 app.whenReady().then(async () => {
   const prijava = await fetch(BAZA + "/api/login", { method: "POST",
@@ -124,6 +205,7 @@ app.whenReady().then(async () => {
     webPreferences: { preload: OMOTAC_PUT, contextIsolation: true } });
   await win.loadFile(path.join(RENDERER, "index.html"));
   win.webContents.send("ws-status", { connected: true });
+  await win.webContents.executeJavaScript(STANJA);
   await cekaj(400);
 
   const tocak = { ukljucen: true, moze: true, prag: 1200, potroseno: 1500, nagrade: [
@@ -230,6 +312,21 @@ p.on("close", (kod) => {
     process.exit(2);
   }
 
+  // TRI STANJA - hover, pritisak, fokus - na svemu sto se klikce.
+  //
+  // Klik koji stize do koda jos ne znaci da se od njega nesto VIDI. Kad se
+  // pritisak ne vidi, igrac klikne drugi put; a bez fokusa se tastaturom ne
+  // moze ni prijaviti ni doci do "Odjava" kad mis zataji.
+  let bezStanja = 0;
+  for (const [ekran, rez] of Object.entries(nalazi)) {
+    const b = rez.bezStanja;
+    if (!Array.isArray(b) || !b.length) continue;
+    bezStanja += b.length;
+    console.log(`  PAO  ${ekran} - ${b.length} bez svih stanja:`);
+    for (const v of b) console.log("         " + v);
+  }
+  if (!bezStanja) console.log("  OK   svako klikabilno ima hover, pritisak i fokus");
+
   let mrtvih = 0;
   for (const [ekran, rez] of Object.entries(nalazi)) {
     const van = rez.van || rez;
@@ -239,5 +336,6 @@ p.on("close", (kod) => {
     for (const v of van) console.log(`         ${v.znak}  "${v.tekst}"  (u ${v.ekran})`);
   }
   console.log(mrtvih ? `\n${mrtvih} dugmadi ne stize do koda` : "\nsvako dugme stize do koda");
-  process.exit(mrtvih ? 1 : 0);
+  if (bezStanja) console.log(`${bezStanja} oblika bez nekog od tri stanja`);
+  process.exit(mrtvih || bezStanja ? 1 : 0);
 });

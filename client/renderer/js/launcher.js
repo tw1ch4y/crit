@@ -1037,14 +1037,22 @@ function gameCardHtml(g, i) {
   // igru i tiho bi odustao, pa je tabela pokretanja ostajala prazna zauvek.
   // Zbog toga igraču nisu radile "skoro igrane" igre, vlasniku spisak
   // najigranijih, a u Logovima nije bilo nijednog zapisa o pokretanju.
-  return `<div class="tile" style="--i:${i}" data-game='${esc(JSON.stringify({ id: g.id, path: g.path, args: g.args, name: g.name }))}'>
+  // PLOČICA JE DUGME, NE DIV.
+  //
+  // Kao div nije mogla da se dohvati tastaturom: igrač koji ne koristi miš (ili
+  // kome miš zataji usred smene) nije mogao da pokrene nijednu igru, a fokus se
+  // nije ni video jer ga plocica nije ni primala. Kao <button> sve to dolazi
+  // samo: Tab je dohvata, Enter i razmak je pokreću, a čitač ekrana je čita kao
+  // dugme. Klik ostaje isti - hvata se preko `data-game`.
+  return `<button class="tile" type="button" style="--i:${i}" aria-label="Pokreni ${esc(g.name)}"
+    data-game='${esc(JSON.stringify({ id: g.id, path: g.path, args: g.args, name: g.name }))}'>
     <div class="tile-media"${cekaIkonu ? ` data-trazi-ikonu="${esc(g.path)}"` : ""}>
       ${cover}
       ${oznakaKategorije(g)}
       <div class="tile-scrim"><div class="tile-name">${esc(g.name)}</div></div>
       <div class="tile-hover"><span class="play-btn">${icon("play", 24)}</span><span class="play-label">Pokreni</span></div>
     </div>
-  </div>`;
+  </button>`;
 }
 // Redosled izvora znaka, od najboljeg ka najgrubljem:
 //   1. slika koju je osoblje okacilo u panelu - izricit izbor, uvek pobedjuje
@@ -1553,11 +1561,22 @@ function cenaHtml(n, klasa = "cena") {
 // malo dugme. Ranije je svaka kartica imala punu crvenu traku "Dodaj" - sedam
 // crvenih pravougaonika jedan do drugog je vikalo preko celog ekrana. Sada je
 // dugme krug sa tankim obodom i boju dobija tek kad je pice u korpi.
+// CELA KARTICA DODAJE U KORPU, NE SAMO DUGME "+".
+//
+// Kartica se na prelazak miša podiže - to je poziv na klik. A klik nije radio
+// ništa: primalo ga je samo malo okruglo dugme u ćošku. Kartica koja se ponaša
+// kao dugme mora i da bude dugme, inače igrač klikne, ne desi se ništa, i on
+// pomisli da program ne radi.
+//
+// Sama kartica NIJE <button>: u njoj već stoje dugmad za količinu, a dugme u
+// dugmetu nije ispravno. Zato nosi `data-add` (isto što nosi i "+"), a
+// tastaturom se do nje stiže preko tog istog dugmeta, koje fokus prima kako
+// treba. Rasprodat artikal se ne dodaje ni klikom na karticu.
 function shopCardHtml(i) {
   const nema = i.stock === 0;
   const malo = i.stock != null && i.stock > 0 && i.stock <= 5;
   const uKorpi = S.cart.get(i.id) || 0;
-  return `<article class="pice ${nema ? "nema" : ""} ${uKorpi ? "izabrano" : ""}" data-pice="${i.id}">
+  return `<article class="pice ${nema ? "nema" : ""} ${uKorpi ? "izabrano" : ""}" data-pice="${i.id}"${nema ? "" : ` data-add="${i.id}"`}>
     <div class="pice-slika">
       ${i.image
         ? `<img src="${esc(S.host)}${esc(i.image)}" alt="${esc(i.name)}" draggable="false" data-color />`
@@ -2572,14 +2591,17 @@ $("#content").addEventListener("click", (e) => {
     return;
   }
 
-  const addEl = e.target.closest("[data-add]");
-  if (addEl) return cartChange(Number(addEl.dataset.add), +1);
+  // "Manje" i "Više" se gledaju PRE "dodaj". Cela kartica nosi `data-add`, pa bi
+  // klik na "manje" - koje stoji u njoj - prvo naišao na karticu i DODAO umesto
+  // da oduzme.
+  const decEl = e.target.closest("[data-dec]");
+  if (decEl) return cartChange(Number(decEl.dataset.dec), -1);
 
   const incEl = e.target.closest("[data-inc]");
   if (incEl) return cartChange(Number(incEl.dataset.inc), +1);
 
-  const decEl = e.target.closest("[data-dec]");
-  if (decEl) return cartChange(Number(decEl.dataset.dec), -1);
+  const addEl = e.target.closest("[data-add]");
+  if (addEl) return cartChange(Number(addEl.dataset.add), +1);
 
   // Klik na tacku prebacuje baner i pomera odbrojavanje od nule.
   const tacka = e.target.closest("[data-promo-idi]");

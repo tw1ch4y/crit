@@ -2045,3 +2045,102 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
 }
 .toast.nivo { border-left-color: var(--gold); border-left-width: 4px; }
 .toast.nivo .t-ic { color: var(--gold); }
+
+/* ============================================================================
+   STANJA: PRELAZAK MIŠA, PRITISAK, FOKUS
+
+   Tri stanja, na svemu što se klikće, i svuda ista. Do sada je hover imalo
+   skoro sve, PRITISAK samo sedam elemenata, a FOKUS - nijedan.
+
+   Zašto to nije sitnica:
+
+     PRITISAK. Kiosk radi na jeftinijim mišem i na mreži koja ume da zastane.
+     Kad se klik ne vidi, igrač klikne drugi put. Na "Poruči" to je bila dupla
+     porudžbina - zato dugmad koja diraju novac imaju svoju bravu (jednomKlik).
+     Ostalo se rešava time da se pritisak VIDI.
+
+     FOKUS. Igrač se prijavljuje tastaturom: ime, Tab, lozinka, Enter. Bez
+     vidljivog fokusa ne zna gde je. Isto važi kad miš zataji usred smene, a
+     radnik treba da dođe do "Odjava" ili do servisnog izlaza.
+
+   Prsten je UNUTRAŠNJI (inset). Skoro sve u launcheru ima odsečen ugao preko
+   `clip-path`, a clip-path seče sve što izađe iz oblika - i `outline` i spoljnu
+   senku. Unutrašnji prsten prati isti oblik i vidi se i na odsečenom uglu.
+   ========================================================================== */
+
+/* Mišem se prsten NE ostavlja - samo tastaturom. `:focus-visible` to radi sam;
+   ovde se gasi podrazumevani outline koji Chrome crta preko odsečenog ugla. */
+:focus { outline: none; }
+
+.tab:focus-visible,
+.btn:focus-visible,
+.tile:focus-visible,
+.site-card:focus-visible,
+.shelf-arr:focus-visible,
+.acc-mi:focus-visible,
+.shop-cip:focus-visible,
+.shop-traka:focus-visible,
+.pice-plus:focus-visible,
+.pice-step button:focus-visible,
+.qbtn:focus-visible,
+.nacin:focus-visible,
+.poz-uzorak:focus-visible,
+.pf-boja:focus-visible,
+.pf-okvir:focus-visible,
+.promo-tacka:focus-visible,
+.tocak-spin:focus-visible,
+.hero-tocak:focus-visible,
+.dlg-x:focus-visible,
+.logout:focus-visible,
+[data-profil-ponovo]:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--brend), inset 0 0 0 4px rgba(var(--bg-rgb), 0.85);
+}
+/* Okrugla dugmad nose okrugao prsten, da ne izgleda kao da je nalepljen. */
+.pice-plus:focus-visible, .qbtn:focus-visible, .promo-tacka:focus-visible,
+.pice-step button:focus-visible { border-radius: 50%; }
+
+/* PRITISAK: kratko i suvo. Sve što se već diže na prelazak miša ovde se vraća
+   na svoje mesto - pokret nadole je ono što ruka očekuje od dugmeta. */
+.tab:active,
+.acc-mi:active,
+.shelf-arr:active,
+.shop-cip:active,
+.pf-boja:active,
+.pf-okvir:active,
+.nacin:active:not(:disabled),
+.dlg-x:active,
+.shop-traka:active {
+  transform: translateY(1px);
+  filter: brightness(0.92);
+}
+.tile:active, .site-card:active, .poz-uzorak:active, .pice:active {
+  transform: translateY(0);
+  filter: brightness(0.94);
+}
+.pice-plus:active, .qbtn:active, .pice-step button:active { transform: scale(0.92); }
+
+/* Prelaz mora da POSTOJI da bi se pritisak uopšte video: bez njega je promena
+   trenutna u oba smera i oko je ne uhvati. `--t-brzo` je namerno kratko - ovo
+   je odgovor na dodir, ne animacija. */
+.tab, .acc-mi, .shelf-arr, .shop-cip, .pf-boja, .pf-okvir, .nacin, .shop-traka, .dlg-x,
+.pice-plus, .qbtn, .pice-step button {
+  transition: background var(--t-brzo), color var(--t-brzo),
+              transform var(--t-brzo), filter var(--t-brzo);
+}
+/* Prsten se NE preliva. Tastatura ide brzo - dok bi se prsten pojavljivao, fokus
+   je vec dva polja dalje. Pojavi se odmah ili ne sluzi nicemu. */
+:focus-visible { transition: none; }
+
+/* KARTICA PIĆA JE DUGME, PA SE TAKO I PONAŠA.
+   Podizala se na prelazak miša - to je poziv na klik - a klik nije primala.
+   Rasprodata se ne diže i ne prima klik: obećanje koje ne može da ispuni. */
+.pice[data-add] { cursor: pointer; }
+.pice.nema { cursor: default; }
+.pice.nema:hover { transform: none; box-shadow: inset 0 0 0 1px var(--line); }
+
+/* PLOČICA IGRE JE SADA <button>. Dugme donosi svoje podrazumevano poravnanje i
+   popunu, pa se vraća na ono što je pločica imala kao div. */
+/* Dugme donosi svoju popunu i poravnanje teksta; sirina i prikaz se NE diraju -
+   plocica je clan police (flex), pa joj sirinu odredjuje polica. Kad je ovde
+   stajalo width: 100%, u polici se videla samo jedna igra. */
+.tile { padding: 0; text-align: left; }
