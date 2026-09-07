@@ -30,6 +30,9 @@ const DATA = path.join(OVDE, ".radno", "probe-data");
 // Alati kojima treba server na PORT-u. proba-procesa sam diže svoj, pa ide bez.
 const ALATI = [
   { ime: "pregled-electron", args: ["--port", String(PORT)], opis: "svi ekrani na dve rezolucije, mere šta ispada iz ekrana" },
+  // Panel je do sada imao svoj alat, ali ga niko nije pustao - stajao je van
+  // ovog spiska, pa se osoblje po ceo dan gledalo u strane koje niko ne meri.
+  { ime: "pregled-panela", args: ["--port", String(PORT)], opis: "svih 15 strana panela, na dve rezolucije" },
   { ime: "proba-klikova", args: [String(PORT)], opis: "svako dugme stvarno stiže do koda" },
   { ime: "proba-kretanja", args: [String(PORT)], opis: "animacije šare se stvarno pomeraju" },
   { ime: "proba-kretanja", args: [String(PORT), "--reduced"], opis: "isto, na računaru sa isključenim Windows animacijama", oznaka: "reduced" },

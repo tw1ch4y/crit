@@ -161,6 +161,10 @@ window.stanjaVan = function () {
   const van = [];
   for (const el of document.querySelectorAll("body *")) {
     if (!el.offsetParent && el.tagName !== "INPUT") continue;
+    // Sakriveno polje (kvacica, izbor fajla) NIJE ono sto covek dodiruje - to je
+    // nacrtana kutija ili natpis oko njega, i stanje stoji na njoj.
+    const b0 = el.getBoundingClientRect();
+    if (b0.width < 2 || b0.height < 2) continue;
     if (!jeKlik(el)) continue;
     // Racuna se samo NAJVISI klikabilni element: deca naslede pokazivac, a igrac
     // klikce na celu plocicu, ne na natpis u njoj.

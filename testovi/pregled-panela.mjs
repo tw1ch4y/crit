@@ -74,7 +74,68 @@ fs.writeFileSync(path.join(RADNO, "u-strani", "mere.js"), `(() => {
   // Koliko je strana stvarno popunjena: dokle dopire sadrzaj u odnosu na
   // raspolozivu visinu. Skoro prazna strana je znak da nesto fali.
   const dno = [...(main ? main.children : [])].map((e) => e.getBoundingClientRect().bottom).sort((a, b) => b - a)[0] || 0;
+  // TRI STANJA NA SVEMU STO SE KLIKCE: prelazak, pritisak, fokus.
+  //
+  // Panel se koristi i sa TELEFONA, jednom rukom, dok neko ceka za kasom - tamo
+  // se pritisak vidi umesto kursora i jedini je znak da je dodir primljen. A
+  // radnik za kasom radi tastaturom: Tab kroz spisak, Enter na naplatu. Do sada
+  // je pritisak imalo pet elemenata, a fokus samo dugmad i kvacice.
+  //
+  // Pravila se citaju iz STVARNIH stilova strane, ne iz izvora.
+  const bezStanja = (() => {
+    const pravila = { hover: [], pritisak: [], fokus: [] };
+    // Uzima se deo selektora DO stanja: ".switch:active .slider" znaci da
+    // prekidac REAGUJE, samo se pomera njegovo dete.
+    const nosilac = (d, st) => {
+      const i = d.indexOf(st);
+      if (i < 0) return null;
+      return d.slice(0, i).replace(/:(hover|active|focus-visible|focus|not\\([^)]*\\))/g, "").trim() || "*";
+    };
+    for (const ss of document.styleSheets) {
+      let rr; try { rr = ss.cssRules; } catch (e) { continue; }
+      for (const r of rr) {
+        const sel = r.selectorText; if (!sel) continue;
+        for (const deo of sel.split(",")) {
+          const d = deo.trim();
+          const h = nosilac(d, ":hover"); if (h) pravila.hover.push(h);
+          const a2 = nosilac(d, ":active"); if (a2) pravila.pritisak.push(a2);
+          const f = nosilac(d, ":focus-visible") || nosilac(d, ":focus"); if (f) pravila.fokus.push(f);
+        }
+      }
+    }
+    const ima = (el, lista) => lista.some((sel) => { try { return el.matches(sel); } catch (e) { return false; } });
+    const jeKlik = (el) => el.namespaceURI !== "http://www.w3.org/2000/svg" &&
+      (["BUTTON", "A", "INPUT", "SELECT", "TEXTAREA"].indexOf(el.tagName) >= 0 || getComputedStyle(el).cursor === "pointer");
+    const van = [];
+    for (const el of document.querySelectorAll("body *")) {
+      if (!el.offsetParent && el.tagName !== "INPUT") continue;
+      // Sakriveno polje (kvacica, izbor fajla) NIJE ono sto covek dodiruje - to
+      // je nacrtana kutija ili natpis oko njega, i stanje stoji na njoj. Polje
+      // bez velicine se zato ne racuna, inace alat vice na nesto sto se ne vidi.
+      const b0 = el.getBoundingClientRect();
+      if (b0.width < 2 || b0.height < 2) continue;
+      if (!jeKlik(el)) continue;
+      let pokriven = false;
+      for (let r = el.parentElement; r; r = r.parentElement) if (jeKlik(r)) { pokriven = true; break; }
+      if (pokriven) continue;
+      // Kartica koja u sebi ima svoje dugme ne mora sama da prima fokus.
+      const svoje = !!el.querySelector("button, a[href], input");
+      const fali = [];
+      if (!ima(el, pravila.hover)) fali.push("hover");
+      if (el.tagName !== "INPUT" && !ima(el, pravila.pritisak)) fali.push("pritisak");
+      if (!svoje && !ima(el, pravila.fokus)) fali.push("fokus");
+      if (fali.length) {
+        const k = typeof el.className === "string" ? el.className.trim().split(/\s+/).filter(Boolean).join(".") : "";
+        van.push(el.tagName.toLowerCase() + (k ? "." + k : "") + " [" + fali.join("+") + "]");
+      }
+    }
+    const g = {};
+    for (const v of van) g[v] = (g[v] || 0) + 1;
+    return Object.keys(g).map((k) => k + " x" + g[k]);
+  })();
+
   return {
+    bezStanja,
     naslov: main && main.querySelector("h1") ? main.querySelector("h1").textContent.trim() : null,
     tekstaZnakova: (main ? main.textContent : "").replace(/\\s+/g, " ").trim().length,
     popunjeno: okvir ? Math.round(100 * (dno - okvir.top) / Math.max(1, innerHeight - okvir.top)) : null,
@@ -157,12 +218,13 @@ p.on("close", (kod) => {
     if (n.viri?.length) g.push(`viri: ${n.viri.join(", ")}`);
     if (n.secen?.length) g.push(`odsecen tekst: ${n.secen.join(" | ")}`);
     if (!n.naslov) g.push("strana nema naslov");
+    if (n.bezStanja?.length) g.push("bez svih stanja: " + n.bezStanja.join(", "));
     if (n.tekstaZnakova < 40) g.push(`strana je skoro prazna (${n.tekstaZnakova} znakova)`);
     problema += g.length;
     console.log(`    ${g.length ? "PAZI" : "OK  "}  ${n.fajl.padEnd(28)} ${String(n.ime).padEnd(18)} popunjeno ${String(n.popunjeno).padStart(3)}%`);
     for (const x of g) console.log(`            -> ${x}`);
   }
   console.log(`\nslike: testovi/.slike-panel/  (${nalazi.length} komada)`);
-  console.log(problema ? `nadjeno ${problema} stvari za pogledati` : "nista ne ispada iz ekrana");
+  console.log(problema ? `nadjeno ${problema} stvari za pogledati` : "nista ne ispada iz ekrana, i sve klikabilno ima hover, pritisak i fokus");
   process.exit(0);
 });
