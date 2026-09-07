@@ -12,6 +12,7 @@ import * as nad from "./nadogradnja.js";
 import { nivoZa, smeDa, otkljucanoZa, OTKLJUCAVANJA, BOJE_IMENA, OKVIRI } from "./nivoi.js";
 import { stanjeInterneta } from "./internet.js";
 import { znackeZa, GRUPE } from "./znacke.js";
+import * as vip from "./vip.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1055,6 +1056,8 @@ export function handleClientMessage(computerId, msg) {
       return odgovorNaZahtev(msg);
     case "tocak_spin":
       return clientTocakSpin(computerId);
+    case "kupi_vip":
+      return clientKupiVip(computerId);
     case "sys_info":
       return clientSysInfo(computerId, msg);
     case "hello":
@@ -1107,6 +1110,17 @@ function clientTocakSpin(computerId) {
   const r = zavrtiTocak(comp.current_player_id);
   if (r.error) return sendClient(computerId, { t: "tocak_err", message: r.error, tocak: tocakInfo(comp.current_player_id) });
   sendClient(computerId, { t: "tocak_rezultat", index: r.index, nagrada: r.nagrada, balance: r.balance, sledeciSpin: r.sledeciSpin });
+}
+
+// Gost kupuje VIP sam, sa svog računara, svojim kreditom. Provera stoji na
+// serveru: launcher stoji na računaru igrača, pa poruka koja stigne mimo njega
+// mora da dobije isti odgovor kao i klik.
+function clientKupiVip(computerId) {
+  const comp = computerById(computerId);
+  if (!comp?.current_player_id) return;
+  const r = kupiVip(comp.current_player_id);
+  if (r.error) return sendClient(computerId, { t: "vip_err", message: r.error });
+  sendClient(computerId, { t: "vip_ok", dana: r.dana, balance: r.balance });
 }
 
 function clientLogin(computerId, username, password) {
@@ -1827,8 +1841,15 @@ export function tocakNagrade() {
 // Sve što klijentu treba da prikaže točak za jednog igrača.
 export function tocakInfo(playerId) {
   const ukljucen = getSetting("tocak_ukljucen", "0") === "1";
-  const prag = Number(getSetting("tocak_prag", "1200")) || 0;
   const p = playerById(playerId);
+  // VIP-u je prag niži. To je JEDINA pogodnost koja kuću stvarno košta, pa je i
+  // jedina koja se podešava iz panela - i nikad ne može da bude viša od običnog
+  // praga (vidi pragZaSpin), jer bi VIP tada postao kazna.
+  const prag = vip.pragZaSpin({
+    jeVip: vip.vaziVip(p?.vip_do),
+    prag: Number(getSetting("tocak_prag", "1200")) || 0,
+    vipPrag: Number(getSetting("vip_tocak_prag", vip.PODRAZUMEVANO.tocakPrag)),
+  });
   const potroseno = p ? potrosnjaNedelja(playerId) : 0;
   const now = Date.now();
   const cekaDo = p && p.last_spin_at ? p.last_spin_at + NEDELJA : 0;
@@ -1855,7 +1876,11 @@ export function zavrtiTocak(playerId) {
   if (getSetting("tocak_ukljucen", "0") !== "1") return { error: "Točak trenutno nije aktivan" };
   const p = playerById(playerId);
   if (!p) return { error: "Nepostojeći igrač" };
-  const prag = Number(getSetting("tocak_prag", "1200")) || 0;
+  const prag = vip.pragZaSpin({
+    jeVip: vip.vaziVip(p.vip_do),
+    prag: Number(getSetting("tocak_prag", "1200")) || 0,
+    vipPrag: Number(getSetting("vip_tocak_prag", vip.PODRAZUMEVANO.tocakPrag)),
+  });
   const potroseno = potrosnjaNedelja(playerId);
   if (potroseno < prag) return { error: `Potrebno je ${prag} potrošnje ove nedelje (imaš ${potroseno})` };
   const now = Date.now();
@@ -3121,8 +3146,11 @@ const profilIzBaze = (red) => {
   let p = {};
   try { p = JSON.parse(red?.profil || "{}") || {}; } catch { p = {}; }
   return {
-    boja: BOJE_IMENA[p.boja] ? p.boja : "bela",
-    okvir: OKVIRI[p.okvir] ? p.okvir : "nema",
+    // VIP boje se čitaju ravnopravno: kad članarina istekne, izbor OSTAJE
+    // zapisan i vrati se sam od sebe čim gost ponovo kupi. Brisanje izbora pri
+    // isteku bi značilo da posle obnove mora sve iznova da bira.
+    boja: BOJE_IMENA[p.boja] || vip.VIP_BOJE[p.boja] ? p.boja : "bela",
+    okvir: OKVIRI[p.okvir] || vip.VIP_OKVIRI[p.okvir] ? p.okvir : "nema",
   };
 };
 
@@ -3138,10 +3166,15 @@ const profilIzBaze = (red) => {
 export function dodajXp(playerId, iznos) {
   const dodatak = Number(iznos);
   if (!playerId || !Number.isFinite(dodatak) || dodatak <= 0) return null;
-  const red = db.prepare("SELECT xp FROM players WHERE id=?").get(playerId);
+  const red = db.prepare("SELECT xp, vip_do FROM players WHERE id=?").get(playerId);
   if (!red) return null;
   const pre = nivoZa(red.xp);
-  const novo = round2((Number(red.xp) || 0) + dodatak);
+  // VIP množilac se računa OVDE, na jednom mestu kroz koje prolazi svaki XP - i
+  // od vremena i od pića. Da se množilo na mestu poziva, jedno od ta dva mesta
+  // bi pre ili kasnije ostalo bez njega i VIP bi tiho važio samo za pola.
+  const mnozilac = vip.xpMnozilac(vip.vaziVip(red.vip_do),
+    Number(getSetting("vip_xp", vip.PODRAZUMEVANO.xpMnozilac)));
+  const novo = round2((Number(red.xp) || 0) + dodatak * mnozilac);
   db.prepare("UPDATE players SET xp=? WHERE id=?").run(novo, playerId);
   const posle = nivoZa(novo);
   return posle.nivo > pre.nivo ? { nivoPre: pre, nivoPosle: posle } : null;
@@ -3176,27 +3209,134 @@ export function zaradiXp(playerId, iznos) {
 
 // Ono što launcher prikazuje u traci na vrhu početne.
 export function vipZaIgraca(playerId) {
-  const red = playerId ? db.prepare("SELECT xp FROM players WHERE id=?").get(playerId) : null;
-  return red ? vipOd(red.xp) : null;
+  const red = playerId ? db.prepare("SELECT xp, vip_do FROM players WHERE id=?").get(playerId) : null;
+  return red ? vipOd(red.xp, red.vip_do) : null;
 }
 
 // Isto, ali bez citanja iz baze - naplata prolazi svakih pet sekundi i vec drzi
 // xp u ruci; jos jedno citanje po sesiji po prolazu je uzalud.
-export function vipOd(xp) {
+export function vipOd(xp, vipDo) {
   const n = nivoZa(xp);
+  const jeVip = vip.vaziVip(vipDo);
   return {
     nivo: n.nivo, naziv: n.naziv,
     // Traka meri napredak U NIVOU. Da meri od nule, igrač na devetom nivou bi
     // gledao traku skoro punu koju nikad ne napuni - to je zid, ne napredak.
     xp: n.uNivou, xpDo: n.poslednji ? null : n.zaSledeci,
     poslednji: n.poslednji, sledeci: n.sledeciNaziv,
-    vip: smeDa(n.xp, "vip"),
+    // VIP se KUPUJE, ne zarađuje - zato ovde stoji rok, a ne nivo.
+    vip: jeVip,
+    vipDana: vip.danaOstalo(vipDo),
+    mnozilac: vip.xpMnozilac(jeVip, Number(getSetting("vip_xp", vip.PODRAZUMEVANO.xpMnozilac))),
   };
+}
+
+// ---- VIP: ČLANARINA KOJA SE KUPUJE ----
+//
+// Zašto se plaća kreditom: kredit je gost već platio kešom na kasi, pa je taj
+// novac već u kasi. Ovo ne uzima kući ništa - pretvara stajaći kredit u prihod,
+// i to samouslužno, bez radnika, u bilo koje doba.
+export function vipObj() {
+  return {
+    ukljucen: getSetting("vip_ukljucen", "0") === "1",
+    cena: Number(getSetting("vip_cena", vip.PODRAZUMEVANO.cena)) || 0,
+    dana: Number(getSetting("vip_dana", vip.PODRAZUMEVANO.dana)) || vip.PODRAZUMEVANO.dana,
+    xpMnozilac: Number(getSetting("vip_xp", vip.PODRAZUMEVANO.xpMnozilac)) || 1,
+    tocakPrag: Number(getSetting("vip_tocak_prag", vip.PODRAZUMEVANO.tocakPrag)) || 0,
+    pogodnosti: vip.POGODNOSTI,
+  };
+}
+
+export function postaviVip({ ukljucen, cena, dana, xpMnozilac, tocakPrag }) {
+  if (ukljucen != null) setSetting("vip_ukljucen", ukljucen ? "1" : "0");
+  if (cena != null) {
+    if (!ispravanIznos(cena) || Number(cena) < 0) return { error: "Cena mora biti broj veći ili jednak nuli" };
+    setSetting("vip_cena", String(Number(cena)));
+  }
+  if (dana != null) {
+    const d = Math.floor(Number(dana));
+    if (!Number.isFinite(d) || d < 1 || d > 400) return { error: "Trajanje mora biti između 1 i 400 dana" };
+    setSetting("vip_dana", String(d));
+  }
+  if (xpMnozilac != null) {
+    const m = Number(xpMnozilac);
+    // Ispod 1 bi značilo KAZNU za one koji nisu kupili, a to nije isto što i
+    // nagrada za one koji jesu. Iznad 5 nivoi prestaju da nešto znače.
+    if (!Number.isFinite(m) || m < 1 || m > 5) return { error: "Množilac iskustva mora biti između 1 i 5" };
+    setSetting("vip_xp", String(m));
+  }
+  if (tocakPrag != null) {
+    if (!ispravanIznos(tocakPrag) || Number(tocakPrag) < 0) return { error: "Prag mora biti broj veći ili jednak nuli" };
+    setSetting("vip_tocak_prag", String(Number(tocakPrag)));
+  }
+  return { ok: true, ...vipObj() };
+}
+
+// Igrač kupuje sam, iz launchera, svojim kreditom.
+export function kupiVip(playerId) {
+  const o = vipObj();
+  if (!o.ukljucen) return { error: "VIP trenutno nije u ponudi." };
+  const p = playerById(playerId);
+  if (!p) return { error: "Nepostojeći nalog." };
+  if (o.cena <= 0) return { error: "Cena VIP-a nije podešena. Pozovi osoblje." };
+  if (round2(Number(p.balance) || 0) < o.cena) {
+    // Iznos, ne "nemas dovoljno": gost tako zna TACNO koliko da dopuni na kasi.
+    const fali = Math.ceil(o.cena - (Number(p.balance) || 0));
+    return { error: `Fali ti još ${fali} ${getSetting("currency", "RSD")}. Dopuni na kasi pa probaj ponovo.` };
+  }
+  let stanje, rok;
+  try {
+    // Naplata i rok su JEDAN posao. Da nisu, pad između njih bi ostavio gosta
+    // bez kredita i bez VIP-a - ili sa VIP-om koji niko nije platio.
+    ({ stanje, rok } = uJednomPoslu(() => {
+      const b = round2((Number(p.balance) || 0) - o.cena);
+      const r = vip.novRok(p.vip_do, o.dana);
+      db.prepare("UPDATE players SET balance=?, vip_do=? WHERE id=?").run(b, r, playerId);
+      addTransaction(playerId, "vip", -o.cena, b, null, `VIP članarina ${o.dana} dana`);
+      return { stanje: b, rok: r };
+    }));
+  } catch (e) {
+    logEvent({ category: "sistem", action: "greska", actor: "server",
+      detail: `VIP nije upisan: ${String(e?.message || e).slice(0, 150)}` });
+    return { error: "Kupovina nije prošla. Pokušaj ponovo." };
+  }
+  logEvent({ category: "novac", action: "vip", actor: p.username, target: p.username,
+    detail: `Kupio VIP na ${o.dana} dana`, amount: o.cena });
+  const comp = db.prepare("SELECT id FROM computers WHERE current_player_id=?").get(playerId);
+  if (comp) {
+    sendClient(comp.id, { t: "balance", balance: stanje, remainingSeconds: remainingSeconds(stanje) });
+    sendClient(comp.id, { t: "vip", vip: vipZaIgraca(playerId) });
+    sendClient(comp.id, { t: "profil", profil: profilIgraca(playerId) });
+  }
+  pushComputers();
+  return { ok: true, vipDo: rok, dana: vip.danaOstalo(rok), balance: stanje };
+}
+
+// Osoblje daje ili oduzima VIP iz panela - za goste koji plate kešom na kasi.
+export function postaviVipIgracu(playerId, dana, ko) {
+  const p = playerById(playerId);
+  if (!p) return { error: "Nepostojeći nalog." };
+  const d = Math.floor(Number(dana));
+  if (!Number.isFinite(d)) return { error: "Broj dana nije ispravan." };
+  // Nula znači ODUZMI odmah. Negativan broj bi bio rok u prošlosti, što je isto
+  // - ali se ne pušta, jer je to skoro uvek greška u kucanju.
+  if (d < 0 || d > 400) return { error: "Broj dana mora biti između 0 i 400." };
+  const rok = d === 0 ? null : vip.novRok(p.vip_do, d);
+  db.prepare("UPDATE players SET vip_do=? WHERE id=?").run(rok, playerId);
+  logEvent({ category: "nalozi", action: d === 0 ? "vip_off" : "vip_on", actor: ko || "sistem", target: p.username,
+    detail: d === 0 ? "Oduzet VIP" : `Dodat VIP na ${d} dana` });
+  const comp = db.prepare("SELECT id FROM computers WHERE current_player_id=?").get(playerId);
+  if (comp) {
+    sendClient(comp.id, { t: "vip", vip: vipZaIgraca(playerId) });
+    sendClient(comp.id, { t: "profil", profil: profilIgraca(playerId) });
+  }
+  pushComputers();
+  return { ok: true, vipDo: rok, dana: vip.danaOstalo(rok) };
 }
 
 // Profil: ko je, dokle je stigao i šta je za sobom ostavio.
 export function profilIgraca(playerId) {
-  const p = db.prepare("SELECT id, username, display_name, xp, profil, created_at, spinova, spin_dobitak FROM players WHERE id=?").get(playerId);
+  const p = db.prepare("SELECT id, username, display_name, xp, profil, created_at, spinova, spin_dobitak, vip_do FROM players WHERE id=?").get(playerId);
   if (!p) return null;
   const n = nivoZa(p.xp);
   const jedan = (sql, ...a) => db.prepare(sql).get(...a) || {};
@@ -3228,7 +3368,18 @@ export function profilIgraca(playerId) {
     omiljenaPuta: omiljena.n || 0,
     izgled: profilIzBaze(p),
     otkljucano: otkljucanoZa(p.xp),
-    boje: BOJE_IMENA, okviri: OKVIRI,
+    // Spisak nosi i VIP izgled, sa oznakom - gost mora da VIDI šta dobija ako
+    // kupi. Sakrivena pogodnost ne prodaje ništa.
+    boje: { ...BOJE_IMENA, ...vip.VIP_BOJE }, okviri: { ...OKVIRI, ...vip.VIP_OKVIRI },
+    // Stanje članarine ide uz profil: po njemu launcher zna da li da prikaže
+    // ponudu ili preostale dane.
+    clanarina: (() => {
+      const o = vipObj();
+      const jeVip = vip.vaziVip(p.vip_do);
+      return { ukljucen: o.ukljucen, jeVip, dana: vip.danaOstalo(p.vip_do),
+        cena: o.cena, trajanje: o.dana, mnozilac: o.xpMnozilac,
+        tocakPrag: o.tocakPrag, pogodnosti: o.pogodnosti };
+    })(),
     // Značke i lični rekordi - vidi znacke.js i statistikaIgraca.
     znacke: znackeZa(stat),
     grupeZnacaka: GRUPE,
@@ -3334,21 +3485,28 @@ function statistikaIgraca(p, vec) {
 // je na računaru igrača. Ko pošalje poruku mimo njega, dobija isti odgovor kao
 // da je kliknuo: ne može dok ne stigne do nivoa.
 export function sacuvajProfilIgraca(playerId, { boja, okvir } = {}) {
-  const p = db.prepare("SELECT xp, profil FROM players WHERE id=?").get(playerId);
+  const p = db.prepare("SELECT xp, profil, vip_do FROM players WHERE id=?").get(playerId);
   if (!p) return { error: "Nalog ne postoji" };
   const sad = profilIzBaze(p);
   const novo = { ...sad };
+  const jeVip = vip.vaziVip(p.vip_do);
 
   if (boja != null) {
-    if (!BOJE_IMENA[boja]) return { error: "Nepoznata boja" };
-    if (boja !== "bela" && !smeDa(p.xp, "boja")) {
+    const vipBoja = !!vip.VIP_BOJE[boja];
+    if (!BOJE_IMENA[boja] && !vipBoja) return { error: "Nepoznata boja" };
+    // VIP boje se NE mogu zaraditi nijednim nivoom. Kad bi mogle, VIP bi bio
+    // samo prečica - a prečica se ne kupuje.
+    if (vipBoja && !jeVip) return { error: "Ova boja ide uz VIP." };
+    if (!vipBoja && boja !== "bela" && !smeDa(p.xp, "boja")) {
       return { error: `Boja imena se otključava na ${OTKLJUCAVANJA.boja.nivo}. nivou` };
     }
     novo.boja = boja;
   }
   if (okvir != null) {
-    if (!OKVIRI[okvir]) return { error: "Nepoznat okvir" };
-    if (okvir !== "nema" && !smeDa(p.xp, "okvir")) {
+    const vipOkvir = !!vip.VIP_OKVIRI[okvir];
+    if (!OKVIRI[okvir] && !vipOkvir) return { error: "Nepoznat okvir" };
+    if (vipOkvir && !jeVip) return { error: "Ovaj okvir ide uz VIP." };
+    if (!vipOkvir && okvir !== "nema" && !smeDa(p.xp, "okvir")) {
       return { error: `Okvir se otključava na ${OTKLJUCAVANJA.okvir.nivo}. nivou` };
     }
     novo.okvir = okvir;

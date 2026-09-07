@@ -301,6 +301,12 @@ function migrate() {
   // Zato stoji na igraču, kao i XP, i iz istog razloga.
   if (!columnExists("players", "spinova")) db.exec("ALTER TABLE players ADD COLUMN spinova INTEGER NOT NULL DEFAULT 0");
   if (!columnExists("players", "spin_dobitak")) db.exec("ALTER TABLE players ADD COLUMN spin_dobitak REAL NOT NULL DEFAULT 0");
+  // VIP: DOKLE vazi clanarina, ne da li je aktivna.
+  //
+  // Zastavica "jeste/nije" bi trazila da neko svakog dana prolazi kroz sve
+  // naloge i gasi istekle - a taj posao se preskoci onog dana kad server ne radi,
+  // pa gost ostane VIP zauvek. Rok se ne kvari: prosao je ili nije.
+  if (!columnExists("players", "vip_do")) db.exec("ALTER TABLE players ADD COLUMN vip_do INTEGER");
 }
 migrate();
 

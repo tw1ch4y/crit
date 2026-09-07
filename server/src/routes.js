@@ -280,6 +280,26 @@ router.post("/players/:id/paket", (req, res) => {
 });
 
 // ---------- NAGRADNI TOČAK (podešavanje) ----------
+// ---------- VIP: ČLANARINA KOJA SE KUPUJE ----------
+//
+// Rang se zarađuje igranjem i besplatan je; VIP se plaća i nosi pogodnosti.
+// Dok je VIP bio nagrada za peti nivo, bio je trošak - i to baš na najboljim
+// gostima, kojima je kuća davala popust iako bi ionako došli.
+router.get("/vip", requireOwner, (req, res) => res.json(svc.vipObj()));
+router.post("/vip", requireOwner, (req, res) => {
+  const r = svc.postaviVip(req.body || {});
+  if (r.error) return res.status(400).json(r);
+  svc.logEvent({ category: "podesavanja", action: "vip", actor: req.admin.username,
+    detail: `VIP: ${r.ukljucen ? "u ponudi" : "nije u ponudi"}, ${r.cena} za ${r.dana} dana, x${r.xpMnozilac} XP` });
+  res.json(r);
+});
+// Gost koji plati kešom na kasi - radnik mu upiše dane. Nula oduzima odmah.
+router.post("/players/:id/vip", (req, res) => {
+  const r = svc.postaviVipIgracu(Number(req.params.id), req.body?.dana, req.admin.username);
+  if (r.error) return res.status(400).json(r);
+  res.json(r);
+});
+
 router.get("/tocak", requireOwner, (req, res) => res.json(svc.tocakConfig()));
 router.post("/tocak", requireOwner, (req, res) => {
   const r = svc.postaviTocak(req.body || {});

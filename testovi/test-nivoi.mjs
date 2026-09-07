@@ -44,7 +44,7 @@ const n3 = nivoZa(4000); // nivo 3 (prag 3000), sledeci 5400
 proveri("napredak se racuna od praga tekuceg nivoa", n3.uNivou === 1000, String(n3.uNivou));
 proveri("granica je razmak do sledeceg", n3.zaSledeci === 2400, String(n3.zaSledeci));
 proveri("kaze koliko tacno fali", n3.doSledeceg === 1400, String(n3.doSledeceg));
-proveri("kaze koji nivo sledi", n3.sledeciNaziv === "Zlato", String(n3.sledeciNaziv));
+proveri("kaze koji nivo sledi", n3.sledeciNaziv === NIVOI[3].naziv, String(n3.sledeciNaziv));
 
 // ---- 5) POSLEDNJI NIVO NEMA LAZNU GRANICU ----
 //
@@ -62,7 +62,18 @@ proveri("na prvom nivou nista nije otkljucano",
   otkljucanoZa(0).every((o) => !o.otkljucano),
   "inace nagrada ne bi bila nagrada");
 proveri("sara se otkljucava na drugom nivou", smeDa(1200, "sara") && !smeDa(1199, "sara"));
-proveri("VIP tek na petom", smeDa(8400, "vip") && !smeDa(8399, "vip"));
+// VIP VISE NIJE NAGRADA ZA NIVO.
+//
+// Dok je bio, kuca ga je DAVALA - i to bas najboljim gostima, kojima je time
+// pravila popust iako bi ionako dosli. Sada su to dve odvojene stvari: rang se
+// ZARADJUJE igranjem i besplatan je, a VIP se KUPUJE i nosi pogodnosti.
+// Ono sto se i dalje zaradjuje mora da ostane zarada - zato ovde ne sme da se
+// pojavi nista sto se placa.
+proveri("VIP se ne otkljucava nivoom", !smeDa(999999, "vip"),
+  "rang je status i besplatan je; VIP je prihod i kupuje se - vidi vip.js");
+proveri("nivoom se otkljucava samo izgled",
+  Object.keys(OTKLJUCAVANJA).every((k) => ["sara", "boja", "okvir"].includes(k)),
+  Object.keys(OTKLJUCAVANJA).join(", "));
 proveri("nepoznata stvar se ne otkljucava nikad", !smeDa(999999, "necega-nema"),
   "provera mora da kaze NE na ono sto ne poznaje, ne DA");
 proveri("spisak nosi i sta jos nije otkljucano",

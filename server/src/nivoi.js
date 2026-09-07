@@ -24,26 +24,37 @@
 // njih. Sa cenom od 120 din/sat, jedan sat igre je 120 XP - pa je Bronza posle
 // desetak sati, a Mit tek za stalnog gosta. Kriva se namerno ne diže brže:
 // nivo koji se ne može dostići prestaje da bude cilj i postaje ukras.
+// Imena su vezana za samo ime igraonice: CRIT je kritican pogodak. Bronza i
+// Srebro ima svaka druga igraonica; ovo ima samo ova.
 export const NIVOI = [
-  { nivo: 1,  prag: 0,     naziv: "Novajlija" },
-  { nivo: 2,  prag: 1200,  naziv: "Bronza",   otkljucava: "sara" },
-  { nivo: 3,  prag: 3000,  naziv: "Srebro",   otkljucava: "boja" },
-  { nivo: 4,  prag: 5400,  naziv: "Zlato",    otkljucava: "okvir" },
-  { nivo: 5,  prag: 8400,  naziv: "Platina",  otkljucava: "vip" },
-  { nivo: 6,  prag: 12000, naziv: "Dijamant" },
-  { nivo: 7,  prag: 16200, naziv: "Master" },
-  { nivo: 8,  prag: 21000, naziv: "Elita" },
-  { nivo: 9,  prag: 26400, naziv: "Legenda" },
-  { nivo: 10, prag: 32400, naziv: "Mit" },
+  { nivo: 1,  prag: 0,     naziv: "Prvi ulazak" },
+  { nivo: 2,  prag: 1200,  naziv: "Zagrevanje",     otkljucava: "sara" },
+  { nivo: 3,  prag: 3000,  naziv: "Pogodak",        otkljucava: "boja" },
+  { nivo: 4,  prag: 5400,  naziv: "Serija",         otkljucava: "okvir" },
+  { nivo: 5,  prag: 8400,  naziv: "Kritičan" },
+  { nivo: 6,  prag: 12000, naziv: "Dupli krit" },
+  { nivo: 7,  prag: 16200, naziv: "Trostruki krit" },
+  { nivo: 8,  prag: 21000, naziv: "Nezaustavljiv" },
+  { nivo: 9,  prag: 26400, naziv: "Legenda kuće" },
+  { nivo: 10, prag: 32400, naziv: "Savršen krit" },
 ];
 
 // Šta se otključava kojim nivoom - jedno mesto za tvrdnju, da se spisak u
 // launcheru i provera na serveru ne raziđu.
+//
+// VIP VIŠE NIJE OVDE, I TO JE NAJVAŽNIJA ODLUKA U CELOM SISTEMU.
+//
+// Dok je VIP bio nagrada za peti nivo, bio je nešto što kuća DAJE - dakle
+// trošak, i to baš najboljim gostima. Sada su to dve odvojene stvari:
+//
+//   RANG se ZARAĐUJE igranjem. Besplatan je, i on je status.
+//   VIP se KUPUJE. Nosi pogodnosti, i on je prihod.
+//
+// Zato ovde ostaje samo ono što se zarađuje. Šta VIP nosi stoji u vip.js.
 export const OTKLJUCAVANJA = {
-  sara:  { nivo: 2, naziv: "Svoja šara",        opis: "Biraš pozadinsku šaru svog naloga" },
-  boja:  { nivo: 3, naziv: "Boja imena",        opis: "Tvoje ime dobija boju koju izabereš" },
-  okvir: { nivo: 4, naziv: "Okvir oko znaka",   opis: "Znak na profilu dobija okvir" },
-  vip:   { nivo: 5, naziv: "VIP",               opis: "Traka na početnoj postaje tvoja" },
+  sara:  { nivo: 2, naziv: "Svoja šara",      opis: "Biraš pozadinsku šaru svog naloga" },
+  boja:  { nivo: 3, naziv: "Boja imena",      opis: "Tvoje ime dobija boju koju izabereš" },
+  okvir: { nivo: 4, naziv: "Okvir oko znaka", opis: "Znak na profilu dobija okvir" },
 };
 
 // Pokvaren ili nepostojeći XP se ponaša kao nula, ne kao greška: igrač bez
