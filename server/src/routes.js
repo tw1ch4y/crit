@@ -646,6 +646,10 @@ router.put("/games/:id", requireOwner, (req, res) => {
   db.prepare("UPDATE games SET name=?, path=?, args=?, emoji=?, category=?, available=? WHERE id=?")
     .run(name, p, iliStaro(args, g.args), iliStaro(emoji, g.emoji), svc.uskladiKategoriju(iliStaro(category, g.category, "Igre"), svc.kategorije("igre")) || "Igre",
       vidljivost(available, g.available), id);
+  // Promenjena putanja briše oznaku o kvaru: vlasnik je upravo pokušao da ga
+  // popravi, pa oznaka koja i dalje stoji ne kaže ništa o novoj putanji. Ostaje
+  // kad se menja samo naziv ili kategorija - tada kvar i dalje važi.
+  if (p !== g.path) svc.ocistiKvar("games", id);
   svc.logEvent({ category: "podesavanja", action: "game_edit", actor: req.admin.username, target: name, detail: `Izmenjena igra${available === false ? " (sakrivena)" : ""}` });
   svc.pushCatalog();
   res.json({ ok: true });

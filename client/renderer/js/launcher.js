@@ -1205,7 +1205,9 @@ function obojiIkoneAlata() {
 }
 async function launchTool(t) {
   if (t.kind === "app") {
-    const r = await window.crit.launchGame({ path: t.target, args: t.args, name: t.name });
+    // `id` i `vrsta` sluze serveru da zapise kvar UZ SAMU precicu - inace se
+    // ona trazi po imenu, a ime se menja.
+    const r = await window.crit.launchGame({ path: t.target, args: t.args, name: t.name, id: t.id, vrsta: "alat" });
     if (!r.ok) toast(r.error || "Ne mogu da pokrenem alat", "error");
     else if (!r.ignored) toast(`Pokrećem ${t.name || "alat"}...`, "success");
   } else {
@@ -2876,7 +2878,7 @@ async function launchFromTile(el) {
   el.classList.add("launching");
   if (label) label.textContent = "Pokrećem...";
   setTimeout(done, 3000);
-  const r = await window.crit.launchGame(g);
+  const r = await window.crit.launchGame({ ...g, vrsta: "igra" });
   if (!r.ok) { done(); toast(r.error || "Nije moguće pokrenuti igru", "error"); }
   else if (!r.ignored) {
     toast(`Pokrećem ${g.name || "igru"}...`, "success");

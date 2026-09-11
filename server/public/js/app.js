@@ -35,6 +35,31 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 // inicijali kad artikal/igra nema sliku
 const monogram = (name) => esc(String(name || "?").trim().slice(0, 2).toUpperCase());
+
+// POSLEDNJI NEUSPEO POKUŠAJ STOJI UZ SAMU STAVKU.
+//
+// Kad igra ili prečica neće da se pokrene, launcher to javi serveru - ali se do
+// sada završavalo kao red u Logovima i poruka koja prođe preko ekrana. Vlasnik
+// je to video samo ako je baš tada gledao u panel.
+//
+// A najčešći uzrok je prečica koja fali na JEDNOJ mašini od trinaest: gost
+// slegne ramenima i pokrene nešto drugo, niko ne prijavi, i tako mesecima.
+//
+// Zato ovde piše sve troje: šta je bilo, NA KOM računaru i kada. Bez imena
+// računara vlasnik ne zna gde da ode, a bez vremena ne zna da li je to staro i
+// odavno popravljeno.
+const KVAR_TEKST = {
+  nema: "putanja ne postoji na tom računaru",
+  folder: "upisan je folder, a treba prečica ili .exe",
+  greska: "Windows je odbio da pokrene",
+};
+function kvarHtml(r) {
+  if (!r || !r.kvar_kad) return "";
+  const sta = KVAR_TEKST[r.kvar_razlog] || KVAR_TEKST.greska;
+  const gde = r.kvar_gde ? ` na ${esc(r.kvar_gde)}` : "";
+  return `<div class="kvar-red" title="Nestaje kad se stavka jednom uspešno pokrene ili kad promeniš putanju">
+    ${icon("alert")}<span>Nije se pokrenulo${gde} - ${sta}</span><i>${timeAgo(r.kvar_kad)}</i></div>`;
+}
 // Uloge idu odozdo nagore: radnik < vlasnik < serviser. Visa uvek sme sve sto
 // sme niza, pa se svuda pita "da li je BAR vlasnik", ne "da li je tacno vlasnik".
 const RANG = { staff: 1, owner: 2, serviser: 3 };
@@ -2364,6 +2389,7 @@ async function renderGames() {
       </div>
       <div class="game-path" title="${esc(g.path)}">${esc(g.path)}</div>
       ${g.args ? `<div class="game-path">argumenti: ${esc(g.args)}</div>` : ""}
+      ${kvarHtml(g)}
       <div class="slike-stanje">
         <span class="ss ${g.image ? "ima" : "fali"}" title="Omot 600x800 - kartica u polici igara">${g.image ? icon("check") : icon("alert")} omot</span>
         <button class="ss ss-akcija ${g.banner ? "ima" : "izborno"}" data-game="baner" data-id="${g.id}"
@@ -3039,6 +3065,7 @@ async function renderTools() {
       </div>
       <div class="game-path" title="${esc(t.target)}">${esc(t.target)}</div>
       ${t.args ? `<div class="game-path">argumenti: ${esc(t.args)}</div>` : ""}
+      ${kvarHtml(t)}
       <div class="slike-stanje">
         ${t.image
           ? `<span class="ss ima" title="Sopstvena slika 256x256">${icon("check")} slika</span>`

@@ -73,14 +73,92 @@ proveri("predugacko ime se odseca", !dugacak || (dugacak.detail.match(/x+/)?.[0]
   String(dugacak?.detail?.match(/x+/)?.[0].length));
 proveri("prazno ime se ne upisuje", !(await logovi()).some((x) => /„" nije htela/.test(x.detail || "")));
 
+// ---- KVAR OSTAJE UZ SAMU STAVKU ----
+//
+// Log i poruka preko ekrana vide se samo ako vlasnik bas tada gleda u panel.
+// A najcesci uzrok je precica koja fali na JEDNOJ masini od trinaest: gost
+// slegne ramenima, niko ne prijavi, i tako mesecima. Zato poslednji neuspeh
+// stoji na samom redu - vlasnik otvori Igre i vidi koja, gde i zasto.
+const post = (put, telo) => fetch(BASE + put, { method: "POST",
+  headers: { "content-type": "application/json", authorization: "Bearer " + token },
+  body: JSON.stringify(telo) }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));
+const put_ = (p2, telo) => fetch(BASE + p2, { method: "PUT",
+  headers: { "content-type": "application/json", authorization: "Bearer " + token },
+  body: JSON.stringify(telo) }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));
+
+const igra = (await post("/api/games", { name: "Proba kvara", path: "C:/igre/proba.exe" })).body;
+const nadji = async () => (await api("/api/games")).find((x) => x.id === igra.id);
+proveri("nova igra nema oznaku kvara", !(await nadji()).kvar_kad);
+
+klijent.send(JSON.stringify({ t: "igra_ne_radi", igra: "Proba kvara", razlog: "folder", id: igra.id, vrsta: "igra" }));
+await cekaj(400);
+const saKvarom = await nadji();
+proveri("KVAR OSTAJE ZAPISAN UZ IGRU", !!saKvarom.kvar_kad, JSON.stringify(saKvarom.kvar_razlog));
+proveri("i pise ZASTO", saKvarom.kvar_razlog === "folder", String(saKvarom.kvar_razlog));
+proveri("i NA KOM racunaru", saKvarom.kvar_gde === pc.name, String(saKvarom.kvar_gde));
+
+// Prigusenje cuva logove od pet istih redova, ali oznaka na stavci je STANJE,
+// ne dogadjaj: drugi racunar u istom minutu mora da je osvezi.
+const comps = await api("/api/computers");
+if (comps[1]) {
+  const k2 = new WebSocket(`${WSB}/ws?kind=client&token=${encodeURIComponent(comps[1].token)}`);
+  await new Promise((r) => k2.once("open", r));
+  await cekaj(200);
+  k2.send(JSON.stringify({ t: "igra_ne_radi", igra: "Proba kvara", razlog: "nema", id: igra.id, vrsta: "igra" }));
+  await cekaj(400);
+  const drugi = await nadji();
+  proveri("drugi racunar osvezava oznaku i u istom minutu", drugi.kvar_gde === comps[1].name,
+    `${drugi.kvar_gde} (ocekivano ${comps[1].name})`);
+  proveri("i razlog se menja na noviji", drugi.kvar_razlog === "nema", String(drugi.kvar_razlog));
+  k2.close();
+}
+
+// Uspelo pokretanje brise oznaku. Oznaka koja stoji i posle popravke je gora od
+// nikakve - nauci se da se ignorise, pa se preskoci i kad je istinita.
+klijent.send(JSON.stringify({ t: "game_start", gameId: igra.id }));
+await cekaj(400);
+proveri("USPELO POKRETANJE BRISE OZNAKU", !(await nadji()).kvar_kad,
+  "inace bi stajala zauvek i vlasnik bi je naucio da preskace");
+
+// Promenjena putanja takodje: vlasnik je upravo pokusao da popravi.
+klijent.send(JSON.stringify({ t: "igra_ne_radi", igra: "Proba kvara", razlog: "nema", id: igra.id, vrsta: "igra" }));
+await cekaj(400);
+proveri("oznaka se vratila", !!(await nadji()).kvar_kad);
+await put_(`/api/games/${igra.id}`, { name: "Proba kvara", path: "C:/igre/drugo.exe" });
+proveri("promena putanje brise oznaku", !(await nadji()).kvar_kad);
+
+klijent.send(JSON.stringify({ t: "igra_ne_radi", igra: "Proba kvara", razlog: "nema", id: igra.id, vrsta: "igra" }));
+await cekaj(400);
+await put_(`/api/games/${igra.id}`, { name: "Drugo ime", path: "C:/igre/drugo.exe" });
+proveri("promena SAMO naziva ne brise oznaku", !!(await nadji()).kvar_kad,
+  "kvar i dalje vazi - putanja je ista");
+
+// Isto vazi i za precice (Steam, Epic...), a bas one su glavni put do igara.
+const alat = (await post("/api/tools", { name: "Proba alat", kind: "app", target: "C:/alati/proba.exe" })).body;
+klijent.send(JSON.stringify({ t: "igra_ne_radi", igra: "Proba alat", razlog: "folder", id: alat.id, vrsta: "alat" }));
+await cekaj(400);
+const alatSad = (await api("/api/tools")).find((x) => x.id === alat.id);
+proveri("precica takodje nosi svoj kvar", alatSad?.kvar_razlog === "folder", JSON.stringify(alatSad?.kvar_razlog));
+
+// Nepoznata vrsta ne sme da pise ni u jednu tabelu.
+klijent.send(JSON.stringify({ t: "igra_ne_radi", igra: "X", razlog: "nema", id: igra.id, vrsta: "shop_items" }));
+await cekaj(300);
+proveri("nepoznata vrsta pada na igre, ne na tudju tabelu",
+  Array.isArray(await api("/api/shop")), "ime tabele ne sme da ulazi u upit spolja");
+
 klijent.close(); panel.close();
 
 // ---- izvor ----
 const main = citajIzvor("client/main.js");
 const app = citajIzvor("server/public/js/app.js");
-proveri("launcher javlja kad putanje nema", main.includes('javiDaNeRadi(name || path.basename(gamePath), "nema")'));
-proveri("launcher javlja kad je upisan folder", main.includes('javiDaNeRadi(name || path.basename(gamePath), "folder")'));
-proveri("launcher javlja kad Windows odbije", main.includes('javiDaNeRadi(entry.name, "greska")'));
+proveri("launcher javlja kad putanje nema", main.includes('javiDaNeRadi(name || path.basename(gamePath), "nema", id, vrsta)'));
+proveri("launcher javlja kad je upisan folder", main.includes('javiDaNeRadi(name || path.basename(gamePath), "folder", id, vrsta)'));
+proveri("launcher javlja kad Windows odbije", main.includes('javiDaNeRadi(entry.name, "greska", id, vrsta)'));
+// Uz poruku ide i KOJA je stavka - bez toga se ona trazi po imenu, a ime se menja.
+proveri("poruka nosi id i vrstu stavke",
+  /wsSend\(\{ t: "igra_ne_radi",[^}]*razlog, id, vrsta \}\)/.test(main));
+proveri("igra salje svoju vrstu", citajIzvor("client/renderer/js/launcher.js").includes('{ ...g, vrsta: "igra" }'));
+proveri("precica salje svoju", citajIzvor("client/renderer/js/launcher.js").includes('id: t.id, vrsta: "alat"'));
 proveri("panel prikazuje obavestenje", app.includes('m.kind === "igra-ne-radi"'));
 proveri("logovi imaju ikonu za igre", app.includes('igre: "igre"'));
 // Bez posebnog izgleda red "igra nije htela da se pokrene" izgleda isto kao
@@ -90,6 +168,16 @@ const css = citajIzvor("server/public/css/style.css").replace(/\s+/g, " ");
 proveri("kvar se u logovima razlikuje od obicnog zapisa", app.includes('/_fail$/.test(l.action'));
 proveri("kvar ima crvenu ikonu i crtu", /\.log-row\.kvar \.log-ic \{[^}]*var\(--danger\)/.test(css)
   && /\.log-row\.kvar \{[^}]*inset 3px 0 0 var\(--danger\)/.test(css));
+
+// Oznaka mora da se VIDI u panelu, i to sa sve tri stvari: sta je bilo, na kom
+// racunaru i kada. Bez imena racunara vlasnik ne zna gde da ode, a bez vremena
+// ne zna da li je staro i odavno popravljeno.
+proveri("panel crta oznaku uz igru i uz precicu",
+  (app.match(/\$\{kvarHtml\(/g) || []).length === 2 && app.includes("function kvarHtml("));
+proveri("oznaka kaze na kom je racunaru", /Nije se pokrenulo\$\{gde\}/.test(app));
+proveri("i kada je bilo", /kvarHtml[\s\S]{0,700}timeAgo\(r\.kvar_kad\)/.test(app));
+proveri("oznaka se vidi kao kvar, ne kao upozorenje",
+  /\.kvar-red \{[^}]*var\(--danger\)/.test(css), "stavka koju gost vidi u launcheru NE RADI");
 
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 process.exit(pao ? 1 : 0);

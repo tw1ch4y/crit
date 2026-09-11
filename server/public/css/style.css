@@ -1037,6 +1037,17 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
   margin-top: 2px; line-height: 1.45; word-break: break-all;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
+/* Poslednji neuspeo pokušaj. Crvena je ovde na mestu - to je kvar, a ne
+   upozorenje: stavka koju gost vidi u launcheru NE RADI. */
+.kvar-red {
+  display: flex; align-items: baseline; gap: 6px; margin-top: 6px;
+  padding: 6px 8px; border-radius: var(--r-sm);
+  background: var(--danger-soft); color: var(--danger);
+  font-size: 12px; line-height: 1.45;
+}
+.kvar-red svg { width: 14px; height: 14px; flex-shrink: 0; align-self: flex-start; margin-top: 2px; }
+.kvar-red span { min-width: 0; }
+.kvar-red i { margin-left: auto; font-style: normal; font-size: 11px; opacity: 0.75; white-space: nowrap; }
 .game-acts { display: flex; gap: 2px; flex-shrink: 0; margin: -4px -6px 0 0; }
 .game-acts .btn { color: var(--text-3); }
 .game-acts .btn:hover { color: var(--text); }

@@ -756,6 +756,8 @@ export function updateTool(id, { name, kind, target, args, color, available }) {
   if (kind === "web" && !/^https?:\/\//i.test(target)) return { error: "Adresa mora počinjati sa http:// ili https://" };
   db.prepare("UPDATE tools SET name=?, kind=?, target=?, args=?, color=?, available=? WHERE id=?")
     .run(name, kind, target, args ?? t.args ?? "", color ?? t.color ?? null, available === false ? 0 : available === true ? 1 : t.available, id);
+  // Promenjen cilj briše oznaku o kvaru - vidi isto kod igara u routes.js.
+  if (target !== t.target) ocistiKvar("tools", id);
   return { ok: true };
 }
 export function deleteTool(id) {
@@ -1027,6 +1029,26 @@ function zabeleziPokretanje(computerId, gameId) {
     .run(gameId, comp?.current_player_id || null, computerId, Date.now());
   const p = comp?.current_player_id ? playerById(comp.current_player_id) : null;
   logEvent({ category: "igre", action: "launch", actor: p?.username || "?", target: comp?.name || "?", detail: `Pokrenuta igra: ${g.name}` });
+  // Uspelo pokretanje BRIŠE zapis o kvaru. Oznaka koja stoji i pošto je prečica
+  // popravljena je gora od nikakve: vlasnik je nauči da ignoriše, pa je preskoči
+  // i onog dana kad je istinita.
+  ocistiKvar("games", gameId);
+}
+
+// Poslednji neuspeh stoji uz samu stavku (vidi migraciju u db.js). Ovde su obe
+// strane tog zapisa na jednom mestu, da se ne razilaze.
+const KVAR_TABELE = { igra: "games", alat: "tools" };
+// Ime tabele ulazi u upit, pa se ne prima spolja nego bira iz ovog spiska.
+function upisiKvar(tabela, id, razlog, gde) {
+  if (tabela !== "games" && tabela !== "tools") return;
+  try {
+    db.prepare(`UPDATE ${tabela} SET kvar_kad=?, kvar_razlog=?, kvar_gde=? WHERE id=?`)
+      .run(Date.now(), String(razlog || "greska").slice(0, 20), String(gde || "").slice(0, 40), Number(id));
+  } catch {}
+}
+export function ocistiKvar(tabela, id) {
+  if (tabela !== "games" && tabela !== "tools") return;
+  try { db.prepare(`UPDATE ${tabela} SET kvar_kad=NULL, kvar_razlog=NULL, kvar_gde=NULL WHERE id=?`).run(Number(id)); } catch {}
 }
 
 // Igra koja nece da se pokrene. Do sada je to znao samo igrac koji sedi za tim
@@ -1048,10 +1070,21 @@ function igraNeRadi(computerId, msg) {
   const razlog = RAZLOZI[msg?.razlog] || RAZLOZI.greska;
   const kljuc = `${computerId}|${igra}`;
   const sada = Date.now();
+  const comp = computerById(computerId);
+
+  // ZAPIS UZ SAMU STAVKU IDE UVEK, I PRE PRIGUŠENJA.
+  //
+  // Prigušenje ispod čuva LOGOVE od pet istih redova kad gost pritisne pet puta.
+  // Ali oznaka na stavci nije zapis događaja nego STANJE - "ova prečica trenutno
+  // ne radi, i to na ovom računaru". Da je i ona išla posle prigušenja, drugi
+  // računar koji u istom minutu naiđe na isti kvar ne bi ništa promenio, pa bi
+  // vlasnik i dalje video samo prvi.
+  const tabela = KVAR_TABELE[msg?.vrsta] || "games";
+  if (msg?.id != null) upisiKvar(tabela, msg.id, msg?.razlog, comp?.name);
+
   if (sada - (skoroJavljeno.get(kljuc) || 0) < 60000) return;
   skoroJavljeno.set(kljuc, sada);
 
-  const comp = computerById(computerId);
   const p = comp?.current_player_id ? playerById(comp.current_player_id) : null;
   logEvent({
     category: "igre", action: "game_fail", actor: p?.username || "-", target: comp?.name || "?",

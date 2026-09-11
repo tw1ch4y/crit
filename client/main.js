@@ -1113,8 +1113,10 @@ function razdvojArgumente(s) {
 // to znao samo onaj ko sedi za tim racunarom: dobije "nije instalirana", slegne
 // ramenima i pokrene nesto drugo. Vlasnik sazna tek ako se neko poduzi da mu
 // kaze - a najcesci uzrok je precica koja bas na tom racunaru fali.
-function javiDaNeRadi(igra, razlog) {
-  try { wsSend({ t: "igra_ne_radi", igra: String(igra || "").slice(0, 80), razlog }); } catch {}
+// `id` i `vrsta` idu uz poruku da bi server mogao da zapise kvar UZ SAMU
+// stavku, a ne samo u logove. Bez njih se stavka trazi po imenu, a ime se menja.
+function javiDaNeRadi(igra, razlog, id, vrsta) {
+  try { wsSend({ t: "igra_ne_radi", igra: String(igra || "").slice(0, 80), razlog, id, vrsta }); } catch {}
 }
 
 // Kvar na samom launcheru. Igrac to ne prijavljuje - on samo vidi da racunar
@@ -1227,16 +1229,16 @@ function smePokretanje(put) {
   return dozvoljeno.has(kljucPutanje2(put));
 }
 
-function launchGame(gamePath, args, name) {
+function launchGame(gamePath, args, name, id, vrsta) {
   if (!smePokretanje(gamePath)) {
     console.error("odbijeno pokretanje van kataloga:", gamePath);
     javiProblem("pokretanje_odbijeno", `Odbijeno pokretanje van kataloga: ${String(gamePath).slice(0, 120)}`);
     return { ok: false, error: "Ova stavka nije u katalogu igraonice. Pozovite osoblje." };
   }
-  return launchGameStvarno(gamePath, args, name);
+  return launchGameStvarno(gamePath, args, name, id, vrsta);
 }
 
-function launchGameStvarno(gamePath, args, name) {
+function launchGameStvarno(gamePath, args, name, id, vrsta) {
   // "C:\Games\game.exe" -> C:\Games\game.exe (kopiranje putanje iz Windows-a
   // često ponese navodnike, pa spawn ne nađe fajl)
   gamePath = String(gamePath || "").trim().replace(/^"|"$/g, "").trim();
@@ -1262,11 +1264,11 @@ function launchGameStvarno(gamePath, args, name) {
 
     const nadjena = nadjiPutanju(gamePath);
     if (!nadjena) {
-      javiDaNeRadi(name || path.basename(gamePath), "nema");
+      javiDaNeRadi(name || path.basename(gamePath), "nema", id, vrsta);
       return { ok: false, error: `"${name || path.basename(gamePath)}" nije instalirana na ovom računaru. Pozovite osoblje.` };
     }
     if (nadjena.folder) {
-      javiDaNeRadi(name || path.basename(gamePath), "folder");
+      javiDaNeRadi(name || path.basename(gamePath), "folder", id, vrsta);
       return { ok: false, error: `Za "${name || path.basename(gamePath)}" je upisan folder, a treba prečica ili .exe fajl. Pozovite osoblje.` };
     }
     gamePath = nadjena.put;
@@ -1277,7 +1279,7 @@ function launchGameStvarno(gamePath, args, name) {
       shell.openPath(gamePath).then((greska) => {
         if (!greska) return;
         sendToRenderer("game-error", { name: name || path.basename(gamePath), message: objasniGresku(greska) });
-        javiDaNeRadi(name || path.basename(gamePath), "greska");
+        javiDaNeRadi(name || path.basename(gamePath), "greska", id, vrsta);
       });
       markExternal([]);   // ne znamo koji proces nastaje - oslanjamo se na zastor
       startGuard();
@@ -1297,7 +1299,7 @@ function launchGameStvarno(gamePath, args, name) {
       spawnedGames.delete(entry);
       launchGuardUntil = 0;
       sendToRenderer("game-error", { name: entry.name, message: objasniGresku(e) });
-      javiDaNeRadi(entry.name, "greska");
+      javiDaNeRadi(entry.name, "greska", id, vrsta);
       focusLauncher();
     });
     child.on("exit", () => {
@@ -1363,7 +1365,7 @@ ipcMain.handle("reset-config", (e, pin) => {
 // Lokalna provera PIN-a - radi i kad server ne odgovara.
 ipcMain.handle("proveri-servisni-pin", (e, pin) => ({ ok: proveriPin(pin) }));
 ipcMain.handle("to-server", (e, msg) => { wsSend(msg); return true; });
-ipcMain.handle("launch-game", (e, { path: p, args, name }) => launchGame(p, args, name));
+ipcMain.handle("launch-game", (e, { path: p, args, name, id, vrsta }) => launchGame(p, args, name, id, vrsta));
 ipcMain.handle("open-browser", (e, url) => { openBrowser(url); return true; });
 ipcMain.handle("focus-launcher", () => { focusLauncher(); return true; });
 

@@ -307,6 +307,25 @@ function migrate() {
   // naloge i gasi istekle - a taj posao se preskoci onog dana kad server ne radi,
   // pa gost ostane VIP zauvek. Rok se ne kvari: prosao je ili nije.
   if (!columnExists("players", "vip_do")) db.exec("ALTER TABLE players ADD COLUMN vip_do INTEGER");
+
+  // KVAR OSTAJE ZAPISAN UZ SAMU IGRU, NE SAMO U LOGOVIMA.
+  //
+  // Kad igra neće da se pokrene, launcher to javi serveru - ali se do sada
+  // završavalo kao jedan red u Logovima i kratka poruka koja prođe preko ekrana.
+  // Vlasnik je to video samo ako je baš u tom trenutku gledao u panel.
+  //
+  // A najčešći uzrok je prečica koja fali na JEDNOJ mašini od trinaest: gost
+  // slegne ramenima i pokrene nešto drugo, niko ne prijavi, i tako mesecima.
+  // Zato poslednji neuspeh stoji na samom redu - vlasnik otvori Igre i vidi
+  // koja, gde i zašto.
+  //
+  // Pamti se samo POSLEDNJI: spisak svih neuspeha je posao logova, a ovde treba
+  // odgovor na jedno pitanje - radi li ova stavka sada.
+  for (const tabela of ["games", "tools"]) {
+    if (!columnExists(tabela, "kvar_kad")) db.exec(`ALTER TABLE ${tabela} ADD COLUMN kvar_kad INTEGER`);
+    if (!columnExists(tabela, "kvar_razlog")) db.exec(`ALTER TABLE ${tabela} ADD COLUMN kvar_razlog TEXT`);
+    if (!columnExists(tabela, "kvar_gde")) db.exec(`ALTER TABLE ${tabela} ADD COLUMN kvar_gde TEXT`);
+  }
 }
 migrate();
 
