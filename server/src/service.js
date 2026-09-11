@@ -3427,6 +3427,87 @@ export function postaviVipIgracu(playerId, dana, ko, { naplati = 0, adminId = nu
   return { ok: true, vipDo: rok, dana: vip.danaOstalo(rok), naplaceno: kes };
 }
 
+// ---- RANG LISTA IGRAONICE ----
+//
+// NIJE SPISAK NAJBOLJIH NEGO TVOJE MESTO U NJEMU.
+//
+// Gola tabela prvih deset radi samo za tih deset. Jedanaesti je pogleda jednom,
+// vidi da mu do vrha fali pola godine, i više je ne otvori - a on je onaj koga
+// je trebalo pokrenuti. Zato uz vrh ide i KOMŠILUK: dvojica iznad i dvojica
+// ispod tebe, i koliko ti tačno fali do sledećeg mesta.
+//
+// "Sedmi si u kući, do šestog ti fali 400" je rečenica zbog koje neko dođe u
+// utorak. "Prvo mesto: Marko, 34.200" nije.
+//
+// Rangira se po ISKUSTVU, ne po potrošnji. Iznos koji je ko ostavio u kasi nije
+// za javni ekran, a iskustvo je već ono čime se gost i inače hvali - i VIP ga
+// množi, pa se brojke ne prevode nazad u dinare.
+//
+// Brzi gosti (gost-01, gost-02...) se ne broje: to su privremeni nalozi koji se
+// prave po nekoliko dnevno i posle brišu. Blokirani takođe ne.
+const RANG_USLOV = "banned = 0 AND username NOT LIKE 'gost-%'";
+
+export function rangLista(playerId = null, koliko = 10) {
+  const n = Math.min(50, Math.max(3, Math.floor(Number(koliko) || 10)));
+  // Isti redosled u oba upita, do poslednjeg kriterijuma - inače se mesto
+  // izračunato prebrojavanjem ne bi poklopilo sa mestom u spisku. Kod jednakog
+  // iskustva prvi je stariji nalog: ko je tu duže, taj je i stigao pre.
+  const redosled = "ORDER BY xp DESC, created_at ASC, id ASC";
+  const kolone = "id, username, display_name, xp, profil, vip_do, created_at";
+  const red = (r, mesto) => ({
+    mesto,
+    ime: r.display_name || r.username,
+    nivo: nivoZa(r.xp).nivo,
+    naziv: nivoZa(r.xp).naziv,
+    xp: Math.round(Number(r.xp) || 0),
+    vip: vip.vaziVip(r.vip_do),
+    izgled: profilIzBaze(r),
+    ja: playerId != null && r.id === playerId,
+  });
+
+  const vrh = db.prepare(`SELECT ${kolone} FROM players WHERE ${RANG_USLOV} ${redosled} LIMIT ?`)
+    .all(n).map((r, i) => red(r, i + 1));
+  const ukupno = db.prepare(`SELECT COUNT(*) c FROM players WHERE ${RANG_USLOV}`).get().c;
+
+  const ja = playerId != null
+    ? db.prepare(`SELECT ${kolone}, banned FROM players WHERE id=?`).get(playerId)
+    : null;
+  // Nalog koji se ne rangira (brzi gost, blokiran) vidi listu, ali sebe na njoj
+  // nema - i tako mu i piše, umesto da mu se izmisli mesto.
+  const rangira = !!ja && !ja.banned && !/^gost-/.test(ja.username);
+  if (!rangira) return { vrh, ukupno, ja: null, komsiluk: [] };
+
+  // Mesto se dobija prebrojavanjem onih ispred, jednim upitom - bez učitavanja
+  // cele tabele. Uslov mora da prati redosled znak za znak.
+  const ispred = db.prepare(
+    `SELECT COUNT(*) c FROM players WHERE ${RANG_USLOV}
+     AND (xp > ? OR (xp = ? AND (created_at < ? OR (created_at = ? AND id < ?))))`
+  ).get(ja.xp, ja.xp, ja.created_at, ja.created_at, ja.id).c;
+  const mesto = ispred + 1;
+
+  // Prvi ispred mene - "do šestog ti fali 400". Bez toga je mesto samo broj.
+  const goreRed = db.prepare(
+    `SELECT ${kolone} FROM players WHERE ${RANG_USLOV}
+     AND (xp > ? OR (xp = ? AND (created_at < ? OR (created_at = ? AND id < ?))))
+     ORDER BY xp ASC, created_at DESC, id DESC LIMIT 1`
+  ).get(ja.xp, ja.xp, ja.created_at, ja.created_at, ja.id);
+
+  // Komšiluk se preskače kad sam ionako u vrhu - isti ljudi dvaput jedan ispod
+  // drugog izgledaju kao greška.
+  let komsiluk = [];
+  if (mesto > n) {
+    const od = Math.max(0, mesto - 3);
+    komsiluk = db.prepare(`SELECT ${kolone} FROM players WHERE ${RANG_USLOV} ${redosled} LIMIT 5 OFFSET ?`)
+      .all(od).map((r, i) => red(r, od + i + 1));
+  }
+
+  return {
+    vrh, ukupno, komsiluk,
+    ja: { ...red(ja, mesto), doSledecegMesta: goreRed ? Math.max(0, Math.round(goreRed.xp - ja.xp)) : null,
+      ispredMene: goreRed ? (goreRed.display_name || goreRed.username) : null },
+  };
+}
+
 // Profil: ko je, dokle je stigao i šta je za sobom ostavio.
 export function profilIgraca(playerId) {
   const p = db.prepare("SELECT id, username, display_name, xp, profil, created_at, spinova, spin_dobitak, vip_do FROM players WHERE id=?").get(playerId);
@@ -3473,6 +3554,10 @@ export function profilIgraca(playerId) {
         cena: o.cena, trajanje: o.dana, mnozilac: o.xpMnozilac,
         tocakPrag: o.tocakPrag, pogodnosti: o.pogodnosti };
     })(),
+    // Rang lista stiže uz profil, a ne posebnom porukom: obe strane Naloga se
+    // otvaraju istim klikom, a profil se ionako traži svaki put - pa je lista
+    // sveža kad se pogleda, bez ijedne dodatne poruke.
+    rang: rangLista(playerId),
     // Značke i lični rekordi - vidi znacke.js i statistikaIgraca.
     znacke: znackeZa(stat),
     grupeZnacaka: GRUPE,

@@ -30,6 +30,40 @@ const XP_PREGLED = 4200;
 const vipZa = (xp) => { const n = nivoZa(xp);
   return { nivo: n.nivo, naziv: n.naziv, xp: n.uNivou, xpDo: n.poslednji ? null : n.zaSledeci,
     poslednji: n.poslednji, sledeci: n.sledeciNaziv, vip: n.nivo >= 5 }; };
+// Rang lista se meri tamo gde se i lomi: igrac je SEDMI, van vrha. Da je prvi,
+// ne bi se videli ni komsiluk ni recenica "do sestog ti fali X" - a to su bas
+// delovi zbog kojih strana postoji. Imena su namerno razlicite duzine, jer se
+// red kvari na najduzem.
+const IMENA_RANG = ["Nemanja", "Aleksandar Đorđević", "Luka", "Miloš", "Stefan",
+  "Đorđe", "Marko", "Ana", "Nikola", "Petar", "Filip", "Vuk"];
+// Iskustvo mora da OPADA niz spisak, i to i tamo gde igrac upada medju druge.
+// Brojke se zato racunaju oko njegovih (XP_PREGLED), a ne nezavisno od njih -
+// inace slika pokazuje cetrnaestog sa vise iskustva od trinaestog i izgleda kao
+// greska u programu, iako je greska samo u izmisljenim podacima.
+const rangZa = (xp) => {
+  const red = (mesto, bod, ime) => {
+    const n = nivoZa(bod);
+    return { mesto, ime, nivo: n.nivo, naziv: n.naziv, xp: bod,
+      vip: mesto === 1 || mesto === 4,
+      izgled: { boja: mesto === 1 ? "zlatna" : "bela", okvir: mesto === 1 ? "zlatni" : "nema" },
+      ja: false };
+  };
+  const vrh = Array.from({ length: 10 }, (_, i) => red(i + 1, 34200 - i * 2800, IMENA_RANG[i]));
+  const n = nivoZa(xp);
+  const ja = { mesto: 14, ime: "Marko", nivo: n.nivo, naziv: n.naziv, xp,
+    vip: false, izgled: { boja: "bela", okvir: "nema" }, ja: true,
+    // 4840 - 4200 = 640: broj na slici mora da se poklopi sa redom iznad.
+    doSledecegMesta: 640, ispredMene: "Tijana" };
+  const komsiluk = [
+    red(12, xp + 2200, "Sandra"),
+    red(13, xp + 640, "Tijana"),
+    ja,
+    red(15, Math.max(0, xp - 300), "Bojan"),
+    red(16, Math.max(0, xp - 1100), "Jelena"),
+  ];
+  return { vrh, ukupno: 84, komsiluk, ja };
+};
+
 const profilZa = (xp) => { const n = nivoZa(xp);
   return { username: "marko", ime: "Marko", clanOd: Date.now() - 240 * 24 * 3600 * 1000,
     nivo: n.nivo, naziv: n.naziv, xp: n.xp, uNivou: n.uNivou, zaSledeci: n.zaSledeci,
@@ -48,7 +82,8 @@ const profilZa = (xp) => { const n = nivoZa(xp);
       omiljenDan: 6, razlicitihIgara: 7, spinova: 12, dobitakUkupno: 340,
       nedeljaZaredom: 5, omiljenoPice: "Coca-Cola 0.5", omiljenoPicePuta: 24 },
     clanarina: { ukljucen: true, jeVip: false, dana: 0, cena: 1500, trajanje: 30,
-      mnozilac: 2, tocakPrag: 700, pogodnosti: POGODNOSTI } }; };
+      mnozilac: 2, tocakPrag: 700, pogodnosti: POGODNOSTI },
+    rang: rangZa(xp) }; };
 
 const OVDE = path.dirname(fileURLToPath(import.meta.url));
 const KOREN = path.join(OVDE, "..");
@@ -175,28 +210,38 @@ const EKRANI = [
       await klik(win, '.tab[data-tab="account"]'); await cekaj(500);
       await klik(win, '[data-acc-sekcija="profil"]'); await cekaj(700);
     } },
-  { ime: "4b-nalog-nagrade", opis: "Nalog > Nagrade (tocak, napredak, spisak)", ocekivan: "desktopScreen",
+  // Igrac je na slici SEDMI, van vrha - da se vide i komsiluk i recenica "do
+  // sestog ti fali X". Kad bi bio prvi, oba bi izostala, a to su bas delovi
+  // zbog kojih strana i postoji.
+  { ime: "4b-nalog-rang", opis: "Nalog > Rang lista (tvoje mesto, komsiluk, vrh)", ocekivan: "desktopScreen",
+    do: async (win, p) => {
+      posalji(win, p.login); await sacekajPozdrav(win);
+      await cekaj(400);
+      await klik(win, '.tab[data-tab="account"]'); await cekaj(500);
+      await klik(win, '[data-acc-sekcija="rang"]'); await cekaj(700);
+    } },
+  { ime: "4c-nalog-nagrade", opis: "Nalog > Nagrade (tocak, napredak, spisak)", ocekivan: "desktopScreen",
     do: async (win, p) => {
       posalji(win, p.login); await sacekajPozdrav(win);
       await cekaj(400);
       await klik(win, '.tab[data-tab="account"]'); await cekaj(500);
       await klik(win, '[data-acc-sekcija="nagrade"]'); await cekaj(600);
     } },
-  { ime: "4e-nalog-podesavanja", opis: "Nalog > Mis i zvuk", ocekivan: "desktopScreen",
+  { ime: "4d-nalog-podesavanja", opis: "Nalog > Mis i zvuk", ocekivan: "desktopScreen",
     do: async (win, p) => {
       posalji(win, p.login); await sacekajPozdrav(win);
       await cekaj(400);
       await klik(win, '.tab[data-tab="account"]'); await cekaj(500);
       await klik(win, '[data-acc-sekcija="podesavanja"]'); await cekaj(2500);
     } },
-  { ime: "4c-nalog-pozadina", opis: "Nalog > Pozadina (izbor sare)", ocekivan: "desktopScreen",
+  { ime: "4e-nalog-pozadina", opis: "Nalog > Pozadina (izbor sare)", ocekivan: "desktopScreen",
     do: async (win, p) => {
       posalji(win, p.login); await sacekajPozdrav(win);
       await cekaj(400);
       await klik(win, '.tab[data-tab="account"]'); await cekaj(500);
       await klik(win, '[data-acc-sekcija="pozadina"]'); await cekaj(700);
     } },
-  { ime: "4d-nalog-lozinka", opis: "Nalog > Lozinka", ocekivan: "desktopScreen",
+  { ime: "4f-nalog-lozinka", opis: "Nalog > Lozinka", ocekivan: "desktopScreen",
     do: async (win, p) => {
       posalji(win, p.login); await sacekajPozdrav(win);
       await cekaj(400);

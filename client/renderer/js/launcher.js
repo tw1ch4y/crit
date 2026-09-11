@@ -82,6 +82,9 @@ const ICONS = {
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
   mis: '<rect x="6" y="2" width="12" height="20" rx="6"/><path d="M12 6v4"/>',
   zvuk: '<path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/>',
+  // Rang lista. Postolje sa tri mesta, a ne pehar: pehar je nagrada koja se
+  // dobije jednom, a ovde je mesto koje se svakog dana brani.
+  postolje: '<rect x="9" y="4" width="6" height="17" rx="1"/><rect x="2.5" y="10" width="6" height="11" rx="1"/><rect x="15.5" y="13" width="6" height="8" rx="1"/>',
 };
 const icon = (name, size = 16) =>
   `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ""}</svg>`;
@@ -1787,6 +1790,9 @@ function renderAccount() {
 const ACC_SEKCIJE = [
   // Profil je prvi: nalog pocinje od toga KO si, pa tek onda od toga sta radis.
   { kljuc: "profil", naziv: "Profil", ikona: "user" },
+  // Rang lista ide odmah uz profil: to su dve strane iste stvari - ko si i gde
+  // si u odnosu na ostale.
+  { kljuc: "rang", naziv: "Rang lista", ikona: "postolje" },
   { kljuc: "porudzbine", naziv: "Porudžbine", ikona: "cup" },
   { kljuc: "nagrade", naziv: "Nagrade", ikona: "gift" },
   { kljuc: "podesavanja", naziv: "Miš i zvuk", ikona: "mis" },
@@ -1821,6 +1827,7 @@ function podrazumevanaSekcija() {
 function sadrzajSekcije() {
   switch (S.accSekcija || "profil") {
     case "profil": return sekcijaProfil();
+    case "rang": return sekcijaRang();
     case "porudzbine": return sekcijaPorudzbine();
     case "nagrade": return sekcijaNagrade();
     case "podesavanja": return sekcijaPodesavanja();
@@ -2040,6 +2047,97 @@ function rekordiHtml(r) {
     <div class="pf-naslov">Tvoji rekordi</div>
     <div class="pf-rekordi">
       ${stavke.map(([l, v]) => `<div class="pf-rek"><span>${esc(l)}</span><b>${esc(String(v))}</b></div>`).join("")}
+    </div>
+  </div>`;
+}
+
+// RANG LISTA: NIJE SPISAK NAJBOLJIH NEGO TVOJE MESTO U NJEMU.
+//
+// Gola tabela prvih deset radi samo za tih deset. Jedanaesti je pogleda jednom,
+// vidi da mu do vrha fali pola godine, i više je ne otvori - a on je onaj koga
+// je trebalo pokrenuti.
+//
+// Zato je prvo što se vidi TVOJE mesto i koliko ti fali do sledećeg, pa tek
+// onda vrh. "Sedmi si u kući, do šestog ti fali 400 XP" je rečenica zbog koje
+// neko dođe u utorak. "Prvo mesto: Marko, 34.200 XP" nije.
+//
+// Boje: zlatna samo prvom (biti prvi JESTE nagrada), boja kuće drugom i trećem
+// i tvom redu (to je izbor - "ovo si ti"). Ostali bez boje. Srebrna i bronzana
+// bi bile dve nove boje koje nigde drugde ništa ne znače.
+function rangRedHtml(r, boje) {
+  const heks = (boje && boje[r.izgled?.boja] || {}).heks || "#eef1f8";
+  const mesto = r.mesto <= 3 ? `<span class="rl-m m${r.mesto}">${r.mesto}</span>` : `<span class="rl-m">${r.mesto}</span>`;
+  return `<div class="rl-red ${r.ja ? "ja" : ""}">
+    ${mesto}
+    <span class="rl-znak okvir-${esc(r.izgled?.okvir || "nema")}">${esc((r.ime || "?").charAt(0).toUpperCase())}</span>
+    <span class="rl-ko">
+      <b style="color:${esc(heks)}">${esc(r.ime)}${r.ja ? " (ti)" : ""}</b>
+      <i>Nivo ${r.nivo} - ${esc(r.naziv)}</i>
+    </span>
+    ${r.vip ? '<span class="rl-vip">VIP</span>' : ""}
+    <span class="rl-xp">${r.xp.toLocaleString("sr-Latn-RS")} <em>XP</em></span>
+  </div>`;
+}
+
+function sekcijaRang() {
+  const p = S.profil;
+  if (!p) {
+    if (profilStanje === "nije") traziProfil();
+    return profilStanje === "palo"
+      ? `<div class="acc-prazno">${icon("postolje", 34)}
+          <div class="ap-t">Rang lista nije stigla</div>
+          <div class="ap-o">Veza sa serverom je prekinuta dok se učitavala.</div>
+          <button class="btn" data-profil-ponovo style="margin-top:14px">Pokušaj ponovo</button>
+        </div>`
+      : `<div class="acc-prazno">${icon("postolje", 34)}<div class="ap-t">Učitavam rang listu</div></div>`;
+  }
+  const l = p.rang;
+  // Igraonica u kojoj još nema koga da se rangira ne sme da pokaže praznu
+  // tabelu - to izgleda kao kvar. Kaže se šta nedostaje.
+  if (!l || !(l.vrh || []).length) {
+    return `<div class="acc-sek">
+      <div class="acc-sek-h"><h3>Rang lista</h3><p>Ko je dokle stigao u ovoj igraonici.</p></div>
+      <div class="acc-prazno">${icon("postolje", 26)}
+        <div class="ap-t">Lista se tek pravi</div>
+        <div class="ap-o">Iskustvo se skuplja igranjem. Čim nekoliko gostiju odigra svoje, ovde će pisati ko je gde.</div>
+      </div></div>`;
+  }
+  const boje = p.boje || {};
+  const ja = l.ja;
+
+  // Tvoja kartica stoji PRE spiska. Ona je razlog zbog kog se ova strana otvara.
+  const tvoje = ja ? `
+    <div class="rl-ja">
+      <div class="rl-ja-mesto"><b>${ja.mesto}</b><span>od ${l.ukupno}</span></div>
+      <div class="rl-ja-tekst">
+        <b>${ja.mesto === 1 ? "Prvi si u kući" : `${ja.mesto}. si u kući`}</b>
+        <span>${ja.mesto === 1
+          ? "Niko te još nije prestigao. Svaki dinar potrošen u igraonici te drži tu."
+          : ja.doSledecegMesta === 0
+            ? `Izjednačen si sa igračem ${esc(ja.ispredMene || "")} - prvi sledeći XP te diže.`
+            : `Do ${ja.mesto - 1}. mesta ti fali ${Number(ja.doSledecegMesta || 0).toLocaleString("sr-Latn-RS")} XP${ja.ispredMene ? ` (ispred je ${esc(ja.ispredMene)})` : ""}.`}</span>
+      </div>
+    </div>` : `
+    <div class="rl-ja bez">
+      <div class="rl-ja-tekst">
+        <b>Ovaj nalog se ne rangira</b>
+        <span>Privremeni gostujući nalozi ne ulaze na listu. Napravi svoj nalog na kasi pa se i ti računaš.</span>
+      </div>
+    </div>`;
+
+  const komsiluk = (l.komsiluk || []).length ? `
+    <div class="pf-odeljak">
+      <div class="pf-naslov">Tvoj deo spiska</div>
+      <div class="rl">${l.komsiluk.map((r) => rangRedHtml(r, boje)).join("")}</div>
+    </div>` : "";
+
+  return `<div class="acc-sek">
+    <div class="acc-sek-h"><h3>Rang lista</h3><p>Rangira se po iskustvu, a iskustvo se dobija za sve što se u igraonici potroši. VIP-u ide dvostruko.</p></div>
+    ${tvoje}
+    ${komsiluk}
+    <div class="pf-odeljak">
+      <div class="pf-naslov">Najbolji u kući</div>
+      <div class="rl">${l.vrh.map((r) => rangRedHtml(r, boje)).join("")}</div>
     </div>
   </div>`;
 }

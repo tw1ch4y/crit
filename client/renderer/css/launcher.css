@@ -2225,3 +2225,77 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
   border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 2px var(--panel);
 }
 .pf-boja, .pf-okvir { position: relative; }
+
+/* ---- RANG LISTA IGRAONICE ----
+
+   Prvo TVOJE mesto, pa tek onda vrh. Gola tabela prvih deset radi samo za tih
+   deset; jedanaesti je pogleda jednom i vise je ne otvori - a bas njega treba
+   pokrenuti.
+
+   Boje: zlatna samo prvom (biti prvi JESTE nagrada, i jedina je na ekranu),
+   boja kuce drugom, trecem i tvom redu (boja kuce znaci izbor - "ovo si ti").
+   Srebrna i bronzana bi bile dve nove boje koje nigde drugde nista ne znace. */
+.rl-ja {
+  display: flex; align-items: center; gap: 16px; padding: 16px; margin-bottom: 20px;
+  background: linear-gradient(135deg, rgba(var(--brend-rgb), 0.14), rgba(var(--brend-rgb), 0.02) 62%), var(--panel-2);
+  box-shadow: inset 0 0 0 1px rgba(var(--brend-rgb), 0.32);
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
+}
+.rl-ja.bez { box-shadow: inset 0 0 0 1px var(--line); background: var(--panel-2); }
+.rl-ja-mesto { flex: none; text-align: center; min-width: 64px; }
+.rl-ja-mesto b {
+  display: block; font-family: var(--font-display); font-size: 36px; font-weight: 700;
+  line-height: 1; color: var(--brend); font-variant-numeric: tabular-nums;
+}
+.rl-ja-mesto span { font-size: 11px; color: var(--text-3); }
+.rl-ja-tekst { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.rl-ja-tekst b { font-family: var(--font-display); font-size: 19px; font-weight: 700; color: var(--text); }
+.rl-ja-tekst span { font-size: 13px; color: var(--text-2); line-height: 1.45; }
+
+.rl { display: flex; flex-direction: column; gap: 4px; }
+.rl-red {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.02); box-shadow: inset 0 0 0 1px var(--line);
+}
+/* Tvoj red se vidi i kad se ne cita: spisak se otvara da bi se on nasao. */
+.rl-red.ja {
+  background: rgba(var(--brend-rgb), 0.10);
+  box-shadow: inset 0 0 0 1px rgba(var(--brend-rgb), 0.42), inset 3px 0 0 var(--brend);
+}
+.rl-m {
+  flex: none; width: 26px; text-align: center;
+  font-family: var(--font-display); font-size: 15px; font-weight: 700;
+  color: var(--text-3); font-variant-numeric: tabular-nums;
+}
+.rl-m.m1 { color: var(--gold); }
+.rl-m.m2, .rl-m.m3 { color: var(--brend); }
+.rl-znak {
+  flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  background: linear-gradient(150deg, var(--panel-3), var(--panel));
+  font-family: var(--font-display); font-size: 15px; font-weight: 700; color: var(--text);
+}
+.rl-znak.okvir-tanki { box-shadow: 0 0 0 2px var(--brend); }
+.rl-znak.okvir-dvojni { box-shadow: 0 0 0 2px var(--brend), 0 0 0 4px rgba(var(--brend-rgb), 0.28); }
+.rl-znak.okvir-zlatni { box-shadow: 0 0 0 2px var(--gold); }
+.rl-znak.okvir-puls { box-shadow: 0 0 0 2px var(--brend); }
+.rl-ko { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.rl-ko b {
+  font-family: var(--font-display); font-size: 15px; font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rl-ko i { font-style: normal; font-size: 12px; color: var(--text-3); }
+.rl-vip {
+  flex: none; font-family: var(--font-ui); font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+  color: var(--gold); background: rgba(255, 181, 39, 0.12); padding: 2px 7px; border-radius: 99px;
+}
+.rl-xp {
+  flex: none; font-family: var(--font-display); font-size: 15px; font-weight: 700;
+  color: var(--text-2); font-variant-numeric: tabular-nums;
+}
+.rl-xp em { font-style: normal; font-size: 11px; color: var(--text-3); }
+@media (max-width: 720px) {
+  .rl-ja { gap: 12px; padding: 14px; }
+  .rl-ja-mesto { min-width: 52px; }
+  .rl-ja-mesto b { font-size: 30px; }
+  .rl-ko i, .rl-xp em { display: none; }
+}
