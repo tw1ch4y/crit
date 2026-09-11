@@ -826,9 +826,12 @@ router.post("/kopija-van/sada", requireOwner, (req, res) => {
   const r = odrz.kopirajVanRacunara();
   if (r.error) return res.status(500).json({ error: `Kopiranje nije uspelo (${r.error}). Proveri da li je disk priključen.` });
   if (r.preskoceno) return res.status(400).json({ error: `Preskočeno: ${r.preskoceno}` });
+  // Slike idu zajedno sa bazom, pa i brojka o njima mora nazad: vlasnik koji
+  // vidi samo "kopija napravljena" ne zna da li su omoti i pozadine otišle.
+  const koliko = (r.slike?.novih || 0) + (r.slike?.preskoceno || 0);
   svc.logEvent({ category: "sistem", action: "kopija_van", actor: req.admin.username,
-    detail: `Kopija odneta van računara: ${r.fajl} -> ${r.cilj}` });
-  res.json({ ok: true, ...odrz.kopijaVanPodesavanja() });
+    detail: `Kopija odneta van računara: ${r.fajl}${koliko ? ` + ${koliko} slika` : ""} -> ${r.cilj}` });
+  res.json({ ok: true, slike: r.slike || null, ...odrz.kopijaVanPodesavanja() });
 });
 
 // ---------- NADOGRADNJA LAUNCHERA ----------

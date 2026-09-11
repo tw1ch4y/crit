@@ -16,6 +16,71 @@ import * as vip from "./vip.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// OTPREMLJENE SLIKE SU PODACI IGRAONICE, NE DEO PROGRAMA.
+//
+// Stajale su u `server/public/uploads` - unutar samog programa, pored panela.
+// Odatle su sledile tri stvari, i sve tri su bile prave greške:
+//
+//   1. NISU SE ČUVALE. Rezervna kopija je jedan `crit.db` i ništa više. Kad disk
+//      otkaže, baza se vrati sa USB-a i u njoj stoje redovi koji pokazuju na
+//      `/uploads/game-2-...png` - a tih fajlova nema. Svaki omot, svaka slika
+//      pića, svih pet pozadina i svi baneri se kucaju ispočetka, ručno.
+//   2. IZOLACIJA JE IMALA RUPU. `CRIT_DATA_DIR` odvaja bazu, ali ne i slike, pa
+//      je svaki test koji otpremi sliku pisao u pravi projekat. Testovi su to
+//      rešavali tako što sami brišu za sobom - a to je zaobilaženje, ne rešenje:
+//      test koji pukne na pola ne stigne da počisti.
+//   3. NADOGRADNJA SERVERA IH JE MEŠALA. Uputstvo kaže "prepiši server\src i
+//      server\public" - a u `public` su bile i slike iz paketa, koje se onda
+//      pomešaju sa onima koje je igraonica sama otpremila.
+//
+// Sada stoje uz bazu, u folderu sa podacima. Isti folder se kopira van računara,
+// isti se preskače pri nadogradnji, i isti se izoluje u testu.
+export const UPLOADS = path.join(DATA_DIR, "uploads");
+fs.mkdirSync(UPLOADS, { recursive: true });
+
+// Iz zapisanog `/uploads/ime.png` pravi putanju do fajla. Ide kroz basename
+// namerno: vrednost dolazi iz baze, a `path.join` sa "../.." u imenu bi izašao
+// iz foldera i obrisao nešto sasvim drugo.
+const putanjaSlike = (url) => {
+  const ime = path.basename(String(url || "").trim());
+  return ime && ime !== "." && ime !== ".." ? path.join(UPLOADS, ime) : null;
+};
+// Brisanje stare slike pri zameni. Nikad ne baca - fajl je mogao biti obrisan
+// ručno, a zbog toga izmena artikla ne sme da padne.
+const obrisiSliku = (url) => {
+  const p = putanjaSlike(url);
+  if (p) { try { fs.unlinkSync(p); } catch {} }
+};
+
+// SELIDBA SA STAROG MESTA.
+//
+// Igraonica koja je radila na staroj verziji ima slike u `server/public/uploads`.
+// Prenose se jednom, pri prvom pokretanju nove verzije: baza već pokazuje na
+// `/uploads/<ime>`, pa je dovoljno da fajl bude na novom mestu. Kopira se, ne
+// premešta - ako nešto pođe naopako, stara kopija je i dalje tu.
+(function preseliStareSlike() {
+  // Samo za PRAVU instalaciju koja se nadograđuje. Izolovana instanca (test,
+  // proba, pregled) po definiciji nema šta da nasledi, a bez ovog uslova bi
+  // svaki test u svoj folder prepisao sve slike igraonice - osam megabajta po
+  // pokretanju, i to iz podataka koje test ne sme ni da vidi.
+  if (process.env.CRIT_DATA_DIR) return;
+  const staro = path.join(__dirname, "..", "public", "uploads");
+  if (staro === UPLOADS) return;
+  let imena = [];
+  try { imena = fs.readdirSync(staro); } catch { return; }
+  let preneto = 0;
+  for (const ime of imena) {
+    const izvor = path.join(staro, ime), cilj = path.join(UPLOADS, ime);
+    try {
+      if (fs.existsSync(cilj)) continue;
+      if (!fs.statSync(izvor).isFile()) continue;
+      fs.copyFileSync(izvor, cilj);
+      preneto++;
+    } catch {}
+  }
+  if (preneto) console.log(`Slike prenete uz bazu: ${preneto} (staro mesto ostaje netaknuto)`);
+})();
+
 // ID trenutno otvorene smene (keširano; inicijalizuje se na dnu fajla)
 let activeShiftId = null;
 
@@ -2414,10 +2479,10 @@ function saveImage(table, prefix, id, dataUrl, col = "image", maxBytes = 3 * 102
   const ext = m[1].toLowerCase() === "jpeg" ? "jpg" : m[1].toLowerCase();
   const buf = Buffer.from(m[2], "base64");
   if (buf.length > maxBytes) return { error: `Slika je prevelika (maksimum ${Math.round(maxBytes / 1048576)} MB)` };
-  const dir = path.join(__dirname, "..", "public", "uploads");
+  const dir = UPLOADS;
   fs.mkdirSync(dir, { recursive: true });
   // obriši staru sliku ako postoji
-  if (item[col]) { try { fs.unlinkSync(path.join(__dirname, "..", "public", item[col])); } catch {} }
+  if (item[col]) { obrisiSliku(item[col]); }
   const fname = `${prefix}-${id}-${Date.now()}.${ext}`;
   fs.writeFileSync(path.join(dir, fname), buf);
   const url = `/uploads/${fname}`;
@@ -2426,7 +2491,7 @@ function saveImage(table, prefix, id, dataUrl, col = "image", maxBytes = 3 * 102
 }
 function removeImage(table, id, col = "image") {
   const item = db.prepare(`SELECT * FROM ${table} WHERE id=?`).get(id);
-  if (item?.[col]) { try { fs.unlinkSync(path.join(__dirname, "..", "public", item[col])); } catch {} }
+  if (item?.[col]) { obrisiSliku(item[col]); }
   db.prepare(`UPDATE ${table} SET ${col}=NULL WHERE id=?`).run(id);
   return { ok: true };
 }
@@ -2594,10 +2659,10 @@ export function sacuvajLogo(dataUrl) {
   const buf = Buffer.from(m[2], "base64");
   if (buf.length > 3 * 1024 * 1024) return { error: "Logo je prevelik (maksimum 3 MB)" };
   const ext = { jpeg: "jpg", "svg+xml": "svg" }[m[1].toLowerCase()] || m[1].toLowerCase();
-  const dir = path.join(__dirname, "..", "public", "uploads");
+  const dir = UPLOADS;
   fs.mkdirSync(dir, { recursive: true });
   const staro = getSetting("brend_logo", null);
-  if (staro) { try { fs.unlinkSync(path.join(__dirname, "..", "public", staro)); } catch {} }
+  if (staro) { obrisiSliku(staro); }
   const fname = `logo-${Date.now()}.${ext}`;
   fs.writeFileSync(path.join(dir, fname), buf);
   const url = `/uploads/${fname}`;
@@ -2608,7 +2673,7 @@ export function sacuvajLogo(dataUrl) {
 
 export function obrisiLogo() {
   const staro = getSetting("brend_logo", null);
-  if (staro) { try { fs.unlinkSync(path.join(__dirname, "..", "public", staro)); } catch {} }
+  if (staro) { obrisiSliku(staro); }
   setSetting("brend_logo", "");
   pushBrend();
   return { ok: true, ...brendObj() };
@@ -2638,10 +2703,10 @@ export function savePozadinu(kljuc, dataUrl) {
   const buf = Buffer.from(m[2], "base64");
   if (buf.length > 8 * 1024 * 1024) return { error: "Slika je prevelika (maksimum 8 MB)" };
   const ext = m[1].toLowerCase() === "jpeg" ? "jpg" : m[1].toLowerCase();
-  const dir = path.join(__dirname, "..", "public", "uploads");
+  const dir = UPLOADS;
   fs.mkdirSync(dir, { recursive: true });
   const staro = getSetting(`pozadina_${kljuc}`, null);
-  if (staro) { try { fs.unlinkSync(path.join(__dirname, "..", "public", staro)); } catch {} }
+  if (staro) { obrisiSliku(staro); }
   const fname = `pozadina-${kljuc}-${Date.now()}.${ext}`;
   fs.writeFileSync(path.join(dir, fname), buf);
   const url = `/uploads/${fname}`;
@@ -2653,7 +2718,7 @@ export function savePozadinu(kljuc, dataUrl) {
 export function removePozadinu(kljuc) {
   if (!POZADINE[kljuc]) return { error: "Nepoznat ekran" };
   const staro = getSetting(`pozadina_${kljuc}`, null);
-  if (staro) { try { fs.unlinkSync(path.join(__dirname, "..", "public", staro)); } catch {} }
+  if (staro) { obrisiSliku(staro); }
   setSetting(`pozadina_${kljuc}`, "");
   pushPozadine();
   return { ok: true };
@@ -2993,7 +3058,7 @@ export function dodajPromo(dataUrl, naziv) {
   const buf = Buffer.from(m[2], "base64");
   if (buf.length > 8 * 1024 * 1024) return { error: "Slika je prevelika (maksimum 8 MB)" };
   const ext = m[1].toLowerCase() === "jpeg" ? "jpg" : m[1].toLowerCase();
-  const dir = path.join(__dirname, "..", "public", "uploads");
+  const dir = UPLOADS;
   fs.mkdirSync(dir, { recursive: true });
   const fname = `promo-${Date.now()}-${Math.floor(Math.random() * 1000)}.${ext}`;
   fs.writeFileSync(path.join(dir, fname), buf);
@@ -3008,7 +3073,7 @@ export function dodajPromo(dataUrl, naziv) {
 export function obrisiPromo(id) {
   const p = db.prepare("SELECT * FROM promo WHERE id=?").get(id);
   if (!p) return { error: "Baner ne postoji" };
-  try { fs.unlinkSync(path.join(__dirname, "..", "public", p.image)); } catch {}
+  obrisiSliku(p.image);
   db.prepare("DELETE FROM promo WHERE id=?").run(id);
   pushPromo();
   return { ok: true };
@@ -3054,12 +3119,12 @@ export const removeToolImage = (id) => removeImage("tools", id);
 // Crtaju se kao SVG i pisu pravo u uploads - ne idu kroz proveru za otpremljene
 // slike (koja prima samo raster), jer ih pravi sam server, ne korisnik.
 function upisiSvg(prefix, svgTekst, staraPutanja) {
-  const dir = path.join(__dirname, "..", "public", "uploads");
+  const dir = UPLOADS;
   fs.mkdirSync(dir, { recursive: true });
   // Obrisi prethodni SAMO ako je i on bio generisan baner (ne diramo sliku koju
   // je vlasnik sam okacio - ako je banner prava slika, ostavljamo je na miru).
   if (staraPutanja && /\/uploads\/baner-/.test(staraPutanja)) {
-    try { fs.unlinkSync(path.join(__dirname, "..", "public", staraPutanja)); } catch {}
+    obrisiSliku(staraPutanja);
   }
   const fname = `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}.svg`;
   fs.writeFileSync(path.join(dir, fname), svgTekst, "utf8");
@@ -3089,7 +3154,7 @@ export function napraviBaneriSvimIgrama() {
 
 export function napraviPromoCrit() {
   const svg = promoCrit(getSetting("cafe_name", "Crit"));
-  const dir = path.join(__dirname, "..", "public", "uploads");
+  const dir = UPLOADS;
   fs.mkdirSync(dir, { recursive: true });
   const fname = `promo-crit-${Date.now()}.svg`;
   fs.writeFileSync(path.join(dir, fname), svg, "utf8");

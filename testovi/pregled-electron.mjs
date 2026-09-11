@@ -27,9 +27,13 @@ import { putanjaElektrona } from "./_okruzenje.mjs";
 // Iskustvo izmisljenog igraca. Namerno je u sredini nivoa: prazna i puna traka
 // izgledaju dobro same po sebi, greske se vide na pola.
 const XP_PREGLED = 4200;
-const vipZa = (xp) => { const n = nivoZa(xp);
+// `vip` je PLACENA CLANARINA, ne nivo. Ovde stoji false: tako se na slikama
+// vidi ono sto vidi vecina gostiju - traka sa imenom ranga i bez ijedne reci
+// VIP. Dok je ovde stajalo `n.nivo >= 5`, izmisljeni igrac je bio clan, pa se
+// greska u kojoj je svako izgledao kao VIP nije videla ni na jednoj slici.
+const vipZa = (xp, clan = false) => { const n = nivoZa(xp);
   return { nivo: n.nivo, naziv: n.naziv, xp: n.uNivou, xpDo: n.poslednji ? null : n.zaSledeci,
-    poslednji: n.poslednji, sledeci: n.sledeciNaziv, vip: n.nivo >= 5 }; };
+    poslednji: n.poslednji, sledeci: n.sledeciNaziv, vip: clan, vipDana: clan ? 12 : 0 }; };
 // Rang lista se meri tamo gde se i lomi: igrac je SEDMI, van vrha. Da je prvi,
 // ne bi se videli ni komsiluk ni recenica "do sestog ti fali X" - a to su bas
 // delovi zbog kojih strana postoji. Imena su namerno razlicite duzine, jer se
@@ -160,6 +164,16 @@ const EKRANI = [
     do: async (win) => { posalji(win, { t: "to_login" }); await cekaj(600); } },
   { ime: "2-pocetna", opis: "Pocetna: izdvojena igra, police, alati", ocekivan: "desktopScreen",
     do: async (win, p) => { posalji(win, p.login); await sacekajPozdrav(win); await cekaj(1400); } },
+  // ISTA TRAKA, ALI ZA CLANA. Dve slike jedna pored druge pokazuju ono sto je
+  // najlakse pokvariti: da se rec VIP vidi SAMO onome ko je clanarinu platio.
+  // Dok je izmisljeni igrac uvek bio clan, greska u kojoj je svako izgledao kao
+  // VIP nije se videla ni na jednoj slici.
+  { ime: "2b-pocetna-vip", opis: "Pocetna kod gosta koji JE platio clanarinu", ocekivan: "desktopScreen",
+    do: async (win, p) => {
+      posalji(win, p.login); await sacekajPozdrav(win);
+      posalji(win, { t: "vip", vip: p.login.vipClan });
+      await cekaj(1400);
+    } },
   // Shop se gleda u stanju koje igrac stvarno ima: nesto u korpi i porudzbina
   // koja se sprema. Prazan shop ne pokazuje ni korpu ni spisak porudzbina, a to
   // je bas ono sto treba da izgleda kako valja.
@@ -462,6 +476,8 @@ app.whenReady().then(async () => {
       // Racuna se OVDE, u omotacu: glavni proces Electrona je zaseban fajl koji
       // se sklapa iz ovog teksta, pa u njemu nema ni nivoi.js ni ovih funkcija.
       vip: ${JSON.stringify(vipZa(XP_PREGLED))}, profil: ${JSON.stringify(profilZa(XP_PREGLED))},
+      // Ista traka za onoga ko JE platio clanarinu - salje se posebnim ekranom.
+      vipClan: ${JSON.stringify(vipZa(XP_PREGLED, true))},
       // Nagradni tocak u stanju "sme da vrti" - da se na slici Naloga vidi tocak.
       tocak: { ukljucen: true, prag: 1200, potroseno: 1450, ispunjava: true, moze: true, sledeciSpin: null,
         nagrade: [{ naziv: "30 din", kredit: 30 }, { naziv: "Ništa", kredit: 0 }, { naziv: "60 din", kredit: 60 },

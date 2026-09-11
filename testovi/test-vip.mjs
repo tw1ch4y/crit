@@ -65,4 +65,27 @@ proveri("promo baneri imaju prednost nad VIP trakom",
   /const levo = lista\.length[\s\S]{0,600}: vipHtml\(\);/.test(rend),
   "prostor koji je vlasnik platio ne sme da pojede nova funkcija");
 
+// ---- REC "VIP" NE STOJI ONOME KO JE NIJE PLATIO ----
+//
+// Dok je VIP bio nagrada za peti nivo, na traci je pisalo "VIP" i to je imalo
+// smisla. Cim je VIP poceo da se KUPUJE, isti natpis je postao greska na
+// najvidljivijem mestu u programu: gost koji nije platio nista gledao je
+// ogromno zlatno VIP iznad svoje trake. Citalo se kao da ga vec ima - a stvar
+// koju vec imas se ne kupuje.
+//
+// Naslov trake je zato IME RANGA, a rec VIP se pojavljuje samo clanu.
+proveri("naslov trake je ime ranga, ne rec VIP",
+  /class="vip-ime">\$\{ima \? esc\(\(v\.naziv \|\| ""\)\.toUpperCase\(\)\)/.test(rend),
+  "upisan natpis VIP je reklamirao clanarinu bas onome ko je nije kupio");
+proveri("oznaka VIP zavisi od placene clanarine",
+  /const jeClan = ima && !!v\.vip;/.test(rend) && /\$\{jeClan \? `<span class="vip-clan"/.test(rend));
+proveri("i kaze koliko jos traje", /još \$\{v\.vipDana\}/.test(rend),
+  "ko ne zna dokle mu vazi, ne obnavlja - obnavlja onaj koji vidi da mu istice");
+// Zvezda je bila znak VIP-a. Na traci svakog gosta znacila bi da ga svi imaju.
+proveri("u stitu je broj nivoa, ne zvezda",
+  /class="vip-broj"/.test(rend) && !/vip-zvezda/.test(rend), "zvezda je znak clanarine");
+proveri("broj u stitu ima svoj stil", /\.vip-broj \{/.test(css));
+proveri("oznaka clana je zlatna", /\.vip-clan \{[\s\S]{0,220}color: var\(--gold\)/.test(css),
+  "clanarina je nagrada - zlatna je tu na mestu");
+
 kraj();

@@ -1270,10 +1270,27 @@ function vipHtml() {
   //   poslednji nivo - traka je puna i NE trazi jos, jer nema sta da trazi
   //   sve ostalo     - napredak unutar tekuceg nivoa
   const ima = !!v && Number.isFinite(v.nivo);
+  // OVO JE TRAKA RANGA, NE VIP-A.
+  //
+  // Dok je VIP bio nagrada za peti nivo, na traci je pisalo "VIP" i to je imalo
+  // smisla. Sada se VIP KUPUJE, pa je isti natpis postao greška koja se vidi na
+  // najvidljivijem mestu u programu: gost koji nije platio ništa gledao je
+  // ogromno zlatno "VIP" iznad svoje trake. Čitalo se kao da ga već ima - a
+  // stvar koju već imaš se ne kupuje.
+  //
+  // Zato traka nosi IME RANGA ("POGODAK"), a reč VIP se pojavljuje samo onome
+  // ko je članarinu stvarno platio, i uz broj preostalih dana: ko ne zna dokle
+  // mu važi, ne obnavlja.
+  //
+  // (Klase su i dalje `vip-*` - to je istorijsko ime iz vremena kad je traka
+  // bila VIP traka, i ne menja se zajedno sa ovim da izmena ostane mala.)
+  const jeClan = ima && !!v.vip;
   const naKraju = ima && v.poslednji;
   const merljiv = ima && !naKraju && Number.isFinite(v.xpDo) && v.xpDo > 0;
   const postotak = naKraju ? 100 : merljiv ? Math.max(0, Math.min(100, (v.xp / v.xpDo) * 100)) : 0;
-  const nivo = ima ? `Nivo ${v.nivo}${v.naziv ? " - " + esc(v.naziv) : ""}` : "Nivo -";
+  // Samo broj: ime ranga je sada naslov trake, pa bi "Nivo 3 - Pogodak" pored
+  // krupnog "POGODAK" bilo isto dvaput u istom redu.
+  const nivo = ima ? `Nivo ${v.nivo}` : "Nivo -";
   const pod = naKraju
     ? "Najviši nivo - dalje se ne ide"
     : merljiv
@@ -1292,16 +1309,20 @@ function vipHtml() {
   // tudji znak na svom najvidljivijem mestu.
   return `<div class="vip ${ima ? "" : "zakljucan"}${naKraju ? " vrh" : ""}">
     <img class="vip-kuca brand-logo" src="img/crit-logo.png" alt="${esc(S.settings.cafeName || "")}" draggable="false" />
+    ${/* U štitu stoji BROJ NIVOA, ne zvezda. Zvezda je bila znak VIP-a, a VIP
+          se sada kupuje; broj je uz to i jedina stvar na traci koja raste, pa
+          mu je mesto na najkrupnijem elementu. */ ""}
     <div class="vip-znak" aria-hidden="true">
       <svg viewBox="0 0 44 48" fill="none">
         <path class="vip-stit" d="M22 2l18 7v18c0 10-8 16-18 19C12 43 4 37 4 27V9z"/>
-        <path class="vip-zvezda" d="M22 13l3.2 6.9 7.3.9-5.4 5 1.5 7.2L22 29.4l-6.6 3.6 1.5-7.2-5.4-5 7.3-.9z"/>
+        <text class="vip-broj" x="22" y="29" text-anchor="middle" dominant-baseline="middle">${ima ? v.nivo : "-"}</text>
       </svg>
     </div>
     <div class="vip-telo">
       <div class="vip-vrh">
-        <span class="vip-ime">VIP</span>
+        <span class="vip-ime">${ima ? esc((v.naziv || "").toUpperCase()) : "RANG"}</span>
         <span class="vip-nivo">${nivo}</span>
+        ${jeClan ? `<span class="vip-clan">${icon("gift", 13)} VIP${v.vipDana ? ` - još ${v.vipDana} ${v.vipDana === 1 ? "dan" : "dana"}` : ""}</span>` : ""}
       </div>
       <div class="vip-traka">
         <i style="width:${postotak.toFixed(1)}%"></i>

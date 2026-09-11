@@ -18,7 +18,11 @@ const api = (p, m = "GET", b) => fetch(BASE + p, { method: m,
   body: b ? JSON.stringify(b) : undefined }).then(async (r) => { const t = await r.text(); let j; try { j = JSON.parse(t); } catch { j = t; } return { status: r.status, body: j }; });
 
 const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
-const uploads = path.join(KOREN, "server", "public", "uploads");
+// Otpremljene slike stoje UZ BAZU, u folderu sa podacima - pa i one koje ovaj
+// test napravi ostaju u njegovoj izolovanoj instanci. Dok su stajale u
+// server/public/uploads, svaki test je pisao u sam projekat i morao sam da
+// cisti za sobom; test koji pukne na pola nije stigao da pocisti.
+const uploads = path.join(DATA, "uploads");
 const napravljeni = [];
 
 // ---- omot i baner igre ----
@@ -248,7 +252,7 @@ proveri("preko promo banera nema sare ni niti", /\.hero\.promo::before,\s*\.hero
 // Igre i alati su to radili od pocetka, shop nije - pa je svaka obrisana
 // limenka ostavljala fotografiju na disku zauvek. Provera ide za sva tri tipa
 // zajedno, da se ne desi da se opet negde zaboravi.
-const naDisku = (u) => fs.existsSync(path.join(KOREN, "server", "public", u));
+const naDisku = (u) => fs.existsSync(path.join(uploads, path.basename(String(u || ""))));
 
 const pice = await api("/api/shop", "POST", { name: "Proba Pice", category: "Pića", price: 100 });
 const piceId = (await api("/api/shop")).body.find((s) => s.name === "Proba Pice")?.id;

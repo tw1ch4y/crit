@@ -3798,8 +3798,12 @@ async function ucitajSkladiste() {
   const disk = s.slobodnoMB === null ? '<span class="faint">nepoznato</span>'
     : `<span${s.maloMesta ? ' style="color:var(--danger)"' : ""}>${mb(s.slobodnoMB)} slobodno</span>`;
   const komada = `${s.kopijaKomada} ${oblik(s.kopijaKomada, "kopija", "kopije", "kopija")}`;
+  // Slike su obično višestruko veće od same baze - devet omota je sedam
+  // megabajta, a baza manja od jednog. Dok se nisu brojale, ovde je pisalo da
+  // program zauzima pola megabajta, pa se prostor na disku nije ni gledao.
   telo.innerHTML =
     kv("Baza", fmtBytes(s.bazaBajta)) +
+    kv("Otpremljene slike", `${fmtBytes(s.slikeBajta || 0)} <span class="faint">${s.slikaKomada || 0} ${oblik(s.slikaKomada || 0, "slika", "slike", "slika")}</span>`) +
     kv("Rezervne kopije", `${fmtBytes(s.kopijeBajta)} <span class="faint">${komada}</span>`) +
     kv("Na disku", disk) +
     (s.najstarijaKopija ? kv("Najstarija kopija", timeAgo(s.najstarijaKopija)) : "") +
@@ -4134,7 +4138,13 @@ async function ucitajKopijuVan() {
   };
   $("#kvSada").onclick = async () => {
     const b = $("#kvSada"); b.disabled = true;
-    try { await api("/kopija-van/sada", "POST"); toast("Kopija je odneta van računara", "success"); }
+    // Koliko je slika otišlo se KAŽE. Baza bez slika je pola kopije, a razliku
+    // vlasnik inače vidi tek kad mu zatreba vraćanje.
+    try {
+      const r = await api("/kopija-van/sada", "POST");
+      const sl = (r.slike?.novih || 0) + (r.slike?.preskoceno || 0);
+      toast(sl ? `Kopija odneta: baza i ${sl} ${oblik(sl, "slika", "slike", "slika")}` : "Kopija je odneta van računara", "success");
+    }
     catch (err) { toast(err.message, "error"); }
     finally { ucitajKopijuVan(); }
   };

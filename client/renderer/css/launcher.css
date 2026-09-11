@@ -1876,9 +1876,26 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
   fill: rgba(255, 181, 39, 0.10); stroke: var(--gold); stroke-width: 2;
   stroke-linejoin: round;
 }
-.vip-zvezda { fill: var(--gold); }
+/* U stitu stoji BROJ NIVOA. Zvezda je bila znak VIP-a, a VIP se sada kupuje -
+   zvezda na traci svakog gosta bi znacila da ga svi imaju. Broj je uz to jedina
+   stvar na traci koja raste. */
+.vip-broj {
+  fill: var(--gold); font-family: var(--font-display); font-size: 19px; font-weight: 700;
+  letter-spacing: 0; paint-order: stroke;
+}
 .vip.zakljucan .vip-stit { stroke: rgba(255, 181, 39, 0.42); fill: rgba(255, 181, 39, 0.05); }
-.vip.zakljucan .vip-zvezda { fill: rgba(255, 181, 39, 0.34); }
+.vip.zakljucan .vip-broj { fill: rgba(255, 181, 39, 0.34); }
+
+/* Rec VIP stoji SAMO onome ko je clanarinu platio, i uz broj preostalih dana:
+   ko ne zna dokle mu vazi, ne obnavlja. Zlatna je ovde na mestu - clanarina je
+   nagrada, i jedina je zlatna stvar u traci pored samog stita. */
+.vip-clan {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--font-ui); font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
+  color: var(--gold); background: rgba(255, 181, 39, 0.12);
+  padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+}
+.vip-clan svg { flex: none; }
 
 .vip-telo { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 8px; }
 .vip-vrh { display: flex; align-items: baseline; gap: 12px; }

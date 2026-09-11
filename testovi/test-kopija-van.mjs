@@ -108,6 +108,42 @@ const src = citajIzvor("server/src/index.js");
 proveri("palo kopiranje ide u Logove", /kopija_van_pala/.test(src),
   "prozor servera niko ne gleda - vlasnik ovo mora naci u panelu");
 
+// ---- 10) SLIKE IDU ZAJEDNO SA BAZOM ----
+//
+// Baza bez slika je pola kopije. Redovi pokazuju na /uploads/..., a tih fajlova
+// nema - pa se posle vracanja svaki omot, svaka slika pica i svih pet pozadina
+// kucaju iznova, rucno. A vlasnik bi pri tom mesecima gledao zeleno "kopija
+// uredna", jer je .db fajl uredno odlazio na USB.
+const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+await api("/api/kopija-van", "POST", { putanja: ODREDISTE });
+const igra = (await api("/api/games", "POST", { name: "Sa omotom", path: "C:/igre/sa-omotom.exe" })).body;
+const saSlikom = await api(`/api/games/${igra.id}/image`, "POST", { image: PNG });
+const imeSlike = path.basename(saSlikom.body.image || "");
+proveri("slika je otpremljena", !!imeSlike, JSON.stringify(saSlikom.body));
+proveri("i stoji UZ BAZU, u folderu sa podacima",
+  fs.existsSync(path.join(DATA, "uploads", imeSlike)),
+  "u server/public/uploads je bila van svake kopije i van svake izolacije");
+
+await api("/api/kopija-van/sada", "POST");
+const slikeTamo = path.join(ODREDISTE, "slike");
+proveri("SLIKA JE OTISLA NA ODREDISTE", fs.existsSync(path.join(slikeTamo, imeSlike)),
+  "vracena baza bez slika pokazuje na fajlove kojih nema");
+
+// Drugi prolaz ne sme da prepisuje isto - USB bi na svako dnevno pokretanje
+// nanovo primao desetine megabajta, a slike se menjaju jednom u par meseci.
+const drugi = (await api("/api/kopija-van/sada", "POST")).body;
+proveri("vec odneta slika se ne prepisuje", (drugi.slike?.novih ?? 0) === 0,
+  JSON.stringify(drugi.slike));
+proveri("ali se i dalje broji kao odneta", (drugi.slike?.preskoceno ?? 0) > 0,
+  JSON.stringify(drugi.slike));
+
+// Slika obrisana na serveru OSTAJE u kopiji: kopija treba da prezivi i gresku
+// vlasnika, a nekoliko zaostalih fajlova kosta megabajt.
+await api(`/api/games/${igra.id}`, "DELETE");
+await api("/api/kopija-van/sada", "POST");
+proveri("kopija ne brise za serverom", fs.existsSync(path.join(slikeTamo, imeSlike)),
+  "izbrisana igra ne sme da povuce sliku i iz rezervne kopije");
+
 fs.rmSync(ODREDISTE, { recursive: true, force: true });
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 await new Promise((r) => setTimeout(r, 300));

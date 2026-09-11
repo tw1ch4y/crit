@@ -132,6 +132,18 @@ const posaljiPanel = (req, res) => {
 app.get("/", posaljiPanel);
 app.get("/index.html", posaljiPanel);
 
+// OTPREMLJENE SLIKE STOJE UZ BAZU, NE U PROGRAMU.
+//
+// Omoti, slike pica, pozadine i baneri su podaci igraonice - zato zive u folderu
+// sa podacima (vidi UPLOADS u service.js): kopiraju se sa bazom, ne mesaju se sa
+// paketom pri nadogradnji, i ne izlaze iz izolovane instance.
+//
+// Mora PRE `express.static(PUBLIC)`: stara instalacija ima iste fajlove i na
+// starom mestu, pa bi se inace servirala zatecena kopija umesto one koju je
+// vlasnik upravo otpremio. Slika se ne menja pod istim imenom (svako otpremanje
+// dobija nov vremenski pecat), pa sme da se kesira dugo.
+app.use("/uploads", express.static(svc.UPLOADS, { maxAge: "7d", fallthrough: true }));
+
 // Staticki panel. express.static sam salje ETag, pa pregledac na svaki fajl
 // pita "je li se promenio" i dobija 304 ako nije - jeftino, a nikad ne servira
 // staru verziju. Uz verziju u adresi (?v=) to znaci: nova verzija = svez fajl,

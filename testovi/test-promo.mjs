@@ -11,10 +11,11 @@ await podigniServer(DATA, 8112);
 let pao = 0, prosao = 0;
 const proveri = (n, u, d = "") => { if (u) { prosao++; console.log("  OK   " + n); } else { pao++; console.log("  PAO  " + n + (d ? "  -> " + d : "")); } };
 const cekaj = (ms) => new Promise((r) => setTimeout(r, ms));
-// Uploads folder je zajednicki sa projektom i drugim pokrenutim serverima.
-// Snimi spisak na pocetku pa na kraju proveri samo NOVE fajlove - tako fajlovi
-// tudjeg servera (npr. demo pregled) ne obaraju test.
-const UPLOADS = path.join(KOREN, "server", "public", "uploads");
+// Slike stoje uz bazu, u folderu ove izolovane instance - pa je sve sto se
+// ovde nadje napravio bas ovaj test. Ranije je folder bio zajednicki sa
+// projektom, pa se spisak morao snimati na pocetku da fajlovi tudjeg servera
+// ne obore test.
+const UPLOADS = path.join(DATA, "uploads");
 const prePromo = new Set(fs.readdirSync(UPLOADS));
 
 const prijava = async (ko, l) => (await fetch(BASE + "/api/login", { method: "POST",
@@ -49,7 +50,7 @@ const b2 = await api("/api/promo", "POST", { image: PNG, naziv: "Drugi" });
 const c = await api("/api/promo", "POST", { image: PNG, naziv: "Treci" });
 proveri("baneri se kace", [a, b2, c].every((r) => r.status === 200 && /^\/uploads\/promo-/.test(r.body.image || "")), JSON.stringify([a, b2, c].map((r) => r.body.image)));
 const napravljeni = [a, b2, c].map((r) => r.body.image);
-proveri("fajlovi postoje na disku", napravljeni.every((u) => fs.existsSync(path.join(KOREN, "server", "public", u))));
+proveri("fajlovi postoje na disku", napravljeni.every((u) => fs.existsSync(path.join(UPLOADS, path.basename(u)))));
 
 let lista = (await api("/api/promo")).body;
 proveri("spisak ima tri banera", lista.length === 3, String(lista.length));

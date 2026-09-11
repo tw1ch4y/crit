@@ -166,13 +166,23 @@ export function stanjeSkladista() {
   }
   const kopije = spisakKopija();
   const kopijeBajta = kopije.reduce((z, k) => z + k.velicina, 0);
+  // Slike su obično VIŠESTRUKO veće od same baze: baza igraonice je manja od
+  // megabajta, a devet omota je sedam. Dok se nisu brojale, panel je tvrdio da
+  // program zauzima pola megabajta - pa se prostor na disku nije ni gledao.
+  let slikeBajta = 0, slikaKomada = 0;
+  try {
+    for (const f of fs.readdirSync(path.join(DATA_DIR, "uploads"))) {
+      try { slikeBajta += fs.statSync(path.join(DATA_DIR, "uploads", f)).size; slikaKomada++; } catch {}
+    }
+  } catch {}
   const slobodno = slobodnoNaDisku();
   const red = (t) => { try { return db.prepare(`SELECT COUNT(*) c FROM ${t}`).get().c; } catch { return 0; } };
   return {
     // I bajtovi, jer nova igraonica ima bazu manju od megabajta - zaokruženo na
     // MB to je nula i u panelu izgleda kao da nešto ne radi.
-    bazaBajta, kopijeBajta,
+    bazaBajta, kopijeBajta, slikeBajta, slikaKomada,
     bazaMB: Math.round(bazaBajta / MB * 10) / 10,
+    slikeMB: Math.round(slikeBajta / MB * 10) / 10,
     kopijaKomada: kopije.length,
     kopijeMB: Math.round(kopijeBajta / MB * 10) / 10,
     najstarijaKopija: kopije.length ? kopije[kopije.length - 1].t : null,
@@ -285,6 +295,33 @@ export function postaviKopijuVan(putanja) {
   return { ok: true, ...kopijaVanPodesavanja() };
 }
 
+// Slike uz kopiju baze. Kopira se samo ono čega na odredištu NEMA ili je druge
+// veličine - inače bi svako dnevno pokretanje nanovo pisalo desetine megabajta
+// na USB, a slike se menjaju jednom u par meseci.
+//
+// NIŠTA SE NE BRIŠE sa odredišta. Slika obrisana na serveru (izbačena igra)
+// ostaje u kopiji, i to je namerno: kopija treba da preživi i grešku vlasnika,
+// a nekoliko zaostalih fajlova košta megabajt.
+function kopirajSlike(cilj) {
+  const izvor = path.join(DATA_DIR, "uploads");
+  let imena = [];
+  try { imena = fs.readdirSync(izvor); } catch { return { preskoceno: "nema slika" }; }
+  const dir = path.join(cilj, "slike");
+  try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { return { greska: e.code || e.message }; }
+  let novih = 0, preskoceno = 0;
+  for (const ime of imena) {
+    const s = path.join(izvor, ime), d = path.join(dir, ime);
+    try {
+      const izv = fs.statSync(s);
+      if (!izv.isFile()) continue;
+      if (fs.existsSync(d) && fs.statSync(d).size === izv.size) { preskoceno++; continue; }
+      fs.copyFileSync(s, d);
+      novih++;
+    } catch {}
+  }
+  return { novih, preskoceno };
+}
+
 // Prepiše najsvežiju kopiju na odredište i proredi tamošnje.
 // Nikad ne baca: odredište je po prirodi nepouzdano (iščupan USB, mreža pala),
 // a to ne sme da obori održavanje ni server.
@@ -320,9 +357,15 @@ export function kopirajVanRacunara() {
       .sort((a, b) => (a.f < b.f ? 1 : -1)); // ime nosi vreme, pa se ređa po njemu
     let obrisano = 0;
     for (const k of tamo.slice(KOPIJA_VAN_ZADRZI)) { try { fs.unlinkSync(k.p); obrisano++; } catch {} }
+    // SLIKE IDU ZAJEDNO SA BAZOM.
+    //
+    // Baza bez slika je pola kopije: redovi pokazuju na `/uploads/...`, a tih
+    // fajlova nema - pa se svaki omot, svaka slika pića i svih pet pozadina
+    // kucaju ispočetka. Vlasnik bi pri tom gledao zeleno "kopija uredna".
+    const slike = kopirajSlike(cilj);
     setSetting(KOPIJA_KAD, String(Date.now()));
     setSetting(KOPIJA_GRESKA, "");
-    return { ok: true, fajl: izvor.f, cilj, obrisano };
+    return { ok: true, fajl: izvor.f, cilj, obrisano, slike };
   } catch (e) {
     const poruka = e.code === "NEMA_ODREDISTA"
       ? "odredište nije dostupno (disk nije priključen ili je folder obrisan)"

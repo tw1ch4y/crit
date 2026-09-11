@@ -127,5 +127,34 @@ for (const alat of ["postavi-bazu.mjs"]) {
     "alat koji brise iz baze mora da moze da se preusmeri na probnu");
 }
 
+// ---- OTPREMLJENE SLIKE SU PODACI, NE DEO PROGRAMA ----
+//
+// Stajale su u server/public/uploads - unutar samog programa. Odatle je
+// sledilo troje, i sve troje je bila prava greska:
+//
+//   1. NISU SE CUVALE. Rezervna kopija je jedan crit.db i nista vise. Kad disk
+//      otkaze, baza se vrati sa USB-a i u njoj stoje redovi koji pokazuju na
+//      /uploads/... - a tih fajlova nema. Svaki omot, svaka slika pica i svih
+//      pet pozadina se kucaju iznova, rucno.
+//   2. IZOLACIJA JE IMALA RUPU. CRIT_DATA_DIR odvaja bazu, ali ne i slike, pa
+//      je svaki test koji otpremi sliku pisao u sam projekat. Testovi su to
+//      resavali tako sto sami brisu za sobom - a test koji pukne na pola ne
+//      stigne da pocisti.
+//   3. NADOGRADNJA SERVERA IH JE MESALA. Uputstvo kaze da se prepisu server/src
+//      i server/public, pa su se slike iz paketa mesale sa onima koje je
+//      igraonica sama otpremila.
+for (const modul of fs.readdirSync(SRC).filter((f) => f.endsWith(".js"))) {
+  const t = fs.readFileSync(path.join(SRC, modul), "utf8");
+  // Selidba sa starog mesta sme da ga pomene - ona ga bas zato i cita. Zato se
+  // ona odseca pre provere, i to bez regexa: trazi se od njenog imena do prve
+  // zatvorene zagrade odmah-pozvane funkcije.
+  const pocetak = t.indexOf("function preseliStareSlike");
+  const kraj = pocetak < 0 ? -1 : t.indexOf("})();", pocetak);
+  const bezSelidbe = kraj < 0 ? t : t.slice(0, pocetak) + t.slice(kraj);
+  proveri(`${modul}: ne pise slike u sam program`,
+    !/"public", "uploads"/.test(bezSelidbe),
+    "slike moraju uz bazu (DATA_DIR/uploads) - inace nisu ni u kopiji ni u izolaciji");
+}
+
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 process.exit(pao ? 1 : 0);

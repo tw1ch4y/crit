@@ -38,7 +38,7 @@ proveri("na pocetku nema nijedne slike", Object.values(spisak.slike).every((v) =
 // ---- kacenje ----
 const r1 = await api("/api/pozadine/prijava", "POST", { image: PNG });
 proveri("slika se kaci", r1.status === 200 && /^\/uploads\/pozadina-prijava-\d+\.png$/.test(r1.body.image || ""), JSON.stringify(r1.body));
-const fajl = path.join(KOREN, "server", "public", r1.body.image);
+const fajl = path.join(DATA, "uploads", path.basename(r1.body.image));
 proveri("fajl stvarno postoji na disku", fs.existsSync(fajl));
 proveri("dostupna je preko servera", (await fetch(BASE + r1.body.image)).status === 200);
 

@@ -67,12 +67,26 @@ for (const f of ["package.json", "Pokreni server.bat", "Otvori port u firewall-u
     if (r.v && r.v.startsWith("/uploads/")) referencirano.add(path.basename(r.v));
   }
   pkgDb.close();
-  const pkgUploads = path.join(SRV, "public", "uploads");
+  // Slike stoje uz bazu (server/data/uploads) - one su podaci igraonice, a ne
+  // deo programa. Staro mesto (public/uploads) se i dalje cisti, da paket ne
+  // nosi dvostruko dok ima instalacija koje se tek sele.
   let orphana = 0;
-  if (fs.existsSync(pkgUploads)) for (const f of fs.readdirSync(pkgUploads)) {
-    if (!referencirano.has(f)) { fs.rmSync(path.join(pkgUploads, f), { force: true }); orphana++; }
+  for (const pkgUploads of [path.join(SRV, "data", "uploads"), path.join(SRV, "public", "uploads")]) {
+    if (!fs.existsSync(pkgUploads)) continue;
+    for (const f of fs.readdirSync(pkgUploads)) {
+      if (!referencirano.has(f)) { fs.rmSync(path.join(pkgUploads, f), { force: true, recursive: true }); orphana++; }
+    }
   }
   if (orphana) console.log(`  uploads: izbaceno ${orphana} orphan slika (baza ih ne koristi)`);
+  // Paket bez slika je paket bez ijednog omota - to se vidi tek u igraonici.
+  const uPaketu = fs.existsSync(path.join(SRV, "data", "uploads"))
+    ? fs.readdirSync(path.join(SRV, "data", "uploads")).length : 0;
+  if (referencirano.size && !uPaketu) {
+    console.error(`\nBaza pominje ${referencirano.size} slika, a u paketu ih nema nijedne.`);
+    console.error("Proveri server/data/uploads - tu sada stoje otpremljene slike.");
+    process.exit(1);
+  }
+  console.log(`  slike uz bazu: ${uPaketu}`);
 }
 
 // Provera da baza NIJE prazna/nepodesena. Jednom se desilo da je paket otisao
