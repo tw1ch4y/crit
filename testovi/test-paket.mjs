@@ -91,7 +91,7 @@ proveri("skripta kaze da treba administrator", ps1.includes("Run as administrato
   "fajl je u Program Files, bez toga upis tiho ne uspe");
 
 // ---- server ide sa svojim podacima ----
-proveri("paket ne nosi radne fajlove baze", /preskoci = new Set\(\["backups", "crit.db-wal", "crit.db-shm"/.test(paket));
+proveri("paket ne nosi radne fajlove baze", /preskoci = new Set\(\[[^\]]*"crit\.db-wal"[^\]]*"crit\.db-shm"/.test(paket));
 proveri("paket ne nosi alat za doradu izgleda", paket.includes('"_proba"'),
   "to je alat za razvoj, nema sta da trazi u igraonici");
 proveri("paket nosi tacno slike koje baza koristi", paket.includes("referencirano") && paket.includes("orphan"),
@@ -121,7 +121,41 @@ proveri("postavi-bazu postavlja 9 alata sa logotipima", setup.includes("const AL
 // Baneri i promo se NE prave unapred. Vrh početne nosi znak kuće i nagradni
 // točak; okačen promo bi ih prekrio, a generisani baner igre bi na ekranu
 // prijave pobedio pravu koricu (baner ima prednost nad omotom).
-proveri("postavi-bazu ne pravi banere ni promo", setup.includes("UPDATE games SET banner=NULL") && setup.includes('db.exec("DELETE FROM promo")'));
+//
+// Ali se skida SAMO generisani baner, a promo se ne dira: oba su ranije brisana
+// bez reči, pa je nestajalo i ono što je vlasnik sam okačio.
+proveri("postavi-bazu ne pravi banere ni promo",
+  setup.includes("banner=NULL WHERE banner LIKE '%/baner-igra-%'") && !setup.includes('db.exec("DELETE FROM promo")'));
+
+// ---- SKRIPTA ZA POSTAVLJANJE BAZE NIŠTA NE BRIŠE ----
+//
+// Naučeno skupo. Radila je `DELETE FROM games` pa upisivala svoj ukucani
+// spisak od sedam igara. Svaka igra koju je vlasnik dodao kroz panel - Apex
+// Legends, World of Warcraft - nestajala je pri svakom pokretanju, a odmah
+// zatim bi čišćenje "orphana" obrisalo i njihove korice sa diska. Vlasnik ih je
+// dodavao iznova i iznova ih gubio; po brojevima igara u bazi (111 pa naviše)
+// videlo se da se to desilo bar desetak puta.
+//
+// Skripta postoji da igraonica radi IZ KUTIJE, a to je dopuna, ne zamena.
+//
+// Komentari se izbacuju pre provere: u njima bas i pise sta se ranije brisalo,
+// pa bi ih gola pretraga po tekstu prijavila kao da se i dalje brise.
+const bezKomentara = setup.split(/\r?\n/).filter((r) => !r.trim().startsWith("//")).join("\n");
+for (const sta of ["games", "tools", "promo", "tocak_nagrade"]) {
+  proveri(`postavi-bazu ne brise ${sta}`, !new RegExp(`DELETE FROM ${sta}\\b`).test(bezKomentara),
+    "vlasnikov unos ne sme da nestane zato sto je neko pustio skriptu za postavljanje");
+}
+proveri("dopunjava se po imenu, bez obzira na velika slova",
+  /const kljuc = \(s\) =>[\s\S]{0,120}toLowerCase\(\)/.test(setup) && /imamo\.has\(kljuc\(name\)\)/.test(setup));
+proveri("nagrade tocka se postavljaju samo ako ih nema",
+  /SELECT COUNT\(\*\) c FROM tocak_nagrade[\s\S]{0,40}=== 0/.test(setup));
+// Spisak koji se cisti mora da dolazi IZ BAZE, ne iz ukucanog spiska gore -
+// inace se brisu korice bas onih igara koje je korak 1 upravo izbacio.
+proveri("cisti se prema onome sto baza STVARNO koristi",
+  /SELECT image FROM games WHERE image IS NOT NULL/.test(setup));
+// Dve igre koje su najcesce nestajale sada stoje i u fabrickom spisku.
+proveri("fabricki spisak nosi Apex i WoW",
+  setup.includes('"Apex Legends"') && setup.includes('"World of Warcraft"'));
 proveri("postavi-bazu pravi pozadine svih ekrana", setup.includes("pozadinaEkrana(kljuc)") && setup.includes("POZADINE_EKRANI"));
 // Sara je d20 kockica, ne rec "CRIT": ponovljena rec preko praznog ekrana
 // izgleda kao vodeni zig, a ne kao tekstura.
@@ -131,6 +165,26 @@ proveri("postavi-bazu pravi pozadine za sve ekrane", setup.includes("POZADINE_EK
 proveri("postavi-bazu cisti cover slike izbacenih igara", setup.includes("Orphani") || setup.includes("orphan") || setup.includes("zadrzaneSlike"));
 proveri("uzima se najskoriji instaler", paket.includes("sort((a, b) => b.vreme - a.vreme)"),
   "inace paket tiho ponese prethodnu verziju launchera");
+
+// ---- PAKET NE SME DA PONESE ZASTARELU BAZU ----
+//
+// SQLite ovde radi u WAL rezimu: sveze izmene stoje u `crit.db-wal` dok se ne
+// prepisu u glavni fajl. Paket je kopirao `crit.db` kao obican fajl, a `-wal`
+// namerno preskakao - pa je u igraonicu odlazila baza BEZ poslednjih izmena, i
+// to bez ijedne poruke.
+//
+// Desilo se tacno to: dve igre dodate kroz panel bile su u WAL-u, u paket je
+// otisla baza sa sedam umesto devet igara, a ciscenje orphana je odmah zatim
+// obrisalo i njihove omote jer ih "baza ne koristi".
+proveri("baza se SNIMA (VACUUM INTO), ne kopira kao fajl",
+  /VACUUM INTO/.test(paket) && /function snimiBazu\(\)/.test(paket),
+  "obicno kopiranje ostavlja ono sto je jos u WAL-u");
+proveri("sirov crit.db se ne kopira uz ostalo",
+  /preskoci = new Set\(\[[^\]]*"crit\.db"/.test(paket),
+  "inace bi ga kopiranje prepisalo preko snimka, ili obrnuto");
+proveri("paket staje ako baza pominje sliku koje nema",
+  /if \(fali\.length\)[\s\S]{0,500}process\.exit\(1\)/.test(paket),
+  "paket bez omota se inace vidi tek u igraonici, kad je vec na USB-u");
 
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 process.exit(pao ? 1 : 0);

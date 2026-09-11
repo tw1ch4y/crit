@@ -32,7 +32,9 @@ fs.mkdirSync(CLI, { recursive: true });
 // ---- server ----
 // _proba je alat za doradu izgleda launchera (testovi/pregled-launchera.mjs) -
 // ne sme da ode u igraonicu ako ostane zaboravljen u public/.
-const preskoci = new Set(["backups", "crit.db-wal", "crit.db-shm", "_proba"]);
+// `crit.db` se ovde NE kopira kao fajl - vidi snimiBazu ispod. Ovaj spisak
+// preskace ono sto u paket ne ide uopste.
+const preskoci = new Set(["backups", "crit.db", "crit.db-wal", "crit.db-shm", "_proba"]);
 function kopiraj(from, to) {
   fs.mkdirSync(to, { recursive: true });
   for (const e of fs.readdirSync(from, { withFileTypes: true })) {
@@ -45,6 +47,29 @@ function kopiraj(from, to) {
 for (const dir of ["src", "public", "node_modules", "data"]) {
   kopiraj(path.join(ROOT, "server", dir), path.join(SRV, dir));
 }
+
+// BAZA SE SNIMA, NE KOPIRA KAO FAJL.
+//
+// SQLite ovde radi u WAL rezimu: sveze izmene stoje u `crit.db-wal` sve dok se
+// ne prepisu u glavni fajl. Obicno kopiranje uzima samo `crit.db` (a -wal se
+// namerno preskace, jer bi bez svog para bio smece), pa u paket ode baza BEZ
+// poslednjih izmena - i to bez ijedne poruke.
+//
+// Desilo se tacno to: dve igre dodate kroz panel bile su u WAL-u, u paket je
+// otisla baza sa sedam igara umesto devet, a ciscenje orphana je odmah zatim
+// obrisalo i njihove omote jer ih "baza ne koristi".
+//
+// `VACUUM INTO` pravi uredan snimak: jedan fajl, sa svim sto je upisano, bez
+// potrebe da server bude ugasen.
+function snimiBazu() {
+  const izvor = path.join(ROOT, "server", "data", "crit.db");
+  const cilj = path.join(SRV, "data", "crit.db");
+  const db = new DatabaseSync(izvor, { readOnly: true });
+  try {
+    db.exec(`VACUUM INTO '${cilj.replace(/\\/g, "/").replace(/'/g, "''")}'`);
+  } finally { db.close(); }
+}
+snimiBazu();
 for (const f of ["package.json", "Pokreni server.bat", "Otvori port u firewall-u.bat", "Podesi autostart.bat", "VRATI-KOPIJU.bat"]) {
   fs.copyFileSync(path.join(ROOT, "server", f), path.join(SRV, f));
 }

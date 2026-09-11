@@ -19,7 +19,23 @@ const ROOT = import.meta.dirname;
 // treba, samo nad pogresnim fajlom, pa greska ne izgleda kao greska.
 const DATA_DIR = process.env.CRIT_DATA_DIR || path.join(ROOT, "server", "data");
 const DB = path.join(DATA_DIR, "crit.db");
-const UPLOADS = path.join(ROOT, "server", "public", "uploads");
+// Otpremljene slike stoje UZ BAZU (vidi UPLOADS u server/src/service.js) - one
+// su podaci igraonice, pa se kopiraju sa bazom i ne mešaju se sa programom.
+// Instalacija koja se tek seli ih još ima na starom mestu; server ih prenese
+// sam pri pokretanju, a ova skripta ume da se pokrene i pre toga.
+const UPLOADS = path.join(DATA_DIR, "uploads");
+fs.mkdirSync(UPLOADS, { recursive: true });
+{
+  const staro = path.join(ROOT, "server", "public", "uploads");
+  if (staro !== UPLOADS) {
+    let imena = [];
+    try { imena = fs.readdirSync(staro); } catch { imena = []; }
+    for (const ime of imena) {
+      const izvor = path.join(staro, ime), cilj = path.join(UPLOADS, ime);
+      try { if (!fs.existsSync(cilj) && fs.statSync(izvor).isFile()) fs.copyFileSync(izvor, cilj); } catch {}
+    }
+  }
+}
 const db = new DatabaseSync(DB);
 const log = (s) => console.log("  " + s);
 
@@ -30,9 +46,21 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS tocak_nagrade (id INTEGER PRIMARY KEY AUTOINCREMENT, naziv TEXT NOT NULL, kredit REAL NOT NULL DEFAULT 0, tezina INTEGER NOT NULL DEFAULT 1, sort INTEGER DEFAULT 0);
 `);
 
-// ---- 1) IGRE: samo one koje stvarno postoje kao prečica u C:\games ----
+// ---- 1) IGRE ----
+//
+// OVA SKRIPTA NIŠTA NE BRIŠE. To je najvažnije pravilo ovde, i naučeno je
+// skupo: ranije je radila `DELETE FROM games` pa upisivala svoj spisak. Svaka
+// igra koju je vlasnik dodao kroz panel nestajala je pri svakom pokretanju - a
+// odmah zatim bi korak 6 obrisao i njen omot sa diska, kao "orphan". Vlasnik je
+// ponovo dodavao Apex Legends i World of Warcraft, ponovo kačio korice, i sve
+// je opet nestajalo. (Po brojevima igara u bazi - 111 pa naviše - videlo se da
+// se to desilo bar desetak puta.)
+//
+// Zato je sada DOPUNA: šta fali, upiše se; šta postoji, ne dira se. Ime je
+// ključ, i poredi se bez obzira na velika slova i razmake.
+//
 // Naziv -> putanja (bez nastavka; launcher sam nađe .lnk/.url). Redosled je
-// redosled u polici.
+// redosled u polici, i važi samo za one koje se TEK upisuju.
 const IGRE = [
   ["Counter-Strike 2", "C:\\games\\cs2"],
   ["Valorant", "C:\\games\\valorant"],
@@ -41,22 +69,25 @@ const IGRE = [
   ["PUBG", "C:\\games\\pubg"],
   ["Minecraft", "C:\\games\\Minecraft"],
   ["Roblox", "C:\\games\\roblox"],
+  ["Apex Legends", "C:\\games\\apex"],
+  ["World of Warcraft", "C:\\games\\wow"],
 ];
-// Zadrži cover slike koje su već okačene - poveži ih po imenu igre.
-const stareIgre = db.prepare("SELECT id, name, image, banner FROM games").all();
-const coverPoImenu = new Map(stareIgre.map((g) => [g.name.trim().toLowerCase(), g.image]));
-
-// Obriši stare banere (regenerišu se), zapamti koje cover slike ostaju u upotrebi.
 const zadrzaneSlike = new Set();
 const setSetting = (k, v) => db.prepare("INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(k, String(v));
-db.exec("DELETE FROM games");
-const insG = db.prepare("INSERT INTO games (name, path, args, emoji, category, available, sort, image) VALUES (?,?,?,?,?,1,?,?)");
-IGRE.forEach(([name, p], i) => {
-  const cover = coverPoImenu.get(name.trim().toLowerCase()) || null;
-  if (cover) zadrzaneSlike.add(path.basename(cover));
-  insG.run(name, p, "", "", "Igre", i, cover);
+
+const kljuc = (s) => String(s ?? "").trim().toLowerCase();
+const postojece = db.prepare("SELECT id, name FROM games").all();
+const imamo = new Set(postojece.map((g) => kljuc(g.name)));
+const insG = db.prepare("INSERT INTO games (name, path, args, emoji, category, available, sort, image) VALUES (?,?,?,?,?,1,?,NULL)");
+let novih = 0;
+const odakleSort = (db.prepare("SELECT COALESCE(MAX(sort), -1) s FROM games").get().s ?? -1) + 1;
+IGRE.forEach(([name, p]) => {
+  if (imamo.has(kljuc(name))) return;
+  insG.run(name, p, "", "", "Igre", odakleSort + novih);
+  novih++;
 });
-log(`Igre: ${IGRE.length} (sa pravim prečicama iz C:\\games)`);
+log(`Igre: ${db.prepare("SELECT COUNT(*) c FROM games").get().c} ukupno` +
+  (novih ? `, ${novih} novih` : ", nijedna nova") + " (postojeće se ne diraju)");
 
 // ---- 2) ALATI: 6 aplikacija iz C:\games + 3 web, svi sa ugrađenim logom ----
 const ALATI = [
@@ -70,10 +101,19 @@ const ALATI = [
   ["Twitch", "web", "https://www.twitch.tv"],
   ["Google", "web", "https://www.google.com"],
 ];
-db.exec("DELETE FROM tools");
+// Isto pravilo kao kod igara: dopunjava se, ne briše. Vlasnik koji doda svoju
+// prečicu (drugi launcher, sajt turnira) ne sme da je izgubi.
+const imamoAlate = new Set(db.prepare("SELECT name FROM tools").all().map((t) => kljuc(t.name)));
 const insT = db.prepare("INSERT INTO tools (name, kind, target, args, color, available, sort, created_at) VALUES (?,?,?,?,?,1,?,?)");
-ALATI.forEach(([name, kind, target], i) => insT.run(name, kind, target, "", null, i, Date.now()));
-log(`Alati: ${ALATI.length} (${ALATI.filter((a) => a[1] === "app").length} iz C:\\games + ${ALATI.filter((a) => a[1] === "web").length} web)`);
+let novihAlata = 0;
+const alatSortOd = (db.prepare("SELECT COALESCE(MAX(sort), -1) s FROM tools").get().s ?? -1) + 1;
+ALATI.forEach(([name, kind, target]) => {
+  if (imamoAlate.has(kljuc(name))) return;
+  insT.run(name, kind, target, "", null, alatSortOd + novihAlata, Date.now());
+  novihAlata++;
+});
+log(`Alati: ${db.prepare("SELECT COUNT(*) c FROM tools").get().c} ukupno` +
+  (novihAlata ? `, ${novihAlata} novih` : ", nijedan nov"));
 
 // ---- 3) BANERI: nijedan; vrh početne nosi znak kuće i točak ----
 // Prvo obriši prethodne generisane banere iz uploads da se ne gomilaju.
@@ -89,12 +129,15 @@ const upisiSvg = (prefix, svg) => {
 // ima prednost nad omotom - a generisani baner je prazan šablon, pa bi na
 // ekranu prijave pobedio pravu koricu igre. Osoblje ga okači ako ga hoće
 // (Igre > izmena igre > Baner), ili ga napravi dugmetom u panelu.
-db.prepare("UPDATE games SET banner=NULL").run();
-// Promo baneri se NE prave unapred. Vrh početne sada nosi pravi znak kuće
-// (crit-logo.png) i widget nagradnog točka, sve iscrtano u launcheru. Okačen
-// promo baner bi to prekrio, pa ostaje na volju osoblju kroz panel.
-db.exec("DELETE FROM promo");
-log("Baneri i promo: nijedan (vrh početne nosi znak kuće i nagradni točak)");
+// Skida se samo GENERISANI baner (`baner-igra-*`) - prazan šablon koji bi na
+// ekranu prijave pobedio pravu koricu igre. Baner koji je vlasnik sam okačio
+// ostaje: "UPDATE games SET banner=NULL" je brisalo i njega.
+const skinuti = db.prepare("UPDATE games SET banner=NULL WHERE banner LIKE '%/baner-igra-%'").run().changes || 0;
+// Promo baneri se NE prave unapred. Vrh početne nosi znak kuće (crit-logo.png)
+// i widget nagradnog točka, sve iscrtano u launcheru. Ali ako je vlasnik promo
+// ipak okačio, njegov je - ranije ga je `DELETE FROM promo` brisalo bez reči.
+const promoIma = db.prepare("SELECT COUNT(*) c FROM promo").get().c;
+log(`Baneri: skinuto ${skinuti} generisanih; promo: ${promoIma ? `${promoIma} zatečeno, ne dira se` : "nijedan"}`);
 
 // ---- 3b) POZADINE EKRANA (2560x1440) ----
 // Bez njih je ekran prijave razvlačio baner izdvojene igre (2800x400) preko
@@ -133,8 +176,10 @@ if (db.prepare("SELECT COUNT(*) c FROM paketi").get().c === 0) {
 }
 // Nagrade točka. Najveća je 250 din; retka, da ostane vredna. Šest polja je
 // taman toliko da se svako pročita dok se točak vrti.
-db.exec("DELETE FROM tocak_nagrade");
-{
+// Samo ako ih nema. Vlasnik koji je nagrade podesio po svojoj kući nije hteo da
+// mu se vrate fabričke - a ranije ih je `DELETE FROM tocak_nagrade` vraćalo pri
+// svakom pokretanju.
+if (db.prepare("SELECT COUNT(*) c FROM tocak_nagrade").get().c === 0) {
   const insN = db.prepare("INSERT INTO tocak_nagrade (naziv, kredit, tezina, sort) VALUES (?,?,?,?)");
   [
     ["30 din", 30, 28, 1],
@@ -147,12 +192,23 @@ db.exec("DELETE FROM tocak_nagrade");
 }
 log("Vremenski paket 5h/500 i nagrade točka spremne");
 
-// ---- 6) očisti cover slike igara koje su izbačene (orphani) ----
+// ---- 6) očisti cover slike koje NIJEDNA igra više ne koristi ----
+//
+// Spisak se čita IZ BAZE, ne iz spiska gore. Ranije se brisalo sve što nije uz
+// jednu od sedam ukucanih igara - a pošto je korak 1 te druge igre upravo
+// obrisao, ovde bi nestale i njihove korice. Vlasnik ih je kačio iznova, i
+// iznova ih gubio.
+for (const g of db.prepare("SELECT image FROM games WHERE image IS NOT NULL AND image <> ''").all()) {
+  zadrzaneSlike.add(path.basename(g.image));
+}
+for (const g of db.prepare("SELECT banner FROM games WHERE banner IS NOT NULL AND banner <> ''").all()) {
+  zadrzaneSlike.add(path.basename(g.banner));
+}
 let obrisano = 0;
 for (const f of fs.readdirSync(UPLOADS)) {
   if (/^game-\d+-/.test(f) && !zadrzaneSlike.has(f)) { try { fs.unlinkSync(path.join(UPLOADS, f)); obrisano++; } catch {} }
 }
-if (obrisano) log(`Očišćeno ${obrisano} cover slika izbačenih igara`);
+if (obrisano) log(`Očišćeno ${obrisano} slika koje nijedna igra ne koristi`);
 
 db.close();
 console.log("\n  Baza je postavljena. Sada pokreni:  node napravi-paket.mjs\n");

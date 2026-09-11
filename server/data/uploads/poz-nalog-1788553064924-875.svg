@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2560" height="1440" viewBox="0 0 2560 1440">
+  <defs>
+    
+    <radialGradient id="sv0" cx="16%" cy="72%" r="52%">
+      <stop offset="0" stop-color="#8b3fd6" stop-opacity="0.21"/>
+      <stop offset="0.42" stop-color="#8b3fd6" stop-opacity="0.076"/>
+      <stop offset="1" stop-color="#8b3fd6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="sv1" cx="86%" cy="16%" r="48%">
+      <stop offset="0" stop-color="#2f6ae8" stop-opacity="0.16"/>
+      <stop offset="0.42" stop-color="#2f6ae8" stop-opacity="0.058"/>
+      <stop offset="1" stop-color="#2f6ae8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="sv2" cx="52%" cy="100%" r="36%">
+      <stop offset="0" stop-color="#2fd4e8" stop-opacity="0.08"/>
+      <stop offset="0.42" stop-color="#2fd4e8" stop-opacity="0.029"/>
+      <stop offset="1" stop-color="#2fd4e8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="baza" x1="0" y1="0" x2="0.22" y2="1">
+      <stop offset="0" stop-color="#131c3c"/>
+      <stop offset="0.5" stop-color="#0c1329"/>
+      <stop offset="1" stop-color="#070b1a"/>
+    </linearGradient>
+    
+    <linearGradient id="trakaX" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="0.35" stop-color="#fff" stop-opacity="1"/>
+      <stop offset="0.65" stop-color="#fff" stop-opacity="1"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="trakaY" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="maskaTrake">
+      <rect x="-2560" y="-1440" width="7680" height="4320" fill="url(#trakaX)"/>
+    </mask>
+    <linearGradient id="prelaz" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.04"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="vinjeta" cx="50%" cy="50%" r="76%">
+      <stop offset="0.42" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.52"/>
+    </radialGradient>
+  </defs>
+  <rect width="2560" height="1440" fill="url(#baza)"/>
+  <rect width="2560" height="1440" fill="url(#sv0)"/>
+  <rect width="2560" height="1440" fill="url(#sv1)"/>
+  <rect width="2560" height="1440" fill="url(#sv2)"/>
+  <g transform="rotate(-19 1280 720)" opacity="0.03" mask="url(#maskaTrake)">
+    <rect x="-768" y="-86.39999999999999" width="4096" height="190" fill="url(#trakaY)"/><rect x="-768" y="288" width="4096" height="64" fill="url(#trakaY)"/><rect x="-768" y="489.6" width="4096" height="260" fill="url(#trakaY)"/><rect x="-768" y="878.4" width="4096" height="40" fill="url(#trakaY)"/><rect x="-768" y="1123.2" width="4096" height="150" fill="url(#trakaY)"/>
+  </g>
+  <rect width="2560" height="1440" fill="url(#prelaz)"/>
+  <rect width="2560" height="1440" fill="url(#vinjeta)"/>
+</svg>
