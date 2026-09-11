@@ -556,7 +556,7 @@ function handleMsg(m) {
       S.balance = m.balance; S.remaining = m.remainingSeconds; updateHud();
       // Iskustvo raste dok naplata tece, pa traka na vrhu pocetne mora da se
       // pomera dok igrac gleda - inace bi napredak postojao samo u bazi.
-      if (m.vip) { S.vip = m.vip; osveziVip(); }
+      if (m.vip) { S.vip = m.vip; osveziRangTraku(); }
       break;
     case "tocak":
       // Vlasnik je upalio/ugasio tocak ili promenio nagrade - osvezi prikaz.
@@ -665,7 +665,7 @@ function handleMsg(m) {
       break;
     case "vip":
       S.vip = m.vip || null;
-      osveziVip();
+      osveziRangTraku();
       break;
     case "profil":
       S.profil = m.profil || null;
@@ -1265,7 +1265,7 @@ function prikaziPromo(i) {
 //
 // i traka se sama popuni - ništa se ovde ne prepravlja. Dok tog polja nema,
 // prikaz je zaključan. Tako se izgled i pravila razvijaju odvojeno.
-function vipHtml() {
+function rangTrakaHtml() {
   const v = S.vip;
   // Tri stanja, ne dva:
   //   nema podataka  - server je stariji ili igrac nije prijavljen -> "Uskoro!"
@@ -1284,8 +1284,10 @@ function vipHtml() {
   // ko je članarinu stvarno platio, i uz broj preostalih dana: ko ne zna dokle
   // mu važi, ne obnavlja.
   //
-  // (Klase su i dalje `vip-*` - to je istorijsko ime iz vremena kad je traka
-  // bila VIP traka, i ne menja se zajedno sa ovim da izmena ostane mala.)
+  // Klase se zovu `rang-*`, a ne `vip-*` kako su se zvale dok je VIP bio nagrada
+  // za nivo. Ime koje laže je skuplje nego što izgleda: sledeći koji otvori ovaj
+  // deo pomisli da je reč o članarini i doda joj još nešto - a ovde nema ničega
+  // što se plaća. Oznaka člana je jedini izuzetak i zato se zove `rang-clan`.
   const jeClan = ima && !!v.vip;
   const naKraju = ima && v.poslednji;
   const merljiv = ima && !naKraju && Number.isFinite(v.xpDo) && v.xpDo > 0;
@@ -1302,37 +1304,37 @@ function vipHtml() {
   // Zupci dele traku na nivoe - bez njih je to samo linija koja raste, a sa
   // njima se vidi DOKLE se stiglo i koliko je ostalo.
   const zupci = Array.from({ length: 9 }, (_, i) =>
-    `<span class="vip-zub" style="left:${((i + 1) * 10).toFixed(0)}%"></span>`).join("");
+    `<span class="rang-zub" style="left:${((i + 1) * 10).toFixed(0)}%"></span>`).join("");
 
   // ZNAK KUCE OSTAJE U VRHU POCETNE.
   //
   // Prva verzija VIP trake ga je izbacila - a bas preko klase `brand-logo`
   // primeniBrend menja logo po igraonici. Bez njega bi svaka igraonica gledala
   // tudji znak na svom najvidljivijem mestu.
-  return `<div class="vip ${ima ? "" : "zakljucan"}${naKraju ? " vrh" : ""}">
-    <img class="vip-kuca brand-logo" src="img/crit-logo.png" alt="${esc(S.settings.cafeName || "")}" draggable="false" />
+  return `<div class="rang ${ima ? "" : "zakljucan"}${naKraju ? " vrh" : ""}">
+    <img class="rang-kuca brand-logo" src="img/crit-logo.png" alt="${esc(S.settings.cafeName || "")}" draggable="false" />
     ${/* U štitu stoji BROJ NIVOA, ne zvezda. Zvezda je bila znak VIP-a, a VIP
           se sada kupuje; broj je uz to i jedina stvar na traci koja raste, pa
           mu je mesto na najkrupnijem elementu. */ ""}
-    <div class="vip-znak" aria-hidden="true">
+    <div class="rang-znak" aria-hidden="true">
       <svg viewBox="0 0 44 48" fill="none">
-        <path class="vip-stit" d="M22 2l18 7v18c0 10-8 16-18 19C12 43 4 37 4 27V9z"/>
-        <text class="vip-broj" x="22" y="29" text-anchor="middle" dominant-baseline="middle">${ima ? v.nivo : "-"}</text>
+        <path class="rang-stit" d="M22 2l18 7v18c0 10-8 16-18 19C12 43 4 37 4 27V9z"/>
+        <text class="rang-broj" x="22" y="29" text-anchor="middle" dominant-baseline="middle">${ima ? v.nivo : "-"}</text>
       </svg>
     </div>
-    <div class="vip-telo">
-      <div class="vip-vrh">
-        <span class="vip-ime">${ima ? esc((v.naziv || "").toUpperCase()) : "RANG"}</span>
-        <span class="vip-nivo">${nivo}</span>
-        ${jeClan ? `<span class="vip-clan">${icon("gift", 13)} VIP${v.vipDana ? ` - još ${v.vipDana} ${v.vipDana === 1 ? "dan" : "dana"}` : ""}</span>` : ""}
+    <div class="rang-telo">
+      <div class="rang-vrh">
+        <span class="rang-ime">${ima ? esc((v.naziv || "").toUpperCase()) : "RANG"}</span>
+        <span class="rang-nivo">${nivo}</span>
+        ${jeClan ? `<span class="rang-clan">${icon("gift", 13)} VIP${v.vipDana ? ` - još ${v.vipDana} ${v.vipDana === 1 ? "dan" : "dana"}` : ""}</span>` : ""}
       </div>
-      <div class="vip-traka">
+      <div class="rang-traka">
         <i style="width:${postotak.toFixed(1)}%"></i>
         ${zupci}
       </div>
-      <div class="vip-pod">${pod}</div>
+      <div class="rang-pod">${pod}</div>
     </div>
-    ${ima ? "" : `<div class="vip-pecat"><span>Uskoro!</span></div>`}
+    ${ima ? "" : `<div class="rang-pecat"><span>Uskoro!</span></div>`}
   </div>`;
 }
 
@@ -1341,11 +1343,11 @@ function vipHtml() {
 // Iskustvo raste dok naplata teče - na svakih pet sekundi. Da se tada iscrtava
 // cela početna, police bi treperile, drag-to-scroll bi se prekidao, a igrač koji
 // prevlači korice bi to osetio kao trzanje.
-function osveziVip() {
-  const stara = $(".vip");
+function osveziRangTraku() {
+  const stara = $(".rang");
   if (!stara) return;
   const p = document.createElement("div");
-  p.innerHTML = vipHtml();
+  p.innerHTML = rangTrakaHtml();
   const nova = p.firstElementChild;
   if (nova) stara.replaceWith(nova);
   primeniBrend(S.brend);
@@ -1359,7 +1361,7 @@ function osveziVip() {
 function proslaviNivo(m) {
   const dobio = (m.otkljucano || []).map((o) => o.naziv).filter(Boolean);
   toast(`Nivo ${m.nivo} - ${m.naziv}${dobio.length ? ": " + dobio.join(", ") : ""}`, "nivo", 7000);
-  const el = $(".vip");
+  const el = $(".rang");
   if (el) {
     // Animacija se pokreće ponovo i kad klasa već stoji - inače drugi nivo
     // zaredom ne bi bljesnuo.
@@ -1384,7 +1386,7 @@ function heroHtml() {
         ${lista.length > 1 ? `<div class="promo-tacke">${lista.map((_, i) =>
           `<button class="promo-tacka ${i === 0 ? "aktivna" : ""}" data-promo-idi="${i}" aria-label="Baner ${i + 1}"></button>`).join("")}</div>` : ""}
       </div>`
-    : vipHtml();
+    : rangTrakaHtml();
   // Kad je okačen promo baner, on je slika koju je osoblje napravilo i preko nje
   // ne sme ništa - ni šara ni crvena nit uz ivicu. Klasa "promo" ih gasi.
   return `<section class="hero ${lista.length ? "promo" : ""}">${levo}${heroTocakHtml()}</section>`;

@@ -56,7 +56,7 @@ proveri("traka stoji IZNAD mreze artikala",
 proveri("u baneru nema igara", !/hero-nastavi|hn-igra/.test(launcher),
   "baner nosi promo ili znak, ne pločice sa imenima igara");
 proveri("promo baner osoblja ima prednost nad znakom", /const lista = S\.promo \|\| \[\];/.test(launcher));
-proveri("kad promo nema, stoji VIP traka", /: vipHtml\(\);/.test(launcher),
+proveri("kad promo nema, stoji VIP traka", /: rangTrakaHtml\(\);/.test(launcher),
   "prostor koji vlasnik nije prodao nosi VIP napredak, ne prazan znak");
 proveri("znak u baneru prati brend igraonice", /class="[^"]*brand-logo"/.test(launcher),
   "inace svaka igraonica gleda tudji logo usred svog banera");

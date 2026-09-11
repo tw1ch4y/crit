@@ -1852,12 +1852,12 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
    Zaključano stanje nije prazna traka nego traka sa pečatom: prazna traka je
    obećanje koje program ne ispunjava, a pečat kaže da stvar tek dolazi.
 */
-.vip {
+.rang {
   position: relative; flex: 1; min-width: 0; height: 100%;
   display: flex; align-items: center; gap: 20px; padding: 0 24px;
   overflow: hidden;
 }
-.vip::before {
+.rang::before {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background:
     radial-gradient(120% 200% at 8% 50%, rgba(255, 181, 39, 0.10), transparent 58%),
@@ -1865,72 +1865,72 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
 }
 /* Znak kuce, pa tanka pregrada, pa VIP. Dva znaka jedan do drugog moraju da
    budu razdvojena - inace se citaju kao jedan zbrkan oblik. */
-.vip-kuca { flex: none; height: 46px; width: auto; display: block;
+.rang-kuca { flex: none; height: 46px; width: auto; display: block;
   filter: drop-shadow(0 4px 16px rgba(var(--brend-rgb), 0.4)); }
-.vip-znak { flex: none; width: 52px; height: 56px; position: relative;
+.rang-znak { flex: none; width: 52px; height: 56px; position: relative;
   padding-left: 20px; margin-left: 2px; box-sizing: content-box;
   border-left: 1px solid var(--line-2); }
-.vip-znak svg { margin-left: 0; }
-.vip-znak svg { width: 100%; height: 100%; display: block; }
-.vip-stit {
+.rang-znak svg { margin-left: 0; }
+.rang-znak svg { width: 100%; height: 100%; display: block; }
+.rang-stit {
   fill: rgba(255, 181, 39, 0.10); stroke: var(--gold); stroke-width: 2;
   stroke-linejoin: round;
 }
 /* U stitu stoji BROJ NIVOA. Zvezda je bila znak VIP-a, a VIP se sada kupuje -
    zvezda na traci svakog gosta bi znacila da ga svi imaju. Broj je uz to jedina
    stvar na traci koja raste. */
-.vip-broj {
+.rang-broj {
   fill: var(--gold); font-family: var(--font-display); font-size: 19px; font-weight: 700;
   letter-spacing: 0; paint-order: stroke;
 }
-.vip.zakljucan .vip-stit { stroke: rgba(255, 181, 39, 0.42); fill: rgba(255, 181, 39, 0.05); }
-.vip.zakljucan .vip-broj { fill: rgba(255, 181, 39, 0.34); }
+.rang.zakljucan .rang-stit { stroke: rgba(255, 181, 39, 0.42); fill: rgba(255, 181, 39, 0.05); }
+.rang.zakljucan .rang-broj { fill: rgba(255, 181, 39, 0.34); }
 
 /* Rec VIP stoji SAMO onome ko je clanarinu platio, i uz broj preostalih dana:
    ko ne zna dokle mu vazi, ne obnavlja. Zlatna je ovde na mestu - clanarina je
    nagrada, i jedina je zlatna stvar u traci pored samog stita. */
-.vip-clan {
+.rang-clan {
   display: inline-flex; align-items: center; gap: 5px;
   font-family: var(--font-ui); font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
   color: var(--gold); background: rgba(255, 181, 39, 0.12);
   padding: 3px 9px; border-radius: 999px; white-space: nowrap;
 }
-.vip-clan svg { flex: none; }
+.rang-clan svg { flex: none; }
 
-.vip-telo { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 8px; }
-.vip-vrh { display: flex; align-items: baseline; gap: 12px; }
-.vip-ime {
+.rang-telo { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.rang-vrh { display: flex; align-items: baseline; gap: 12px; }
+.rang-ime {
   font-family: var(--font-display); font-size: 30px; font-weight: 700;
   letter-spacing: 0.08em; color: var(--gold); line-height: 1;
   text-shadow: 0 0 26px var(--gold-glow);
 }
-.vip.zakljucan .vip-ime { color: rgba(255, 181, 39, 0.55); text-shadow: none; }
-.vip-nivo {
+.rang.zakljucan .rang-ime { color: rgba(255, 181, 39, 0.55); text-shadow: none; }
+.rang-nivo {
   font-family: var(--font-ui); font-size: 13px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3);
 }
 
 /* Traka: zupci je dele na nivoe, pa se vidi DOKLE se stiglo, ne samo da raste. */
-.vip-traka {
+.rang-traka {
   position: relative; height: 12px; border-radius: 3px;
   background: rgba(var(--bg-rgb), 0.65);
   box-shadow: inset 0 0 0 1px var(--line-2);
   overflow: hidden;
 }
-.vip-traka i {
+.rang-traka i {
   display: block; height: 100%; border-radius: 2px;
   background: linear-gradient(90deg, var(--gold), #ffd97a);
   box-shadow: 0 0 18px -2px var(--gold-glow);
   transition: width 0.6s var(--tr);
 }
-.vip-zub {
+.rang-zub {
   position: absolute; top: 0; bottom: 0; width: 1px;
   background: rgba(var(--bg-rgb), 0.9);
 }
-.vip-pod { font-size: 13px; color: var(--text-3); }
+.rang-pod { font-size: 13px; color: var(--text-3); }
 
 /* Pečat: nakrivljen kao da je otisnut, ne kao dugme. */
-.vip-pecat {
+.rang-pecat {
   position: absolute; right: 26px; top: 50%; z-index: 2;
   transform: translateY(-50%) rotate(-8deg);
   padding: 8px 16px 10px;
@@ -1940,13 +1940,13 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
   letter-spacing: 0.1em; text-transform: uppercase; line-height: 1;
   box-shadow: 0 0 34px -8px var(--gold-glow), inset 0 0 22px -12px var(--gold-glow);
 }
-.vip-pecat span { display: block; }
+.rang-pecat span { display: block; }
 
 @media (max-width: 1180px) {
-  .vip { gap: 12px; padding: 0 16px; }
-  .vip-znak { width: 46px; height: 50px; }
-  .vip-ime { font-size: 24px; }
-  .vip-pecat { font-size: 19px; padding: 6px 12px 8px; right: 18px; }
+  .rang { gap: 12px; padding: 0 16px; }
+  .rang-znak { width: 46px; height: 50px; }
+  .rang-ime { font-size: 24px; }
+  .rang-pecat { font-size: 19px; padding: 6px 12px 8px; right: 18px; }
 }
 
 /* ---------- Profil igrača ---------- */
@@ -2057,8 +2057,8 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
 
 /* Nov nivo: traka bljesne jednom. Bez toga bi se promenila tiho, a igrač bi je
    primetio tek slučajno - i otključana stvar bi stajala neiskorišćena. */
-.vip.slavi { animation: vip-slavi 2.4s ease-out; }
-@keyframes vip-slavi {
+.rang.slavi { animation: rang-slavi 2.4s ease-out; }
+@keyframes rang-slavi {
   0% { box-shadow: inset 0 0 0 0 var(--gold-glow); }
   18% { box-shadow: inset 0 0 90px -20px var(--gold-glow); }
   100% { box-shadow: inset 0 0 0 0 rgba(255, 181, 39, 0); }

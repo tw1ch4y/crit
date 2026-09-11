@@ -18,16 +18,16 @@ const rend = citajIzvor("client/renderer/js/launcher.js");
 const css = citajIzvor("client/renderer/css/launcher.css");
 
 // ---- 1) bez podataka: zakljucano, i to se VIDI ----
-proveri("VIP traka postoji", /function vipHtml\(\)/.test(rend));
+proveri("VIP traka postoji", /function rangTrakaHtml\(\)/.test(rend));
 // Tri stanja, ne dva: nema podataka (stariji server ili neprijavljen igrac),
 // poslednji nivo (traka puna, nema sta da se trazi) i sve ostalo.
 proveri("bez podataka je zakljucana", /const ima = !!v && Number\.isFinite\(v\.nivo\);/.test(rend),
   "traka se crta tek kad server posalje nivo");
 proveri("poslednji nivo nema laznu granicu", /const naKraju = ima && v\.poslednji;/.test(rend),
   "inace bi svaki sledeci dinar izgledao kao napredak ka necemu cega nema");
-proveri("zakljucano stanje nosi pecat", /vip-pecat[\s\S]{0,120}Uskoro!/.test(rend),
+proveri("zakljucano stanje nosi pecat", /rang-pecat[\s\S]{0,120}Uskoro!/.test(rend),
   "prazna traka bez objasnjenja izgleda kao kvar, ne kao najava");
-proveri("pecat se sklanja cim podaci stignu", /\$\{ima \? "" : `<div class="vip-pecat"/.test(rend));
+proveri("pecat se sklanja cim podaci stignu", /\$\{ima \? "" : `<div class="rang-pecat"/.test(rend));
 proveri("bez podataka napredak je NULA", /: merljiv \? Math\.max\(0, Math\.min\(100,[\s\S]{0,40}: 0;/.test(rend),
   "izmisljen napredak je gori od nikakvog - igrac bi cekao nagradu koje nema");
 proveri("bez podataka se ne izmislja ni nivo", /: "Nivo -"/.test(rend));
@@ -51,10 +51,10 @@ proveri("zapisano je sta server treba da posalje",
 // Zlatna u celom programu znaci NAGRADU (nagradni tocak). VIP je nagrada, pa
 // nosi istu boju. Boja kuce se ovde ne koristi - VIP bi se izgubio medju
 // dugmadima, a ovo mora da se izdvoji.
-proveri("VIP nosi zlatnu, ne boju kuce", /\.vip-ime \{[^}]*color: var\(--gold\)/.test(css),
+proveri("VIP nosi zlatnu, ne boju kuce", /\.rang-ime \{[^}]*color: var\(--gold\)/.test(css),
   "zlatna znaci nagradu; boja kuce bi VIP izjednacila sa obicnim dugmetom");
-proveri("traka se puni zlatnom", /\.vip-traka i \{[^}]*var\(--gold\)/.test(css));
-proveri("zupci dele traku na nivoe", /\.vip-zub \{/.test(css),
+proveri("traka se puni zlatnom", /\.rang-traka i \{[^}]*var\(--gold\)/.test(css));
+proveri("zupci dele traku na nivoe", /\.rang-zub \{/.test(css),
   "bez njih je to linija koja raste, a ne napredak kroz nivoe");
 
 // ---- 5) placeni prostor ima prednost ----
@@ -62,7 +62,7 @@ proveri("zupci dele traku na nivoe", /\.vip-zub \{/.test(css),
 // Ako je vlasnik okacio promo banere, taj prostor je njegov. VIP traka se tada
 // sklanja - inace bi nova funkcija pojela oglasni prostor koji neko placa.
 proveri("promo baneri imaju prednost nad VIP trakom",
-  /const levo = lista\.length[\s\S]{0,600}: vipHtml\(\);/.test(rend),
+  /const levo = lista\.length[\s\S]{0,600}: rangTrakaHtml\(\);/.test(rend),
   "prostor koji je vlasnik platio ne sme da pojede nova funkcija");
 
 // ---- REC "VIP" NE STOJI ONOME KO JE NIJE PLATIO ----
@@ -75,17 +75,17 @@ proveri("promo baneri imaju prednost nad VIP trakom",
 //
 // Naslov trake je zato IME RANGA, a rec VIP se pojavljuje samo clanu.
 proveri("naslov trake je ime ranga, ne rec VIP",
-  /class="vip-ime">\$\{ima \? esc\(\(v\.naziv \|\| ""\)\.toUpperCase\(\)\)/.test(rend),
+  /class="rang-ime">\$\{ima \? esc\(\(v\.naziv \|\| ""\)\.toUpperCase\(\)\)/.test(rend),
   "upisan natpis VIP je reklamirao clanarinu bas onome ko je nije kupio");
 proveri("oznaka VIP zavisi od placene clanarine",
-  /const jeClan = ima && !!v\.vip;/.test(rend) && /\$\{jeClan \? `<span class="vip-clan"/.test(rend));
+  /const jeClan = ima && !!v\.vip;/.test(rend) && /\$\{jeClan \? `<span class="rang-clan"/.test(rend));
 proveri("i kaze koliko jos traje", /još \$\{v\.vipDana\}/.test(rend),
   "ko ne zna dokle mu vazi, ne obnavlja - obnavlja onaj koji vidi da mu istice");
 // Zvezda je bila znak VIP-a. Na traci svakog gosta znacila bi da ga svi imaju.
 proveri("u stitu je broj nivoa, ne zvezda",
-  /class="vip-broj"/.test(rend) && !/vip-zvezda/.test(rend), "zvezda je znak clanarine");
-proveri("broj u stitu ima svoj stil", /\.vip-broj \{/.test(css));
-proveri("oznaka clana je zlatna", /\.vip-clan \{[\s\S]{0,220}color: var\(--gold\)/.test(css),
+  /class="rang-broj"/.test(rend) && !/vip-zvezda/.test(rend), "zvezda je znak clanarine");
+proveri("broj u stitu ima svoj stil", /\.rang-broj \{/.test(css));
+proveri("oznaka clana je zlatna", /\.rang-clan \{[\s\S]{0,220}color: var\(--gold\)/.test(css),
   "clanarina je nagrada - zlatna je tu na mestu");
 
 kraj();
