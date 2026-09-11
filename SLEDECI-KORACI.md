@@ -1,13 +1,17 @@
 # Šta ostaje tebi
 
-Sve što se moglo uraditi sa razvojnog računara je urađeno i provereno:
-**1792 automatske provere, 17 alata na pravom Electronu, 0 palo.**
+Sve što se moglo uraditi sa razvojnog računara je urađeno i provereno. Provera
+se pušta ovde, traje oko dva minuta i sama ispiše koliko ih je prošlo:
+
+```
+node testovi/pokreni-sve.mjs
+```
 
 Ovde je ostalo ono što traži tvoj nalog, tvoju mrežu ili tvoje ruke. Redosled
 nije proizvoljan - svaki korak se oslanja na prethodni.
 
 Paket za USB je već napravljen: **`Desktop\CRIT-ZA-IGRAONICU`** (105 MB,
-instaler `Crit Launcher Setup 2.45.0.exe`).
+instaler `Crit Launcher Setup 2.49.0.exe`).
 
 ---
 
@@ -26,7 +30,7 @@ node alati/kopija-koda.mjs D:\kopije
 ```
 
 Jedan fajl, sve grane i svi commitovi. Vraćanje na bilo kom računaru sa git-om:
-`git clone "D:\kopije\crit-kod-2.45.0-....bundle" crit`
+`git clone "D:\kopije\crit-kod-2.49.0-....bundle" crit`
 
 > Odredište koje ne postoji alat **odbija**. Namerno: folder napravljen na
 > lokalnom disku izgledao bi kao uspela kopija, a bio bi na istom disku od kog
@@ -52,7 +56,7 @@ git push -u origin master
 Git na ovoj mašini koristi credential manager - otvoriće ti se prozor za prijavu
 na GitHub, nema tokena za prekucavanje.
 
-Posle push-a CI se pokreće sam i prolazi kroz svih 1792 provere. Provereno na
+Posle push-a CI se pokreće sam i pušta ceo isti skup provera. Provereno na
 pravom klonu da je zelen.
 
 ---
@@ -81,6 +85,15 @@ svim mašinama.
 rezervne kopije inače stoje na istom disku; kad taj disk otkaže, nestaje i jedno
 i drugo.
 
+Na odredište odlaze **dve stvari**: `crit-....db` (baza) i folder `slike\`
+(omoti, slike pića, pozadine, baneri). Slike se prepisuju samo kad se promene,
+pa USB ne prima iste megabajte svaki dan.
+
+> **Ako ikad budeš vraćao sa nule** (nov disk, nov računar): prekopiraj `.db` u
+> `server\data\crit.db`, a **ceo sadržaj `slike\` u `server\data\uploads\`**. Bez
+> tog drugog koraka baza se otvori uredno, ali svaki omot i svaka pozadina budu
+> prazni - u bazi stoje putanje do fajlova kojih više nema.
+
 ### 2.4 Ruter: gosti odvojeno od osoblja
 
 Lozinke i token panela putuju mrežom **u čistom tekstu** (HTTPS još nije urađen).
@@ -99,7 +112,15 @@ kablu, nikad sa mreže koju koriste gosti.
 2. Napravi kopiju celog `server\data\` foldera sa strane.
 3. Iz paketa prepiši `server\src\` i `server\public\`. **`server\data\` ne diraj.**
 4. Pokreni server. Bazu sam prilagodi novoj verziji.
-5. Panel → Podešavanja → mora da piše **2.45.0**.
+5. Panel → Podešavanja → mora da piše **2.49.0**.
+
+> Od ove verzije otpremljene slike stoje uz bazu, u `server\data\uploads\`. Ako
+> su na tvom serveru još u `server\public\uploads\`, server ih **prenese sam** pri
+> prvom pokretanju i to ispiše u svom prozoru. Staro mesto ostaje netaknuto, pa
+> se ništa ne gubi ako nešto pođe naopako.
+>
+> Zašto: dok su bile unutar programa, nisu ulazile ni u jednu rezervnu kopiju -
+> vraćena baza je pokazivala na fajlove kojih nema.
 
 ---
 
@@ -125,7 +146,7 @@ skine, a nova da se instalira **sa naloga igrača**.
    sa kog je pokrenuta. Ako je pokreneš sa administratorskog, launchera na nalogu
    igrača **neće biti**.
 
-3. Pokreni `Crit Launcher Setup 2.45.0.exe`. Ne traži administratora.
+3. Pokreni `Crit Launcher Setup 2.49.0.exe`. Ne traži administratora.
 
 4. **Prepravi prečicu za automatsko pokretanje.** Stara pokazuje na
    `Program Files` - te putanje više nema.
@@ -138,7 +159,7 @@ skine, a nova da se instalira **sa naloga igrača**.
 
 5. Restartuj računar i sačekaj da se launcher digne sam.
 
-6. U panelu, strana **Računari**, kolona *verzija* mora da pokaže **2.45.0**.
+6. U panelu, strana **Računari**, kolona *verzija* mora da pokaže **2.49.0**.
 
 **Ako mašina još nije zaključana** (`zastita-ukljuci.bat` nikad pokrenut):
 desni klik → *Run as administrator*, pa odjava i ponovna prijava.
@@ -152,7 +173,7 @@ desni klik → *Run as administrator*, pa odjava i ponovna prijava.
 
 Bez ustajanja od kase:
 
-1. Ovde: `node verzija.mjs 2.46.0` → `cd client && npm run build`
+1. Ovde: `node verzija.mjs <nova>` → `cd client && npm run build`
 2. Panel → **Instalacije** → *Postavi instalater* → izaberi `.exe` iz `dist\`
 3. *Pusti verziju u rad*
 

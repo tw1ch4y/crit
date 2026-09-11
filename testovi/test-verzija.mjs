@@ -75,5 +75,31 @@ proveri("panel istice racunar koji zaostaje", panel.includes("const zaostao = na
   "inace se rucno uporedjuje 13 redova");
 proveri("prazno polje je objasnjeno", panel.includes("Launcher stariji od 2.22 ne javlja verziju"));
 
+// ---- UPUTSTVO ZA OBILAZAK NE SME DA ZAOSTANE IZA KODA ----
+//
+// SLEDECI-KORACI.md se cita RUKOM, pred trinaest masina: u njemu pise koji se
+// instaler pokrece i koja verzija mora da stoji u panelu posle toga. Dok se
+// menjao rucno, zaostajao je - uputstvo je trazilo 2.45.0, a u paketu je stajao
+// 2.49.0. Covek koji to zatekne ili prekuca pogresno ili pomisli da je uzeo
+// pogresan paket, i to usred obilaska.
+//
+// Zato `verzija.mjs` sada menja i njega, a ovde se cuva da to stvarno radi.
+const uputstvo = citajIzvor("SLEDECI-KORACI.md");
+const nasa = JSON.parse(citajIzvor("server/package.json")).version;
+const pomenute = [...new Set(uputstvo.match(/\d+\.\d+\.\d+/g) || [])];
+proveri("uputstvo uopste pominje verziju", pomenute.length > 0,
+  "ako vise ne pominje, ova provera nema sta da cuva - obrisi je");
+proveri(`uputstvo nosi tekucu verziju (${nasa})`,
+  pomenute.every((v) => v === nasa), `nadjeno: ${pomenute.join(", ")}`);
+proveri("verzija.mjs menja i uputstvo",
+  citajIzvor("verzija.mjs").includes("SLEDECI-KORACI.md"),
+  "inace ce opet zaostati, samo sledeci put");
+
+// Brojevi provera se u uputstvu ne zapisuju: zastare istog dana, a niko ih ne
+// osvezava. Umesto toga stoji komanda koja ih sama ispise.
+proveri("uputstvo ne tvrdi koliko ima provera",
+  !/\d{3,} (automatske )?provere/.test(uputstvo) && uputstvo.includes("node testovi/pokreni-sve.mjs"),
+  "upisan broj zastari istog dana");
+
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 process.exit(pao ? 1 : 0);

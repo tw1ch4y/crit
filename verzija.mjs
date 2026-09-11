@@ -62,6 +62,28 @@ for (const m of MESTA) {
   console.log(`  ${path.relative(KOREN, m.put)} -> ${nova}`);
 }
 
+// UPUTSTVO ZA OBILAZAK TAKOĐE NOSI VERZIJU, I TO NA PET MESTA.
+//
+// `SLEDECI-KORACI.md` se čita rukom, pred trinaest mašina: u njemu piše koji se
+// instaler pokreće i koja verzija mora da stoji u panelu posle toga. Dok se
+// menjao ručno, zaostajao je iza koda - pa je uputstvo tražilo 2.45.0, a u
+// paketu je stajao 2.49.0. Čovek koji to zatekne ili prekuca pogrešno ili
+// pomisli da je uzeo pogrešan paket, i to usred obilaska.
+//
+// Menja se SAMO puna verzija u tekstu; sve ostalo se ne dira.
+{
+  const put = path.join(KOREN, "SLEDECI-KORACI.md");
+  try {
+    const pre = fs.readFileSync(put, "utf8");
+    const posle = pre.replaceAll(stara, nova);
+    if (posle !== pre) {
+      fs.writeFileSync(put, posle);
+      const koliko = pre.split(stara).length - 1;
+      console.log(`  SLEDECI-KORACI.md -> ${nova} (${koliko} ${koliko === 1 ? "mesto" : "mesta"})`);
+    }
+  } catch {}
+}
+
 console.log(`\nVerzija: ${stara} -> ${nova}\n`);
 console.log("Dalje:");
 console.log("  1. cd client && npm run build      (instaler)");

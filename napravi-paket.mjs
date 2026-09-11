@@ -67,26 +67,49 @@ for (const f of ["package.json", "Pokreni server.bat", "Otvori port u firewall-u
     if (r.v && r.v.startsWith("/uploads/")) referencirano.add(path.basename(r.v));
   }
   pkgDb.close();
-  // Slike stoje uz bazu (server/data/uploads) - one su podaci igraonice, a ne
-  // deo programa. Staro mesto (public/uploads) se i dalje cisti, da paket ne
-  // nosi dvostruko dok ima instalacija koje se tek sele.
-  let orphana = 0;
-  for (const pkgUploads of [path.join(SRV, "data", "uploads"), path.join(SRV, "public", "uploads")]) {
-    if (!fs.existsSync(pkgUploads)) continue;
-    for (const f of fs.readdirSync(pkgUploads)) {
-      if (!referencirano.has(f)) { fs.rmSync(path.join(pkgUploads, f), { force: true, recursive: true }); orphana++; }
+
+  // SLIKE IDU UZ BAZU, U data/uploads - one su podaci igraonice, a ne deo
+  // programa (vidi UPLOADS u service.js).
+  //
+  // Na razvojnom racunaru mogu da budu na oba mesta: u data/uploads ako je
+  // server ovde vec radio, ili jos uvek u public/uploads ako nije. Paket ih zato
+  // skuplja sa oba i slaze na JEDNO mesto, a staro se prazni do kraja: dve
+  // kopije istih fajlova u paketu su cist visak, a instalacija u igraonici bi
+  // posle prve nadogradnje imala i jedne i druge.
+  const cilj = path.join(SRV, "data", "uploads");
+  const staro = path.join(SRV, "public", "uploads");
+  fs.mkdirSync(cilj, { recursive: true });
+  let preneto = 0;
+  if (fs.existsSync(staro)) {
+    for (const f of fs.readdirSync(staro)) {
+      const izvor = path.join(staro, f);
+      try {
+        if (referencirano.has(f) && !fs.existsSync(path.join(cilj, f))) { fs.copyFileSync(izvor, path.join(cilj, f)); preneto++; }
+      } catch {}
     }
+    fs.rmSync(staro, { recursive: true, force: true });
   }
-  if (orphana) console.log(`  uploads: izbaceno ${orphana} orphan slika (baza ih ne koristi)`);
-  // Paket bez slika je paket bez ijednog omota - to se vidi tek u igraonici.
-  const uPaketu = fs.existsSync(path.join(SRV, "data", "uploads"))
-    ? fs.readdirSync(path.join(SRV, "data", "uploads")).length : 0;
-  if (referencirano.size && !uPaketu) {
-    console.error(`\nBaza pominje ${referencirano.size} slika, a u paketu ih nema nijedne.`);
-    console.error("Proveri server/data/uploads - tu sada stoje otpremljene slike.");
+
+  // Sve cega baza ne pominje je orphan (probni baner, slika izbacene igre) i
+  // samo bi opterecivalo paket.
+  let orphana = 0;
+  for (const f of fs.readdirSync(cilj)) {
+    if (!referencirano.has(f)) { fs.rmSync(path.join(cilj, f), { force: true, recursive: true }); orphana++; }
+  }
+  if (orphana) console.log(`  slike: izbaceno ${orphana} orphan (baza ih ne koristi)`);
+
+  // Paket bez slika je paket bez ijednog omota - a to se inace vidi tek u
+  // igraonici, kad je vec na USB-u.
+  const uPaketu = fs.readdirSync(cilj).length;
+  const fali = [...referencirano].filter((f) => !fs.existsSync(path.join(cilj, f)));
+  if (fali.length) {
+    console.error(`\nBaza pominje ${fali.length} slika kojih u paketu nema:`);
+    for (const f of fali.slice(0, 8)) console.error(`  ${f}`);
+    console.error("\nSlike stoje u server/data/uploads. Ako su jos na starom mestu,");
+    console.error("pokreni server jednom - prenese ih sam pri pokretanju.");
     process.exit(1);
   }
-  console.log(`  slike uz bazu: ${uPaketu}`);
+  console.log(`  slike uz bazu: ${uPaketu}${preneto ? ` (${preneto} preneto sa starog mesta)` : ""}`);
 }
 
 // Provera da baza NIJE prazna/nepodesena. Jednom se desilo da je paket otisao

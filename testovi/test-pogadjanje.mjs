@@ -65,11 +65,25 @@ const veza = async (comp) => {
   poruke.length = 0;
   return { w, poruke };
 };
+// CEKA ODGOVOR, NE FIKSNIH 250 ms.
+//
+// Dok je stajala pauza, test je povremeno padao na "drugi racunar radi
+// normalno" - ne zato sto kocnica ne radi, nego zato sto odgovor nije stigao za
+// to vreme. Suite pusta vise servera uporedo, pa je 250 ms na opterecenom
+// racunaru ponekad premalo.
+//
+// Test koji padne svaki deseti put je gori od nikakvog: nauci se da se ponovo
+// pusti, pa se tako preskoci i pravi pad. Ovako je i brze - odgovor obicno
+// stigne za desetak milisekundi.
 const probaj = async (v, username, password) => {
   v.poruke.length = 0;
   v.w.send(JSON.stringify({ t: "login", username, password }));
-  await cekaj(250);
-  return v.poruke.find((m) => m.t === "login_err" || m.t === "login_ok");
+  for (let i = 0; i < 200; i++) {
+    const m = v.poruke.find((x) => x.t === "login_err" || x.t === "login_ok");
+    if (m) return m;
+    await cekaj(20);
+  }
+  return undefined;
 };
 
 const a = await veza(comps[0]);
