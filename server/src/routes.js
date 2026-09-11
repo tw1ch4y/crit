@@ -529,6 +529,14 @@ router.post("/shop", requireOwner, (req, res) => {
   const name = String(req.body?.name ?? "").trim();
   if (!name || price == null) return res.status(400).json({ error: "Naziv i cena su obavezni" });
   if (!cenaOk(price)) return res.status(400).json({ error: "Cena mora biti broj veći ili jednak nuli" });
+  // Isto ime se ne zabranjuje nego se JAVI: dva reda sa istim imenom su dve iste
+  // pločice na kasi, zaliha podeljena na dve strane i ista stvar brojana dvaput
+  // u izveštaju. Odluka je vlasnikova - ponovi zahtev sa `svejedno`.
+  const isti = svc.istoImeArtikla(name);
+  if (isti && !req.body?.svejedno) {
+    return res.status(409).json({ kod: "duplikat", postojeci: { naziv: isti.name, kategorija: isti.category, cena: isti.price },
+      error: `„${isti.name}" već postoji u kategoriji ${isti.category || "Ostalo"}.` });
+  }
   const info = db.prepare("INSERT INTO shop_items (name, category, price, emoji, stock) VALUES (?,?,?,?,?)")
     .run(name, svc.uskladiKategoriju(category, svc.kategorije("shop")) || "Ostalo", Number(price), emoji || "", parseStock(stock));
   svc.logEvent({ category: "podesavanja", action: "shop_add", actor: req.admin.username, target: name, detail: `Dodat artikal, cena ${Number(price)}` });
@@ -544,6 +552,13 @@ router.put("/shop/:id", requireOwner, (req, res) => {
   if (!name) return res.status(400).json({ error: "Naziv je obavezan" });
   const cena = price == null ? it.price : Number(price);
   if (!cenaOk(cena)) return res.status(400).json({ error: "Cena mora biti broj veći ili jednak nuli" });
+  // Preimenovanje u ime koje već nosi neki drugi artikal - isto pitanje kao i
+  // pri dodavanju. Sam artikal se, naravno, ne poredi sa sobom.
+  const istiDrugi = svc.istoImeArtikla(name, id);
+  if (istiDrugi && !req.body?.svejedno) {
+    return res.status(409).json({ kod: "duplikat", postojeci: { naziv: istiDrugi.name, kategorija: istiDrugi.category, cena: istiDrugi.price },
+      error: `„${istiDrugi.name}" već postoji u kategoriji ${istiDrugi.category || "Ostalo"}.` });
+  }
   db.prepare("UPDATE shop_items SET name=?, category=?, price=?, emoji=?, available=?, stock=? WHERE id=?")
     .run(name, category == null ? (it.category || "Ostalo") : (svc.uskladiKategoriju(category, svc.kategorije("shop")) || "Ostalo"), cena, emoji ?? it.emoji ?? "",
       available === undefined ? it.available : (available ? 1 : 0),

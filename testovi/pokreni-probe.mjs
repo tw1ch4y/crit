@@ -32,7 +32,7 @@ const ALATI = [
   { ime: "pregled-electron", args: ["--port", String(PORT)], opis: "svi ekrani na dve rezolucije, mere šta ispada iz ekrana" },
   // Panel je do sada imao svoj alat, ali ga niko nije pustao - stajao je van
   // ovog spiska, pa se osoblje po ceo dan gledalo u strane koje niko ne meri.
-  { ime: "pregled-panela", args: ["--port", String(PORT)], opis: "svih 15 strana panela, na dve rezolucije" },
+  { ime: "pregled-panela", args: ["--port", String(PORT)], opis: "svih 15 strana panela, na tri rezolucije (i na telefonu)" },
   { ime: "proba-klikova", args: [String(PORT)], opis: "svako dugme stvarno stiže do koda" },
   { ime: "proba-kretanja", args: [String(PORT)], opis: "animacije šare se stvarno pomeraju" },
   { ime: "proba-kretanja", args: [String(PORT), "--reduced"], opis: "isto, na računaru sa isključenim Windows animacijama", oznaka: "reduced" },
@@ -97,9 +97,37 @@ if (izabrani.some((a) => !a.sam)) {
   // objašnjenje gura polje iz reda.
   await api("/api/vip", "POST", { ukljucen: true, cena: 1500, dana: 30, xpMnozilac: 2, tocakPrag: 700 });
   await api("/api/tocak", "POST", { ukljucen: true, prag: 1200 });
-  await api("/api/players", "POST", { username: "marko", password: "marko123", displayName: "Marko", balance: 1500 });
+  for (const [u, ime] of [["marko", "Marko"], ["nikola", "Nikola"]]) {
+    await api("/api/players", "POST", { username: u, password: u + "1234", displayName: ime, balance: 1500 });
+  }
   const igraci = JSON.parse(await api("/api/players").catch(() => "[]") || "[]");
   if (igraci[0]) await api(`/api/players/${igraci[0].id}/vip`, "POST", { dana: 30, naplati: 1500 });
+
+  // PORUDŽBINE SE MERE PUNE, NE PRAZNE.
+  //
+  // Strana Porudžbine je ono u šta radnik gleda ceo dan, i to sa telefona kraj
+  // kase. Dok je baza za probe bila bez ijednog artikla, ta strana se merila u
+  // praznom stanju: alat je javljao "sve u redu" nad porukom „Nema aktivnih
+  // porudžbina", a raspored kartica - koji se jedini i gleda - nije video niko.
+  //
+  // Jedna je od VIP gosta, da se izmeri i zlatna oznaka i to što stoji prva.
+  // Artikli se dodaju SAMO ako ih nema. Nova baza već nosi svoj sank, pa je
+  // slepo dodavanje pravilo dva reda „Coca-Cola 0.5" i dve kategorije koje se
+  // razlikuju u jednom slovu - a onda alat meri nered koji je sam napravio.
+  let artikli = JSON.parse(await api("/api/shop").catch(() => "[]") || "[]");
+  if (!artikli.length) {
+    for (const [ime, cena, kat] of [["Coca-Cola 0.5", 130, "Sokovi"], ["Red Bull", 300, "Energetsko"],
+      ["Čips paprika", 180, "Grickalice"], ["Espreso", 120, "Topli napici"]]) {
+      await api("/api/shop", "POST", { name: ime, price: cena, category: kat, stock: 25 });
+    }
+    artikli = JSON.parse(await api("/api/shop").catch(() => "[]") || "[]");
+  }
+  if (artikli.length >= 2 && igraci.length >= 2) {
+    await api("/api/pos", "POST", { playerId: igraci[0].id, payment: "cash",
+      items: [{ id: artikli[0].id, qty: 2 }, { id: artikli[1].id, qty: 1 }] });
+    await api("/api/pos", "POST", { playerId: igraci[1].id, payment: "credit",
+      items: [{ id: artikli[2].id, qty: 1 }], note: "bez leda" });
+  }
 }
 
 const zaostalih = ugasiLaunchere();

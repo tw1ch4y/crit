@@ -76,7 +76,15 @@ async function api(path, method = "GET", body) {
     doLogout();
     throw new Error("Sesija je istekla");
   }
-  if (!res.ok) throw new Error(data.error || "Došlo je do greške");
+  // Uz poruku ide i SAV odgovor servera. Neke greške nisu kraj posla nego
+  // pitanje ("ovo ime već postoji - svejedno?"), a da bi se to pitalo, pozivalac
+  // mora da vidi šta je tačno stiglo, ne samo rečenicu.
+  if (!res.ok) {
+    const e = new Error(data.error || "Došlo je do greške");
+    e.status = res.status;
+    e.podaci = data;
+    throw e;
+  }
   return data;
 }
 
@@ -2280,13 +2288,34 @@ function shopModal(item) {
     if (rem) rem.addEventListener("click", () => { removeImg = true; picked = null; $("#imgPrev", root).innerHTML = monogram(it.name); });
     $("#siSave", root).addEventListener("click", async () => {
       const body = { name: $("#siName", root).value, category: $("#siCat", root).value, price: $("#siPrice", root).value, emoji: it.emoji || "", available: $("#siAvail", root).checked, stock: $("#siStock", root).value };
-      try {
+      // ISTO IME NIJE GREŠKA NEGO PITANJE.
+      //
+      // Dva reda „Coca-Cola 0.5" su dve iste pločice na kasi koje radnik ne ume
+      // da razlikuje, zaliha podeljena na dve strane (jedna piše „rasprodato"
+      // dok druga ima dvadeset komada) i ista stvar brojana dvaput u izveštaju.
+      // Ali ponekad se baš to hoće, pa se ne zabranjuje - samo se kaže šta već
+      // postoji, pa vlasnik bira.
+      const sacuvaj = async (svejedno) => {
         let id = item?.id;
-        if (item) await api(`/shop/${item.id}`, "PUT", body); else { const r = await api("/shop", "POST", body); id = r.id; }
+        if (item) await api(`/shop/${item.id}`, "PUT", { ...body, svejedno });
+        else { const r = await api("/shop", "POST", { ...body, svejedno }); id = r.id; }
         if (picked) await api(`/shop/${id}/image`, "POST", { image: picked });
         else if (removeImg) await api(`/shop/${id}/image`, "DELETE");
         toast("Sačuvano", "success"); close(); renderShop();
-      } catch (e) { $("#siErr", root).textContent = e.message; }
+      };
+      try {
+        await sacuvaj(false);
+      } catch (e) {
+        if (e.podaci?.kod !== "duplikat") { $("#siErr", root).textContent = e.message; return; }
+        const p = e.podaci.postojeci || {};
+        const ok = await confirmDialog(
+          `Artikal pod imenom „${p.naziv}" već postoji${p.kategorija ? ` (${p.kategorija}, ${money(p.cena)})` : ""}.`,
+          { title: "Isto ime već postoji", ok: "Svejedno sačuvaj",
+            istaknuto: "Na kasi će stajati dve iste pločice, zaliha se deli na dve strane, a u izveštaju se ista stvar broji dvaput." });
+        if (!ok) return;
+        try { await sacuvaj(true); }
+        catch (e2) { $("#siErr", root).textContent = e2.message; }
+      }
     });
   });
 }

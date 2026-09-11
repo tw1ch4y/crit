@@ -693,6 +693,28 @@ export function uskladiKategoriju(novo, postojece) {
   return isto || cisto;
 }
 
+// DVA ARTIKLA ISTOG IMENA SU DVA ARTIKLA, MA KOLIKO LIČILA.
+//
+// Kategorije se same usklađuju (vidi gore), ali imena ne mogu: dva reda u bazi
+// se ne mogu spojiti u jedan, jer svaki nosi svoju cenu, svoju zalihu i svoju
+// istoriju prodaje. Zato se ovde ništa ne menja - samo se javi da isto ime već
+// postoji, a vlasnik odlučuje.
+//
+// Zašto uopšte: dva reda „Coca-Cola 0.5" na kasi su dve iste pločice koje radnik
+// ne ume da razlikuje, zaliha se deli na dve strane (jedna piše „rasprodato" dok
+// druga ima dvadeset komada), a u izveštaju se ista stvar broji dvaput, pa nije
+// ni prva ni druga po prodaji.
+//
+// Poredi se isto kao kod kategorija: razmak, veliko/malo slovo i kvačice.
+export function istoImeArtikla(ime, osimId = null) {
+  const trazeno = golo(ime);
+  if (!trazeno) return null;
+  const red = db.prepare(
+    osimId ? "SELECT id, name, category, price FROM shop_items WHERE id <> ?" : "SELECT id, name, category, price FROM shop_items"
+  ).all(...(osimId ? [Number(osimId)] : []));
+  return red.find((r) => golo(r.name) === trazeno) || null;
+}
+
 // Sve kategorije koje se već koriste, po abecedi. Panel ih nudi ispod polja.
 export function kategorije(sta) {
   const red = sta === "igre" ? gamesList() : shopList();

@@ -81,4 +81,51 @@ proveri("ponuda stoji uz polje za igre", /id="giCat" list="giCatLista"/.test(pan
 proveri("polje i dalje prima novu kategoriju", !/<select id="siCat"/.test(panel),
   "spisak koji ne da da se upise nova bi ogranicio igraonicu na ono sto je zateceno");
 
+// ---- ISTO IME ARTIKLA: PITANJE, NE ZABRANA ----
+//
+// Kategorije se same usklade, ali imena ne mogu: dva reda u bazi se ne mogu
+// spojiti u jedan, jer svaki nosi svoju cenu, svoju zalihu i svoju istoriju
+// prodaje. Dva reda "Probni napitak 0.5" znace dve iste plocice na kasi koje radnik
+// ne ume da razlikuje, zalihu podeljenu na dve strane (jedna pise "rasprodato"
+// dok druga ima dvadeset komada) i istu stvar brojanu dvaput u izvestaju.
+//
+// Zato se javi, a vlasnik odlucuje - ponekad se bas to i hoce.
+// (Ime je namerno izmisljeno: fabricki sank vec nosi Coca-Colu, pa bi test
+// pukao na prvom redu - i to je samo po sebi dokaz da provera radi.)
+const prvi = await api("/api/shop", "POST", { name: "Probni napitak 0.5", price: 130, category: "Sokovi", stock: 10 });
+proveri("prvi artikal prolazi", prvi.status === 200, JSON.stringify(prvi.body));
+
+const opet = await api("/api/shop", "POST", { name: "Probni napitak 0.5", price: 150, category: "Pica" });
+proveri("isto ime se ne upisuje cutke", opet.status === 409, String(opet.status));
+proveri("i kaze STA vec postoji",
+  opet.body?.kod === "duplikat" && opet.body?.postojeci?.kategorija === "Sokovi",
+  JSON.stringify(opet.body));
+
+// Isto pravilo kao kod kategorija: razmak, veliko/malo slovo i kvacice.
+const drugacije = await api("/api/shop", "POST", { name: "  probni napitak 0.5 ", price: 150 });
+proveri("razlika u slovu i razmaku se hvata", drugacije.status === 409, String(drugacije.status));
+proveri("stvarno drugo ime prolazi",
+  (await api("/api/shop", "POST", { name: "Probni napitak Zero", price: 130 })).status === 200);
+
+// Zabrana bi bila pogresna: ponekad vlasnik bas hoce dva reda.
+const svejedno = await api("/api/shop", "POST", { name: "Probni napitak 0.5", price: 150, svejedno: true });
+proveri("moze svejedno, kad vlasnik tako kaze", svejedno.status === 200, JSON.stringify(svejedno.body));
+
+// Preimenovanje u tudje ime pita isto. Sam artikal se ne poredi sa sobom -
+// inace se sopstveni naziv ne bi mogao ni sacuvati bez pitanja.
+const spisakArtikala = (await api("/api/shop")).body;
+const zero = spisakArtikala.find((x) => x.name === "Probni napitak Zero");
+proveri("preimenovanje u tudje ime pita",
+  (await api(`/api/shop/${zero.id}`, "PUT", { name: "Probni napitak 0.5" })).status === 409);
+proveri("cuvanje SOPSTVENOG imena ne pita",
+  (await api(`/api/shop/${zero.id}`, "PUT", { name: "Probni napitak Zero", price: 140 })).status === 200,
+  "inace se nijedan artikal ne bi mogao izmeniti bez pitanja");
+
+// Panel pita, a ne samo ispise gresku - i kaze sta se tacno desava.
+proveri("panel nudi da svejedno sacuva", /kod !== "duplikat"/.test(panel) && /svejedno sačuvaj/i.test(panel));
+proveri("i objasni posledicu", /zaliha se deli na dve strane/.test(panel),
+  "gola poruka o postojanju ne kaze zasto je to lose");
+proveri("greska nosi ceo odgovor servera", /e\.podaci = data;/.test(panel),
+  "bez toga pozivalac vidi samo recenicu, pa ne moze da razlikuje pitanje od greske");
+
 kraj();

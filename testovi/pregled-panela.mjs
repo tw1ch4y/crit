@@ -20,7 +20,16 @@ const OVDE = path.dirname(fileURLToPath(import.meta.url));
 const KOREN = path.join(OVDE, "..");
 const arg = (ime, p) => { const i = process.argv.indexOf("--" + ime); return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : p; };
 const PORT = arg("port", "8096");
-const REZOLUCIJE = arg("rez", "1920x1080,1366x768").split(",").map((r) => { const [w, h] = r.split("x").map(Number); return { w, h, ime: `${w}x${h}` }; });
+// TELEFON JE TREĆA REZOLUCIJA, I NIJE DODATAK.
+//
+// Radnik panel drži na telefonu, kraj kase: tu prima porudžbine, dopunjava
+// kredit i zatvara smenu. Panel za to ima ceo svoj raspored (donja traka umesto
+// bočnog menija, profil u vrhu, upozorenja pomerena dole) - a nijedan alat ga
+// nikad nije pogledao na toj širini. Merile su se samo dve veličine ekrana koje
+// kraj kase niko ne koristi.
+//
+// 412x915 je tipičan Android; uže od toga je danas retko.
+const REZOLUCIJE = arg("rez", "1920x1080,1366x768,412x915").split(",").map((r) => { const [w, h] = r.split("x").map(Number); return { w, h, ime: `${w}x${h}` }; });
 const SAMO = arg("strana", "");
 const RADNO = path.join(OVDE, ".radno", "pregled-panela");
 const SLIKE = path.join(OVDE, ".slike-panel");
