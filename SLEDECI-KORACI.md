@@ -11,7 +11,7 @@ Ovde je ostalo ono što traži tvoj nalog, tvoju mrežu ili tvoje ruke. Redosled
 nije proizvoljan - svaki korak se oslanja na prethodni.
 
 Paket za USB je već napravljen: **`Desktop\CRIT-ZA-IGRAONICU`** (105 MB,
-instaler `Crit Launcher Setup 2.51.0.exe`).
+instaler `Crit Launcher Setup 2.52.0.exe`).
 
 ---
 
@@ -30,7 +30,7 @@ node alati/kopija-koda.mjs D:\kopije
 ```
 
 Jedan fajl, sve grane i svi commitovi. Vraćanje na bilo kom računaru sa git-om:
-`git clone "D:\kopije\crit-kod-2.51.0-....bundle" crit`
+`git clone "D:\kopije\crit-kod-2.52.0-....bundle" crit`
 
 > Odredište koje ne postoji alat **odbija**. Namerno: folder napravljen na
 > lokalnom disku izgledao bi kao uspela kopija, a bio bi na istom disku od kog
@@ -112,7 +112,7 @@ kablu, nikad sa mreže koju koriste gosti.
 2. Napravi kopiju celog `server\data\` foldera sa strane.
 3. Iz paketa prepiši `server\src\` i `server\public\`. **`server\data\` ne diraj.**
 4. Pokreni server. Bazu sam prilagodi novoj verziji.
-5. Panel → Podešavanja → mora da piše **2.51.0**.
+5. Panel → Podešavanja → mora da piše **2.52.0**.
 
 > Od ove verzije otpremljene slike stoje uz bazu, u `server\data\uploads\`. Ako
 > su na tvom serveru još u `server\public\uploads\`, server ih **prenese sam** pri
@@ -146,7 +146,7 @@ skine, a nova da se instalira **sa naloga igrača**.
    sa kog je pokrenuta. Ako je pokreneš sa administratorskog, launchera na nalogu
    igrača **neće biti**.
 
-3. Pokreni `Crit Launcher Setup 2.51.0.exe`. Ne traži administratora.
+3. Pokreni `Crit Launcher Setup 2.52.0.exe`. Ne traži administratora.
 
 4. **Prepravi prečicu za automatsko pokretanje.** Stara pokazuje na
    `Program Files` - te putanje više nema.
@@ -159,7 +159,7 @@ skine, a nova da se instalira **sa naloga igrača**.
 
 5. Restartuj računar i sačekaj da se launcher digne sam.
 
-6. U panelu, strana **Računari**, kolona *verzija* mora da pokaže **2.51.0**.
+6. U panelu, strana **Računari**, kolona *verzija* mora da pokaže **2.52.0**.
 
 **Ako mašina još nije zaključana** (`zastita-ukljuci.bat` nikad pokrenut):
 desni klik → *Run as administrator*, pa odjava i ponovna prijava.
