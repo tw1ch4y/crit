@@ -18,9 +18,56 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { putanjaElektrona } from "./_okruzenje.mjs";
+// Nivoi, znacke i pogodnosti se UZIMAJU iz programa, ne prepisuju ovde - isto
+// kao u pregled-electron.mjs. Prepisan spisak bi zastareo cim se doda jedna
+// znacka, a alat bi i dalje tvrdio da je sve provereno.
+import { nivoZa, otkljucanoZa, BOJE_IMENA, OKVIRI } from "../server/src/nivoi.js";
+import { znackeZa, GRUPE } from "../server/src/znacke.js";
+import { VIP_BOJE, VIP_OKVIRI, POGODNOSTI } from "../server/src/vip.js";
 
 const OVDE = path.dirname(fileURLToPath(import.meta.url));
 const KOREN = path.join(OVDE, "..");
+
+// Profil izmisljenog igraca. Bez njega Nalog stoji na "Ucitavam profil" i
+// nijedan odeljak se ne iscrta - a bas tu su kupovina VIP-a, rang lista, boje
+// imena i okviri. Iskustvo je u SREDINI nivoa: prazna i puna traka izgledaju
+// dobro same po sebi, greske se vide na pola.
+const XP = 4200;
+const N = nivoZa(XP);
+const PROFIL = {
+  username: "marko", ime: "Marko", clanOd: Date.now() - 240 * 24 * 3600 * 1000,
+  nivo: N.nivo, naziv: N.naziv, xp: N.xp, uNivou: N.uNivou, zaSledeci: N.zaSledeci,
+  doSledeceg: N.doSledeceg, poslednji: N.poslednji, sledeciNaziv: N.sledeciNaziv,
+  sati: 96.5, poseta: 41, porudzbina: 63, omiljenaIgra: "Counter-Strike 2", omiljenaPuta: 28,
+  izgled: { boja: "bela", okvir: "nema" }, otkljucano: otkljucanoZa(XP),
+  boje: { ...BOJE_IMENA, ...VIP_BOJE }, okviri: { ...OKVIRI, ...VIP_OKVIRI },
+  znacke: znackeZa({ sati: 96, poseta: 41, porudzbina: 63, najduzaSesijaMin: 340,
+    ranoSesija: 1, kasnaSesija: 2, razlicitihIgara: 7, pokretanja: 210,
+    najvisePutaIgra: 62, igaraUKatalogu: 12, najvisePutaArtikal: 24,
+    spinova: 12, dobitakUkupno: 340, nedeljaZaredom: 5, danaOdUpisa: 240 }),
+  grupeZnacaka: GRUPE,
+  rekordi: { najduzaSesijaMin: 340, najboljiDan: { datum: "2026-08-14", iznos: 2400 },
+    omiljenDan: 6, razlicitihIgara: 7, spinova: 12, dobitakUkupno: 340,
+    nedeljaZaredom: 5, omiljenoPice: "Coca-Cola 0.5", omiljenoPicePuta: 24 },
+  // VIP je UKLJUCEN i NIJE kupljen - jedino tako na profilu stoji dugme "Uzmi
+  // VIP", a bas ono se ovde i proverava.
+  clanarina: { ukljucen: true, jeVip: false, dana: 0, cena: 1500, trajanje: 30,
+    mnozilac: 2, tocakPrag: 700, pogodnosti: POGODNOSTI },
+  rang: {
+    ukupno: 84,
+    vrh: Array.from({ length: 10 }, (_, i) => {
+      const b = 34200 - i * 2800, n = nivoZa(b);
+      return { mesto: i + 1, ime: "Igrač " + (i + 1), nivo: n.nivo, naziv: n.naziv, xp: b,
+        vip: i === 0, izgled: { boja: "bela", okvir: "nema" }, ja: false };
+    }),
+    komsiluk: [],
+    ja: { mesto: 7, ime: "Marko", nivo: N.nivo, naziv: N.naziv, xp: XP, vip: false,
+      izgled: { boja: "bela", okvir: "nema" }, ja: true, doSledecegMesta: 640, ispredMene: "Igrač 6" },
+  },
+};
+const VIP_TRAKA = { nivo: N.nivo, naziv: N.naziv, xp: N.uNivou,
+  xpDo: N.poslednji ? null : N.zaSledeci, poslednji: N.poslednji, sledeci: N.sledeciNaziv,
+  vip: false, vipDana: 0 };
 const PORT = process.argv[2] || "8096";
 const RADNO = path.join(OVDE, ".radno", "proba-klikova");
 fs.rmSync(RADNO, { recursive: true, force: true });
@@ -75,15 +122,27 @@ const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const RENDERER = ${JSON.stringify(path.join(KOREN, "client", "renderer"))};
 const BAZA = "http://127.0.0.1:${PORT}";
+const PROFIL_JSON = ${JSON.stringify(PROFIL)};
+const VIP_JSON = ${JSON.stringify(VIP_TRAKA)};
 const OMOTAC_PUT = ${JSON.stringify(path.join(RADNO, "omotac-preload.js"))};
 
 ipcMain.handle("program-icon", async () => null);
 ipcMain.handle("get-config", () => ({ host: BAZA, token: "x", configured: true }));
 ipcMain.handle("verzija", () => "proba");
 ipcMain.handle("sys-stats", () => ({ cpu: 20, ramUsedPct: 44, ramGb: "16", temp: 40, uptime: 7200 }));
-for (const k of ["save-config", "reset-config", "to-server", "launch-game", "open-browser",
+for (const k of ["save-config", "reset-config", "launch-game", "open-browser",
   "focus-launcher", "admin-exit", "renderer-ready", "podesavanja-citaj", "podesavanja-primeni", "proveri-servisni-pin"])
   ipcMain.handle(k, () => true);
+
+// STA JE LAUNCHER STVARNO POSLAO SERVERU.
+//
+// Ostatak ovog alata proverava da klik ima slusaoca - to hvata mrtvo dugme, ali
+// ne i dugme koje slusa a nista ne posalje. Kod kupovine VIP-a to je razlika
+// izmedju "ne radi" i "uzeo pare": gost klikne, nista se ne desi, i on klikne
+// ponovo. Zato se poruke ka serveru ovde pamte, pa se posle proverava da li je
+// bas ona prava izasla.
+const poslato = [];
+ipcMain.handle("to-server", (e, poruka) => { poslato.push(poruka); return true; });
 const cekaj = (ms) => new Promise((r) => setTimeout(r, ms));
 const posalji = (w, m) => w.webContents.send("server-msg", m);
 
@@ -244,6 +303,9 @@ app.whenReady().then(async () => {
   posalji(win, { t: "login_ok", player: { id: 1, username: "marko", displayName: "Marko" },
     balance: 640, remainingSeconds: 19200, session: { id: 1, startedAt: Date.now() },
     skoroIgrane: [], tocak, tekstura,
+    // Bez profila Nalog stoji na "Ucitavam profil" i nijedan odeljak se ne
+    // iscrta - racuna se u omotacu, jer glavni proces je zaseban fajl.
+    profil: PROFIL_JSON, vip: VIP_JSON,
     teksture: { spisak: tex.spisak, jacine: tex.jacine, kretanja: tex.kretanja, prozirnosti: tex.prozirnosti } });
   await cekaj(4200);
   korak("pocetna"); nalazi["pocetna"] = await js(PREGLED);
@@ -255,6 +317,35 @@ app.whenReady().then(async () => {
 
   await klik('.tab[data-tab="account"]'); await cekaj(700);
   korak("nalog"); nalazi["nalog"] = await js(PREGLED);
+
+  // NALOG JE MENI SA SEDAM ODELJAKA, A GLEDAO SE SAMO PRVI.
+  //
+  // Dok se prijava slala bez profila, Nalog je stajao na "Ucitavam profil" i
+  // nijedan od njih se nije ni iscrtao. Tako su bas najnoviji ekrani - profil sa
+  // kupovinom VIP-a, rang lista i znacke - ostali van svake provere.
+  for (const [kljuc, ime] of [["profil", "nalog > profil"], ["rang", "nalog > rang lista"],
+    ["porudzbine", "nalog > porudzbine"], ["nagrade", "nalog > nagrade"],
+    ["podesavanja", "nalog > mis i zvuk"], ["pozadina", "nalog > pozadina"],
+    ["lozinka", "nalog > lozinka"]]) {
+    await klik('[data-acc-sekcija="' + kljuc + '"]'); await cekaj(600);
+    korak(ime); nalazi[ime] = await js(PREGLED);
+  }
+
+  // KUPOVINA VIP-A: KLIK MORA DA IZADJE IZ LAUNCHERA.
+  //
+  // Ovde se skida kredit, pa nije dovoljno da dugme ima slusaoca. Gost koji
+  // klikne i ne vidi nista klikne ponovo - a ako poruka izlazi, drugi klik ne
+  // sme da je posalje jos jednom dok prvi ne dobije odgovor.
+  await klik('[data-acc-sekcija="profil"]'); await cekaj(600);
+  poslato.length = 0;
+  await klik("#vipKupi"); await cekaj(300);
+  const prviKlik = poslato.filter((m) => m && m.t === "kupi_vip").length;
+  await klik("#vipKupi"); await cekaj(300);
+  const posleDrugog = poslato.filter((m) => m && m.t === "kupi_vip").length;
+  // Ime pocinje donjom crtom: to nije merenje ekrana nego poseban nalaz, pa ga
+  // petlje koje broje mrtva dugmad preskacu.
+  nalazi["_kupovinaVipa"] = { poslato: prviKlik, posleDvaKlika: posleDrugog,
+    zakljucano: await js('(() => { const b = document.querySelector("#vipKupi"); return !!b && b.disabled; })()') };
 
   // 3) Pop-up nagradnog tocka - tu je i bio kvar
   await klik('.tab[data-tab="home"]'); await cekaj(600);
@@ -305,6 +396,7 @@ p.on("close", (kod) => {
   // vec jednom bilo: presretac je bio ubacen prekasno i sve je izgledalo cisto.
   const lose = [];
   for (const [ekran, r] of Object.entries(nalazi)) {
+    if (ekran.startsWith("_")) continue;
     if (!r || typeof r !== "object" || Array.isArray(r)) continue;
     if (!(r.slusalaca > 0)) lose.push(`${ekran}: presretac nije uhvatio nijednog slusaoca`);
     if (r.crit !== "object") lose.push(`${ekran}: launcher nema window.crit, nije ni krenuo`);
@@ -323,6 +415,7 @@ p.on("close", (kod) => {
   // moze ni prijaviti ni doci do "Odjava" kad mis zataji.
   let bezStanja = 0;
   for (const [ekran, rez] of Object.entries(nalazi)) {
+    if (ekran.startsWith("_")) continue;
     const b = rez.bezStanja;
     if (!Array.isArray(b) || !b.length) continue;
     bezStanja += b.length;
@@ -333,13 +426,35 @@ p.on("close", (kod) => {
 
   let mrtvih = 0;
   for (const [ekran, rez] of Object.entries(nalazi)) {
+    if (ekran.startsWith("_")) continue;
     const van = rez.van || rez;
     if (!van.length) { console.log(`  OK   ${ekran}  (pregledano ${rez.skenirano})`); continue; }
     mrtvih += van.length;
     console.log(`  PAO  ${ekran} - ${van.length} bez slusaoca:`);
     for (const v of van) console.log(`         ${v.znak}  "${v.tekst}"  (u ${v.ekran})`);
   }
+
+  // KUPOVINA VIP-A: OVDE SE SKIDA KREDIT.
+  //
+  // Slusalac na dugmetu nije dovoljan - dugme sme da slusa a da nista ne
+  // posalje. A drugi klik, koji gost napravi kad se prvi put nista ne vidi, ne
+  // sme da posalje istu poruku jos jednom: to bi bila dva puta naplacena
+  // clanarina.
+  let vipLose = 0;
+  const kv = nalazi._kupovinaVipa;
+  if (!kv) {
+    console.log("  PAO  kupovina VIP-a - nalaz nije ni stigao");
+    vipLose++;
+  } else {
+    if (kv.poslato === 1) console.log("  OK   klik na 'Uzmi VIP' stvarno salje poruku serveru");
+    else { console.log(`  PAO  klik na 'Uzmi VIP' poslao ${kv.poslato} poruka (ocekivano 1)`); vipLose++; }
+    if (kv.posleDvaKlika === 1) console.log("  OK   drugi klik ne salje jos jednom (dvostruka naplata)");
+    else { console.log(`  PAO  dva klika poslala ${kv.posleDvaKlika} poruka - clanarina bi se naplatila dvaput`); vipLose++; }
+    if (kv.zakljucano) console.log("  OK   dugme je zakljucano dok se ceka odgovor");
+    else { console.log("  PAO  dugme ostaje otkljucano dok se ceka odgovor"); vipLose++; }
+  }
+
   console.log(mrtvih ? `\n${mrtvih} dugmadi ne stize do koda` : "\nsvako dugme stize do koda");
   if (bezStanja) console.log(`${bezStanja} oblika bez nekog od tri stanja`);
-  process.exit(mrtvih || bezStanja ? 1 : 0);
+  process.exit(mrtvih || bezStanja || vipLose ? 1 : 0);
 });

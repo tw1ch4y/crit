@@ -147,7 +147,12 @@ ugasiLaunchere();
 // u polici viška, koliko praznine ostaje do alata. Dok se ispis pokazivao samo
 // kad nešto PADNE, ti brojevi se nisu videli nikad - a baš po njima se odlučuje
 // kako ekran izgleda. Vraćali su se tako što se alat ručno pušta iznova.
-for (const n of nalazi.filter((x) => x.ok && x.naziv.startsWith("pregled-"))) {
+//
+// `proba-klikova` ide uz njih iz istog razloga: ona ispisuje KOJE je ekrane
+// obisla i koliko je elemenata pregledala. Dok se to nije videlo, ekran koji
+// ispadne iz obilaska (Nalog je godinu dana stajao na "Ucitavam profil", pa se
+// nijedan njegov odeljak nije ni iscrtao) prolazio je kao uredan.
+for (const n of nalazi.filter((x) => x.ok && (x.naziv.startsWith("pregled-") || x.naziv.startsWith("proba-klikova")))) {
   const redovi = n.izlaz.split("\n").filter((l) => l.trim());
   if (redovi.length) console.log(`\n--- ${n.naziv} ---\n${redovi.join("\n")}`);
 }
