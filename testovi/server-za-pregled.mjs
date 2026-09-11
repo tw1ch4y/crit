@@ -52,4 +52,14 @@ if (!(await api("/api/players"))?.length) {
   }
   for (const p of await api("/api/players")) await api(`/api/players/${p.id}/topup`, "POST", { amount: 1500, note: "keš" });
 }
+// VIP i točak se pale, i to sa po jednim prodatim - inače se kartica meri u
+// stanju u kom je vlasnik nikad neće videti: isključena, praznih brojki i bez
+// ijednog upozorenja. Tada se ne vidi ni da li se brojke lome ni da li dugačko
+// objašnjenje gura polje iz reda.
+if (!(await api("/api/vip"))?.ukljucen) {
+  await api("/api/vip", "POST", { ukljucen: true, cena: 1500, dana: 30, xpMnozilac: 2, tocakPrag: 700 });
+  await api("/api/tocak", "POST", { ukljucen: true, prag: 1200 });
+  const svi = await api("/api/players");
+  if (svi?.[0]) await api(`/api/players/${svi[0].id}/vip`, "POST", { dana: 30, naplati: 1500 });
+}
 console.log("Panel spreman: " + BASE);

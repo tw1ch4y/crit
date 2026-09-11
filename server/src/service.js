@@ -339,6 +339,11 @@ export function stats(from, to) {
   const shopRev = g2("SELECT COALESCE(SUM(total),0) s FROM orders WHERE status!='cancelled' AND created_at BETWEEN ? AND ?");
   const shopCash = g2("SELECT COALESCE(SUM(total),0) s FROM orders WHERE payment='cash' AND status!='cancelled' AND created_at BETWEEN ? AND ?");
   const topups = g2("SELECT COALESCE(SUM(amount),0) s FROM transactions WHERE type='topup' AND created_at BETWEEN ? AND ?");
+  // VIP ČLANARINA. Isti novac kao sesija ili piće: gost ga je uplatio na kasi, a
+  // ovde ga je potrošio. Da ne ulazi u promet, VIP bi u izveštaju izgledao kao
+  // da ne donosi ništa - pa bi ga vlasnik prvi ugasio, baš onu stvar koja se
+  // prodaje sama i ne traži radnika.
+  const vipRev = g2("SELECT COALESCE(SUM(-amount),0) s FROM transactions WHERE type='vip' AND created_at BETWEEN ? AND ?");
   // Poklonjen kredit: nagradni točak i popust na vremenski paket. Ne ulazi u
   // pazar (nije novac u kasi), ali vlasnik mora da vidi koliko ga je koštao -
   // inače se trošak nigde ne pojavljuje i točak izgleda kao da je besplatan.
@@ -348,23 +353,26 @@ export function stats(from, to) {
 
   const dayFmt = "strftime('%Y-%m-%d', created_at/1000, 'unixepoch', 'localtime')";
   const hourFmt = "CAST(strftime('%H', created_at/1000, 'unixepoch', 'localtime') AS INTEGER)";
-  const merge = (sessRows, shopRows, keyName) => {
+  // Prima koliko god nizova - promet je zbir svega što je gost ostavio, a
+  // izvora je vremenom postalo više (sesije, piće, članarina).
+  const merge = (...nizovi) => {
     const map = {};
-    for (const r of sessRows) map[r.k] = (map[r.k] || 0) + r.v;
-    for (const r of shopRows) map[r.k] = (map[r.k] || 0) + r.v;
+    for (const niz of nizovi) for (const r of niz) map[r.k] = (map[r.k] || 0) + r.v;
     return map;
   };
   const sByDay = db.prepare(`SELECT ${dayFmt} k, SUM(-amount) v FROM transactions WHERE type='session' AND created_at BETWEEN ? AND ? GROUP BY k`).all(from, to);
   const oByDay = db.prepare(`SELECT ${dayFmt} k, SUM(total) v FROM orders WHERE status!='cancelled' AND created_at BETWEEN ? AND ? GROUP BY k`).all(from, to);
-  const dayMap = merge(sByDay, oByDay);
+  const vByDay = db.prepare(`SELECT ${dayFmt} k, SUM(-amount) v FROM transactions WHERE type='vip' AND created_at BETWEEN ? AND ? GROUP BY k`).all(from, to);
+  const dayMap = merge(sByDay, oByDay, vByDay);
   const byDay = Object.keys(dayMap).sort().map((d) => ({ label: d.slice(8) + "." + d.slice(5, 7), revenue: round2(dayMap[d]) }));
 
   const sByHour = db.prepare(`SELECT ${hourFmt} k, SUM(-amount) v FROM transactions WHERE type='session' AND created_at BETWEEN ? AND ? GROUP BY k`).all(from, to);
   const oByHour = db.prepare(`SELECT ${hourFmt} k, SUM(total) v FROM orders WHERE status!='cancelled' AND created_at BETWEEN ? AND ? GROUP BY k`).all(from, to);
-  const hourMap = merge(sByHour, oByHour);
+  const vByHour = db.prepare(`SELECT ${hourFmt} k, SUM(-amount) v FROM transactions WHERE type='vip' AND created_at BETWEEN ? AND ? GROUP BY k`).all(from, to);
+  const hourMap = merge(sByHour, oByHour, vByHour);
   const byHour = Array.from({ length: 24 }, (_, h) => ({ label: String(h).padStart(2, "0"), revenue: round2(hourMap[h] || 0) }));
 
-  const topPlayers = db.prepare("SELECT p.username u, COALESCE(SUM(-t.amount),0) spent FROM transactions t JOIN players p ON p.id=t.player_id WHERE t.type IN ('session','shop') AND t.created_at BETWEEN ? AND ? GROUP BY p.id ORDER BY spent DESC LIMIT 8")
+  const topPlayers = db.prepare("SELECT p.username u, COALESCE(SUM(-t.amount),0) spent FROM transactions t JOIN players p ON p.id=t.player_id WHERE t.type IN ('session','shop','vip') AND t.created_at BETWEEN ? AND ? GROUP BY p.id ORDER BY spent DESC LIMIT 8")
     .all(from, to).map((r) => ({ username: r.u, spent: round2(r.spent) }));
   const byComputer = db.prepare("SELECT c.name n, COALESCE(SUM(s.cost),0) rev, COUNT(*) cnt FROM sessions s JOIN computers c ON c.id=s.computer_id WHERE s.started_at BETWEEN ? AND ? GROUP BY c.id ORDER BY rev DESC")
     .all(from, to).map((r) => ({ name: r.n, revenue: round2(r.rev), sessions: r.cnt }));
@@ -375,7 +383,7 @@ export function stats(from, to) {
   const vrhSat = byHour.reduce((a, h) => (h.revenue > a.revenue ? h : a), { label: "", revenue: 0 });
   const vrhDan = byDay.reduce((a, h) => (h.revenue > a.revenue ? h : a), { label: "", revenue: 0 });
   return {
-    revenue: { session: round2(sessionRev), shop: round2(shopRev), shopCash: round2(shopCash), shopCredit: round2(shopRev - shopCash), topups: round2(topups), poklonjeno: round2(poklonjeno), total: round2(sessionRev + shopRev) },
+    revenue: { session: round2(sessionRev), shop: round2(shopRev), shopCash: round2(shopCash), shopCredit: round2(shopRev - shopCash), topups: round2(topups), poklonjeno: round2(poklonjeno), vip: round2(vipRev), total: round2(sessionRev + shopRev + vipRev) },
     sessions: {
       count: sessCount, minutes: Math.round(playSec / 60000),
       // Prosečan promet po sesiji - koliko u proseku ostavi jedan gost.
@@ -467,6 +475,12 @@ const mapPlayer = (p) => ({
   nivo: nivoZa(p.xp).nivo,
   nivoNaziv: nivoZa(p.xp).naziv,
   xp: Math.round(Number(p.xp) || 0),
+  // VIP ide uz igraca iz istog razloga kao i nivo, ali nosi i posao: gost koji
+  // je platio clanarinu ocekuje da ga osoblje prepozna a da on to ne trazi.
+  // Racuna se iz roka, ne iz zastavice - istekao je ili nije, i niko ga ne gasi.
+  vip: vip.vaziVip(p.vip_do),
+  vipDana: vip.danaOstalo(p.vip_do),
+  vipDo: p.vip_do || null,
   banned: !!p.banned,
   note: p.note,
   createdAt: p.created_at,
@@ -475,7 +489,7 @@ const mapPlayer = (p) => ({
 
 export function playersSnapshot() {
   return db
-    .prepare("SELECT id, username, display_name, balance, banned, note, created_at, last_login, xp FROM players ORDER BY username")
+    .prepare("SELECT id, username, display_name, balance, banned, note, created_at, last_login, xp, vip_do FROM players ORDER BY username")
     .all()
     .map(mapPlayer);
 }
@@ -489,7 +503,7 @@ export function playersPage({ page = 1, per = 25, search = "" } = {}) {
   const pages = Math.max(1, Math.ceil(total / per));
   page = Math.min(Math.max(1, Number(page) || 1), pages);
   const items = db
-    .prepare(`SELECT id, username, display_name, balance, banned, note, created_at, last_login, xp FROM players ${cond} ORDER BY username LIMIT ? OFFSET ?`)
+    .prepare(`SELECT id, username, display_name, balance, banned, note, created_at, last_login, xp, vip_do FROM players ${cond} ORDER BY username LIMIT ? OFFSET ?`)
     .all(...args, per, (page - 1) * per)
     .map(mapPlayer);
   return { items, total, page, pages, per };
@@ -497,19 +511,35 @@ export function playersPage({ page = 1, per = 25, search = "" } = {}) {
 
 export function ordersSnapshot(includeDone = false) {
   const where = includeDone ? "" : "WHERE o.status IN ('pending','preparing')";
+  // PREDNOST NA KASI - jedina pogodnost VIP-a koja se ne vidi igracu nego se
+  // OSETI. Obecana je u spisku pogodnosti, pa mora i da postoji: radnik radi
+  // odozgo nadole, i "prednost" znaci tacno to - dok ceka, VIP porudzbina stoji
+  // iznad ostalih.
+  //
+  // Redja se u SQL-u, a ne posle citanja, da granica od 100 redova ne bi
+  // odsekla bas onu koja treba da bude prva.
+  //
+  // Istorija se NE predredja: zavrsene porudzbine su evidencija i citaju se po
+  // vremenu, kao izvod.
+  const redosled = includeDone
+    ? "o.created_at DESC"
+    : "CASE WHEN p.vip_do > ? THEN 0 ELSE 1 END, o.created_at DESC";
   const orders = db
     .prepare(
-      `SELECT o.*, p.username, c.name AS computer_name
+      `SELECT o.*, p.username, p.vip_do, c.name AS computer_name
        FROM orders o
        LEFT JOIN players p ON p.id = o.player_id
        LEFT JOIN computers c ON c.id = o.computer_id
        ${where}
-       ORDER BY o.created_at DESC LIMIT 100`
+       ORDER BY ${redosled} LIMIT 100`
     )
-    .all();
+    .all(...(includeDone ? [] : [Date.now()]));
   return orders.map((o) => ({
     id: o.id,
     player: o.username || null,
+    // Radnik mora da VIDI zasto je ova prva, inace izgleda kao da se spisak
+    // premesta sam od sebe.
+    vip: vip.vaziVip(o.vip_do),
     computer: o.computer_name,
     total: round2(o.total),
     status: o.status,
@@ -3247,6 +3277,22 @@ export function vipObj() {
   };
 }
 
+// Isto, ali sa odgovorom na pitanje zbog kog vlasnik i otvara ovu karticu:
+// ISPLATI LI SE. Bez toga podešavanje VIP-a je pet polja za kucanje i nijedan
+// podatak - pa se cena nikad ne menja, jer se ne zna prema čemu bi se menjala.
+//
+// Odvojeno od vipObj() namerno: vipObj se poziva pri svakoj kupovini, a ovo su
+// dva prebrojavanja koja tamo nemaju šta da traže.
+export function vipPregled() {
+  const sada = Date.now();
+  const aktivnih = db.prepare("SELECT COUNT(*) c FROM players WHERE vip_do > ?").get(sada).c;
+  // Trideset dana unazad, jer se i članarina prodaje po mesecu - brojevi se
+  // tako porede sa cenom bez računanja u glavi.
+  const od = sada - 30 * 86400000;
+  const r = db.prepare("SELECT COUNT(*) c, COALESCE(SUM(-amount),0) s FROM transactions WHERE type='vip' AND created_at > ?").get(od);
+  return { ...vipObj(), aktivnih, prodato30: r.c, prihod30: round2(r.s) };
+}
+
 export function postaviVip({ ukljucen, cena, dana, xpMnozilac, tocakPrag }) {
   if (ukljucen != null) setSetting("vip_ukljucen", ukljucen ? "1" : "0");
   if (cena != null) {
@@ -3300,8 +3346,17 @@ export function kupiVip(playerId) {
       detail: `VIP nije upisan: ${String(e?.message || e).slice(0, 150)}` });
     return { error: "Kupovina nije prošla. Pokušaj ponovo." };
   }
+  // BEZ `amount` - I TO NAMERNO.
+  //
+  // `logs.amount` u kategoriji "novac" znaci KES KOJI SE POMERIO U KASI: iz
+  // njega se racuna koliko para radnik mora da ima pri zatvaranju smene. VIP se
+  // placa kreditom, a taj je novac usao ranije, pri dopuni. Dok je ovde stajao
+  // iznos, obracun je od radnika trazio 1500 dinara viska za svaku prodatu
+  // clanarinu - i to bi isplivalo tek uvece, kao manjak koji niko ne ume da
+  // objasni. Kretanje kredita stoji u `transactions` (tip "vip"), odakle ga i
+  // citaju izvestaji. Isto radi i nagradni tocak, iz istog razloga.
   logEvent({ category: "novac", action: "vip", actor: p.username, target: p.username,
-    detail: `Kupio VIP na ${o.dana} dana`, amount: o.cena });
+    detail: `Kupio VIP na ${o.dana} dana (${o.cena} sa kredita)` });
   const comp = db.prepare("SELECT id FROM computers WHERE current_player_id=?").get(playerId);
   if (comp) {
     sendClient(comp.id, { t: "balance", balance: stanje, remainingSeconds: remainingSeconds(stanje) });
@@ -3312,8 +3367,24 @@ export function kupiVip(playerId) {
   return { ok: true, vipDo: rok, dana: vip.danaOstalo(rok), balance: stanje };
 }
 
+// "1 dan", "2 dana", "21 dan". Stoji ovde jer se ispisuje u log koji čita
+// radnik, a "1 dana" u evidenciji izgleda kao da program ne zna šta radi.
+const oblikDana = (n) => (Math.abs(n) % 10 === 1 && Math.abs(n) % 100 !== 11 ? "dan" : "dana");
+
 // Osoblje daje ili oduzima VIP iz panela - za goste koji plate kešom na kasi.
-export function postaviVipIgracu(playerId, dana, ko) {
+//
+// KEŠ MORA DA SE UPIŠE, INAČE SE KASA NE POKLAPA.
+//
+// Gost preda 1500 dinara preko pulta i radnik mu klikne VIP. Dok se taj novac
+// nigde nije zapisivao, uveče je u fioci stajalo 1500 viška koje obračun ne
+// pominje - a neobjašnjen višak se gleda isto kao i manjak.
+//
+// Zato se keš vodi kao ono što jeste: dopuna pa odmah naplata članarine. Stanje
+// na nalogu ostaje isto (ne dobija gost i kredit i VIP), ali oba koraka postoje:
+//   - dopuna ide u pazar smene, pa kasa očekuje tih 1500
+//   - naplata ide u promet, pa se u izveštaju vidi koliko VIP donosi
+// Ni jedan izveštaj za ovo nije morao da dobije izuzetak.
+export function postaviVipIgracu(playerId, dana, ko, { naplati = 0, adminId = null } = {}) {
   const p = playerById(playerId);
   if (!p) return { error: "Nepostojeći nalog." };
   const d = Math.floor(Number(dana));
@@ -3321,17 +3392,39 @@ export function postaviVipIgracu(playerId, dana, ko) {
   // Nula znači ODUZMI odmah. Negativan broj bi bio rok u prošlosti, što je isto
   // - ali se ne pušta, jer je to skoro uvek greška u kucanju.
   if (d < 0 || d > 400) return { error: "Broj dana mora biti između 0 i 400." };
+  const kes = round2(Number(naplati) || 0);
+  if (kes < 0) return { error: "Naplaćen iznos ne može biti negativan." };
+  if (kes > 0 && d === 0) return { error: "Oduzimanje VIP-a se ne naplaćuje." };
+
   const rok = d === 0 ? null : vip.novRok(p.vip_do, d);
-  db.prepare("UPDATE players SET vip_do=? WHERE id=?").run(rok, playerId);
+  let log = null;
+  try {
+    // Rok i novac su JEDAN posao, iz istog razloga kao i kod kupovine iz
+    // launchera: pad između njih ostavlja naplaćenog gosta bez VIP-a.
+    log = uJednomPoslu(() => {
+      db.prepare("UPDATE players SET vip_do=? WHERE id=?").run(rok, playerId);
+      if (kes <= 0) return null;
+      const stanje = round2(Number(p.balance) || 0);
+      addTransaction(playerId, "topup", kes, stanje, adminId, `Keš za VIP članarinu (${d} dana)`);
+      addTransaction(playerId, "vip", -kes, stanje, adminId, `VIP članarina ${d} dana`);
+      return upisiLog({ category: "novac", action: "topup", actor: ko || "sistem", target: p.username,
+        detail: `Keš za VIP članarinu (${d} ${oblikDana(d)})`, amount: kes });
+    });
+  } catch (e) {
+    logEvent({ category: "sistem", action: "greska", actor: "server",
+      detail: `VIP iz panela nije upisan: ${String(e?.message || e).slice(0, 150)}` });
+    return { error: "Upis nije prošao. Pokušaj ponovo - novac nije naplaćen." };
+  }
+  if (log) javiLog(log);
   logEvent({ category: "nalozi", action: d === 0 ? "vip_off" : "vip_on", actor: ko || "sistem", target: p.username,
-    detail: d === 0 ? "Oduzet VIP" : `Dodat VIP na ${d} dana` });
+    detail: d === 0 ? "Oduzet VIP" : `Dodat VIP na ${d} ${oblikDana(d)}${kes > 0 ? `, naplaćeno ${kes} kešom` : " (bez naplate)"}` });
   const comp = db.prepare("SELECT id FROM computers WHERE current_player_id=?").get(playerId);
   if (comp) {
     sendClient(comp.id, { t: "vip", vip: vipZaIgraca(playerId) });
     sendClient(comp.id, { t: "profil", profil: profilIgraca(playerId) });
   }
   pushComputers();
-  return { ok: true, vipDo: rok, dana: vip.danaOstalo(rok) };
+  return { ok: true, vipDo: rok, dana: vip.danaOstalo(rok), naplaceno: kes };
 }
 
 // Profil: ko je, dokle je stigao i šta je za sobom ostavio.

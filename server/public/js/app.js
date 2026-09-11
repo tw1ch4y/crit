@@ -498,6 +498,9 @@ async function renderReports() {
       <div class="stat"><div class="k">Vreme (sesije)</div><div class="v">${money(r.session || 0)}</div></div>
       <div class="stat"><div class="k">Shop</div><div class="v">${money(r.shop || 0)}</div>
         <div class="stat-split">${icon("cash")} keš ${money(r.shopCash || 0)}, kredit ${money(r.shopCredit || 0)}</div></div>
+      ${/* VIP se pojavljuje tek kad ga neko kupi. Prazna pločica "VIP 0" u
+            igraonici koja ga još ne prodaje je samo još jedan broj za gledanje. */ ""}
+      ${r.vip ? `<div class="stat"><div class="k">VIP članarine</div><div class="v">${money(r.vip)}</div></div>` : ""}
       <div class="stat"><div class="k">Dopune</div><div class="v">${money(r.topups || 0)}</div>
         ${r.poklonjeno ? `<div class="stat-split">${icon("gift")} poklonjeno ${money(r.poklonjeno)}</div>` : ""}</div>
       <div class="stat"><div class="k">Sesije</div><div class="v">${s.count || 0} <small>${fmtMinutes(s.minutes || 0)}</small></div></div>
@@ -543,6 +546,7 @@ function izveziIzvestaj(period, d) {
     red("Shop ukupno", r.shop || 0),
     red("  - keš", r.shopCash || 0),
     red("  - kredit", r.shopCredit || 0),
+    red("VIP članarine", r.vip || 0),
     red("Dopune kredita", r.topups || 0),
     // Poklonjen kredit (nagradni točak i popust na paket) stoji na ekranu kao
     // trošak, pa mora i ovde: bez njega izveštaj koji ide knjigovođi kaže manje
@@ -1451,7 +1455,9 @@ async function refreshPlayers() {
          vidi se odavde, bez otvaranja ijedne strane. */ ""}
     <td class="nivo-c"><span class="nivo-znak">${p.nivo || 1}</span><span class="faint">${esc(p.nivoNaziv || "")}</span></td>
     <td class="mono ${p.balance > 0 ? "pos" : "zero"}">${money(p.balance)}</td>
-    <td>${p.banned ? '<span class="pill red">Blokiran</span>' : '<span class="pill green">Aktivan</span>'}</td>
+    ${/* VIP stoji uz status jer je posao osoblja: gost koji je platio članarinu
+         očekuje da ga prepoznaju a da on to ne traži. */ ""}
+    <td>${p.banned ? '<span class="pill red">Blokiran</span>' : '<span class="pill green">Aktivan</span>'}${p.vip ? ` <span class="pill gold" title="Još ${p.vipDana} ${oblik(p.vipDana, "dan", "dana", "dana")}">VIP</span>` : ""}</td>
     <td class="mono faint">${p.lastLogin ? timeAgo(p.lastLogin) : "-"}</td>
     <td style="text-align:right;white-space:nowrap">
       <button class="btn btn-sm btn-primary" data-p="topup" data-id="${p.id}">${icon("wallet")} Dopuni</button>
@@ -1717,9 +1723,16 @@ async function editPlayerModal(p) {
     <div class="kv-card">
       ${kv("Kredit", `<b class="${p.balance > 0 ? "pos" : "zero"}">${money(p.balance)}</b>`)}
       ${kv("Status", p.banned ? '<span class="pill red">Blokiran</span>' : '<span class="pill green">Aktivan</span>')}
+      ${kv("VIP", p.vip
+        ? `<span class="pill gold">Još ${p.vipDana} ${oblik(p.vipDana, "dan", "dana", "dana")}</span>`
+        : '<span class="faint">nema</span>')}
       ${kv("Nalog kreiran", p.createdAt ? dt(p.createdAt) : "-")}
       ${kv("Poslednja prijava", p.lastLogin ? timeAgo(p.lastLogin) : "-")}
     </div>
+    <div class="field"><label>VIP članarina</label>
+      <div class="btn-row">
+        <button class="btn" id="epVip" style="flex:1">${icon("star")} ${p.vip ? "Produži ili oduzmi VIP" : "Upiši VIP (keš na kasi)"}</button>
+      </div></div>
     <div class="form-row">
       <div class="field"><label>Korisničko ime</label><input id="epUser" value="${esc(p.username)}" /></div>
       <div class="field"><label>Ime za prikaz</label><input id="epName" value="${esc(p.displayName || "")}" /></div>
@@ -1741,6 +1754,7 @@ async function editPlayerModal(p) {
       } catch (e) { $("#epErr", root).textContent = e.message; }
     });
     $("#epPassBtn", root).addEventListener("click", async () => { try { await api(`/players/${p.id}/password`, "POST", { password: $("#epPass", root).value }); toast("Lozinka je resetovana", "success"); } catch (e) { toast(e.message, "error"); } });
+    $("#epVip", root).addEventListener("click", () => { close(); vipIgracuModal(p); });
     // BLOKIRANJE PREKIDA SESIJU I GASI IGRU.
     //
     // Nije samo oznaka na nalogu: ako gost trenutno igra, blokiranje mu zatvara
@@ -1768,7 +1782,62 @@ async function editPlayerModal(p) {
     });
   });
 }
-const txLabel = (t) => ({ topup: "Dopuna", session: "Sesija", shop: "Shop", refund: "Povraćaj", adjust: "Korekcija", bonus: "Bonus (paket)" }[t] || t);
+// VIP ZA GOSTA KOJI PLATI KEŠOM NA KASI.
+//
+// Gost koji ima kredit kupuje VIP sam, iz launchera, i osoblje o tome ne zna
+// ništa. Ovaj prozor je za onog koji preda pare preko pulta.
+//
+// KEŠ SE UPISUJE, I TO JE POLA POSLA OVOG PROZORA. Dok se novac nigde nije
+// zapisivao, uveče je u fioci stajao neobjašnjen višak - a višak se u obračunu
+// gleda isto kao i manjak. Zato je iznos ovde polje, a ne pretpostavka, i zato
+// poklonjen VIP mora da se izabere svesno.
+async function vipIgracuModal(p) {
+  let cfg = null;
+  try { cfg = await api("/vip"); } catch {}
+  const cena = Math.max(0, Number(cfg?.cena) || 0);
+  const dana = Math.max(1, Number(cfg?.dana) || 30);
+  const stanje = p.vip
+    ? `<div class="vip-stanje"><span class="pill gold">VIP</span> Ističe za ${p.vipDana} ${oblik(p.vipDana, "dan", "dana", "dana")}. Novi dani se dodaju na to, ne počinje ispočetka.</div>`
+    : `<div class="vip-stanje faint">Nalog trenutno nema VIP.</div>`;
+  modal("VIP - " + p.username, `
+    ${stanje}
+    ${!cfg?.ukljucen ? `<div class="nad-nota upozorenje" style="margin-bottom:12px">VIP nije uključen u podešavanjima, pa ga gost ne vidi u launcheru. Upis ovde svejedno radi.</div>` : ""}
+    <div class="form-row">
+      <div class="field"><label>Koliko dana</label><div class="input-suffix"><input id="vgDana" type="number" value="${dana}" autofocus /><span>dana</span></div></div>
+      <div class="field"><label>Naplaćeno kešom</label><div class="input-suffix"><input id="vgKes" type="number" value="${cena}" /><span>${cur()}</span></div></div>
+    </div>
+    <label class="cbx"><input type="checkbox" id="vgPoklon"><span class="box"></span> <span style="font-size:14px">Poklon - ne naplaćuje se</span></label>
+    <div class="faint" style="font-size:12px;line-height:1.55;margin:8px 0 12px">Naplaćen iznos ulazi u pazar smene, pa kasa uveče računa i na te pare. Kredit gostu ostaje nedirnut.</div>
+    <div class="err-msg" id="vgErr"></div>
+    <button class="btn btn-primary btn-block" id="vgSave">${p.vip ? "Produži VIP" : "Upiši VIP"}</button>
+    ${p.vip ? `<button class="btn btn-danger btn-block" id="vgOff" style="margin-top:8px">${icon("x")} Oduzmi VIP odmah</button>` : ""}`,
+  (root, close) => {
+    const poklon = $("#vgPoklon", root), kes = $("#vgKes", root);
+    // Polje za iznos se zaključava, a ne skriva: radnik vidi da se ne naplaćuje
+    // umesto da se pita gde je nestalo.
+    poklon.addEventListener("change", () => { kes.disabled = poklon.checked; if (poklon.checked) kes.value = 0; else kes.value = cena; });
+    $("#vgSave", root).addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
+      const d = Number($("#vgDana", root).value);
+      const naplati = poklon.checked ? 0 : Number(kes.value) || 0;
+      if (!(d >= 1)) { $("#vgErr", root).textContent = "Upiši koliko dana."; return; }
+      try {
+        const r = await api(`/players/${p.id}/vip`, "POST", { dana: d, naplati });
+        toast(naplati > 0 ? `VIP upisan, ${money(naplati)} u pazar` : "VIP je upisan", "success");
+        close(); renderPlayers();
+        return r;
+      } catch (e) { $("#vgErr", root).textContent = e.message; }
+    }, "Upisujem..."));
+    const off = $("#vgOff", root);
+    if (off) off.addEventListener("click", async () => {
+      if (!(await confirmDialog(`Gostu "${p.username}" se VIP oduzima odmah, pre isteka roka.`,
+        { title: "Oduzimanje VIP-a", ok: "Oduzmi", danger: true,
+          istaknuto: p.vipDana > 0 ? `Ostalo mu je još ${p.vipDana} ${oblik(p.vipDana, "dan", "dana", "dana")} - taj deo se ne vraća.` : null }))) return;
+      try { await api(`/players/${p.id}/vip`, "POST", { dana: 0 }); toast("VIP je oduzet", "success"); close(); renderPlayers(); }
+      catch (e) { $("#vgErr", root).textContent = e.message; }
+    });
+  });
+}
+const txLabel = (t) => ({ topup: "Dopuna", session: "Sesija", shop: "Shop", refund: "Povraćaj", adjust: "Korekcija", bonus: "Bonus (paket)", vip: "VIP članarina" }[t] || t);
 
 // Porudžbine
 const ORDER_STATUS = { pending: ["Na čekanju", "amber"], preparing: ["Priprema se", "blue"], delivered: ["Dostavljeno", "green"], cancelled: ["Otkazano", "red"] };
@@ -1808,9 +1877,13 @@ async function renderOrders() {
       const [stLbl, stCol] = ORDER_STATUS[o.status] || [o.status, "gray"];
       const items = o.items.map((i) => `<div class="oi"><span class="oi-q">${i.qty}x</span><span class="oi-n">${esc(i.name)}</span><span class="oi-p">${money(i.price * i.qty)}</span></div>`).join("");
       return `
-      <div class="order">
+      ${/* VIP porudžbina stoji na vrhu spiska - to je pogodnost koja se plaća uz
+           članarinu. Oznaka mora da se vidi, inače izgleda kao da se spisak
+           premešta sam od sebe. */ ""}
+      <div class="order${o.vip ? " vip" : ""}">
         <div class="order-head">
           <span class="order-id">#${o.id}</span>
+          ${o.vip ? '<span class="pill gold">VIP</span>' : ""}
           <span class="pill ${stCol}">${stLbl}</span>
           <span class="order-ago" data-ago="${o.createdAt}">${timeAgo(o.createdAt)}</span>
         </div>
@@ -3605,9 +3678,10 @@ async function renderSettings() {
       <div class="card">
         <div class="card-head"><h2>Vremenski paketi</h2>
           <button class="btn btn-sm btn-primary" id="paketNovi">${icon("plus")} Novi paket</button></div>
-        <div class="card-sub">Jeftinije vreme kupljeno unapred. Osoblje ih prodaje na dopuni kredita, jednim klikom.</div>
+        <div class="card-nota">Jeftinije vreme kupljeno unapred. Osoblje ih prodaje na dopuni kredita, jednim klikom.</div>
         <div id="paketiLista" class="paketi-lista"><div class="empty" style="padding:16px">učitavam...</div></div>
       </div>
+      <div class="card" id="vipKartica"><div class="empty" style="padding:22px">učitavam...</div></div>
       <div class="card" id="tocakKartica"><div class="empty" style="padding:22px">učitavam...</div></div>
       ${si ? `
       <div class="card">
@@ -3618,7 +3692,7 @@ async function renderSettings() {
           ${kv("Port", `<span class="mono">${si.port}</span>`)}
           ${kv("Veličina baze", fmtBytes(si.dbSizeBytes))}
         </div>
-        <div class="card-sub">Adresa servera - unosi se u launcher pri podešavanju računara</div>
+        <div class="card-nota">Adresa servera - unosi se u launcher pri podešavanju računara</div>
         <div class="card-body kv-list" style="padding-top:4px">${addrRows}</div>
       </div>
       <div class="card">
@@ -3630,7 +3704,7 @@ async function renderSettings() {
         </div>
         <div class="card-sub">Poslednje kopije</div>
         <div class="table-wrap"><table><tbody id="kopijeRedovi"><tr><td class="empty" style="padding:18px">učitavam...</td></tr></tbody></table></div>
-        <div class="card-sub">Ako baza pukne, kopija se vraća skriptom <span class="mono">VRATI-KOPIJU.bat</span> u folderu servera. Server pri tome mora da bude ugašen.</div>
+        <div class="card-nota">Ako baza pukne, kopija se vraća skriptom <span class="mono">VRATI-KOPIJU.bat</span> u folderu servera. Server pri tome mora da bude ugašen.</div>
         <div class="card-foot"><button class="btn" id="backupNow">${icon("refresh")} Napravi kopiju sada</button></div>
       </div>
 
@@ -3644,7 +3718,7 @@ async function renderSettings() {
         <div class="card-body kv-list" id="skladisteTelo"><div class="faint" style="padding:4px 0">učitavam...</div></div>
         <div class="card-sub">Koliko se dugo čuva</div>
         <div class="card-body set-rows" id="skladisteGranice"></div>
-        <div class="card-sub">Zapisi stariji od zadatog se brišu, a ako ih i posle toga ima previše, briše se najstariji da bi novi imao mesto. Promet, sesije i porudžbine se ne brišu nikad - to je poslovna evidencija.</div>
+        <div class="card-nota">Zapisi stariji od zadatog se brišu, a ako ih i posle toga ima previše, briše se najstariji da bi novi imao mesto. Promet, sesije i porudžbine se ne brišu nikad - to je poslovna evidencija.</div>
         <div class="card-foot">
           <button class="btn" id="skladisteSacuvaj">Sačuvaj granice</button>
           <button class="btn" id="skladisteOcisti">${icon("trash")} Očisti sada</button>
@@ -3696,6 +3770,7 @@ async function renderSettings() {
   const pn = $("#paketNovi");
   if (pn) pn.addEventListener("click", () => paketModal());
   ucitajPakete();
+  ucitajVip();
   ucitajTocak();
   ucitajKopije();
   ucitajKopijuVan();
@@ -3769,6 +3844,99 @@ async function ucitajSkladiste() {
   };
 }
 
+// VIP ČLANARINA - podešavanje (vlasnik).
+//
+// RANG SE ZARAĐUJE, VIP SE KUPUJE. Rang dolazi od igranja, besplatan je i on je
+// status; VIP se plaća, nosi pogodnosti i on je prihod. Dok je VIP bio nagrada
+// za peti nivo, bio je trošak - i to baš na najboljim gostima, kojima je kuća
+// pravila popust iako bi ionako došli.
+//
+// Kartica odgovara na dva pitanja, i to tim redom: ISPLATI LI SE (koliko ih ima
+// i koliko je ušlo) i ŠTA GOST DOBIJA. Bez prvog, podešavanje je pet polja za
+// kucanje bez ijednog podatka - pa se cena nikad ne menja, jer se ne zna prema
+// čemu bi se menjala.
+async function ucitajVip() {
+  const box = $("#vipKartica");
+  if (!box) return;
+  let cfg, tocak = null;
+  // Točak se čita i ovde, a ne iz window._tocak: dve kartice se učitavaju
+  // paralelno, pa se na koju će prva stići ne može računati. Dok se računalo,
+  // VIP kartica je pri prvom otvaranju tvrdila da je točak isključen.
+  try { [cfg, tocak] = await Promise.all([api("/vip"), api("/tocak").catch(() => null)]); }
+  catch (e) {
+    // Kartica koja zauvek piše "učitavam..." je ista greška kao i prazna strana:
+    // vlasnik ne zna da li VIP ne postoji ili nešto ne radi.
+    box.innerHTML = `<div class="ucitavanje-palo">${icon("alert")}
+      <b>VIP podešavanja nisu učitana</b><span>${esc(e.message)}</span>
+      <button class="btn btn-sm" id="vipPonovo">Pokušaj ponovo</button></div>`;
+    const d = $("#vipPonovo"); if (d) d.addEventListener("click", ucitajVip);
+    return;
+  }
+  if (!$("#vipKartica")) return;
+  window._vip = cfg;
+
+  const tocakUkljucen = !!tocak?.ukljucen;
+  const obicanPrag = Number(tocak?.prag ?? 1200);
+  // Brojke se pokazuju tek kad ih ima. "0 članova, 0 dinara" u igraonici koja
+  // VIP još nije ni uključila nije podatak nego ukras.
+  const imaBrojki = cfg.aktivnih > 0 || cfg.prodato30 > 0;
+  const brojke = imaBrojki ? `
+    <div class="vip-brojke">
+      <div class="vb"><div class="vb-v">${cfg.aktivnih}</div><div class="vb-k">${oblik(cfg.aktivnih, "član", "člana", "članova")} trenutno</div></div>
+      <div class="vb"><div class="vb-v">${cfg.prodato30}</div><div class="vb-k">prodato za 30 dana</div></div>
+      <div class="vb"><div class="vb-v money">${money(cfg.prihod30)}</div><div class="vb-k">ušlo za 30 dana</div></div>
+    </div>` : "";
+
+  const pogodnosti = (cfg.pogodnosti || []).map((p) => `<div class="vip-pog">
+    <span class="vp-t">${esc(p.naziv)}</span><span class="vp-o">${esc(p.opis)}</span></div>`).join("");
+
+  box.innerHTML = `
+    <div class="card-head"><h2>VIP članarina</h2>
+      <label class="switch"><input type="checkbox" id="vipUkljucen" ${cfg.ukljucen ? "checked" : ""}><span class="slider"></span></label></div>
+    <div class="card-nota">Rang se zarađuje igranjem i besplatan je. VIP se kupuje: gost ga plaća svojim kreditom, iz launchera, bez radnika i u bilo koje doba. Kešom na kasi ga upisuje osoblje, na nalogu igrača.</div>
+    ${brojke}
+    <div class="set-rows" style="padding:0 16px">
+      ${setRow("Cena", cfg.cena > 0
+        ? `Skida se sa kredita koji je gost već uplatio na kasi${cfg.dana > 0 ? `, ${Math.round(cfg.cena / cfg.dana)} ${cur()} dnevno` : ""}`
+        : "Dok je cena nula, gost ne može da kupi VIP - launcher mu kaže da pozove osoblje",
+        `<div class="input-suffix"><input id="vipCena" type="number" value="${cfg.cena}" /><span>${cur()}</span></div>`,
+        cfg.ukljucen && cfg.cena <= 0 ? "upozorenje" : "")}
+      ${setRow("Trajanje", "Obnova dok VIP još traje se nadovezuje na postojeći rok, pa gost ne gubi dane ako obnovi ranije",
+        `<div class="input-suffix"><input id="vipDana" type="number" value="${cfg.dana}" /><span>dana</span></div>`)}
+      ${setRow("Množilac iskustva", cfg.xpMnozilac > 1
+        ? `Svaki potrošen dinar nosi ${cfg.xpMnozilac}x iskustva - do sledećeg ranga se stiže brže. Kuću ne košta ništa.`
+        : "Množilac 1 znači da VIP ne daje ništa od iskustva - a to je pogodnost koja se najviše oseti, a ne košta ništa",
+        `<div class="input-suffix"><input id="vipXp" type="number" step="0.5" value="${cfg.xpMnozilac}" /><span>x</span></div>`,
+        cfg.ukljucen && cfg.xpMnozilac <= 1 ? "upozorenje" : "")}
+      ${setRow("Prag za točak (VIP)", !tocakUkljucen
+        ? "Nagradni točak je isključen, pa ova pogodnost trenutno ne radi ništa"
+        : `Ostalima je prag ${money(obicanPrag)} nedeljno. Ovo je jedina pogodnost koja kuću stvarno košta.`,
+        `<div class="input-suffix"><input id="vipTocakPrag" type="number" value="${cfg.tocakPrag}" /><span>${cur()}</span></div>`,
+        cfg.ukljucen && !tocakUkljucen ? "upozorenje" : "")}
+    </div>
+    <div class="card-sub">Šta gost dobija za to</div>
+    <div class="vip-pogodnosti">${pogodnosti}</div>`;
+
+  const sw = $("#vipUkljucen");
+  if (sw) sw.addEventListener("change", async () => {
+    try {
+      await api("/vip", "POST", { ukljucen: sw.checked });
+      toast(sw.checked ? "VIP je u ponudi" : "VIP više nije u ponudi", "success");
+      ucitajVip();
+    } catch (e) { toast(e.message, "error"); sw.checked = !sw.checked; }
+  });
+  // Svako polje se čuva kad ga radnik napusti, kao i kod točka. Poruka o grešci
+  // vraća staru vrednost u polje - inače na ekranu ostane broj koji nije upisan.
+  for (const [polje, kljuc] of [["#vipCena", "cena"], ["#vipDana", "dana"], ["#vipXp", "xpMnozilac"], ["#vipTocakPrag", "tocakPrag"]]) {
+    const el = $(polje);
+    if (!el) continue;
+    el.addEventListener("change", async () => {
+      try { await api("/vip", "POST", { [kljuc]: el.value }); toast("Sačuvano", "success"); ucitajVip(); }
+      catch (e) { toast(e.message, "error"); ucitajVip(); }
+    });
+  }
+}
+
 // Nagradni točak - podešavanje (vlasnik): uključi/isključi, prag potrošnje, nagrade.
 async function ucitajTocak() {
   const box = $("#tocakKartica");
@@ -3791,7 +3959,7 @@ async function ucitajTocak() {
   box.innerHTML = `
     <div class="card-head"><h2>Nagradni točak</h2>
       <label class="switch"><input type="checkbox" id="tocakUkljucen" ${cfg.ukljucen ? "checked" : ""}><span class="slider"></span></label></div>
-    <div class="card-sub">Jednom nedeljno može da zavrti svako ko je za tih 7 dana potrošio bar prag. Ishod bira server, igrač ne može da namesti.</div>
+    <div class="card-nota">Jednom nedeljno može da zavrti svako ko je za tih 7 dana potrošio bar prag. Ishod bira server, igrač ne može da namesti.</div>
     <div class="set-rows" style="padding:0 16px">
       ${setRow("Prag potrošnje (nedeljno)", `Igrač mora toliko da potroši za 7 dana da bi smeo da vrti${rph > 0 ? ` (~${(cfg.prag / rph).toFixed(1)}h igre)` : ""}`, `<div class="input-suffix"><input id="tocakPrag" type="number" value="${cfg.prag}" /><span>${cur()}</span></div>`)}
     </div>
@@ -3799,13 +3967,15 @@ async function ucitajTocak() {
       <button class="btn btn-sm" id="nagNova">${icon("plus")} Nagrada</button></div>
     <div class="paketi-lista">${nagRedovi}</div>`;
   const sw = $("#tocakUkljucen");
+  // VIP kartica se osvežava zajedno sa točkom: na njoj piše koliki je prag
+  // ostalima i da li točak uopšte radi, pa bi inače ostajala da tvrdi staro.
   if (sw) sw.addEventListener("change", async () => {
-    try { await api("/tocak", "POST", { ukljucen: sw.checked }); toast(sw.checked ? "Točak je uključen" : "Točak je isključen", "success"); }
+    try { await api("/tocak", "POST", { ukljucen: sw.checked }); toast(sw.checked ? "Točak je uključen" : "Točak je isključen", "success"); ucitajVip(); }
     catch (e) { toast(e.message, "error"); sw.checked = !sw.checked; }
   });
   const prag = $("#tocakPrag");
   if (prag) prag.addEventListener("change", async () => {
-    try { await api("/tocak", "POST", { prag: prag.value }); toast("Prag sačuvan", "success"); ucitajTocak(); }
+    try { await api("/tocak", "POST", { prag: prag.value }); toast("Prag sačuvan", "success"); ucitajTocak(); ucitajVip(); }
     catch (e) { toast(e.message, "error"); }
   });
   const nn = $("#nagNova");

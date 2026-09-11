@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "crit-pregled",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:\\Users\\tw1ch\\OneDrive\\Desktop\\crit\\testovi\\server-za-pregled.mjs"],
+      "port": 8096
+    },
+    {
       "name": "crit-server",
       "runtimeExecutable": "node",
       "runtimeArgs": ["C:\\Users\\tw1ch\\OneDrive\\Desktop\\crit\\server\\src\\index.js"],

@@ -281,5 +281,67 @@ proveri("slanje instalacije se zakljucava", /#itSend[\s\S]{0,60}jednomKlik/.test
 proveri("istaknuto upozorenje ima svoje polje", /opts\.istaknuto \? `<div class="confirm-hi">\$\{esc\(opts\.istaknuto\)\}/.test(app));
 proveri("istaknuto upozorenje ima svoj stil", /\.confirm-hi \{/.test(css));
 
+// ---- VIP CLANARINA U PANELU ----
+//
+// Server je znao sve o VIP-u, a vlasnik nije imao gde da ga ukljuci - pa se
+// clanarina nije mogla prodati nijednom gostu. Ovde se cuva da svako parce tog
+// puta postoji: podesavanje, upis za kes i oznaka koju osoblje vidi.
+proveri("VIP kartica stoji u podesavanjima", app.includes('id="vipKartica"') && /async function ucitajVip\(\)/.test(app));
+proveri("i ucitava se kad se strana otvori", /ucitajVip\(\);\s*[\r\n]+\s*ucitajTocak\(\);/.test(app),
+  "kartica koju niko ne pozove zauvek pise 'ucitavam...'");
+proveri("VIP ima prekidac, cenu, trajanje, mnozilac i prag",
+  ["vipUkljucen", "vipCena", "vipDana", "vipXp", "vipTocakPrag"].every((i) => app.includes(`id="${i}"`)));
+// Kartica koja zauvek pise "ucitavam..." je ista greska kao i prazna strana:
+// vlasnik ne zna da li VIP ne postoji ili nesto ne radi.
+proveri("pala kartica se vidi i moze da se ponovi",
+  /#vipKartica[\s\S]{0,900}ucitavanje-palo[\s\S]{0,300}vipPonovo/.test(app));
+// Tocak se cita u samoj kartici. Dok se citao iz window._tocak, dve kartice su
+// se ucitavale paralelno pa je VIP pri prvom otvaranju tvrdio da je tocak
+// iskljucen - a od toga zavisi da li pogodnost uopste radi.
+proveri("prag se poredi sa pravim stanjem tocka",
+  /Promise\.all\(\[api\("\/vip"\), api\("\/tocak"\)/.test(app),
+  "iz window._tocak je pri prvom otvaranju stizalo prazno");
+proveri("i kartica se osvezava kad se tocak promeni",
+  /\/tocak", "POST", \{ prag: prag\.value \}\)[\s\S]{0,120}ucitajVip\(\)/.test(app));
+// Cena nula i mnozilac 1 su tiha kvarenja: VIP stoji ukljucen, a ne radi nista.
+proveri("cena nula se prijavljuje kao greska", /cfg\.ukljucen && cfg\.cena <= 0 \? "upozorenje"/.test(app));
+proveri("mnozilac 1 takodje", /cfg\.ukljucen && cfg\.xpMnozilac <= 1 \? "upozorenje"/.test(app));
+proveri("iskljucen tocak takodje", /cfg\.ukljucen && !tocakUkljucen \? "upozorenje"/.test(app));
+
+// KES ZA VIP. Gost preda pare preko pulta; ako se to nigde ne upise, uvece u
+// fioci stoji visak koji obracun ne pominje.
+proveri("nalog igraca ima dugme za VIP", app.includes('id="epVip"') && /function vipIgracuModal\(p\)/.test(app));
+proveri("prozor pita i koliko je naplaceno", app.includes('id="vgKes"') && app.includes('id="vgPoklon"'));
+proveri("iznos ide serveru", /"POST", \{ dana: d, naplati \}/.test(app));
+proveri("poklon se bira svesno", /poklon\.checked \? 0 : Number\(kes\.value\)/.test(app),
+  "da se ne ispostavi da je pola clanarina 'poklonjeno' zato sto je polje slucajno ostalo prazno");
+proveri("oduzimanje VIP-a pita", /Oduzimanje VIP-a[\s\S]{0,120}danger: true/.test(app));
+proveri("i kaze koliko dana propada", /taj deo se ne vraća/.test(app));
+
+// OSOBLJE MORA DA VIDI KO JE VIP, bez otvaranja naloga: gost koji je platio
+// clanarinu ocekuje da ga prepoznaju a da on to ne trazi.
+proveri("VIP se vidi u spisku igraca", /p\.vip \? ` <span class="pill gold"[^>]*>VIP<\/span>/.test(app));
+proveri("i u samom nalogu, sa preostalim danima", /kv\("VIP", p\.vip[\s\S]{0,80}Još \$\{p\.vipDana\}/.test(app));
+proveri("VIP porudzbina nosi oznaku na kasi", /o\.vip \? '<span class="pill gold">VIP<\/span>'/.test(app),
+  "bez oznake izgleda kao da se spisak premesta sam od sebe");
+proveri("i vidi se da je izdvojena", /\.order\.vip \{/.test(css));
+
+// Zlatna znaci NAGRADA - isto kao u launcheru. Zuta (--locked) je "paznja" i to
+// su dve razlicite stvari; dva imena za istu boju znace da razlika postoji samo
+// u kodu, a radnik vidi jednu stvar.
+proveri("panel ima svoju zlatnu", /--gold: #[0-9a-f]{6};/.test(css) && /\.pill\.gold \{/.test(css));
+proveri("zlatna nije ista boja kao 'paznja'",
+  /--gold: (#[0-9a-f]{6});/.exec(css)?.[1] !== /--locked: (#[0-9a-f]{6});/.exec(css)?.[1]);
+proveri("zlatna je ista kao u launcheru",
+  /--gold: (#[0-9a-f]{6});/.exec(css)?.[1] === /--gold: (#[0-9a-f]{6});/.exec(citajIzvor("client/renderer/css/launcher.css"))?.[1],
+  "panel i launcher se gledaju jedan pored drugog");
+
+// VIP novac u izvestaju. Da ne ulazi u promet, VIP bi izgledao kao da ne donosi
+// nista - pa bi ga vlasnik prvi ugasio.
+proveri("VIP stoji u izvestaju", /r\.vip \? `<div class="stat"><div class="k">VIP članarine/.test(app));
+proveri("i u izvozu za knjigovodju", /red\("VIP članarine", r\.vip \|\| 0\)/.test(app));
+proveri("VIP transakcija ima svoje ime u istoriji naloga", /vip: "VIP članarina"/.test(app),
+  "inace u istoriji naloga stoji golo 'vip'");
+
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 process.exit(pao ? 1 : 0);

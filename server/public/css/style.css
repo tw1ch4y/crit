@@ -37,6 +37,10 @@
   --offline: #5d6684;
   --danger: #e5484d;
   --danger-soft: rgba(229, 72, 77, 0.11);
+  /* Nagrada - ista zlatna kao u launcheru (--gold), da VIP oznaka na kasi bude
+     ista boja kao ona koju gost gleda na svom ekranu. */
+  --gold: #ffb527;
+  --gold-soft: rgba(255, 181, 39, 0.13);
   --r-sm: 8px;
   --r: 12px;
   --r-lg: 16px;
@@ -443,6 +447,10 @@ td { padding: 12px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.035); ve
 tr:last-child td { border-bottom: none; }
 tbody tr { transition: background var(--tr); }
 tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
+/* Red igrača se ceo klikće (otvara nalog), pa mora i da se pritisne. Bez toga
+   klik na ime nije davao nikakav znak da je stigao - a spisak se na dodirnom
+   ekranu kucka baš po redu, ne po dugmetu. */
+tbody tr[data-prow]:active { background: rgba(255, 255, 255, 0.05); }
 .mono { font-variant-numeric: tabular-nums; }
 .muted { color: var(--text-2); }
 .faint { color: var(--text-3); }
@@ -465,6 +473,11 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .pill.red { background: var(--danger-soft); color: var(--danger); }
 .pill.blue { background: var(--standby-soft); color: var(--standby); }
 .pill.gray { background: rgba(255, 255, 255, 0.06); color: var(--text-3); }
+/* Zlatna znači NAGRADA, isto kao u launcheru - točak, VIP, prelazak nivoa. Ne
+   koristi se ni za šta drugo, inače prestane da znači bilo šta. Žuta (--locked)
+   je "pažnja" i to su dve različite stvari; zato se i vrednosti razlikuju po
+   tonu, ne samo po imenu. */
+.pill.gold { background: var(--gold-soft); color: var(--gold); }
 .pos { color: var(--online); font-weight: 600; }
 .zero { color: var(--danger); font-weight: 600; }
 
@@ -487,6 +500,9 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
   display: flex; flex-direction: column;
 }
+/* VIP porudžbina stoji prva u spisku - to je pogodnost koja se plaća. Leva
+   zlatna ivica je da se vidi ZAŠTO je prva, bez čitanja. */
+.order.vip { border-color: rgba(255, 181, 39, 0.35); box-shadow: inset 3px 0 0 var(--gold); }
 .order-head { display: flex; align-items: center; gap: 8px; padding: 12px 12px 0; }
 .order-id { font-weight: 650; font-size: 14px; font-variant-numeric: tabular-nums; }
 .order-ago { margin-left: auto; font-size: 12px; color: var(--text-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -890,16 +906,58 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .set-row .sr-d.upozorenje { color: var(--locked); }
 .set-row .sr-c { width: 230px; flex-shrink: 0; }
 .card-foot { padding: 12px 16px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; }
+/* .card-sub je NASLOV odeljka: dve-tri reči, velikim slovima. Sve preko toga se
+   piše u .card-nota.
+
+   Ista klasa je nosila i naslove ("Poslednje kopije") i cela objašnjenja od tri
+   reda. U verzalu nestaje oblik reči, pa se rečenica od tri reda ne čita nego
+   preskače - a baš u tim rečenicama stoji jedino mesto gde piše šta neka opcija
+   radi. Nizovi velikih slova još i razmiču letter-spacing-om, što ih razvlači
+   preko celog reda. */
 .card-sub {
   padding: 12px 16px 0; font-size: 11px; font-weight: 600; color: var(--text-3);
   text-transform: uppercase; letter-spacing: 0.06em; border-top: 1px solid var(--line);
 }
+.card-nota {
+  padding: 10px 16px 0; font-size: 13px; color: var(--text-2); line-height: 1.55;
+  border-top: 1px solid var(--line);
+}
+.card-nota + .card-nota, .card-sub + .card-nota { border-top: none; padding-top: 6px; }
 .input-suffix { position: relative; }
 .input-suffix input { padding-right: 64px; }
 .input-suffix span {
   position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
   font-size: 12px; color: var(--text-3); pointer-events: none;
 }
+/* VIP članarina (podešavanja)
+
+   Tri brojke odgovaraju na jedino pitanje zbog kog vlasnik i otvara ovu
+   karticu: isplati li se. Stoje iznad polja za kucanje, jer se cena menja
+   PREMA njima - a ne obrnuto. */
+.vip-brojke {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+  margin: 12px 16px 0; background: var(--line); border: 1px solid var(--line); border-radius: var(--r-sm);
+  overflow: hidden;
+}
+.vb { background: var(--surface-2); padding: 10px 12px; }
+.vb-v { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.vb-v.money { color: var(--online); }
+.vb-k { font-size: 11px; color: var(--text-3); margin-top: 2px; line-height: 1.4; }
+@media (max-width: 560px) { .vip-brojke { grid-template-columns: 1fr; } }
+
+/* Spisak pogodnosti je isti onaj koji gost vidi u launcheru. Stoji ovde da
+   vlasnik zna ŠTA tačno prodaje kad odredi cenu. */
+.vip-pogodnosti { padding: 4px 16px 14px; }
+.vip-pog { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--hair); }
+.vip-pog:last-child { border-bottom: none; }
+.vp-t { font-size: 13px; font-weight: 600; color: var(--gold); width: 160px; flex-shrink: 0; }
+.vp-o { font-size: 13px; color: var(--text-2); line-height: 1.45; }
+@media (max-width: 560px) { .vip-pog { flex-direction: column; gap: 2px; } .vp-t { width: auto; } }
+.vip-stanje {
+  font-size: 13px; color: var(--text-2); line-height: 1.5; margin-bottom: 14px;
+  padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm);
+}
+
 .input-eye { position: relative; }
 .input-eye input { padding-right: 40px; }
 .input-eye .ic-btn { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); color: var(--text-3); }

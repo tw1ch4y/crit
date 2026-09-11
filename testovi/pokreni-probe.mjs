@@ -91,6 +91,15 @@ if (izabrani.some((a) => !a.sam)) {
   for (const g of ["Counter-Strike 2", "Valorant", "Fortnite"]) {
     await api("/api/games", "POST", { name: g, path: "C:\\games\\" + g.toLowerCase().replace(/\s/g, ""), category: "Igre" });
   }
+  // VIP i točak se pale, i jedan gost dobija članarinu. Inače se kartica meri u
+  // stanju u kom je vlasnik nikad neće videti - isključena, praznih brojki i bez
+  // ijednog upozorenja - pa se ne vidi ni da li se brojke lome ni da li dugačko
+  // objašnjenje gura polje iz reda.
+  await api("/api/vip", "POST", { ukljucen: true, cena: 1500, dana: 30, xpMnozilac: 2, tocakPrag: 700 });
+  await api("/api/tocak", "POST", { ukljucen: true, prag: 1200 });
+  await api("/api/players", "POST", { username: "marko", password: "marko123", displayName: "Marko", balance: 1500 });
+  const igraci = JSON.parse(await api("/api/players").catch(() => "[]") || "[]");
+  if (igraci[0]) await api(`/api/players/${igraci[0].id}/vip`, "POST", { dana: 30, naplati: 1500 });
 }
 
 const zaostalih = ugasiLaunchere();

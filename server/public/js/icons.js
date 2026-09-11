@@ -40,6 +40,9 @@ const ICONS = {
   // Isti oblik kao stavka "Igre" u bocnom meniju, da se red u logovima prepozna
   // po ikoni bez citanja.
   igre: '<path d="M6 12h4M8 10v4M15 11h.01M18 13h.01"/><rect x="2" y="6" width="20" height="12" rx="4"/>',
+  // VIP clanarina. Zvezda, a ne kruna: kruna se u launcheru vec koristi za
+  // rang, a rang se zaradjuje - VIP se kupuje, i to su dve razlicite stvari.
+  star: '<path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z"/>',
 };
 
 function icon(name, cls = "") {

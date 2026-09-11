@@ -285,17 +285,29 @@ router.post("/players/:id/paket", (req, res) => {
 // Rang se zarađuje igranjem i besplatan je; VIP se plaća i nosi pogodnosti.
 // Dok je VIP bio nagrada za peti nivo, bio je trošak - i to baš na najboljim
 // gostima, kojima je kuća davala popust iako bi ionako došli.
-router.get("/vip", requireOwner, (req, res) => res.json(svc.vipObj()));
+// Cenu i trajanje vidi i radnik: on je taj koji uzima keš preko pulta, pa mu
+// prozor za upis VIP-a mora znati koliko se naplaćuje. Tajna i nije - istu tu
+// cenu launcher piše svakom gostu. Brojke o zaradi ostaju vlasniku.
+router.get("/vip", (req, res) => {
+  const v = svc.vipPregled();
+  if (req.admin.role !== "owner") { delete v.aktivnih; delete v.prodato30; delete v.prihod30; }
+  res.json(v);
+});
 router.post("/vip", requireOwner, (req, res) => {
   const r = svc.postaviVip(req.body || {});
   if (r.error) return res.status(400).json(r);
   svc.logEvent({ category: "podesavanja", action: "vip", actor: req.admin.username,
     detail: `VIP: ${r.ukljucen ? "u ponudi" : "nije u ponudi"}, ${r.cena} za ${r.dana} dana, x${r.xpMnozilac} XP` });
-  res.json(r);
+  res.json(svc.vipPregled());
 });
 // Gost koji plati kešom na kasi - radnik mu upiše dane. Nula oduzima odmah.
+//
+// `naplati` je iznos koji je gost predao preko pulta. Ide u pazar smene, pa
+// kasa uveče očekuje i taj novac; bez njega bi u fioci stajao višak koji obračun
+// ne pominje. Poklonjen VIP (nagrada, ispravka) se šalje bez njega.
 router.post("/players/:id/vip", (req, res) => {
-  const r = svc.postaviVipIgracu(Number(req.params.id), req.body?.dana, req.admin.username);
+  const r = svc.postaviVipIgracu(Number(req.params.id), req.body?.dana, req.admin.username,
+    { naplati: req.body?.naplati, adminId: req.admin.adminId });
   if (r.error) return res.status(400).json(r);
   res.json(r);
 });
