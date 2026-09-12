@@ -186,5 +186,27 @@ proveri("paket staje ako baza pominje sliku koje nema",
   /if \(fali\.length\)[\s\S]{0,500}process\.exit\(1\)/.test(paket),
   "paket bez omota se inace vidi tek u igraonici, kad je vec na USB-u");
 
+// ---- PAKET SE PROVERAVA TAKO STO SE POKRENE ----
+//
+// Ovaj fajl cita kod i proverava da su pravila na mestu. To ne pusta ono sto ce
+// stvarno otici u igraonicu - a bas tu se lomilo: paket je otisao sa bazom bez
+// poslednjih izmena, pa je ciscenje odmah obrisalo i omote igara kojih u toj
+// bazi nema. Sve je izgledalo uredno dok se ne stigne na lice mesta.
+//
+// Zato postoji alat koji dize server IZ SAME KUTIJE. Ovde se cuva da postoji i
+// da radi ono zbog cega je napravljen.
+const provera = citajIzvor("alati/proveri-paket.mjs");
+proveri("postoji alat koji pusta paket", /spawn\(process\.execPath, \[path\.join\(SRV, "src", "index\.js"\)\]/.test(provera),
+  "citanje koda ne dokazuje da ce se paket podici");
+proveri("alat povlaci svaku sliku koju baza pominje",
+  /const stigla = async \(u\)/.test(provera) && /content-type"\) \|\| ""\)\.startsWith\("image\/"\)/.test(provera),
+  "status 200 nije dovoljan - prazan odgovor bi prosao");
+proveri("alat proverava i verziju instalera", /instaler je verzija \$\{verzija\}/.test(provera),
+  "instaler druge verzije znaci launcher koji ne odgovara panelu");
+proveri("alat ne pada na port glavnog servera", /PORT \|\| "8211"/.test(provera),
+  "server igraonice ume da radi na istom racunaru dok se paket proverava");
+proveri("alat kaze gde se pusta", /node alati\/proveri-paket\.mjs/.test(citajIzvor("SLEDECI-KORACI.md")),
+  "alat koji niko ne zna da postoji se ne pusta");
+
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 process.exit(pao ? 1 : 0);

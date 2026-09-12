@@ -201,6 +201,23 @@ Računari je preuzimaju sami čim se oslobode. **Mašina na kojoj neko igra se n
 dira** - dolazi na red kad gost ustane. Ako nešto ne prođe, u panelu piše zašto,
 a launcher se u svakom slučaju vraća.
 
+### 5.1 Pre nego što USB krene - pusti ovo
+
+Kad praviš nov paket (`node napravi-paket.mjs`), proveri ga pre puta:
+
+```
+node alati/proveri-paket.mjs
+```
+
+Diže server **iz same kutije** i radi ono što igraonica radi prvog dana: otvara
+panel, traži katalog i povlači svaku sliku koju baza pominje. Traje dvadesetak
+sekundi.
+
+> Zašto: jednom je paket otišao sa bazom bez poslednjih izmena - SQLite ih je
+> držao u svom radnom fajlu, a kopiranje je uzelo samo bazu. Čišćenje je odmah
+> zatim obrisalo i omote igara kojih u toj bazi nema. Sve je izgledalo uredno
+> dok se ne stigne na lice mesta.
+
 ---
 
 ## 6. Kad zatreba - nije sada
