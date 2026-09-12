@@ -1613,64 +1613,92 @@ function javiSkokSata(proteklo) {
   });
 }
 
+// Kvar naplate se javlja jednom u minutu po sesiji - inače bi jedna ista greška
+// na svakih pet sekundi napunila logove i pregazila sve ostalo u njima.
+const kvarNaplateJavljen = new Map();
+function javiKvarNaplate(s, e) {
+  const sada = Date.now();
+  if (sada - (kvarNaplateJavljen.get(s.id) || 0) < 60000) return;
+  kvarNaplateJavljen.set(s.id, sada);
+  const ime = compName(s.computer_id);
+  console.error(`naplata (${ime}):`, e);
+  try {
+    logEvent({ category: "sistem", action: "greska", actor: "server",
+      detail: `Naplata nije prošla na ${ime}: ${String(e?.message || e).slice(0, 150)}. Ostali računari se naplaćuju normalno.` });
+  } catch {}
+}
+
 // naplata svakih nekoliko sekundi
 export function billingTick() {
   const r = rate();
   const now = Date.now();
   const active = db.prepare("SELECT * FROM sessions WHERE status='active'").all();
   for (const s of active) {
-    const st = tickState.get(s.id) || { last: now };
-    // Pauziraj naplatu ako klijent tog računara nije povezan (nestanak struje/mreže) -
-    // resetuj vreme da nema "catch-up" naplate kad se ponovo poveže.
-    if (!isClientOnline(s.computer_id)) { st.last = now; tickState.set(s.id, st); continue; }
-    const proteklo = (now - st.last) / 1000;
-    st.last = now;
-    tickState.set(s.id, st);
-    if (r <= 0 || proteklo <= 0) continue;
-    if (proteklo > NAJVISE_PO_PROLAZU) javiSkokSata(proteklo);
-    const elapsed = sekundeZaNaplatu(proteklo);
-
-    const p = playerById(s.player_id);
-    if (!p) continue;
-    // Ne naplaćuj više nego što igrač ima - inače bi sesija zabeležila veći
-    // trošak nego što je stvarno skinuto i promet bi bio naduvan.
-    const cost = (elapsed / 3600) * r;
-    const charged = Math.min(cost, Math.max(0, p.balance));
-    const newBal = round2(p.balance - charged);
-    const newCost = round2(s.cost + charged);
-
-    if (newBal <= 0) {
-      // Ova dva upisa NISU u istom poslu sa `endSession`, i to namerno.
-      // `endSession` hvata svoju grešku i vraća se normalno; da su u zajedničkom
-      // poslu, njegov rollback bi poništio samo zatvaranje sesije dok bi se
-      // nulovanje kredita svejedno potvrdilo - a to je gore od oba upisa
-      // posebno. Ovako se stanje samo popravlja: kredit je 0, pa sledeći prolaz
-      // za pet sekundi ponovo dođe ovde i pokuša da zatvori sesiju.
-      db.prepare("UPDATE players SET balance=0 WHERE id=?").run(p.id);
-      db.prepare("UPDATE sessions SET cost=? WHERE id=?").run(newCost, s.id);
-      endSession(s.computer_id, { lock: true, reason: "time" });
-      broadcastPanels({ t: "event", kind: "timeup", text: `${p.username} - isteklo vreme (${db.prepare("SELECT name FROM computers WHERE id=?").get(s.computer_id)?.name})` });
-      continue;
-    }
-    // Stanje na nalogu i cena sesije moraju da se pomere zajedno: ako se skine
-    // kredit a cena ne upiše, taj novac nestaje iz izveštaja i iz obračuna.
-    // Iskustvo ide u ISTI upis kao kredit, ne u zaseban.
+    // JEDNA SESIJA KOJA PUKNE NE SME DA ZAUSTAVI OSTALE.
     //
-    // Naplata prolazi svakih pet sekundi za svaku sesiju; zaseban upis bi
-    // udvostrucio pisanje po bazi bez razloga. A i tacnije je: dinar koji je
-    // skinut i XP koji je zaradjen su isti dogadjaj i ne smeju da se raziđu.
-    const noviXp = round2((Number(p.xp) || 0) + charged);
-    uJednomPoslu(() => {
-      db.prepare("UPDATE players SET balance=?, xp=? WHERE id=?").run(newBal, noviXp, p.id);
-      db.prepare("UPDATE sessions SET cost=? WHERE id=?").run(newCost, s.id);
-    });
-    // Nivo se javlja tek posle upisa - da igrac ne dobije cestitku za nesto sto
-    // se nije sacuvalo.
-    const preNivo = nivoZa(p.xp), posleNivo = nivoZa(noviXp);
-    if (posleNivo.nivo > preNivo.nivo) javiNivo(p.id, { nivoPre: preNivo, nivoPosle: posleNivo });
-    const preostalo = remainingSeconds(newBal);
-    sendClient(s.computer_id, { t: "balance", balance: round2(newBal), remainingSeconds: preostalo, vip: vipOd(noviXp) });
-    javiOsobljuPredIstek(s, p, preostalo);
+    // Ovo je petlja kroz svih trinaest mašina. Pozivalac hvata grešku, pa server
+    // ne pada - ali bi greška na trećoj sesiji preskočila mašine od četvrte do
+    // trinaeste, i to pri SVAKOM prolazu, jer se svaki put puca na istom mestu.
+    // Rezultat: devet računara igra besplatno, a nigde ne piše zašto.
+    try {
+      const st = tickState.get(s.id) || { last: now };
+      // Pauziraj naplatu ako klijent tog računara nije povezan (nestanak struje/mreže) -
+      // resetuj vreme da nema "catch-up" naplate kad se ponovo poveže.
+      if (!isClientOnline(s.computer_id)) { st.last = now; tickState.set(s.id, st); continue; }
+      const proteklo = (now - st.last) / 1000;
+      st.last = now;
+      tickState.set(s.id, st);
+      if (r <= 0 || proteklo <= 0) continue;
+      if (proteklo > NAJVISE_PO_PROLAZU) javiSkokSata(proteklo);
+      const elapsed = sekundeZaNaplatu(proteklo);
+
+      const p = playerById(s.player_id);
+      if (!p) continue;
+      // Ne naplaćuj više nego što igrač ima - inače bi sesija zabeležila veći
+      // trošak nego što je stvarno skinuto i promet bi bio naduvan.
+      const cost = (elapsed / 3600) * r;
+      const charged = Math.min(cost, Math.max(0, p.balance));
+      const newBal = round2(p.balance - charged);
+      const newCost = round2(s.cost + charged);
+
+      if (newBal <= 0) {
+        // Ova dva upisa NISU u istom poslu sa `endSession`, i to namerno.
+        // `endSession` hvata svoju grešku i vraća se normalno; da su u zajedničkom
+        // poslu, njegov rollback bi poništio samo zatvaranje sesije dok bi se
+        // nulovanje kredita svejedno potvrdilo - a to je gore od oba upisa
+        // posebno. Ovako se stanje samo popravlja: kredit je 0, pa sledeći prolaz
+        // za pet sekundi ponovo dođe ovde i pokuša da zatvori sesiju.
+        db.prepare("UPDATE players SET balance=0 WHERE id=?").run(p.id);
+        db.prepare("UPDATE sessions SET cost=? WHERE id=?").run(newCost, s.id);
+        endSession(s.computer_id, { lock: true, reason: "time" });
+        broadcastPanels({ t: "event", kind: "timeup", text: `${p.username} - isteklo vreme (${db.prepare("SELECT name FROM computers WHERE id=?").get(s.computer_id)?.name})` });
+        continue;
+      }
+      // Stanje na nalogu i cena sesije moraju da se pomere zajedno: ako se skine
+      // kredit a cena ne upiše, taj novac nestaje iz izveštaja i iz obračuna.
+      // Iskustvo ide u ISTI upis kao kredit, ne u zaseban.
+      //
+      // Naplata prolazi svakih pet sekundi za svaku sesiju; zaseban upis bi
+      // udvostrucio pisanje po bazi bez razloga. A i tacnije je: dinar koji je
+      // skinut i XP koji je zaradjen su isti dogadjaj i ne smeju da se raziđu.
+      const noviXp = round2((Number(p.xp) || 0) + charged);
+      uJednomPoslu(() => {
+        db.prepare("UPDATE players SET balance=?, xp=? WHERE id=?").run(newBal, noviXp, p.id);
+        db.prepare("UPDATE sessions SET cost=? WHERE id=?").run(newCost, s.id);
+      });
+      // Nivo se javlja tek posle upisa - da igrac ne dobije cestitku za nesto sto
+      // se nije sacuvalo.
+      const preNivo = nivoZa(p.xp), posleNivo = nivoZa(noviXp);
+      if (posleNivo.nivo > preNivo.nivo) javiNivo(p.id, { nivoPre: preNivo, nivoPosle: posleNivo });
+      const preostalo = remainingSeconds(newBal);
+      sendClient(s.computer_id, { t: "balance", balance: round2(newBal), remainingSeconds: preostalo, vip: vipOd(noviXp) });
+      javiOsobljuPredIstek(s, p, preostalo);
+    } catch (e) {
+      // Vreme se pomera i za sesiju koja je pukla: bez toga bi sledeći prolaz
+      // pokušao da naplati sve od početka greške odjednom.
+      tickState.set(s.id, { last: now });
+      javiKvarNaplate(s, e);
+    }
   }
   if (active.length) pushComputers();
 }
