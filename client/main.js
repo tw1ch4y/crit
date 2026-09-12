@@ -584,6 +584,17 @@ function proveriVreme(preostaloSek, tiho = false) {
   //
   // Zato: strogo veće. Prag od 30 minuta se ne javlja onome ko ima 12 (to bi
   // bila laž), ali prag u kom čovek jeste - javlja se odmah.
+  // DOPUNA KREDITA VRAĆA PRAGOVE.
+  //
+  // Pragovi se pamte da se isto upozorenje ne ponavlja. Ali gost koji je stigao
+  // do dva minuta, pa dopunio na dva sata, imao je svih šest već potrošenih -
+  // pa bi sledeće upozorenje dobio tek na jedan minut, dva sata kasnije. Isto
+  // kao da ga nije ni bilo.
+  //
+  // Prag koji je ponovo IZNAD preostalog vremena vredi zaboraviti: do njega se
+  // opet stiže, i tada je vest, a ne ponavljanje.
+  for (const p of [...javljeniPragovi]) if (min > p) javljeniPragovi.delete(p);
+
   const dostignuti = PRAGOVI.filter((p) => (tiho ? min < p : min <= p));
   const novi = dostignuti.filter((p) => !javljeniPragovi.has(p));
   if (!novi.length) return;

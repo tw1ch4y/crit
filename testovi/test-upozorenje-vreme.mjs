@@ -134,6 +134,36 @@ const napravi = () => {
   proveri("zakljucan racunar ne dobija upozorenja", t.prikazano.length === 0);
 }
 
+// ---- 6b) DOPUNA KREDITA VRACA PRAGOVE ----
+//
+// Gost stigne do dva minuta, radnik mu dopuni na dva sata. Pragovi su svi vec
+// potroseni, pa bi sledece upozorenje dobio tek na jedan minut - dva sata
+// kasnije. Isto kao da ga nije ni bilo.
+{
+  const t = napravi();
+  t.proveriVreme(3600, true);
+  for (const sek of [30 * 60, 15 * 60, 10 * 60, 5 * 60, 2 * 60]) t.proveriVreme(sek);
+  const preDopune = t.prikazano.length;
+  proveri("pre dopune je javljeno pet pragova", preDopune === 5, String(preDopune));
+
+  t.proveriVreme(2 * 3600);            // radnik dopunio na dva sata
+  t.proveriVreme(30 * 60);             // posle dva sata igranja
+  proveri("POSLE DOPUNE UPOZORENJA SE VRACAJU", t.prikazano.length === preDopune + 1,
+    "pragovi su ostajali potroseni, pa se do jednog minuta nije javljalo nista");
+  proveri("i to opet od 30 minuta", /30 minuta/.test(t.prikazano[preDopune]?.naslov || ""),
+    t.prikazano[preDopune]?.naslov);
+}
+
+// A obicno igranje nadole ne sme da ponavlja isti prag.
+{
+  const t = napravi();
+  t.proveriVreme(3600, true);
+  t.proveriVreme(30 * 60);
+  for (const sek of [29 * 60, 28 * 60, 20 * 60, 16 * 60]) t.proveriVreme(sek);
+  proveri("dok vreme pada, prag se ne ponavlja", t.prikazano.length === 1,
+    t.prikazano.map((x) => x.naslov).join(" | "));
+}
+
 // ---- 7) ZVUK ZA VREME SE NE MOZE UTISATI ----
 //
 // Ostali zvuci launchera imaju prekidac (Nalog > Mis i zvuk). Ovaj ga namerno
