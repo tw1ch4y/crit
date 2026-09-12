@@ -233,6 +233,41 @@
   gomilanja), slušaoci događaja (svi na `document`, registrovani jednom),
   bekstvo teksta u HTML (`esc` svuda gde ulaze podaci iz baze), korpa i
   ograničenje količine, pokretanje igara, donja statusna traka
+- [x] **DUGME JE POD MIŠEM POSTAJALO CRVENO.** `.btn-primary:hover` je imao
+  upisanu crvenu (`#ff4040`) — ostatak palete od pre nego što je kuća postala
+  plava. Crvena u ovom programu znači *ističe vreme* i *zaključano*, pa je dugme
+  „Poruči" pod mišem izgledalo kao da nešto nije u redu, baš u trenutku kad
+  igrač hoće da ga pritisne — a to je isto dugme na svakom ekranu: prijava,
+  Poruči, Sačuvaj lozinku, Uzmi VIP, Zavrti točak. Svetliju nijansu kuće **već
+  računa server** (`nijanse().hover`) i šalje je uz brend; panel je koristi kao
+  `--accent-hover`, launcher je jedini nije uzimao — pa je hover morao da bude
+  upisan u kod, a upisana boja ne prati izbor vlasnika. Isto je bilo i na
+  prečicama: hover je uzimao boju izvučenu iz samog logotipa, pa je YouTube
+  svetleo crveno. Sada `test-znacenje-boja` čuva da nijedan hover ne uvede boju
+  koja nešto znači
+- [x] **Isključeno dugme je pod mišem postajalo plavo.** `.btn:disabled:hover` je
+  vraćao podlogu na plavi preliv glavnog dugmeta — i to na *svako* isključeno
+  dugme, i sivo i providno. Izgledalo je kao da može da se pritisne baš kad ne
+  može. Uz to je crven sat („ističe vreme") svetleo bojom kuće umesto svojom
+- [x] **Polica igara oživi dok se skroluje** — nagib u smeru kretanja (ugao ide
+  od *brzine*, pa se spor pokret jedva primeti a nagli oseti), paralaksa omota
+  unutar okvira, i utišavanje pločice srazmerno tome koliko je ivica police
+  seče, pa utišana pločica govori jedno: „ima još, pomeri". Petlja radi samo dok
+  se nešto stvarno pomera, a igrač koji je ugasio animacije ne dobija nijednu.
+  Prva verzija dubine je **skupljala okvir**, a ime igre stoji unutar tog okvira
+  — naslovi na polici nisu stajali u istoj liniji, razlika 46px, i to je
+  izgledalo kao pokvaren red a ne kao dubina. `proba-police.mjs` zato meri i
+  gde stoji svako ime, jer su sve ostale provere merile samo da li se vrednost
+  promenila — nijedna da li polica posle toga lepo izgleda
+- [x] **Profil je govorio drugim oblikom od ostatka programa.** Sve u launcheru
+  ima odsečen ugao i unutrašnji prsten umesto okvira; profil je jedini držao
+  zaobljene kartice — a značke stoje *tačno ispod* njegovih brojki, na istom
+  ekranu. Zlatna tačka koja kaže šta ide uz članarinu lebdela je u praznom iznad
+  čipa (postavljena je za krug, gde sedi na ivici) i izgledala kao mrlja na
+  ekranu; sada je na čipu unutra, uz sam naziv. Dugme „Sačuvaj lozinku" nije
+  bilo poravnato sa poljima: `.field` nosi donju marginu za slučaj kad polja
+  stoje jedno ispod drugog, a ovde su u istom redu — margina je gurala polja
+  naviše, a dugme ostajalo spušteno
 ### Faza 10 - Priprema za izdavanje drugim igraonicama
 
 Cilj nije licenciranje sada, nego da program prestane da bude „program za jednu
