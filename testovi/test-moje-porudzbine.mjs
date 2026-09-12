@@ -30,10 +30,20 @@ const poruke = [];
 const ws = new WebSocket(`${WSB}/ws?kind=client&token=${encodeURIComponent(comps[0].token)}`);
 ws.on("message", (b) => { try { poruke.push(JSON.parse(b.toString())); } catch {} });
 await new Promise((res, rej) => { ws.once("open", res); ws.once("error", rej); });
-ws.send(JSON.stringify({ t: "login", username: "marko", password: "test1234" }));
-await cekaj(700);
+// CEKA SE PORUKA, NE FIKSNA PAUZA.
+//
+// Suita pusta vise servera uporedo, pa je 700 ms na opterecenom racunaru
+// ponekad premalo - test bi pukao na "Cannot read properties of undefined".
+// Test koji padne svaki deseti put je gori od nikakvog: nauci se da se pusti
+// ponovo, pa se preskoci i pravi pad.
+const sacekaj = async (uslov, ms = 4000) => {
+  for (let i = 0; i < ms / 20; i++) { const v = uslov(); if (v) return v; await cekaj(20); }
+  return uslov();
+};
 
-const prijava = poruke.find((m) => m.t === "login_ok");
+ws.send(JSON.stringify({ t: "login", username: "marko", password: "test1234" }));
+const prijava = await sacekaj(() => poruke.find((m) => m.t === "login_ok"));
+proveri("prijava je stigla", !!prijava, JSON.stringify(poruke.map((m) => m.t)));
 proveri("prijava nosi spisak porudzbina", Array.isArray(prijava.porudzbine), JSON.stringify(prijava.porudzbine));
 proveri("nov igrac nema porudzbina", prijava.porudzbine.length === 0);
 
@@ -42,8 +52,7 @@ const zadnji = () => [...poruke].reverse().find((m) => m.t === "moje_porudzbine"
 // --- porudzbina odmah stize u spisak ---
 poruke.length = 0;
 ws.send(JSON.stringify({ t: "order", items: [{ id: kola.id, qty: 2 }], payment: "credit" }));
-await cekaj(700);
-const p1 = zadnji();
+const p1 = await sacekaj(() => zadnji());
 proveri("posle porucivanja stize spisak", !!p1, "nema poruke moje_porudzbine");
 proveri("porudzbina je u spisku", p1?.porudzbine.length === 1, JSON.stringify(p1?.porudzbine));
 proveri("status je primljeno", p1?.porudzbine[0].status === "pending", p1?.porudzbine[0].status);

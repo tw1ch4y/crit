@@ -82,4 +82,21 @@ proveri("dok igrac igra, nadzor ne poziva focus()",
   && !/if \(sesijaAktivna\) \{[\s\S]{0,400}win\.focus\(\)/.test(nadzor),
   "otimanje prvog plana usred igre je tacno ono na sta se igrac zalio");
 
+// ---- 4) PROMENA REZOLUCIJE SE PRATI, NE PRETPOSTAVLJA ----
+//
+// Igra koja se pokrene u 1280x720 na ekranu od 2560x1440 ostavlja za sobom
+// launcher u punom ekranu STARE mere (nadzor ga ne popravlja jer vec jeste
+// isFullScreen), zastor manji od ekrana i obavestenje van ekrana.
+proveri("launcher slusa promenu rezolucije",
+  /screen\.on\("display-metrics-changed"/.test(main) && /function pratiRezoluciju\(\)/.test(main));
+proveri("prati i kad se monitor doda ili skloni",
+  /screen\.on\("display-added"/.test(main) && /screen\.on\("display-removed"/.test(main));
+const pr = main.slice(main.indexOf("function pratiRezoluciju"), main.indexOf("function pratiRezoluciju") + 1400);
+proveri("obnavlja sva tri prozora", /backdrop\.setBounds/.test(pr) && /overlay\.setBounds\(overlayMere\(\)\)/.test(pr)
+  && /win\.setBounds/.test(pr));
+proveri("ne dira launcher dok igra radi", /!gameActive\(\)/.test(pr),
+  "diranje prvog plana usred igre je tacno ono na sta se igrac zalio");
+proveri("mera se cita i malo kasnije", /setTimeout\(obnovi, 1200\)/.test(pr),
+  "Windows javi promenu pre nego sto je stvarno primenjena");
+
 kraj();

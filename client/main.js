@@ -1700,8 +1700,50 @@ app.whenReady().then(() => {
   planNapajanja(true);
   startWatchdog();
   connectWs();
+  pratiRezoluciju();
   app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
+
+// IGRE MENJAJU REZOLUCIJU, A PROZORI SU JE PAMTILI SAMO IZ PRVE SEKUNDE.
+//
+// Sva tri prozora (launcher, zastor, obaveštenje) uzimala su meru ekrana jednom,
+// pri pravljenju, i nikad je više nisu proveravala. Igra koja se pokrene u
+// 1280x720 na ekranu od 2560x1440 ostavlja za sobom:
+//
+//   - launcher u punom ekranu STARE mere; nadzor ga ne popravlja jer već jeste
+//     `isFullScreen()`, pa igrač gleda crne trake ili sadržaj koji viri
+//   - zastor manji od ekrana, pa se po ivicama vidi Windows desktop
+//   - obaveštenje na staroj koordinati, često potpuno van ekrana - a to je baš
+//     onaj prozor kojim se javlja da vreme ističe
+//
+// Windows javlja promenu, pa se mera samo obnovi. Ne dira se dok igra radi:
+// tada je promena rezolucije njeno delo i prozori su ionako iza nje, a svako
+// diranje prvog plana u tom trenutku je tačno ono što je igračima kvarilo igru.
+function pratiRezoluciju() {
+  if (DEV) return;
+  const obnovi = () => {
+    try {
+      const { width, height } = screen.getPrimaryDisplay().size;
+      if (backdrop && !backdrop.isDestroyed() && backdrop.isVisible()) {
+        backdrop.setBounds({ x: 0, y: 0, width, height });
+      }
+      if (overlay && !overlay.isDestroyed() && overlay.isVisible()) overlay.setBounds(overlayMere());
+      if (win && !win.isDestroyed() && !gameActive()) {
+        const b = win.getBounds();
+        if (b.width !== width || b.height !== height) {
+          win.setBounds({ x: 0, y: 0, width, height });
+          win.setFullScreen(true);
+        }
+      }
+    } catch {}
+  };
+  // Windows ume da javi promenu pre nego što je stvarno primenjena, pa se mera
+  // čita i malo kasnije - inače se upiše ona ista, stara.
+  const kasnije = () => { obnovi(); setTimeout(obnovi, 1200); };
+  screen.on("display-metrics-changed", kasnije);
+  screen.on("display-added", kasnije);
+  screen.on("display-removed", kasnije);
+}
 
 // Bez admin izlaza (PIN) aplikacija se ne gasi: ni zatvaranjem prozora,
 // ni Alt+F4, ni preko "window-all-closed".
