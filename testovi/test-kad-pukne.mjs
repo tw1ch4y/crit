@@ -53,9 +53,23 @@ for (const [slucaj, tekst] of [
 ]) proveri(`prevod postoji: ${slucaj}`, main.includes(tekst));
 proveri("nijedna sirova poruka ne ide igracu", !/game-error", \{ name: [^}]*message: (e|greska)\.message/.test(main)
   && !/game-error", \{ name: [^}]*message: greska \}/.test(main));
-proveri("obe putanje pokretanja idu kroz prevod",
-  (main.match(/message: objasniGresku\(/g) || []).length === 2,
-  `nadjeno ${(main.match(/message: objasniGresku\(/g) || []).length}`);
+// Igra se pokrece na dva nacina i OBA moraju da prevode: precica (.lnk/.url/
+// .bat) ide kroz shell.openPath, a pravi .exe kroz spawn. Ranije se ovde brojalo
+// koliko puta se `objasniGresku` pojavi - a to pukne cim se kod prepravi, iako
+// prevod i dalje postoji. Sada se gleda SVAKA putanja za sebe.
+const lnkOd = main.indexOf("shell.openPath(gamePath)");
+const lnkBlok = main.slice(Math.max(0, lnkOd - 700), lnkOd + 300);
+// Trazi se child.on("error") IZ POKRETANJA IGRE, ne prvi u fajlu - prvi
+// pripada instalateru, koji svoju gresku uredno salje osoblju, ne igracu.
+const spawnOd = main.indexOf('child.on("error"', main.indexOf("function launchGameStvarno"));
+const spawnBlok = main.slice(spawnOd, spawnOd + 400);
+proveri("precica ide kroz prevod", /objasniGresku\(/.test(lnkBlok), "shell.openPath");
+proveri("spawn ide kroz prevod", /objasniGresku\(/.test(spawnBlok), "child.on(error)");
+// I odbijeno obecanje, ne samo vracena poruka: shell.openPath obicno VRATI
+// gresku, ali kad odbije, neobradjeno odbijanje ruši ceo launcher.
+proveri("i odbijeno obecanje ide kroz prevod",
+  /\.catch\(\(e\) => javiKvar\(objasniGresku\(e\)\)\)/.test(main),
+  "jedan pokvaren .lnk bi inace ostavio racunar na golom Windowsu");
 // SVAKA PORUKA KAZE I STA SAD.
 //
 // Provere PRE pokretanja odavno zavrsavaju sa "Pozovite osoblje"; poruke koje

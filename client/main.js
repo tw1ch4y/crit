@@ -248,6 +248,8 @@ function createWindow() {
       devTools: DEV,
     },
   });
+  // Od ovog trenutka greška više ne ruši program - vidi mrežu uz javiProblem.
+  prozorPostojao = true;
   // svako (ponovno) učitavanje stranice resetuje spremnost renderera
   win.webContents.on("did-start-loading", () => { rendererReady = false; });
 
@@ -1229,6 +1231,40 @@ function javiProblem(vrsta, opis) {
   try { wsSend({ t: "klijent_problem", vrsta: String(vrsta).slice(0, 40), opis: String(opis).slice(0, 200) }); } catch {}
 }
 
+// LAUNCHER NE SME DA UMRE OD GREŠKE KOJU NISMO PREDVIDELI.
+//
+// Server ovo ima od početka; launcher nije imao, a kod njega je cena veća.
+// Neobrađeno odbijanje obećanja u glavnom procesu Electrona gasi ceo program -
+// i računar ostaje na GOLOM WINDOWSU: bez kioska, bez zaključavanja, bez
+// naplate. Gost sedne i igra besplatno, a osoblje to vidi samo ako slučajno
+// prođe pored te mašine.
+//
+// Zato se greška zapisuje, javlja panelu (gde ima ime računara) i - ostaje se u
+// životu. Program koji radi sa jednom pokvarenom stvari je bolji od ugašenog
+// kioska. Jedini izuzetak je gašenje na zahtev osoblja, koje ide svojim putem.
+//
+// Ne glumi se da je sve u redu: svaki ovakav slučaj stoji u Logovima, uz ime
+// mašine, pa se ponavljanje vidi.
+// PRE PRVOG PROZORA SE NE HVATA NISTA.
+//
+// Program koji preživi grešku, a nikad nije napravio prozor, gori je od pada:
+// ostaje da visi bez ičega na ekranu, a Windows ga i dalje vidi kao pokrenutog,
+// pa se prečica sa autostarta neće ponovo uhvatiti. Tada je bolje da padne -
+// restart mašine ga onda vrati. Posle prvog prozora nadzor ume da ga popravi
+// (pravi nov prozor ako ga nema), pa se isplati ostati u životu.
+let prozorPostojao = false;
+for (const [dogadjaj, vrsta] of [["uncaughtException", "neuhvacena-greska"], ["unhandledRejection", "neobradjeno-odbijanje"]]) {
+  process.on(dogadjaj, (e) => {
+    if (app.isQuitting) return;
+    const tekst = String(e?.stack || e?.message || e || "").split("\n").slice(0, 2).join(" ");
+    if (!prozorPostojao) {
+      console.error("[launcher] pad pre prvog prozora:", tekst);
+      process.exit(1);
+    }
+    javiProblem(vrsta, tekst);
+  });
+}
+
 // Igracu se NE prikazuje sistemska poruka. Windows javlja stvari poput
 // "spawn C:\games\cs2.lnk ENOENT" ili "Access is denied" - to je engleski,
 // tehnicki, i igracu ne kaze ni sta se desilo ni sta da radi. Osoblje i dalje
@@ -1378,11 +1414,19 @@ function launchGameStvarno(gamePath, args, name, id, vrsta) {
     // Prečice (.lnk), .url i .bat se ne mogu pokrenuti kroz spawn - njih otvara
     // Windows sam. Osoblje često zalepi baš putanju do prečice sa desktopa.
     if (/\.(lnk|url|bat|cmd)$/i.test(gamePath)) {
-      shell.openPath(gamePath).then((greska) => {
-        if (!greska) return;
-        sendToRenderer("game-error", { name: name || path.basename(gamePath), message: objasniGresku(greska) });
+      // `.catch` NIJE ukras. `shell.openPath` obično VRAĆA poruku o grešci
+      // umesto da odbije obećanje, pa je izgledalo da se nema šta hvatati - ali
+      // kad odbije (pokvarena prečica, disk koji je otpao), neobrađeno odbijanje
+      // u glavnom procesu Electrona ruši ceo launcher. A ovo je put kojim se
+      // pokreće SVAKA prečica u igraonici: računar bi ostao na golom Windowsu,
+      // bez kioska i bez naplate, zato što je jedan `.lnk` pokvaren.
+      const javiKvar = (poruka) => {
+        sendToRenderer("game-error", { name: name || path.basename(gamePath), message: poruka });
         javiDaNeRadi(name || path.basename(gamePath), "greska", id, vrsta);
-      });
+      };
+      shell.openPath(gamePath)
+        .then((greska) => { if (greska) javiKvar(objasniGresku(greska)); })
+        .catch((e) => javiKvar(objasniGresku(e)));
       markExternal([]);   // ne znamo koji proces nastaje - oslanjamo se na zastor
       startGuard();
       stepBack();
