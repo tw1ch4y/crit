@@ -15,6 +15,10 @@ contextBridge.exposeInMainWorld("crit", {
   onNeedSetup: (cb) => ipcRenderer.on("need-setup", () => cb()),
   onHotkey: (cb) => ipcRenderer.on("hotkey", (e, h) => cb(h)),
   onGameError: (cb) => ipcRenderer.on("game-error", (e, d) => cb(d)),
+  // Vreme istice. Ide kroz svoj kanal, a ne kroz obavestenje preko igre, jer se
+  // zvuk cuje i kad je launcher iza igre u punom ekranu - a prozor se tada cesto
+  // ne vidi uopste.
+  onVremeIstice: (cb) => ipcRenderer.on("vreme-istice", (e, d) => cb(d)),
   onBlokirano: (cb) => ipcRenderer.on("blokirano", (e, d) => cb(d)),
   sysStats: () => ipcRenderer.invoke("sys-stats"),
   programIcon: (putanja) => ipcRenderer.invoke("program-icon", putanja),

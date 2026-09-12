@@ -478,13 +478,26 @@ function zapamtiBojuKuce(heks) {
   if (/^#[0-9a-f]{6}$/i.test(String(heks || ""))) bojaKuce = String(heks).toLowerCase();
 }
 
+// GDE OBAVEŠTENJE STOJI - RAČUNA SE SVAKI PUT, NE JEDNOM.
+//
+// Igre menjaju rezoluciju ekrana. Širina je ranije očitana samo pri pravljenju
+// prozora, pa je obaveštenje zauvek ostajalo na koordinati iz tog trenutka: na
+// ekranu od 2560 stoji na x=950, a čim igra spusti rezoluciju na 1280, ono
+// izlazi skoro celo van ekrana. Igrač tada NE VIDI upozorenje da mu vreme
+// ističe - poruka postoji, samo je van slike.
+//
+// Zato se položaj računa pri svakom prikazivanju, iz trenutne rezolucije.
+function overlayMere() {
+  const { width } = screen.getPrimaryDisplay().workAreaSize;
+  const w = Math.max(280, Math.min(660, width - 40));
+  return { width: w, height: 110, x: Math.round((width - w) / 2), y: 0 };
+}
+
 function createOverlay() {
   if (DEV) return null;
   if (overlay && !overlay.isDestroyed()) return overlay;
-  const { width } = screen.getPrimaryDisplay().workAreaSize;
   overlay = new BrowserWindow({
-    width: Math.min(660, width - 40), height: 110,
-    x: Math.round((width - Math.min(660, width - 40)) / 2), y: 0,
+    ...overlayMere(),
     frame: false, transparent: true, resizable: false, movable: false,
     skipTaskbar: true, focusable: false, show: false, alwaysOnTop: true,
     webPreferences: { preload: path.join(__dirname, "overlay-preload.js"), contextIsolation: true },
@@ -501,6 +514,10 @@ function prikaziObavestenje({ naslov, opis = "", vrsta = "vreme", boja = "", tra
   if (!o || o.isDestroyed()) return;
   const posalji = () => {
     o.webContents.send("overlay-prikazi", { naslov, opis, vrsta, boja, kuca: bojaKuce });
+    // Položaj se namešta pred SVAKO prikazivanje: igra je u međuvremenu mogla da
+    // promeni rezoluciju, a obaveštenje koje je ostalo na staroj koordinati
+    // završi van ekrana - i upozorenje o vremenu niko ne vidi.
+    try { o.setBounds(overlayMere()); } catch {}
     o.showInactive(); // nikad ne otima fokus igri
     o.setAlwaysOnTop(true, "screen-saver");
     clearTimeout(overlayTajmer);
@@ -554,7 +571,20 @@ let javljeniPragovi = new Set();
 function proveriVreme(preostaloSek, tiho = false) {
   if (preostaloSek == null || !sesijaAktivna) return;
   const min = Math.ceil(preostaloSek / 60);
-  const dostignuti = PRAGOVI.filter((p) => min <= p);
+  // TIHO ZAPAMTI SAMO ONO ŠTO JE VEĆ PROŠLO, NE I PRAG U KOM SE TRENUTNO NALAZI.
+  //
+  // Ovde je bila greška zbog koje se računar ume zaključati BEZ IJEDNOG
+  // upozorenja. Pri prijavi (i pri svakom vraćanju veze usred sesije) pragovi su
+  // se tiho markirali sa `min <= p`, dakle i onaj u kom je igrač baš tada bio.
+  //
+  // Gost koji se prijavi sa 45 sekundi kredita: min = 1, pa se tiho obeleže SVIH
+  // šest pragova - uključujući i onaj od jednog minuta. Posle toga nema šta da
+  // se javi, i ekran se prosto zaključa. Isto se dešava ako veza pukne i vrati
+  // se pred sam kraj sesije.
+  //
+  // Zato: strogo veće. Prag od 30 minuta se ne javlja onome ko ima 12 (to bi
+  // bila laž), ali prag u kom čovek jeste - javlja se odmah.
+  const dostignuti = PRAGOVI.filter((p) => (tiho ? min < p : min <= p));
   const novi = dostignuti.filter((p) => !javljeniPragovi.has(p));
   if (!novi.length) return;
   novi.forEach((p) => javljeniPragovi.add(p));
@@ -569,6 +599,16 @@ function proveriVreme(preostaloSek, tiho = false) {
     boja: hitno ? "" : "zuta",
     trajanje: hitno ? 12000 : 7000,
   });
+  // I ZVUK, NE SAMO SLIKA.
+  //
+  // Igrač je u punom ekranu i launcher ne vidi. Obaveštenje preko igre je jedini
+  // prozor koji pokušavamo da mu pokažemo - a iznad igre u EKSKLUZIVNOM punom
+  // ekranu Windows takav prozor često ne iscrta uopšte. Tako se i desilo da se
+  // računar zaključa, a igrač se zakune da nije bilo nikakvog upozorenja.
+  //
+  // Zvuk ide kroz sam launcher (radi i kad je iza igre) i ne zavisi od toga da
+  // li se ijedan prozor video.
+  sendToRenderer("vreme-istice", { minuta: p, hitno });
 }
 
 // Kraj sesije: ugasi sve što je igrač pokrenuo, pa obriši njegove tragove.
@@ -956,21 +996,70 @@ function createBackdrop() {
   });
   backdrop.loadFile(path.join(__dirname, "renderer", "backdrop.html"));
   backdrop.on("close", (e) => { if (!app.isQuitting) e.preventDefault(); });
-  // Kad se igra zatvori, Windows dodeljuje fokus sledećem prozoru - a to je zastor.
-  // To nam je najbrži znak da je igra gotova, bez čekanja na proveru procesa.
+  // Kad se igra zatvori, Windows dodeljuje fokus sledećem prozoru - a to je
+  // zastor. To je najbrži znak da je igra gotova.
+  //
+  // ALI TO NIJE DOKAZ, i tu je bila greška koja je igračima kvarila igru.
+  //
+  // Igra u punom ekranu izgubi prvi plan i kad je živa: pri učitavanju mape, uz
+  // Windows obaveštenje, uz alt-tab, pa i zbog NAŠEG obaveštenja o vremenu.
+  // Fokus tada padne na zastor, i posle 400 ms je launcher ulazio preko igre -
+  // pun ekran, iznad svega, sa fokusom. Igra u ekskluzivnom punom ekranu tada
+  // ispadne iz njega i EKRAN PROMENI REZOLUCIJU; igrač se vrati u igru i
+  // rezolucija se promeni opet. Iz stolice to izgleda kao da launcher "bagira".
+  //
+  // Zato se sada traži da zastor drži fokus BEZ PREKIDA, pa se tek onda pita
+  // sistem da li igra stvarno više ne radi.
   backdrop.on("focus", () => {
     if (Date.now() < launchGuardUntil) return;
-    setTimeout(() => {
-      if (backdrop && !backdrop.isDestroyed() && backdrop.isFocused()) focusLauncher();
-    }, 400);
+    zastorFokusOd = Date.now();
+    setTimeout(potvrdiDaJeIgraGotova, POTVRDA_MS);
   });
+  backdrop.on("blur", () => { zastorFokusOd = 0; });
   return backdrop;
+}
+
+// Koliko zastor mora da drži fokus da bismo poverovali da igre više nema.
+// Kratak gubitak prvog plana (učitavanje, obaveštenje, alt-tab) ne preživi ovo,
+// a stvarno zatvorena igra ga preživi uvek.
+const POTVRDA_MS = 3000;
+let zastorFokusOd = 0;
+
+function potvrdiDaJeIgraGotova() {
+  if (app.isQuitting) return;
+  if (!backdrop || backdrop.isDestroyed() || !backdrop.isFocused()) return;
+  if (!zastorFokusOd || Date.now() - zastorFokusOd < POTVRDA_MS - 100) return; // fokus je u međuvremenu skakao
+  if (Date.now() < launchGuardUntil) return;
+
+  const images = [...new Set([...externalImages, ...[...spawnedGames].map((g) => g.image)])].filter(Boolean);
+  if (!images.length) { clearExternal(); focusLauncher(); return; }
+  anyRunning(images, (running) => {
+    if (running) return;                      // igra je i dalje tu - ne diramo je
+    if (Date.now() < launchGuardUntil) return;
+    if (!backdrop || backdrop.isDestroyed() || !backdrop.isFocused()) return;
+    clearExternal();
+    focusLauncher();
+  });
 }
 function showBackdrop() {
   const b = createBackdrop();
   if (!b || b.isDestroyed()) return;
   if (b.isMinimized()) b.restore();
-  b.showInactive(); // nikad ne otima fokus igri
+  // Zastor mora da pokriva CEO ekran, i posle svake promene rezolucije. Mera je
+  // ranije uzeta jednom, pri pravljenju prozora; kad igra spusti rezoluciju pa
+  // je vrati, zastor ostane manji od ekrana i po ivicama se vidi Windows
+  // desktop - tačno ono što zastor postoji da spreči.
+  //
+  // Poziva se svake sekunde iz nadzora, pa se dira samo kad se mera stvarno
+  // razlikuje: nepotreban setBounds nad punim ekranom ume da trgne igru.
+  try {
+    const { width, height } = screen.getPrimaryDisplay().size;
+    const t = b.getBounds();
+    if (t.width !== width || t.height !== height || t.x !== 0 || t.y !== 0) {
+      b.setBounds({ x: 0, y: 0, width, height });
+    }
+  } catch {}
+  if (!b.isVisible()) b.showInactive(); // nikad ne otima fokus igri
 }
 function hideBackdrop() {
   if (backdrop && !backdrop.isDestroyed() && backdrop.isVisible()) backdrop.hide();
@@ -1028,14 +1117,16 @@ const gameActive = () =>
 function checkGameGone() {
   if (Date.now() < launchGuardUntil) return;
 
-  // Zastor ima fokus => ispred njega nema ničega, program je zatvoren.
-  if (backdrop && !backdrop.isDestroyed() && backdrop.isFocused()) {
+  // Zastor sa fokusom je NAGOVEŠTAJ da je program zatvoren, ne dokaz - vidi
+  // objašnjenje uz potvrdiDaJeIgraGotova. Ista provera važi i ovde: dok god
+  // znamo koji proces da pitamo, pitamo njega.
+  const images = [...new Set([...externalImages, ...[...spawnedGames].map((g) => g.image)])].filter(Boolean);
+  if (!images.length && backdrop && !backdrop.isDestroyed() && backdrop.isFocused()
+    && zastorFokusOd && Date.now() - zastorFokusOd >= POTVRDA_MS) {
     clearExternal();
     focusLauncher();
     return;
   }
-
-  const images = [...new Set([...externalImages, ...[...spawnedGames].map((g) => g.image)])].filter(Boolean);
   // Ako ne znamo koji proces da pratimo (pokretač je izašao, igra radi pod
   // drugim imenom), NE diramo prvi plan - inače bismo prekrili igru.
   if (!images.length) return;

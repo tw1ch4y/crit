@@ -121,6 +121,28 @@ const sfx = (() => {
     boot: () => { tone(150, 0.5, "sawtooth", 0.05, 700); tone(920, 0.2, "sine", 0.05, 1500, 0.26); },
     // Kucanje kazaljke po poljima tocka - kratko i suvo, da se ne stopi u zujanje.
     tik: () => tone(1750, 0.028, "square", 0.022),
+    // VREME ISTIČE - JEDINI ZVUK KOJI SE NE MOŽE UTIŠATI.
+    //
+    // Igrač je u punom ekranu i ne vidi launcher; obaveštenje preko igre je u
+    // ekskluzivnom punom ekranu nepouzdano, a zvuk se čuje uvek. Ovo nije zvuk
+    // dugmeta nego jedino upozorenje koje stigne do čoveka pre nego što mu se
+    // računar zaključa, pa namerno zaobilazi prekidač za zvuke launchera:
+    // izgubljena sesija je skuplja od jednog neželjenog tona.
+    vreme: (hitno) => {
+      const a = (() => { try { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === "suspended") ac.resume(); return ac; } catch { return null; } })();
+      if (!a) return;
+      const puta = hitno ? 3 : 2;
+      for (let i = 0; i < puta; i++) {
+        const t = a.currentTime + i * 0.34;
+        const o = a.createOscillator(), g = a.createGain();
+        o.type = "square";
+        o.frequency.setValueAtTime(hitno ? 980 : 760, t);
+        o.connect(g); g.connect(a.destination);
+        g.gain.setValueAtTime(hitno ? 0.075 : 0.055, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+        o.start(t); o.stop(t + 0.26);
+      }
+    },
   };
 })();
 
@@ -279,6 +301,15 @@ function toast(msg, type = "info", trajanje = 3000) {
   }
   if (window.crit.onGameError) {
     window.crit.onGameError(({ name, message }) => toast(`Ne mogu da pokrenem ${name}: ${message}`, "error"));
+  }
+  // Vreme istice. Zvuk je jedini kanal koji stigne do igraca u punom ekranu -
+  // vidi sfx.vreme. Poruka stoji i u launcheru, za slucaj da se vrati na njega.
+  if (window.crit.onVremeIstice) {
+    window.crit.onVremeIstice(({ minuta, hitno }) => {
+      sfx.vreme(!!hitno);
+      toast(minuta === 1 ? "Ostao ti je još 1 minut - javi se osoblju za dopunu"
+        : `Ostalo ti je još ${minuta} min - javi se osoblju za dopunu`, hitno ? "error" : "info", hitno ? 12000 : 7000);
+    });
   }
   // tek sada je sve zakačeno - javi main procesu da može da pusti poruke
   if (window.crit.ready) window.crit.ready();
