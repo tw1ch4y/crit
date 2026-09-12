@@ -39,6 +39,14 @@
   --brend-rgb: 47, 106, 232;
   --brend: #2f6ae8;
   --brend-deep: #2454c4;
+  /* SVETLIJA BOJA KUĆE, ZA HOVER.
+     Server je već računa (`nijanse().hover`) i šalje uz brend, a panel je
+     koristi kao `--accent-hover`. Launcher je jedini nije uzimao, pa je
+     glavno dugme na prelaz mišem imalo upisanu crvenu - ostatak palete od
+     pre nego što je kuća postala plava. Crvena ovde znači "ističe vreme" i
+     "zaključano": dugme koje pocrveni kad pređeš preko njega izgleda kao da
+     nešto nije u redu, baš u trenutku kad igrač hoće da ga pritisne. */
+  --brend-hover: #4c7feb;
   --brend-soft: rgba(47, 106, 232, 0.15);
   --brend-glow: rgba(47, 106, 232, 0.55);
   /* ČETIRI BOJE KOJE NEŠTO ZNAČE. Ne biraju se i ne koriste se za ukras - po
@@ -57,6 +65,7 @@
   --amber: #ff7a26;
   --red-status: #ff3b3b;
   --red-status-rgb: 255, 59, 59;
+  --red-glow: rgba(255, 59, 59, 0.55);
 
   --cut: 13px;
   --cut-lg: 18px;
@@ -356,7 +365,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   box-shadow: inset 0 0 0 1px var(--line-2);
   clip-path: inherit;
 }
-.btn:hover { background: #24242f; }
+.btn:hover:not(:disabled) { background: #24242f; }
 .btn:active { transform: scale(0.97); }
 .btn svg { width: 17px; height: 17px; }
 .btn-primary {
@@ -364,14 +373,18 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   filter: drop-shadow(0 4px 16px var(--brend-glow));
 }
 .btn-primary::after { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3); }
-.btn-primary:hover { background: linear-gradient(135deg, #ff4040, #e42328); filter: drop-shadow(0 6px 24px var(--brend-glow)); }
+.btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, var(--brend-hover) 0%, var(--brend) 100%); filter: drop-shadow(0 6px 24px var(--brend-glow)); }
 .btn-ghost { background: transparent; color: var(--text-2); }
 .btn-ghost::after { box-shadow: none; }
-.btn-ghost:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+.btn-ghost:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); color: var(--text); }
 .btn-lg { padding: 16px 24px; font-size: 15px; }
 .btn-block { width: 100%; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
-.btn:disabled:hover { background: linear-gradient(135deg, var(--brend) 0%, var(--brend-deep) 100%); }
+/* Isključeno dugme nema hover - zato `:not(:disabled)` stoji gore, na samim
+   pravilima. Ranije je ovde stajalo `.btn:disabled:hover` koje je VRAĆALO
+   podlogu na plavi preliv glavnog dugmeta: svako sivo i providno dugme je,
+   dok je isključeno, pod mišem postajalo plavo - izgledalo je kao da može da
+   se pritisne baš kad ne može. */
 .err { color: var(--red-status); font-size: 14px; min-height: 20px; margin-bottom: 4px; font-weight: 600; }
 
 /* Setup / login */
@@ -521,7 +534,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .hud-chip.timer .hc-v { font-variant-numeric: tabular-nums; font-size: 17px; letter-spacing: 0.01em; }
 .hud-chip.timer.low { background: var(--brend-soft); }
 .hud-chip.timer.low::after { box-shadow: inset 0 0 0 1px var(--brend); }
-.hud-chip.timer.low .hc-v { color: var(--red-status); text-shadow: 0 0 16px var(--brend-glow); animation: timer-low 1.1s ease-in-out infinite; }
+.hud-chip.timer.low .hc-v { color: var(--red-status); text-shadow: 0 0 16px var(--red-glow); animation: timer-low 1.1s ease-in-out infinite; }
 @keyframes timer-low { 50% { opacity: 0.5; } }
 .hud-chip.bump { animation: chip-bump 0.42s var(--tr); }
 @keyframes chip-bump { 0% { transform: scale(1); } 32% { transform: scale(1.09); } 100% { transform: scale(1); } }
@@ -589,10 +602,27 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   clip-path: polygon(0 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%);
   display: grid; place-items: center;
   box-shadow: inset 0 0 0 1px var(--line-2);
-  transition: box-shadow var(--tr), filter var(--tr);
+  /* Nagib dolazi iz skrolovanja (vidi ozivipolicu u launcher.js) i u miru je
+     nula, pa ovo ne menja ništa dok se polica ne pomeri.
+
+     DUBINA UTIŠAVA, NE SKUPLJA. Ovde je stajalo i `scale(var(--dub))`, pa se
+     ceo okvir smanjivao prema ivicama police. A IME IGRE STOJI UNUTAR OVOG
+     OKVIRA (`.tile-scrim` je u `.tile-media`): skupljanje ga je podizalo i
+     smanjivalo, pa naslovi na polici nisu stajali u istoj liniji - razlika je
+     bila oko 13px i izgledala je kao da je red pokvaren, a ne kao dubina.
+     Providnost radi isto, a red ostaje prav. */
+  transform: perspective(900px) rotateY(var(--nagib, 0deg));
+  opacity: var(--dub, 1);
+  transition: box-shadow var(--tr), filter var(--tr), opacity 0.24s var(--tr);
 }
+/* ZUM I PARALAKSA DELE ISTI `transform`.
+
+   Hover zumira sliku, a skrolovanje je pomera u dubinu (vidi ozivipolicu u
+   launcher.js). Da svaki pise svoj `transform`, drugi bi brisao prvog - pa se
+   oba slazu ovde, kroz promenljive. */
 .tile-media img {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  transform: translate3d(var(--par-omot, 0px), 0, 0) scale(var(--zum, 1));
   transition: transform 0.35s var(--tr);
 }
 .tile-emoji { font-size: 64px; line-height: 1; opacity: 0.8; filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.5)); }
@@ -638,8 +668,10 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .tile-media { box-shadow: inset 0 0 0 1px var(--line-2), 0 12px 26px -14px rgba(0, 0, 0, 0.9); }
 .tile:hover { transform: translateY(-6px); }
 .tile:active { transform: translateY(-2px); }
-.tile:hover .tile-media { box-shadow: inset 0 0 0 1.5px var(--brend), 0 22px 42px -16px rgba(0, 0, 0, 0.95), 0 0 34px -10px var(--brend-glow); }
-.tile:hover .tile-media img { transform: scale(1.07); }
+/* Ono na šta igrač pokaže izlazi napred celo, pa i pločica koju ivica seče:
+   dubina kaže "ima još tamo", a prelazak mišem je već odgovor na to. */
+.tile:hover .tile-media { box-shadow: inset 0 0 0 1.5px var(--brend), 0 22px 42px -16px rgba(0, 0, 0, 0.95), 0 0 34px -10px var(--brend-glow); opacity: 1; }
+.tile:hover .tile-media img { --zum: 1.07; }
 .tile:hover .tile-scrim { background: linear-gradient(transparent, rgba(var(--bg-rgb), 0.97) 55%); }
 .tile:hover .tile-hover { opacity: 1; }
 .tile:hover .tile-hover .play-btn { transform: scale(1) translateY(0); }
@@ -920,7 +952,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
    odakle da sazna kakav je internet), tacka ostaje siva - crvena tacka pored
    crtice bi rekla "nema interneta", a to niko nije proverio. Traka onda salje
    igraca da trazi kvar tamo gde ga mozda nema. */
-#sbNet:not(.ok) .sb-dot, #sbInet.nema .sb-dot { background: var(--red-status); box-shadow: 0 0 7px var(--red-status); }
+#sbNet:not(.ok) .sb-dot, #sbInet.nema .sb-dot { background: var(--red-status); box-shadow: 0 0 7px var(--red-glow); }
 #sbInet:not(.ok):not(.nema) .sb-dot { background: var(--text-3); box-shadow: none; }
 #sbClock .sb-txt, #sbPc .sb-txt { color: var(--text-2); }
 .sb-item.hot { color: var(--red-status); }
@@ -1283,9 +1315,20 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 
 /* Promena lozinke: dva polja i dugme u jednom redu. Panel je iste sirine kao
    ostali na Nalogu, a sadrzaj se ne razvlaci preko celog ekrana. */
+/* DUGME STOJI U ISTOM REDU SA POLJIMA, NE ISPOD NJIH.
+
+   `.field` svuda nosi `margin-bottom: 16px` (tamo gde polja stoje jedno ispod
+   drugog to je razmak između njih). Ovde su polja i dugme u ISTOM redu, poravnata
+   po dnu - pa je ta donja margina gurala polja 16px naviše, a dugme je ostajalo
+   samo, spušteno. Izgledalo je kao da je zalepljeno ispod, a ne uz njih.
+
+   Razmak u ovom redu drži `gap`, pa margina ovde nema šta da radi. */
 .acc-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; max-width: 660px; }
-.acc-form .field { flex: 1 1 190px; min-width: 0; }
-.acc-form .btn { flex: 0 0 auto; height: 42px; padding: 0 20px; }
+.acc-form .field { flex: 1 1 190px; min-width: 0; margin-bottom: 0; }
+/* Ista visina kao polje, do piksela. Izmereno u pravom Electronu: polje je 46px
+   (12 + tekst + 12, uz ivicu od 1px sa obe strane). Na 47px su se dna poklapala
+   a vrhovi razilazili za piksel - dovoljno da red izgleda neuredno. */
+.acc-form .btn { flex: 0 0 auto; height: 46px; padding: 0 20px; }
 @media (max-width: 900px) {
   .acc-stats { gap: 20px; }
   .acc-form .btn { flex: 1 1 100%; }
@@ -1325,13 +1368,24 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
   background: linear-gradient(90deg, var(--glow, var(--brend)), transparent 46%);
   transition: opacity var(--tr);
 }
+/* BOJA BRENDA KAŽE KO SI, BOJA KUĆE KAŽE ŠTA RADIŠ.
+
+   Hover je ovde uzimao boju samog logotipa (--glow, izvučena iz slike). Na
+   YouTube-u to znači da prelaskom miša plava kuća postane CRVENA - a crvena u
+   ovom programu ima svoje značenje: ističe vreme, zaključano, nema na stanju.
+   Uz to je svaka kartica na hover svetlela drugom bojom, pa red od devet
+   prečica nije imao nijedno zajedničko pravilo.
+
+   Sada: u miru kartica nosi svoj brend (po tome se Steam razlikuje od Twitch-a
+   na prvi pogled), a čim se dodirne - svetli bojom kuće, isto kao pločica igre
+   i kao izabran artikal u Shop-u. Jedan jezik na celom ekranu. */
 .site-card:hover {
   transform: translateY(-4px);
-  box-shadow: inset 0 0 0 1px var(--line-2), 0 18px 34px -14px rgba(0, 0, 0, 0.95), 0 0 28px -10px var(--glow);
+  box-shadow: inset 0 0 0 1px rgba(var(--brend-rgb), 0.45),
+    0 18px 34px -14px rgba(0, 0, 0, 0.95), 0 0 28px -10px var(--brend-glow);
 }
-.site-card:hover::after { opacity: 0.55; }
-.site-card:hover .site-traka { box-shadow: 0 0 12px 1px var(--glow); }
-.site-card:hover .site-logo { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), 0 8px 20px -8px var(--glow); }
+.site-card:hover .site-traka { box-shadow: 0 0 12px 1px var(--brend-glow); }
+.site-card:hover .site-logo { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), 0 8px 20px -8px var(--brend-glow); }
 .site-card:active { transform: translateY(-1px); }
 
 /* Logo stoji na svojoj ploci - ikone izvucene iz .exe fajlova imaju svakakve
@@ -1994,8 +2048,15 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
 .pf-xp-pod { font-size: 12px; color: var(--text-3); }
 
 .pf-brojke { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr)); gap: 10px; }
+/* PROFIL GOVORI ISTIM OBLIKOM KAO OSTATAK PROGRAMA.
+   Sve u launcheru ima odsečen ugao (`clip-path`) i unutrašnji prsten umesto
+   okvira - police, redovi porudžbina, značke. Profil je jedini držao zaobljene
+   kartice sa `border-radius`, a značke stoje TAČNO ISPOD njegovih brojki, na
+   istom ekranu: gore zaobljeno, dole odsečeno. Dve vrste kartice jedna ispod
+   druge izgledaju kao da su iz dva programa. */
 .pf-brojka {
-  background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--cut);
+  background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
   padding: 12px 12px; min-width: 0;
 }
 .pf-bl { font-family: var(--font-ui); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
@@ -2014,7 +2075,7 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
    je poziv, a "zaključano" je zid. */
 .pf-brava {
   display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
-  border-radius: 20px; background: var(--gold-soft, rgba(255, 181, 39, 0.12));
+  border-radius: 999px; background: rgba(255, 181, 39, 0.12);
   color: var(--gold); font-size: 11px; letter-spacing: 0.06em;
 }
 .pf-boje, .pf-okviri { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -2029,23 +2090,28 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
 .pf-boja:hover { transform: scale(1.12); }
 .pf-boja.aktivna { border-color: var(--text); transform: scale(1.12); }
 .pf-okvir {
-  padding: 8px 16px; border-radius: var(--cut); cursor: pointer;
-  background: var(--panel-2); border: 1px solid var(--line-2); color: var(--text-2);
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 16px; cursor: pointer; border: 0;
+  background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line-2); color: var(--text-2);
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
   font-family: var(--font-ui); font-size: 13px; font-weight: 700;
-  transition: all var(--tr);
 }
-.pf-okvir:hover { color: var(--text); border-color: var(--brend); }
-.pf-okvir.aktivna { background: var(--brend-soft); border-color: var(--brend); color: var(--text); }
+/* Prelaz stoji dole, uz ostale stvari koje se klikću - ovde je bio `all`, a
+   `all` preliva i ono što ne treba i svakako ga je to pravilo pregazilo. */
+.pf-okvir:hover { color: var(--text); box-shadow: inset 0 0 0 1px var(--brend); }
+.pf-okvir.aktivna { background: var(--brend-soft); box-shadow: inset 0 0 0 1px var(--brend); color: var(--text); }
 
 .pf-nagrade { display: flex; flex-direction: column; gap: 6px; }
 .pf-nagrada {
   display: flex; align-items: center; gap: 12px; padding: 10px 12px;
-  background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--cut);
+  background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line);
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
   opacity: 0.6;
 }
-.pf-nagrada.ima { opacity: 1; border-color: rgba(255, 181, 39, 0.35); }
+.pf-nagrada.ima { opacity: 1; box-shadow: inset 0 0 0 1px rgba(255, 181, 39, 0.35); }
 .pf-n-nivo {
-  flex: none; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
+  flex: none; width: 28px; height: 28px; display: grid; place-items: center;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
   background: rgba(var(--bg-rgb), 0.6); color: var(--text-2);
   font-family: var(--font-display); font-size: 14px; font-weight: 700;
 }
@@ -2235,13 +2301,23 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
 .pf-rek span { font-size: 12px; color: var(--text-3); }
 .pf-rek b { font-family: var(--font-display); font-size: 15px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
 
-/* VIP boja i okvir se u spisku poznaju po zlatnoj tacki - da se odmah vidi sta
-   ide uz clanarinu, a sta se zaradjuje nivoom. */
-.pf-boja[data-vip]::after, .pf-okvir[data-vip]::after {
+/* VIP boja i okvir se u spisku poznaju po zlatnoj tački - da se odmah vidi šta
+   ide uz članarinu, a šta se zarađuje nivoom.
+
+   KRUG JE NOSI SPOLJA, ČIP IZNUTRA. Na krugu tačka sedi na samoj ivici i vidi
+   se čija je. Na čipu je stajala isto tako, na -2px od ugla - ali čip je širok
+   pravougaonik, pa je tačka lebdela u praznom iznad njega i izgledala kao mrlja
+   na ekranu, a ne kao oznaka. Uz to čip sada ima odsečen ugao, a `clip-path`
+   seče sve što izađe iz oblika: spolja bi potpuno nestala. */
+.pf-boja[data-vip]::after {
   content: ""; position: absolute; top: -2px; right: -2px; width: 7px; height: 7px;
   border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 2px var(--panel);
 }
-.pf-boja, .pf-okvir { position: relative; }
+.pf-okvir[data-vip]::after {
+  content: ""; flex: none; width: 6px; height: 6px;
+  border-radius: 50%; background: var(--gold);
+}
+.pf-boja { position: relative; }
 
 /* ---- RANG LISTA IGRAONICE ----
 

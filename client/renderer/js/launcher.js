@@ -343,6 +343,14 @@ function primeniBrend(b) {
   // ekrana - ostalo je ostajalo crveno.
   s.setProperty("--brend-rgb", b.rgb);
   s.setProperty("--brend-deep", b.down);
+  // Svetlija nijansa za hover. Server je racuna uz sve ostale i panel je vec
+  // koristi; launcher je jedini nije uzimao, pa je u CSS-u ostala upisana
+  // crvena iz stare palete - glavno dugme je pod misem menjalo boju u onu
+  // koja u ostatku programa znaci "istice vreme".
+  // Stariji server ne salje ovu nijansu. Tada se NE upisuje nista i ostaje ono
+  // sto stoji u :root: upisano `undefined` bi pokvarilo ceo preliv koji ga
+  // koristi, pa bi dugme pod misem ostalo bez podloge - gore nego bez hovera.
+  if (b.hover) s.setProperty("--brend-hover", b.hover);
   s.setProperty("--brend-soft", `rgba(${b.rgb}, 0.15)`);
   s.setProperty("--brend-glow", `rgba(${b.rgb}, 0.55)`);
   // Znak na svim ekranima: podešavanje, prijava, gornja traka, zaključan ekran.
@@ -1551,8 +1559,123 @@ function updateHomeArrows() {
   };
   upd();
   track.onscroll = upd;
+  ozivipolicu(track);
 }
 window.addEventListener("resize", () => { if (S.tab === "home") updateHomeArrows(); });
+
+// POLICA KOJA SE OSEĆA DOK SE POMERA
+//
+// Polica je do sada bila spisak koji klizi. Ovde dobija tri stvari koje se ne
+// vide pojedinačno, ali zajedno daju osećaj težine - kao da se pomera nešto što
+// ima masu, a ne tabela:
+//
+//   NAGIB    Dok se vuče, pločice se blago okreću u smeru kretanja i vraćaju kad
+//            se stane. Ugao ide od BRZINE, ne od položaja - spor pokret jedva da
+//            se primeti, nagli se oseti.
+//   PARALAKSA Omot se unutar okvira pomera suprotno od kretanja. Slika tako
+//            "zaostaje" za pločicom i dobija dubinu; bez toga je pločica plosnat
+//            papir koji klizi.
+//   DUBINA   Pločica koju ivica police seče gasi se srazmerno tome koliko je
+//            odsečeno, a cela pločica ostaje puna. Utišana pločica zato govori
+//            jedno: "ima još, pomeri". Dubina je prvo išla po udaljenosti od
+//            sredine - tada je prva igra, najigranija i uvek cela vidljiva,
+//            stalno bila prigušena, kao da je manje važna.
+//
+// ŠTA JE OVDE NAMERNO SKROMNO
+//
+// Ovo je ekran za koji neko plaća po satu, ne demo. Zato: bez odskakanja, bez
+// rotacije koja menja čitljivost imena, bez zamućenja (ono na slabijoj grafici
+// košta više nego sve ostalo zajedno). Sve staje u granice ispod, a jače od
+// toga se brzo prejede i počne da smeta.
+const POLICA = { nagib: 7, paralaksa: 14, dubina: 0.5, trenje: 0.86 };
+
+function ozivipolicu(track) {
+  if (!track || track._oziveo) return;
+  track._oziveo = true;
+
+  let prosli = track.scrollLeft;
+  let brzina = 0;
+  let kadr = null;
+
+  const crtaj = () => {
+    kadr = null;
+    // Igrač koji je ugasio animacije ne dobija nijednu - isto pravilo kao za
+    // šaru i prelaze. Tada se sve vrati na nulu i petlja staje.
+    if (!S.animacije) { ocisti(); return; }
+
+    const sada = track.scrollLeft;
+    // Nova brzina je razlika, ali se meša sa starom: sirova razlika po kadru
+    // skače i nagib bi treperio.
+    brzina = brzina * POLICA.trenje + (sada - prosli) * (1 - POLICA.trenje);
+    prosli = sada;
+
+    const norm = Math.max(-1, Math.min(1, brzina / 26));
+    const sirina = track.clientWidth;
+
+    for (const plocica of track.children) {
+      const medij = plocica.firstElementChild;
+      if (!medij) continue;
+      // DUBINA IDE PO TOME KOLIKO POLICA SEČE PLOČICU, ne po udaljenosti od
+      // sredine. Po sredini je prva igra - najigranija, i uvek cela vidljiva -
+      // stalno bila utišana, a to je govorilo da je manje važna. Ovako se gasi
+      // samo ono što je zaista presečeno ivicom, pa utišana pločica znači jedno:
+      // "ima još, pomeri". Kad polica nema gde da klizi, sve je celo i ništa se
+      // ne menja - što je i tačno.
+      const levo = plocica.offsetLeft - sada;
+      const vidljivo = Math.min(levo + plocica.offsetWidth, sirina) - Math.max(levo, 0);
+      const udeo = Math.max(0, Math.min(1, vidljivo / (plocica.offsetWidth || 1)));
+
+      medij.style.setProperty("--nagib", (norm * POLICA.nagib).toFixed(2) + "deg");
+      medij.style.setProperty("--dub", (1 - (1 - udeo) * POLICA.dubina).toFixed(4));
+      const omot = medij.querySelector("img");
+      if (omot) omot.style.setProperty("--par-omot", (-norm * POLICA.paralaksa).toFixed(2) + "px");
+    }
+
+    // Petlja radi samo dok se nešto stvarno pomera. Stalni rAF na trinaest
+    // mašina je trošak koji se ne vidi na ekranu, ali se vidi na ventilatoru.
+    if (Math.abs(brzina) > 0.05) kadr = requestAnimationFrame(crtaj);
+    else pusti();
+  };
+
+  // Kad se stane, nagib i paralaksa se puste na nulu i CSS ih sam odvede nazad
+  // (prelaz je već na .tile-media i na slici). Dubina OSTAJE - ona zavisi od
+  // toga koliko polica seče pločicu, ne od kretanja.
+  const pusti = () => {
+    brzina = 0;
+    for (const plocica of track.children) {
+      const medij = plocica.firstElementChild;
+      if (!medij) continue;
+      medij.style.setProperty("--nagib", "0deg");
+      const omot = medij.querySelector("img");
+      if (omot) omot.style.setProperty("--par-omot", "0px");
+    }
+  };
+
+  const ocisti = () => {
+    for (const plocica of track.children) {
+      const medij = plocica.firstElementChild;
+      if (!medij) continue;
+      medij.style.removeProperty("--nagib");
+      medij.style.removeProperty("--dub");
+      const omot = medij.querySelector("img");
+      if (omot) omot.style.removeProperty("--par-omot");
+    }
+  };
+
+  // Kad su animacije ugašene, ne budi se petlja nego se ono što je ostalo
+  // zapisano skida. U samom programu se posle prekidača ekran ionako iscrta
+  // iznova, pa se ovo ne vidi - ali vrednost koja ostane da visi na elementu je
+  // greška i onda kad je niko ne gleda.
+  const probudi = () => {
+    if (!S.animacije) { if (kadr) { cancelAnimationFrame(kadr); kadr = null; } ocisti(); return; }
+    if (!kadr) kadr = requestAnimationFrame(crtaj);
+  };
+  track.addEventListener("scroll", probudi, { passive: true });
+  // Prevlačenje menja scrollLeft direktno, bez "scroll" događaja u istom kadru -
+  // bez ovoga bi nagib kasnio za prstom.
+  track.addEventListener("pointermove", probudi, { passive: true });
+  probudi(); // jednom odmah, da dubina stoji i pre prvog pomeranja
+}
 
 // ---- Shop ----
 // Jedan spisak pića i traka kategorija iznad njega - kao jelovnik. Ranije je

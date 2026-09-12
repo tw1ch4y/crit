@@ -37,6 +37,7 @@ const ALATI = [
   { ime: "proba-kretanja", args: [String(PORT)], opis: "animacije šare se stvarno pomeraju" },
   { ime: "proba-kretanja", args: [String(PORT), "--reduced"], opis: "isto, na računaru sa isključenim Windows animacijama", oznaka: "reduced" },
   { ime: "proba-fonta", args: [String(PORT)], opis: "font ima naša slova, sve debljine" },
+  { ime: "proba-police", args: [], opis: "polica igara se stvarno naginje i vraća dok se skroluje", sam: true },
   { ime: "proba-porudzbine", args: [String(PORT)], opis: "porudžbina od klika do baze, preko pravog WebSocketa" },
   { ime: "proba-procesa", args: [], opis: "daljinski task manager: popis i gašenje pravog programa", sam: true },
   { ime: "proba-nadogradnja-pin", args: [], opis: "servisni PIN preživljava nadogradnju launchera", sam: true },

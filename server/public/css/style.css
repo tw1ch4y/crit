@@ -20,7 +20,11 @@
   --text-3: #8c96b7;
   /* Fabrička boja kuće. Vlasnik je menja iz panela (Izgled launchera). */
   --accent: #2f6ae8;
-  --accent-hover: #4a80f2;
+  /* Svetlija nijansa fabričke boje, ista vrednost koju daje `nijanse()` na
+     serveru. Ovo je samo zaklon dok se boja kuće ne učita - ali dok je bila
+     #4a80f2, panel je na tren pokazivao jednu nijansu pa se prelomio u
+     drugu. */
+  --accent-hover: #4c7feb;
   --accent-down: #2454c4;
   --accent-soft: rgba(47, 106, 232, 0.14);
   --accent-line: rgba(47, 106, 232, 0.45);
