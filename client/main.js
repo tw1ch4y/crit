@@ -1,14 +1,14 @@
 const { app, BrowserWindow, globalShortcut, ipcMain, powerMonitor, screen, shell } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
-const { spawn, exec } = require("node:child_process");
+const { spawn, execFile } = require("node:child_process");
 const https = require("node:https");
 const { scryptSync, timingSafeEqual, createHash } = require("node:crypto");
 const http = require("node:http");
 const os = require("node:os");
 const WebSocket = require("ws");
 const { ocistiSesiju, racunarJeZasticen, STOP_FAJL } = require("./ciscenje.js");
-const { snimiStanje, ugasiNoveProcese, presretniPokretanja, spisakZaPanel, ugasiProces } = require("./procesi.js");
+const { snimiStanje, ugasiNoveProcese, pokreniStrazu, spisakZaPanel, ugasiProces } = require("./procesi.js");
 const winPod = require("./windows-podesavanja.js");
 const { napraviSkriptu, napraviOsigurac, KOD_OSIGURAC } = require("./nadogradnja-skripta.js");
 
@@ -417,6 +417,7 @@ function handleServerMsg(msg) {
     showBackdrop(); // od sada zastor pokriva desktop dok god traje sesija
     proveriVreme(msg.remainingSeconds, true); // pri prijavi samo zapamti stanje
     if (!NO_LOCK) snimiStanje().then((s) => { procesiPreSesije = s; }).catch(() => {});
+    pokreniStrazuSesije();
     // Zapamti kako je miš i zvuk bio pre ovog igrača, da se na kraju sesije
     // vrati. Bez toga bi sledeći gost zatekao tuđa podešavanja.
     winPod.procitajSve().then((s) => { podesavanjaPreSesije = s; }).catch(() => {});
@@ -445,16 +446,33 @@ function handleServerMsg(msg) {
   if (msg.t === "nadogradnja") primiNadogradnju(msg);
 }
 
+// STRAŽA NAD PREUZETIM PROGRAMIMA
+//
 // Igrač skine program kroz pregledač i pokrene ga - time bi zaobišao launcher.
-// Gasimo sve pokrenuto iz Preuzimanja/Temp/Desktop i javljamo mu zašto.
-function presretniSkinute() {
-  if (NO_LOCK || !podesavanje("blokirajPreuzeteProgram", true)) return;
-  presretniPokretanja({
+// Sve pokrenuto iz Preuzimanja/Temp/Desktop se gasi i igraču se kaže zašto.
+//
+// Ovo je do sada radio NADZOR, na svake četiri sekunde, celu sesiju: novi
+// PowerShell koji preko WMI popiše sve procese. Pola sekunde do sekunde
+// procesora po pozivu, trzaj slike na četiri sekunde, i bez roka - zaglavljen
+// WMI je gomilao PowerShell za PowerShell-om dok računar ne stane.
+//
+// Sada straža živi koliko i sesija: jedan pomoćni proces na sniženom prioritetu,
+// podignut pri prijavi i ugašen na kraju. Vidi pokreniStrazu u procesi.js.
+let straza = null;
+function pokreniStrazuSesije() {
+  if (NO_LOCK || straza || !podesavanje("blokirajPreuzeteProgram", true)) return;
+  straza = pokreniStrazu({
     obavesti: (ime) => {
       sendToRenderer("blokirano", { ime });
       wsSend({ t: "log_klijent", tekst: `Blokirano pokretanje preuzetog programa: ${ime}` });
     },
-  }).catch(() => {});
+    kvar: (opis) => javiProblem("straza", opis),
+  });
+}
+function zaustaviStrazu() {
+  if (!straza) return;
+  try { straza.zaustavi(); } catch {}
+  straza = null;
 }
 
 function podesavanje(kljuc, podrazumevano) {
@@ -643,6 +661,7 @@ function vratiPodesavanja() {
 
 function zavrsiSesiju() {
   vratiPodesavanja();
+  zaustaviStrazu();
   javljeniPragovi = new Set();
   clearInterval(mirovanjeTajmer);
   mirovanjeTajmer = null;
@@ -961,9 +980,9 @@ function runCommand(cmd) {
     return;
   }
   switch (cmd) {
-    case "shutdown": exec('shutdown /s /t 3 /c "Crit - kraj smene"'); break;
-    case "restart": exec('shutdown /r /t 3 /c "Crit - restart"'); break;
-    case "logoff": exec("shutdown /l"); break;
+    case "shutdown": pokreniKomandu("shutdown", ["/s", "/t", "3", "/c", "Crit - kraj smene"]); break;
+    case "restart": pokreniKomandu("shutdown", ["/r", "/t", "3", "/c", "Crit - restart"]); break;
+    case "logoff": pokreniKomandu("shutdown", ["/l"]); break;
     // "taskmgr" je izbačen. Otvarao je Task Manager NA računaru igrača: radnik
     // bi morao da ustane i ode do te mašine, a igrač bi u međuvremenu imao Task
     // Manager pred sobom. Zamenjen je daljinskim prikazom - server šalje
@@ -1004,7 +1023,7 @@ function createBackdrop() {
   backdrop = new BrowserWindow({
     width, height, x: 0, y: 0,
     frame: false, fullscreen: true, skipTaskbar: true, show: false,
-    backgroundColor: "#07070a",
+    backgroundColor: "#070c1c",
     webPreferences: { preload: path.join(__dirname, "backdrop-preload.js"), contextIsolation: true },
   });
   backdrop.loadFile(path.join(__dirname, "renderer", "backdrop.html"));
@@ -1144,10 +1163,17 @@ function checkGameGone() {
   // drugim imenom), NE diramo prvi plan - inače bismo prekrili igru.
   if (!images.length) return;
 
+  // Nova provera ne kreće dok prethodna ne završi. Zove se na pet sekundi, a
+  // na računaru zauzetom igrom jedna ume da traje i duže - bez ovoga bi se
+  // preklapale i gomilale.
+  if (proveraIgreUToku) return;
+  proveraIgreUToku = true;
   anyRunning(images, (running) => {
+    proveraIgreUToku = false;
     if (!running && Date.now() >= launchGuardUntil) { clearExternal(); focusLauncher(); }
   });
 }
+let proveraIgreUToku = false;
 
 // Nadzor prozora: hvata Win+D, "minimize all", pad procesa i slično.
 // Dok igra radi ne otimamo fokus (showInactive), samo ne dozvoljavamo
@@ -1166,7 +1192,6 @@ function startWatchdog() {
       // desktop i da prozor launchera ne ostane sakriven.
       if (win.isAlwaysOnTop()) win.setAlwaysOnTop(false);
       showBackdrop();
-      if (++tick % 4 === 0) presretniSkinute();
     } else if (gameActive()) {
       // Nema prijavljenog igrača, ali nešto još radi (npr. osoblje otvorilo Task Manager)
       if (win.isAlwaysOnTop()) win.setAlwaysOnTop(false);
@@ -1194,6 +1219,22 @@ function anyRunning(images, cb) {
   }
 }
 
+// SPOLJNA KOMANDA UVEK IMA ROK, I POKREĆE SE BEZ cmd.exe.
+//
+// `exec` pušta komandu KROZ cmd.exe, a njegov `timeout` gasi taj cmd - ne samu
+// komandu. Zaglavljen `tasklist` ili PowerShell tako ostaje da visi i posle
+// roka, a sledeći poziv doda još jedan. Na mestu koje se zove na par sekundi to
+// se gomila dok ne pojede memoriju. `execFile` pokreće program direktno, pa rok
+// gasi baš njega - a argumenti ne prolaze kroz tumačenje ljuske.
+const ROK_KOMANDE = 10000;
+function pokreniKomandu(program, argumenti, gotovo = () => {}, rok = ROK_KOMANDE) {
+  try {
+    execFile(program, argumenti, { windowsHide: true, timeout: rok }, (greska, izlaz) => gotovo(greska, izlaz));
+  } catch (e) {
+    gotovo(e, "");
+  }
+}
+
 // ---------- Pokretanje igara ----------
 const recentLaunch = new Map(); // putanja -> vreme (spreči dupli klik)
 
@@ -1201,9 +1242,13 @@ const recentLaunch = new Map(); // putanja -> vreme (spreči dupli klik)
 // pokretač startovao pa se sam ugasio) - da ne otmemo fokus pokrenutoj igri.
 function isProcessRunning(imageName, cb) {
   if (!imageName) return cb(false);
-  exec(`tasklist /FI "IMAGENAME eq ${imageName}" /NH`, { windowsHide: true }, (err, stdout) => {
-    cb(!err && String(stdout).toLowerCase().includes(String(imageName).toLowerCase()));
-  });
+  // Kad provera ne uspe (istekne rok, tasklist zapne), odgovor je "RADI".
+  // Obrnut odgovor bi poslao launcher preko žive igre - a to je tačno ono što je
+  // igračima menjalo rezoluciju. Ako je igra stvarno gotova, sledeća provera to
+  // vidi za par sekundi, a igrač se i sam vraća klikom na zastor.
+  pokreniKomandu("tasklist", ["/FI", `IMAGENAME eq ${imageName}`, "/NH"], (err, stdout) => {
+    cb(err ? true : String(stdout).toLowerCase().includes(String(imageName).toLowerCase()));
+  }, 8000);
 }
 
 // Argumenti se dele po razmacima, ali ono pod navodnicima ostaje celo
@@ -1466,7 +1511,7 @@ function killAllGames() {
   for (const g of spawnedGames) {
     try { g.child.kill("SIGKILL"); } catch {}
     // pokretač je često već izašao - dokrajči i sam proces igre
-    if (g.image) { try { exec(`taskkill /IM "${g.image}" /F /T`, { windowsHide: true }); } catch {} }
+    if (g.image) pokreniKomandu("taskkill", ["/IM", g.image, "/F", "/T"]);
   }
   spawnedGames.clear();
   recentLaunch.clear();
@@ -1489,7 +1534,7 @@ function closeBrowser() {
   clearExternal();
   if (DEV || process.platform !== "win32") return;
   for (const img of BROWSER_IMAGES) {
-    try { exec(`taskkill /IM "${img}" /F /T`, { windowsHide: true }, () => {}); } catch {}
+    pokreniKomandu("taskkill", ["/IM", img, "/F", "/T"]);
   }
 }
 
@@ -1569,32 +1614,34 @@ function planNapajanja(ukljuci) {
   if (NO_LOCK || process.platform !== "win32") return;
   const cmds = ukljuci
     ? [
-        `powercfg /setactive ${PLAN_VISOKI}`,
-        "powercfg /change monitor-timeout-ac 0",   // ekran se ne gasi
-        "powercfg /change standby-timeout-ac 0",   // racunar ne ide na spavanje
-        "powercfg /change disk-timeout-ac 0",
+        ["/setactive", PLAN_VISOKI],
+        ["/change", "monitor-timeout-ac", "0"],   // ekran se ne gasi
+        ["/change", "standby-timeout-ac", "0"],   // racunar ne ide na spavanje
+        ["/change", "disk-timeout-ac", "0"],
       ]
     : [
-        `powercfg /setactive ${PLAN_URAVNOTEZEN}`,
-        "powercfg /change monitor-timeout-ac 15",
-        "powercfg /change standby-timeout-ac 30",
-        "powercfg /change disk-timeout-ac 20",
+        ["/setactive", PLAN_URAVNOTEZEN],
+        ["/change", "monitor-timeout-ac", "15"],
+        ["/change", "standby-timeout-ac", "30"],
+        ["/change", "disk-timeout-ac", "20"],
       ];
-  for (const c of cmds) exec(c, { windowsHide: true }, () => {});
+  for (const argumenti of cmds) pokreniKomandu("powercfg", argumenti);
 }
 
 function setPolicies(on) {
   if (NO_LOCK || process.platform !== "win32") return;
   const v = on ? 1 : 0;
-  const cmds = [
-    `reg add "${POLICY_SYS}" /v DisableTaskMgr /t REG_DWORD /d ${v} /f`,
-    `reg add "${POLICY_SYS}" /v DisableLockWorkstation /t REG_DWORD /d ${v} /f`,
-    `reg add "${POLICY_SYS}" /v DisableChangePassword /t REG_DWORD /d ${v} /f`,
-    `reg add "${POLICY_EXP}" /v NoLogoff /t REG_DWORD /d ${v} /f`,
-    `reg add "${POLICY_EXP}" /v NoWinKeys /t REG_DWORD /d ${v} /f`,
-    `reg add "${POLICY_EXP}" /v NoClose /t REG_DWORD /d ${v} /f`,
+  const vrednosti = [
+    [POLICY_SYS, "DisableTaskMgr"],
+    [POLICY_SYS, "DisableLockWorkstation"],
+    [POLICY_SYS, "DisableChangePassword"],
+    [POLICY_EXP, "NoLogoff"],
+    [POLICY_EXP, "NoWinKeys"],
+    [POLICY_EXP, "NoClose"],
   ];
-  for (const c of cmds) exec(c, { windowsHide: true }, () => {});
+  for (const [kljuc, ime] of vrednosti) {
+    pokreniKomandu("reg", ["add", kljuc, "/v", ime, "/t", "REG_DWORD", "/d", String(v), "/f"]);
+  }
 }
 
 ipcMain.handle("admin-exit", () => {
@@ -1616,25 +1663,31 @@ function cpuLoad() {
   if (dt <= 0) return null;
   return Math.max(0, Math.min(100, Math.round(100 - (di / dt) * 100)));
 }
-// Temperatura CPU-a preko WMI (radi na delu mašina; na desktopima često nije dostupno).
-// Keširano da ne pokrećemo PowerShell prečesto; gracefully null ako ne uspe.
-let _tempCache = { at: 0, val: null };
+// Temperatura CPU-a preko WMI.
+//
+// NA RAČUNARU U IGRAONICI OVO NIKAD NE USPE. Ovaj WMI razred traži
+// administratora, a nalog igrača to nije: odgovor je "Access denied", svaki put.
+// Upit se ipak ponavljao na 15 sekundi, ceo dan - nov PowerShell za odgovor koji
+// se zna unapred, i to i dok igrač igra, kad se donja traka ionako ne vidi.
+//
+// Sada: posle tri neuspeha zaredom se više ne pita do kraja rada launchera, a
+// dok igra radi ne pita se uopšte.
+let _temp = { at: 0, val: null, neuspeha: 0 };
 function cpuTemp() {
   return new Promise((resolve) => {
-    if (Date.now() - _tempCache.at < 15000) return resolve(_tempCache.val);
-    _tempCache.at = Date.now();
-    exec(
-      'powershell -NoProfile -Command "(Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction Stop | Select-Object -First 1).CurrentTemperature"',
-      { windowsHide: true, timeout: 4000 },
-      (err, stdout) => {
-        let v = null;
-        const n = parseInt(String(stdout).trim(), 10);
-        if (!err && n) v = Math.round(n / 10 - 273.15); // desetine Kelvina -> °C
-        if (v != null && (v < 10 || v > 120)) v = null;
-        _tempCache.val = v;
-        resolve(v);
-      }
-    );
+    if (_temp.neuspeha >= 3 || gameActive() || Date.now() - _temp.at < 60000) return resolve(_temp.val);
+    _temp.at = Date.now();
+    pokreniKomandu("powershell", ["-NoProfile", "-NonInteractive", "-Command",
+      "(Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction Stop | Select-Object -First 1).CurrentTemperature"],
+    (err, stdout) => {
+      let v = null;
+      const n = parseInt(String(stdout || "").trim(), 10);
+      if (!err && n) v = Math.round(n / 10 - 273.15); // desetine Kelvina -> °C
+      if (v != null && (v < 10 || v > 120)) v = null;
+      _temp.neuspeha = v == null ? _temp.neuspeha + 1 : 0;
+      _temp.val = v;
+      resolve(v);
+    }, 5000);
   });
 }
 ipcMain.handle("verzija", () => app.getVersion());
@@ -1811,6 +1864,7 @@ app.on("before-quit", (e) => {
 });
 app.on("will-quit", () => {
   clearInterval(watchdog);
+  zaustaviStrazu();
   globalShortcut.unregisterAll();
   setPolicies(false); // vrati Task Manager i Ctrl+Alt+Del opcije
   planNapajanja(false); // vrati uspavljivanje i gašenje ekrana

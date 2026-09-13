@@ -40,6 +40,7 @@ const ALATI = [
   { ime: "proba-police", args: [], opis: "polica igara se stvarno naginje i vraća dok se skroluje", sam: true },
   { ime: "proba-porudzbine", args: [String(PORT)], opis: "porudžbina od klika do baze, preko pravog WebSocketa" },
   { ime: "proba-procesa", args: [], opis: "daljinski task manager: popis i gašenje pravog programa", sam: true },
+  { ime: "proba-straze", args: [], opis: "straža nad skinutim programima: jedan proces, gasi skinuto, ne preživi launcher", sam: true },
   { ime: "proba-nadogradnja-pin", args: [], opis: "servisni PIN preživljava nadogradnju launchera", sam: true },
   { ime: "proba-servisni-pin-server", args: [], opis: "servisni PIN se upisuje jednom u panelu i vazi na svim masinama, i bez servera", sam: true },
   { ime: "proba-veza", args: [], opis: "launcher preživljava otkucaj servera i sam se vraća", sam: true },

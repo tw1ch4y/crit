@@ -62,7 +62,7 @@ proveri("alatke za programere su samo u dev rezimu", /devTools: DEV/.test(main))
 
 // ---- 5) programi skinuti kroz pregledac ----
 // Igrac skine .exe kroz Steam ili Discord i pokrene ga iz Preuzimanja.
-proveri("presretanje pokretanja postoji", /presretniPokretanja/.test(main));
+proveri("presretanje pokretanja postoji", /pokreniStrazu\(/.test(main));
 proveri("blokiranje preuzetih programa se moze ukljuciti", /blokirajPreuzeteProgram/.test(pod));
 
 // A sada ista stvar PONASANJEM, ne citanjem koda: pusta se prava funkcija koja

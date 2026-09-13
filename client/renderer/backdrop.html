@@ -10,8 +10,8 @@
     html, body { height: 100%; overflow: hidden; cursor: default; }
     body {
       background:
-        radial-gradient(900px 600px at 50% 42%, rgba(255, 43, 43, 0.10), transparent 62%),
-        #07070a;
+        radial-gradient(900px 600px at 50% 42%, rgba(47, 106, 232, 0.10), transparent 62%),
+        #070c1c;
       display: grid; place-items: center;
       font-family: "Chakra Petch", "Segoe UI", system-ui, sans-serif; color: #6a6d80;
     }
@@ -23,7 +23,13 @@
       background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 5px; padding: 2px 7px; font-family: inherit; font-size: 12px; color: #a8acbf;
     }
-    .pulse { animation: p 3s ease-in-out infinite; }
+    /* Zastor stoji vidljiv IZA IGRE celu sesiju, preko celog ekrana. Igra u
+       ekskluzivnom punom ekranu Chromium-u ne javlja uvek da ga pokriva, pa je
+       beskonačna animacija umela da se crta i dok je niko ne vidi - uporedo sa
+       igrom, na istoj grafičkoj. Sada stoji dok zastor nema fokus, a kreće tek
+       kad igrač stvarno gleda u njega (igra je zatvorena). */
+    .pulse { animation: p 3s ease-in-out infinite; animation-play-state: paused; }
+    body.vidljiv .pulse { animation-play-state: running; }
     @keyframes p { 50% { opacity: 0.55; } }
   </style>
 </head>
@@ -36,6 +42,10 @@
   <script>
     // klik na zastor vraća launcher u prvi plan
     document.addEventListener("click", () => window.critBackdrop && window.critBackdrop.focusLauncher());
+    const vidljiv = () => document.body.classList.toggle("vidljiv", document.hasFocus());
+    window.addEventListener("focus", vidljiv);
+    window.addEventListener("blur", vidljiv);
+    vidljiv();
   </script>
 </body>
 </html>

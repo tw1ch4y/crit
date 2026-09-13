@@ -51,8 +51,10 @@ proveri("postoji probni rad koji ništa ne briše", /--suvo/.test(izvorC));
 // U igraonici to znači crn ekran nasred filma i prekid igre koja se ne dira mišem.
 proveri("plan napajanja se postavlja", /function planNapajanja/.test(main));
 proveri("prelazi na High performance", main.includes("8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"));
-proveri("ekran se ne gasi", /monitor-timeout-ac 0/.test(main));
-proveri("računar ne ide na spavanje", /standby-timeout-ac 0/.test(main));
+// Komanda se piše kao program i argumenti odvojeno (vidi pokreniKomandu u
+// main.js), pa se i ovde traži taj oblik.
+proveri("ekran se ne gasi", /"monitor-timeout-ac", "0"/.test(main));
+proveri("računar ne ide na spavanje", /"standby-timeout-ac", "0"/.test(main));
 proveri("plan se postavlja pri pokretanju", /planNapajanja\(true\)/.test(main));
 proveri("plan se VRAĆA pri admin izlazu", /planNapajanja\(false\)/.test(main),
   "inače bi računar zauvek ostao bez uspavljivanja, i posle deinstalacije launchera");

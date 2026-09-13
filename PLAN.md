@@ -268,6 +268,33 @@
   bilo poravnato sa poljima: `.field` nosi donju marginu za slučaj kad polja
   stoje jedno ispod drugog, a ovde su u istom redu — margina je gurala polja
   naviše, a dugme ostajalo spušteno
+- [x] **RAČUNAR SE POVREMENO „ZAKOČI" — uzrok nije bio Electron, nego ono što je
+  launcher radio iza igre.** Nadzor je **na svake četiri sekunde, celu sesiju**
+  pokretao nov PowerShell koji preko WMI popiše sve procese (da uhvati program
+  skinut kroz pregledač). Izmereno: ~0,5 s procesora po pozivu, dakle **~8 s
+  procesora u svakom minutu igre** — i to potcenjeno, jer se posao koji WMI
+  radi u svom procesu ne vidi. Igrač to oseća kao trzaj slike na četiri sekunde.
+  A poziv **nije imao rok**: kad WMI zapne, svaki krug je dodavao još jedan
+  zaglavljen PowerShell dok memorija ne nestane. Sada **jedna straža** za celu
+  sesiju: jedan pomoćni proces na sniženom prioritetu, popis iz samog .NET-a
+  (bez WMI), javlja samo nove procese — **~0,25 s procesora u minuti**, oko 30
+  puta manje. Cena: straža drži ~100 MB memorije dok traje sesija. Sama se gasi
+  kad launchera nema; kad zaćuti, diže se iznova; kad pada u krug, staje i javlja
+  osoblju jednom. `proba-straze.mjs` to meri sa pravim PowerShell-om
+- [x] **Temperatura procesora nije uspela nijednom, a pitala se ceo dan.** WMI
+  razred za temperaturu traži administratora, a nalog igrača to nije: odgovor je
+  „Access denied" svaki put. Upit se ipak ponavljao na 15 s — nov PowerShell za
+  odgovor koji se zna unapred, i dok igrač igra. Sada posle tri neuspeha više ne
+  pita, a dok igra radi ne pita uopšte
+- [x] **Rok komande nije gasio komandu.** Sve spoljne komande (`tasklist`,
+  `taskkill`, `reg`, `powercfg`, `shutdown`, PowerShell) išle su kroz `exec`, tj.
+  kroz cmd.exe — a `timeout` gasi taj cmd, ne program ispod njega. Sada `execFile`
+  sa rokom na svakom pozivu. Kad provera „da li igra još radi" ne uspe, odgovor
+  je **radi** (obrnut bi poslao launcher preko žive igre), a provere se više ne
+  preklapaju
+- [x] Zastor iza igre je vrteo beskonačnu animaciju preko celog ekrana i dok ga
+  igra pokriva; sada stoji dok zastor nema fokus. Uz to je nosio crvenu iz stare
+  palete
 ### Faza 10 - Priprema za izdavanje drugim igraonicama
 
 Cilj nije licenciranje sada, nego da program prestane da bude „program za jednu

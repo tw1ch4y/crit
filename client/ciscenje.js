@@ -16,7 +16,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { exec } = require("node:child_process");
+const { execFile } = require("node:child_process");
 
 const SUVO = process.argv.includes("--suvo"); // probni rad: ništa se ne briše
 
@@ -107,16 +107,17 @@ function uOblaku(put) {
 }
 
 // Registry vrednosti: Steam pamti poslednji nalog i van fajla
+// Program i argumenti odvojeno, i uvek sa rokom - vidi pokreniKomandu u main.js.
 const REG_KOMANDE = [
-  'reg delete "HKCU\\Software\\Valve\\Steam" /v AutoLoginUser /f',
-  'reg delete "HKCU\\Software\\Valve\\Steam" /v RememberPassword /f',
+  ["reg", ["delete", "HKCU\\Software\\Valve\\Steam", "/v", "AutoLoginUser", "/f"]],
+  ["reg", ["delete", "HKCU\\Software\\Valve\\Steam", "/v", "RememberPassword", "/f"]],
 ];
 
 // Korpa za otpatke se ne brise kao fascikla - Windows je cuva po disku i
 // direktno brisanje ume da je ostavi u nevaljanom stanju. Ovo je zvanicni put.
 // Cisti se samo korpa TEKUCEG korisnika (naloga za igrace).
-const KORPA_KOMANDA =
-  'powershell -NoProfile -NonInteractive -Command "Clear-RecycleBin -Force -ErrorAction SilentlyContinue"';
+const KORPA_KOMANDA = ["powershell", ["-NoProfile", "-NonInteractive", "-Command",
+  "Clear-RecycleBin -Force -ErrorAction SilentlyContinue"]];
 
 function obrisi(meta, log, licneDozvoljene) {
   const { put, opis, sadrzaj, licno } = meta;
@@ -169,8 +170,11 @@ function ocistiSesiju({ dozvoljeno, resourcesPath, execPath, dirname, log = () =
   for (const m of mete(process.env)) obrisi(m, log, licneDozvoljene);
 
   if (!SUVO) {
-    for (const c of REG_KOMANDE) exec(c, { windowsHide: true }, () => {});
-    exec(KORPA_KOMANDA, { windowsHide: true }, () => log("  ispražnjena korpa za otpatke"));
+    for (const [program, argumenti] of REG_KOMANDE) {
+      execFile(program, argumenti, { windowsHide: true, timeout: 10000 }, () => {});
+    }
+    execFile(KORPA_KOMANDA[0], KORPA_KOMANDA[1], { windowsHide: true, timeout: 60000 },
+      () => log("  ispražnjena korpa za otpatke"));
   } else {
     log("  [PROBNI RAD] obrisao bih Steam AutoLoginUser iz registry-ja");
     log("  [PROBNI RAD] ispraznio bih korpu za otpatke");
