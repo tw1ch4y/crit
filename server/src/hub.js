@@ -73,7 +73,9 @@ export function initWs(server, { authComputer, authAdmin }) {
       // Verzija launchera dolazi uz adresu. Stariji launcheri je ne salju, pa
       // ostaje prazna - i to je podatak: znaci da je racunar zaostao.
       const verzija = (url.searchParams.get("v") || "").slice(0, 20);
-      handlers.onClientOpen(comp, ws, ip, verzija);
+      // Launcher koji je radio bez servera to najavljuje u samoj adresi. Tada
+      // se sesija ne vraća dok ne stigne izveštaj - vidi clientOfflineIzvestaj.
+      handlers.onClientOpen(comp, ws, ip, verzija, { offline: url.searchParams.get("offline") === "1" });
 
       ws.on("message", (buf) => {
         let msg;

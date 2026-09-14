@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import dgram from "node:dgram";
 import { scryptSync, randomBytes } from "node:crypto";
+import * as bezServera from "./offline.js";
 import { fileURLToPath } from "node:url";
 import { db, getSetting, setSetting, DATA_DIR, uJednomPoslu } from "./db.js";
 import { verifyPassword, hashPassword, rang } from "./auth.js";
@@ -909,8 +910,9 @@ function pushOrders() {
 // KLIJENT: konekcija / prijava
 const connectedSince = new Map(); // computerId -> ts (od kada je launcher povezan)
 
-export function onClientOpen(comp, ip, verzija) {
+export function onClientOpen(comp, ip, verzija, opcije = {}) {
   connectedSince.set(comp.id, Date.now());
+  if (opcije.offline) cekajOfflineIzvestaj(comp.id);
   // Verzija se pamti samo kad je launcher posalje. Stariji je ne salju, pa
   // ostaje ono sto je poslednje bilo poznato - a prazno polje u panelu znaci
   // "ovaj racunar ima launcher stariji od 2.22".
@@ -953,13 +955,26 @@ export function sendWelcomeState(computerId) {
     promo: promoZaKlijenta(),
   });
 
+  // LAUNCHER KOJI JE RADIO BEZ SERVERA PRVO JAVLJA KOLIKO JE ODIGRANO.
+  //
+  // Do tada mu se sesija ne vraća: "login_ok" bi ga vratio na radnu površinu i
+  // tamo gde se igrač u međuvremenu odjavio ili mu je isteklo vreme, a naplata
+  // bi krenula pre obračuna. Vidi clientOfflineIzvestaj.
+  if (cekaOfflineIzvestaj.has(comp.id)) return;
+  posaljiStanjeSesije(comp.id);
+}
+
+// Stanje računara posle povezivanja: nastavak sesije, zaključan ekran ili prijava.
+function posaljiStanjeSesije(computerId) {
+  const comp = computerById(computerId);
+  if (!comp) return;
   // Ako postoji aktivna sesija (npr. server se restartovao) - nastavi je
   const s = activeSessionForComputer(comp.id);
   if (s) {
     const p = playerById(s.player_id);
     db.prepare("UPDATE computers SET status='in_use', current_player_id=?, current_session_id=? WHERE id=?")
       .run(p.id, s.id, comp.id);
-    sendClient(comp.id, loginOkPayload(p, s));
+    sendClient(comp.id, loginOkPayload(p, s, { nastavak: true }));
   } else if (comp.status === "locked") {
     sendClient(comp.id, { t: "locked", reason: "staff" });
   } else {
@@ -968,19 +983,127 @@ export function sendWelcomeState(computerId) {
   }
 }
 
+// ---------- RAD BEZ SERVERA ----------
+//
+// Kad glavni računar ne radi (ugašen, zatvoren prozor servera, pukao ruter),
+// launcheri vode sesije sami: sat ide dalje, računar se zaključa kad istekne,
+// igrač sme da se odjavi. Kad se veza vrati, launcher javi koliko je sekundi
+// sesija ukupno trajala, a ovde se naplaćuje razlika. Ceo račun je u
+// offline.js; ovde je samo upis.
+//
+// Launcher to najavi u adresi veze (offline=1). Ako izveštaj ne stigne za
+// petnaest sekundi - kvar, ili stariji launcher koji je najavio a ne ume da
+// pošalje - sesija se nastavlja kao i do sada, bez naplate tog vremena, i to
+// ostaje zapisano. Računar ne sme da visi na tom čekanju.
+const OFFLINE_CEKA_MS = Number(process.env.OFFLINE_IZVESTAJ_CEKA_MS) || 15000;
+const cekaOfflineIzvestaj = new Map(); // computerId -> tajmer
+
+function cekajOfflineIzvestaj(computerId) {
+  clearTimeout(cekaOfflineIzvestaj.get(computerId));
+  const tajmer = setTimeout(() => {
+    if (cekaOfflineIzvestaj.get(computerId) !== tajmer) return;
+    cekaOfflineIzvestaj.delete(computerId);
+    logEvent({ category: "sistem", action: "offline_bez_izvestaja", actor: "launcher", target: compName(computerId),
+      detail: "Računar je radio bez servera i najavio izveštaj, ali ga nije poslao. Sesija je nastavljena; vreme bez veze nije naplaćeno." });
+    posaljiStanjeSesije(computerId);
+    pushComputers();
+  }, OFFLINE_CEKA_MS);
+  if (tajmer.unref) tajmer.unref();
+  cekaOfflineIzvestaj.set(computerId, tajmer);
+}
+
+function clientOfflineIzvestaj(computerId, msg) {
+  clearTimeout(cekaOfflineIzvestaj.get(computerId));
+  cekaOfflineIzvestaj.delete(computerId);
+  const comp = computerById(computerId);
+  if (!comp) return;
+
+  const nastavi = () => { posaljiStanjeSesije(computerId); pushComputers(); };
+  const odbij = (detail, sesija) => {
+    logEvent({ category: "sistem", action: "offline_odbijen", actor: "launcher", target: comp.name, detail });
+    sendClient(computerId, { t: "offline_primljen", sesija: sesija ?? null, stanje: "odbijeno" });
+    nastavi();
+  };
+
+  const zapis = bezServera.procitajZapis(msg?.zapis);
+  if (!zapis) return odbij("Izveštaj o radu bez servera nije ispravnog oblika - vreme bez veze nije naplaćeno.");
+  if (!bezServera.potpisJeIspravan(msg.zapis, msg.potpis, comp.token)) {
+    return odbij("Izveštaj o radu bez servera ne prolazi proveru potpisa - vreme bez veze nije naplaćeno. " +
+      "Ako se ponavlja na istom računaru, proveri ga.", zapis.sesija);
+  }
+
+  const s = activeSessionForComputer(computerId);
+  const p = s ? playerById(s.player_id) : null;
+  const r = bezServera.obracun({ zapis, sesija: s, stopaServera: rate(), kredit: Number(p?.balance) || 0 });
+  if (r.razlog === "drugi_igrac") {
+    return odbij("Izveštaj o radu bez servera je za drugog igrača nego sesija na tom računaru - nije naplaćen.", zapis.sesija);
+  }
+  if (r.razlog) {
+    // Osoblje je zatvorilo sesiju dok računar nije bio na vezi. Tada je bilo
+    // razloga, a računar to nije mogao da čuje - pa se ne naplaćuje ništa posle.
+    return odbij("Sesija na ovom računaru je zatvorena dok računar nije bio na vezi - " +
+      "vreme igranja bez veze nije naplaćeno.", zapis.sesija);
+  }
+
+  const noviXp = round2((Number(p.xp) || 0) + r.naplaceno);
+  if (r.dugSekundi > 0) {
+    try {
+      uJednomPoslu(() => {
+        db.prepare("UPDATE players SET balance=?, xp=? WHERE id=?").run(r.noviKredit, noviXp, p.id);
+        db.prepare("UPDATE sessions SET cost=?, sekundi=? WHERE id=?").run(round2(s.cost + r.naplaceno), r.noveSekunde, s.id);
+      });
+    } catch (e) {
+      return odbij(`Naplata vremena bez veze nije upisana: ${String(e?.message || e).slice(0, 150)}`, s.id);
+    }
+    const preNivo = nivoZa(p.xp), posleNivo = nivoZa(noviXp);
+    if (posleNivo.nivo > preNivo.nivo) javiNivo(p.id, { nivoPre: preNivo, nivoPosle: posleNivo });
+    const minuta = Math.max(1, Math.round(r.dugSekundi / 60));
+    logEvent({
+      category: "sesija", action: "offline_naplata", actor: p.username, target: comp.name,
+      detail: `Igrao ${minuta} min dok server nije bio dostupan - naplaćeno ${r.naplaceno}` +
+        (r.nedostaje > 0 ? `. Kredita je bilo manje nego odigranog vremena, nije naplaćeno još ${r.nedostaje}.` : ""),
+    });
+  }
+
+  sendClient(computerId, {
+    t: "offline_primljen", sesija: s.id, stanje: r.kraj ? "zavrseno" : "nastavljeno",
+    sekundi: r.dugSekundi > 0 ? r.noveSekunde : Number(s.sekundi) || 0,
+    naplaceno: r.naplaceno, balance: r.noviKredit, remainingSeconds: remainingSeconds(r.noviKredit),
+  });
+  if (r.kraj) {
+    // Isteklo vreme zaključava - osim kad je osoblje računar već otključalo
+    // servisnim PIN-om dok servera nije bilo. Inače bi se zaključao ponovo čim
+    // se veza vrati, a osoblje ne bi znalo zašto.
+    endSession(computerId, { lock: r.kraj === "vreme" && !zapis.otkljucano, reason: bezServera.RAZLOG_KRAJA[r.kraj] });
+    return;
+  }
+  nastavi();
+}
+
 export function onClientClose(computerId) {
+  // Čekanje na izveštaj važi dok je taj računar na vezi. Stara veza koja se
+  // zatvori POSLE otvaranja nove ne sme da ga prekine.
+  if (!isClientOnline(computerId)) {
+    clearTimeout(cekaOfflineIzvestaj.get(computerId));
+    cekaOfflineIzvestaj.delete(computerId);
+  }
   connectedSince.delete(computerId);
   db.prepare("UPDATE computers SET last_seen = ? WHERE id = ?").run(Date.now(), computerId);
   pushComputers();
 }
 
-function loginOkPayload(player, session) {
+function loginOkPayload(player, session, { nastavak = false } = {}) {
   return {
     t: "login_ok",
     player: { id: player.id, username: player.username, displayName: player.display_name },
     balance: round2(player.balance),
     remainingSeconds: remainingSeconds(player.balance),
-    session: { id: session.id, startedAt: session.started_at },
+    // `sekundi`: koliko je već naplaćeno - launcher od toga broji dalje, i kad
+    // servera nema. Vidi server/src/offline.js.
+    session: { id: session.id, startedAt: session.started_at, sekundi: Number(session.sekundi) || 0 },
+    // Sesija koja se VRAĆA posle prekida veze, a ne nova prijava: launcher tada
+    // ne pušta pozdravnu animaciju usred igre.
+    nastavak,
     skoroIgrane: skoroIgraneIgre(player.id),
     porudzbine: igracevePorudzbine(player.id),
     // Igraceva sara ide odmah uz prijavu, da ne bljesne kucna pa se promeni.
@@ -1213,6 +1336,8 @@ export function handleClientMessage(computerId, msg) {
     case "hello":
       // launcher se (ponovo) učitao - pošalji mu svež katalog i stanje
       return sendWelcomeState(computerId);
+    case "offline_izvestaj":
+      return clientOfflineIzvestaj(computerId, msg);
     case "heartbeat":
       db.prepare("UPDATE computers SET last_seen = ? WHERE id = ?").run(Date.now(), computerId);
       if (msg.mirovanje != null) proveriMirovanje(computerId, Number(msg.mirovanje));
@@ -1645,6 +1770,9 @@ export function billingTick() {
       // Pauziraj naplatu ako klijent tog računara nije povezan (nestanak struje/mreže) -
       // resetuj vreme da nema "catch-up" naplate kad se ponovo poveže.
       if (!isClientOnline(s.computer_id)) { st.last = now; tickState.set(s.id, st); continue; }
+      // Dok se čeka izveštaj o radu bez servera, ne naplaćuje se ništa - prvo
+      // obračun, pa onda sat ide dalje. Čekanje traje najviše 15 sekundi.
+      if (cekaOfflineIzvestaj.has(s.computer_id)) { st.last = now; tickState.set(s.id, st); continue; }
       const proteklo = (now - st.last) / 1000;
       st.last = now;
       tickState.set(s.id, st);
@@ -1660,6 +1788,7 @@ export function billingTick() {
       const charged = Math.min(cost, Math.max(0, p.balance));
       const newBal = round2(p.balance - charged);
       const newCost = round2(s.cost + charged);
+      const noveSekunde = Math.round(((Number(s.sekundi) || 0) + elapsed) * 10) / 10;
 
       if (newBal <= 0) {
         // Ova dva upisa NISU u istom poslu sa `endSession`, i to namerno.
@@ -1669,7 +1798,7 @@ export function billingTick() {
         // posebno. Ovako se stanje samo popravlja: kredit je 0, pa sledeći prolaz
         // za pet sekundi ponovo dođe ovde i pokuša da zatvori sesiju.
         db.prepare("UPDATE players SET balance=0 WHERE id=?").run(p.id);
-        db.prepare("UPDATE sessions SET cost=? WHERE id=?").run(newCost, s.id);
+        db.prepare("UPDATE sessions SET cost=?, sekundi=? WHERE id=?").run(newCost, noveSekunde, s.id);
         endSession(s.computer_id, { lock: true, reason: "time" });
         broadcastPanels({ t: "event", kind: "timeup", text: `${p.username} - isteklo vreme (${db.prepare("SELECT name FROM computers WHERE id=?").get(s.computer_id)?.name})` });
         continue;
@@ -1684,14 +1813,14 @@ export function billingTick() {
       const noviXp = round2((Number(p.xp) || 0) + charged);
       uJednomPoslu(() => {
         db.prepare("UPDATE players SET balance=?, xp=? WHERE id=?").run(newBal, noviXp, p.id);
-        db.prepare("UPDATE sessions SET cost=? WHERE id=?").run(newCost, s.id);
+        db.prepare("UPDATE sessions SET cost=?, sekundi=? WHERE id=?").run(newCost, noveSekunde, s.id);
       });
       // Nivo se javlja tek posle upisa - da igrac ne dobije cestitku za nesto sto
       // se nije sacuvalo.
       const preNivo = nivoZa(p.xp), posleNivo = nivoZa(noviXp);
       if (posleNivo.nivo > preNivo.nivo) javiNivo(p.id, { nivoPre: preNivo, nivoPosle: posleNivo });
       const preostalo = remainingSeconds(newBal);
-      sendClient(s.computer_id, { t: "balance", balance: round2(newBal), remainingSeconds: preostalo, vip: vipOd(noviXp) });
+      sendClient(s.computer_id, { t: "balance", balance: round2(newBal), remainingSeconds: preostalo, vip: vipOd(noviXp), sesija: s.id, sekundi: noveSekunde });
       javiOsobljuPredIstek(s, p, preostalo);
     } catch (e) {
       // Vreme se pomera i za sesiju koja je pukla: bez toga bi sledeći prolaz

@@ -115,17 +115,19 @@ proveri("znacka nestaje kad nema porudzbina", /if \(!cekaju\) \{ if \(z\) z\.rem
 proveri("oznaka kategorije stoji dole, ne preko logotipa", /\.tile-badge \{[^}]*bottom: 46px/.test(jedanRed));
 
 // ---- PUKLA VEZA USRED IGRANJA ----
-// Igracu nestane ceo ekran i ostane na "Povezivanje sa serverom...". Bez ijedne
-// reci o vremenu prvo pomisli da mu kredit curi dok gleda spiner, pa zove
-// osoblje. Server naplatu pauzira dok racunar nije na vezi, tako da poruka nije
-// teha nego tacna informacija.
+// Do sada je igracu nestajao ceo ekran na "Povezivanje sa serverom...", sat je
+// stajao, a igra iza toga je radila besplatno. Sada igrac ostaje u svojoj
+// sesiji i vreme se racuna na racunaru (vidi lokalna-sesija.js), pa bi poruka
+// "vreme ti se ne trosi" bila laz - i nje vise nema.
 const html = citajIzvor("client/renderer/index.html");
-proveri("ekran bez veze objasnjava sta je sa vremenom", html.includes("connSesija"));
-proveri("poruka kaze da se vreme ne trosi", /Vreme ti se ne troši dok nema veze/.test(html));
-proveri("poruka se prikazuje samo ako je igrac bio prijavljen",
-  /connSesija"\)\.classList\.toggle\("hidden", !S\.player\)/.test(launcher),
-  "pri paljenju racunara nema sta da se cuva, poruka bi samo zbunjivala");
-proveri("poruka nestaje kad se veza vrati", /if \(connected\) \$\("#connSesija"\)\.classList\.add\("hidden"\)/.test(launcher));
+proveri("nema vise poruke da se vreme ne trosi", !/Vreme ti se ne troši dok nema veze/.test(html),
+  "vreme se sada racuna i bez servera - poruka bi igracu lagala");
+proveri("igrac usred sesije ostaje na radnoj povrsini", /if \(S\.player\) \{[\s\S]{0,900}S\.bezServera = true/.test(launcher));
+proveri("i sazna jednom da server nije dostupan", /Server trenutno nije dostupan\. Igraš dalje/.test(launcher));
+proveri("donja traka to kaze zutom, ne crvenom", /Bez servera: igraš dalje/.test(launcher) &&
+  /#sbNet\.bez \.sb-dot \{[^}]*var\(--amber\)/.test(citajIzvor("client/renderer/css/launcher.css")));
+proveri("bez prijavljenog igraca ekran i dalje kaze da se povezuje",
+  /stopTimer\(\);\s*\$\("#connText"\)\.textContent = "Povezivanje sa serverom\.\.\.";\s*show\("connScreen"\)/.test(launcher));
 
 // ---- PRAZNA STANJA I PORUKE ----
 // Prazan shop je bio sitan sivi tekst zalepljen uz vrh ogromne praznine -

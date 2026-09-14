@@ -46,7 +46,7 @@ ipcMain.handle("sys-stats", () => ({ cpu: 23, ramUsedPct: 46, ramGb: "16", temp:
 // pozove. Spisak je preuzet iz preload.js - ako se tamo doda novi kanal, dodaje
 // se i ovde.
 for (const k of ["save-config", "reset-config", "to-server", "launch-game", "open-browser",
-  "focus-launcher", "admin-exit", "renderer-ready", "podesavanja-citaj", "podesavanja-primeni", "verzija", "proveri-servisni-pin"])
+  "focus-launcher", "admin-exit", "renderer-ready", "podesavanja-citaj", "podesavanja-primeni", "verzija", "proveri-servisni-pin", "otkljucaj-bez-servera"])
   ipcMain.handle(k, () => true);
 
 const cekaj = (ms) => new Promise((r) => setTimeout(r, ms));

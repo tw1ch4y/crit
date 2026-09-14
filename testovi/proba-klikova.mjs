@@ -131,7 +131,7 @@ ipcMain.handle("get-config", () => ({ host: BAZA, token: "x", configured: true }
 ipcMain.handle("verzija", () => "proba");
 ipcMain.handle("sys-stats", () => ({ cpu: 20, ramUsedPct: 44, ramGb: "16", temp: 40, uptime: 7200 }));
 for (const k of ["save-config", "reset-config", "launch-game", "open-browser",
-  "focus-launcher", "admin-exit", "renderer-ready", "podesavanja-citaj", "podesavanja-primeni", "proveri-servisni-pin"])
+  "focus-launcher", "admin-exit", "renderer-ready", "podesavanja-citaj", "podesavanja-primeni", "proveri-servisni-pin", "otkljucaj-bez-servera"])
   ipcMain.handle(k, () => true);
 
 // STA JE LAUNCHER STVARNO POSLAO SERVERU.

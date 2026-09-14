@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld("crit", {
   // Servisni PIN se proverava LOKALNO, bez servera - da osoblje može da uđe u
   // podešavanja i izađe iz launchera i kad server ne radi.
   proveriServisniPin: (pin) => ipcRenderer.invoke("proveri-servisni-pin", pin),
+  // Otključavanje posle isteklog vremena dok servera nema - vidi main.js.
+  otkljucajBezServera: (pin) => ipcRenderer.invoke("otkljucaj-bez-servera", pin),
   // Miš i zvuk koje igrač namešta sa svog naloga. Važi dok traje sesija; kad se
   // odjavi, launcher vraća ono što je zatekao.
   podesavanjaCitaj: () => ipcRenderer.invoke("podesavanja-citaj"),

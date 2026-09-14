@@ -295,6 +295,28 @@
 - [x] Zastor iza igre je vrteo beskonačnu animaciju preko celog ekrana i dok ga
   igra pokriva; sada stoji dok zastor nema fokus. Uz to je nosio crvenu iz stare
   palete
+- [x] **SERVER UGAŠEN = BESPLATNO IGRANJE.** Kad glavni računar nije radio
+  (ugašen, zatvoren prozor servera, pukao ruter), launcher je preko cele radne
+  površine stavljao „Povezivanje sa serverom", sat je stajao, a igra iza toga je
+  radila **besplatno** koliko god server ćutao - i nije se zaključavala kad kredit
+  istekne. Isto je dobijao igrač koji sam iščupa svoj mrežni kabl, a u programu je
+  to pisalo kao namera („Vreme ti se ne troši dok nema veze"). Sada launcher vodi
+  sesiju sam: sat ide dalje, upozorenja stižu, računar se zaključa kad kredit
+  istekne (osoblje ga otključava servisnim PIN-om), igrač sme da se odjavi i
+  ostatak kredita mu ostaje. Stanje se piše na disk, potpisano, pa preživi i pad
+  launchera i restart računara. Kad se server vrati, launcher javi **koliko je
+  sekundi sesija ukupno trajala**, a server naplati razliku između toga i onoga
+  što je već naplatio - bez poređenja satova dva računara, bez duple naplate za
+  pola minuta dok server nije znao da veze nema, i isti izveštaj poslat dvaput ne
+  naplaćuje dvaput. Po nižoj od dve cene, nikad više od kredita; sesija koju je
+  osoblje u međuvremenu zatvorilo se ne dira. Shop, točak i promene na nalogu
+  čekaju server i to kažu. Provereno na tri nivoa: račun na brojkama
+  (`test-lokalna-sesija`), pravi server (`test-offline-naplata`) i pravi launcher
+  sa serverom koji se ubije usred igranja (`proba-bez-servera`)
+- [ ] **Novi gost dok server ne radi** - prijava bez servera namerno ne postoji:
+  kredit zapamćen na jednom računaru ne zna šta je potrošeno na drugom, pa bi isti
+  novac mogao da se potroši dvaput. Sledeće: osoblje servisnim PIN-om pušta
+  sesiju za keš na tom računaru, a server je upiše u smenu kad se vrati
 ### Faza 10 - Priprema za izdavanje drugim igraonicama
 
 Cilj nije licenciranje sada, nego da program prestane da bude „program za jednu

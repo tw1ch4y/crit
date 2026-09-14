@@ -107,6 +107,14 @@ app.whenReady().then(async () => {
     if (!fs.existsSync(IZLAZ + ".ubij")) break;
     await new Promise((r) => setTimeout(r, 200));
   }
+  // Launcher ne pusta tocak kad ZNA da veze nema (vidi zavrtiTocakKlik) - tada
+  // nema ni vrtnje koja bi mogla da se zaglavi.
+  await js('(() => { const b = document.querySelector("#tocakSpin"); if (b) b.click(); return 1; })()');
+  upisi({ korak: "bez-veze", vrti: await js("S.tocakVrti === true") });
+  // Opasan je trenutak kad je veza VEC mrtva, a launcher to jos ne zna: ruter koji
+  // stane ne javlja nista, i do otkrivanja prodje i pola minuta. Taj trenutak se
+  // ovde glumi - ekranu se kaze da je veza ziva, pa klik ode u mrtvu vezu.
+  await js("(() => { S.wsOk = true; return 1; })()");
   await js('(() => { const b = document.querySelector("#tocakSpin"); if (b) b.click(); return 1; })()');
   upisi({ korak: "kliknuto", vrti: await js("S.tocakVrti === true") });
 
@@ -176,6 +184,8 @@ const korak = (ime) => redovi.find((r) => r.korak === ime);
 
 proveri("launcher se prijavio", korak("prijava")?.ekran === "desktopScreen", JSON.stringify(korak("prijava")));
 proveri("točak se otvorio", korak("tocak-otvoren")?.imaSpin === true, JSON.stringify(korak("tocak-otvoren")));
+proveri("kad launcher zna da veze nema, tocak se i ne pusta", korak("bez-veze")?.vrti === false,
+  JSON.stringify(korak("bez-veze")));
 proveri("klik je upalio vrtnju", korak("kliknuto")?.vrti === true,
   "ako nije, proba ne meri ono zbog cega postoji");
 

@@ -307,6 +307,14 @@ function migrate() {
   // naloge i gasi istekle - a taj posao se preskoci onog dana kad server ne radi,
   // pa gost ostane VIP zauvek. Rok se ne kvari: prosao je ili nije.
   if (!columnExists("players", "vip_do")) db.exec("ALTER TABLE players ADD COLUMN vip_do INTEGER");
+  // KOLIKO JE SEKUNDI SESIJE NAPLAĆENO.
+  //
+  // Launcher broji sekunde i dok servera nema, pa kad se vrati javi koliko je
+  // sesija ukupno trajala. Naplaćuje se razlika između toga i ovoga - bez
+  // poređenja satova dva računara, i bez duple naplate kad isti izveštaj stigne
+  // dvaput. Iz `cost` se ovo ne može izvući: cena po satu se menja, a naplata
+  // staje na nuli kredita. Vidi server/src/offline.js.
+  if (!columnExists("sessions", "sekundi")) db.exec("ALTER TABLE sessions ADD COLUMN sekundi REAL NOT NULL DEFAULT 0");
 
   // KVAR OSTAJE ZAPISAN UZ SAMU IGRU, NE SAMO U LOGOVIMA.
   //

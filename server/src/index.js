@@ -170,7 +170,7 @@ initWs(server, {
 });
 
 setHandlers({
-  onClientOpen: (comp, ws, ip, verzija) => svc.onClientOpen(comp, ip, verzija),
+  onClientOpen: (comp, ws, ip, verzija, opcije) => svc.onClientOpen(comp, ip, verzija, opcije),
   onClientClose: (id) => svc.onClientClose(id),
   onClientMessage: (id, msg) => svc.handleClientMessage(id, msg),
   onPanelOpen: (ws) => {

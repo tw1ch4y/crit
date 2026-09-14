@@ -53,7 +53,7 @@ ipcMain.handle("verzija", () => "proba");
 ipcMain.handle("program-icon", async () => null);
 ipcMain.handle("podesavanja-citaj", () => ({ mis: { brzina: 10, ubrzanje: false }, zvuk: { jacina: 65 } }));
 for (const k of ["save-config", "reset-config", "to-server", "launch-game", "open-browser",
-  "focus-launcher", "admin-exit", "renderer-ready", "proveri-servisni-pin", "podesavanja-primeni"])
+  "focus-launcher", "admin-exit", "renderer-ready", "proveri-servisni-pin", "podesavanja-primeni", "otkljucaj-bez-servera"])
   ipcMain.handle(k, () => true);
 
 const cekaj = (ms) => new Promise((r) => setTimeout(r, ms));

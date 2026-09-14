@@ -93,8 +93,12 @@ for (const [opis, p, ocekivano] of [
 }
 
 // ---- 6) prekid veze ne oslobadja racunar ----
-proveri("prekid veze pokriva ekran", /show\("connScreen"\)/.test(rend));
-proveri("naplata staje dok nema veze", /stopTimer\(\)/.test(rend));
+// Bez prijavljenog igraca prekid veze i dalje pokriva ekran. Igrac usred sesije
+// ostaje u njoj - ali mu vreme tece i racunar se zakljucava kad istekne, pa
+// iscupan kabl vise nije besplatno igranje (vidi test-rad-bez-servera).
+proveri("prekid veze bez igraca pokriva ekran", /show\("connScreen"\)/.test(rend));
+proveri("igrac bez veze nema besplatno vreme", /function tikLokalneSesije\(\)/.test(main) && /zavrsiBezServera\("vreme"\)/.test(main),
+  "iscupan kabl je do sada zaustavljao sat, a igra je radila dalje");
 
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 process.exit(pao ? 1 : 0);

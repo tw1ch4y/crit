@@ -285,7 +285,7 @@ const EKRANI = [
       posalji(win, p.login); await sacekajPozdrav(win);
       await klik(win, '.tab[data-tab="shop"]'); await cekaj(700);
     } },
-  { ime: "8-nema-veze", opis: "Pukla veza sa serverom usred igranja", ocekivan: "connScreen",
+  { ime: "8-nema-veze", opis: "Server nedostupan usred igranja (igra se dalje)", ocekivan: "desktopScreen",
     do: async (win, p) => {
       posalji(win, p.login); await sacekajPozdrav(win);
       win.webContents.send("ws-status", { connected: false });

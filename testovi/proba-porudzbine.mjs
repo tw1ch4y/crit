@@ -50,7 +50,7 @@ ipcMain.handle("program-icon", async () => null);
 ipcMain.handle("get-config", () => ({ host: BAZA, token: "x", configured: true }));
 ipcMain.handle("sys-stats", () => ({ cpu: 23, ramUsedPct: 46, ramGb: "16", temp: 41, uptime: 7200 }));
 for (const k of ["save-config", "reset-config", "launch-game", "open-browser", "focus-launcher",
-  "admin-exit", "renderer-ready", "podesavanja-citaj", "podesavanja-primeni", "verzija", "proveri-servisni-pin"])
+  "admin-exit", "renderer-ready", "podesavanja-citaj", "podesavanja-primeni", "verzija", "proveri-servisni-pin", "otkljucaj-bez-servera"])
   ipcMain.handle(k, () => true);
 
 const klik = (sel) => win.webContents.executeJavaScript(

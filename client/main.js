@@ -11,6 +11,7 @@ const { ocistiSesiju, racunarJeZasticen, STOP_FAJL } = require("./ciscenje.js");
 const { snimiStanje, ugasiNoveProcese, pokreniStrazu, spisakZaPanel, ugasiProces } = require("./procesi.js");
 const winPod = require("./windows-podesavanja.js");
 const { napraviSkriptu, napraviOsigurac, KOD_OSIGURAC } = require("./nadogradnja-skripta.js");
+const { LokalnaSesija, snimiPotpisano, ucitajPotpisano } = require("./lokalna-sesija.js");
 
 const DEV = process.argv.includes("--dev");
 
@@ -64,6 +65,17 @@ let ws = null;
 let reconnectTimer = null;
 let config = loadConfig();
 const spawnedGames = new Set();
+
+// RAD BEZ SERVERA - vidi lokalna-sesija.js i "RAD BEZ SERVERA" niže.
+//
+// Sesija i poslednji katalog stoje na disku, u nalogu korisnika. Katalog treba
+// launcheru koji se ponovo pokrene dok servera nema: bez njega ne bi znao ni
+// koje igre sme da pokrene, ni kako izgleda početna.
+const SESIJA_PATH = path.join(app.getPath("userData"), "sesija.json");
+const KATALOG_PATH = path.join(app.getPath("userData"), "katalog.json");
+const lokalna = new LokalnaSesija({ putanja: SESIJA_PATH, token: config.token });
+let kesiraniKatalog = null;
+const naVezi = () => !!ws && ws.readyState === WebSocket.OPEN;
 
 // ---------- Config ----------
 // Osoblje po pravilu ukuca samo "192.168.1.67" ili "192.168.1.67:8095".
@@ -216,6 +228,7 @@ function saveConfig(c) {
   const token = String(c.token || "").trim();
   if (!host || !token) return { ok: false, error: "Unesi adresu servera i token računara." };
   config = { ...config, ...c, host, token, configured: true };
+  lokalna.postaviToken(token);
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
   return { ok: true, host };
 }
@@ -224,6 +237,11 @@ function saveConfig(c) {
 function resetConfig() {
   try { fs.unlinkSync(CONFIG_PATH); } catch {}
   config = { host: "", token: "", configured: false };
+  // Novi server, novi token: zapis sesije i katalog starog više ne važe.
+  lokalna.obrisi();
+  lokalna.postaviToken("");
+  kesiraniKatalog = null;
+  try { fs.unlinkSync(KATALOG_PATH); } catch {}
   try { if (ws) ws.close(); } catch {}
   clearTimeout(reconnectTimer);
   sendToRenderer("need-setup", {});
@@ -309,7 +327,10 @@ function connectWs() {
   // racunar ima koji launcher. Bez toga se u igraonici sa 13 masina ne moze
   // znati zasto se jedna ponasa drugacije.
   const url = config.host.replace(/^http/i, "ws") + "/ws?kind=client&token=" + encodeURIComponent(config.token)
-    + "&v=" + encodeURIComponent(app.getVersion());
+    + "&v=" + encodeURIComponent(app.getVersion())
+    // Radio je bez servera i ima šta da javi: server tada ne vraća sesiju dok
+    // izveštaj ne stigne (vidi clientOfflineIzvestaj na serveru).
+    + (lokalna.izvestaj() ? "&offline=1" : "");
   let sveza;
   try { sveza = new WebSocket(url); } catch (e) { scheduleReconnect(); return; }
   ws = sveza;
@@ -319,6 +340,14 @@ function connectWs() {
 
   sveza.on("open", () => {
     if (!jeAktuelna()) return;
+    lokalna.postaviVezu(true);
+    // Izveštaj o radu bez servera ide PRVI, pre svega ostalog.
+    const izvestaj = lokalna.izvestaj();
+    if (izvestaj) wsSend({ t: "offline_izvestaj", ...izvestaj });
+    if (neispravanZapisZaJavu) {
+      javiProblem("sesija_zapis", `Zapis sesije na ovom računaru nije prošao proveru (${neispravanZapisZaJavu}) - nije korišćen`);
+      neispravanZapisZaJavu = null;
+    }
     sendToRenderer("ws-status", { connected: true });
     // Uz MAC adrese (za Wake-on-LAN) ide i da li je servisni PIN jos fabricki.
     //
@@ -340,7 +369,10 @@ function connectWs() {
   });
   sveza.on("close", () => {
     if (!jeAktuelna()) return;
+    lokalna.postaviVezu(false);
     sendToRenderer("ws-status", { connected: false });
+    // Igrač usred sesije ne čeka sledeći otkucaj da vidi svoje stanje.
+    if (lokalna.aktivna()) posaljiLokalnoStanje();
     scheduleReconnect();
   });
   sveza.on("error", () => {});
@@ -377,6 +409,7 @@ function localNics() {
 
 // server komande koje main obrađuje lokalno
 function handleServerMsg(msg) {
+  pratiLokalnuSesiju(msg);
   // Servisni PIN stiže uz "welcome" (pri svakom povezivanju) i zasebno kad ga
   // vlasnik promeni u panelu - da nova vrednost važi odmah, ne tek posle
   // restarta svakog računara.
@@ -416,11 +449,14 @@ function handleServerMsg(msg) {
     javljeniPragovi = new Set();
     showBackdrop(); // od sada zastor pokriva desktop dok god traje sesija
     proveriVreme(msg.remainingSeconds, true); // pri prijavi samo zapamti stanje
-    if (!NO_LOCK) snimiStanje().then((s) => { procesiPreSesije = s; }).catch(() => {});
+    // Sesija koja se VRAĆA posle prekida veze ne snima zatečeno ponovo: igre
+    // koje je igrač u međuvremenu pokrenuo ušle bi u "zatečeno" i ne bi se
+    // ugasile na kraju sesije, a miš i zvuk bi se vratili na - njegove.
+    if (!NO_LOCK && !(msg.nastavak && procesiPreSesije)) snimiStanje().then((s) => { procesiPreSesije = s; }).catch(() => {});
     pokreniStrazuSesije();
     // Zapamti kako je miš i zvuk bio pre ovog igrača, da se na kraju sesije
     // vrati. Bez toga bi sledeći gost zatekao tuđa podešavanja.
-    winPod.procitajSve().then((s) => { podesavanjaPreSesije = s; }).catch(() => {});
+    if (!(msg.nastavak && podesavanjaPreSesije)) winPod.procitajSve().then((s) => { podesavanjaPreSesije = s; }).catch(() => {});
   }
   // Server šalje novo stanje na svakih par sekundi - odatle znamo koliko je ostalo.
   if (msg.t === "balance") proveriVreme(msg.remainingSeconds);
@@ -1219,6 +1255,107 @@ function anyRunning(images, cb) {
   }
 }
 
+// ---------- RAD BEZ SERVERA ----------
+//
+// Kad servera nema - ugašen glavni računar, zatvoren prozor servera, pukao
+// ruter, iščupan kabl - launcher vodi sesiju sam: sat ide dalje, upozorenja
+// stižu, računar se zaključa kad kredit istekne, igrač sme da se odjavi. Do
+// sada je sve to stajalo: ekran "Povezivanje", sat zaustavljen, a igra iza
+// njega je radila besplatno koliko god server ćutao.
+//
+// Kad se veza vrati, server obračuna tačno ono što nije naplatio. Račun je u
+// lokalna-sesija.js (ovde) i server/src/offline.js (tamo).
+let neispravanZapisZaJavu = null;
+
+function ucitajRadBezServera() {
+  lokalna.postaviToken(config.token);
+  lokalna.ucitaj();
+  if (lokalna.neispravanZapis) {
+    // Zapis koji ne prolazi proveru se ne koristi, ali se ni ne briše tiho:
+    // ostaje sa strane da se vidi šta je bilo, a osoblje dobija prijavu.
+    try { fs.renameSync(SESIJA_PATH, SESIJA_PATH + ".neispravan"); } catch {}
+    neispravanZapisZaJavu = lokalna.neispravanZapis;
+  }
+  const k = ucitajPotpisano(KATALOG_PATH, config.token);
+  if (k.podaci) {
+    kesiraniKatalog = k.podaci;
+    zapamtiDozvoljeno(k.podaci);
+    lokalna.postaviCenu(k.podaci.settings?.ratePerHour);
+  }
+  // Launcher pokrenut usred sesije (pao, restart računara) nastavlja je kao
+  // kiosk sesiju: zastor pokriva desktop, igrač sme da prebacuje prozore.
+  // Pragovi upozorenja koji su već prošli se tiho zapamte, da se ne jave svi
+  // odjednom.
+  if (lokalna.aktivna()) {
+    sesijaAktivna = true;
+    proveriVreme(lokalna.preostalo(), true);
+  }
+}
+
+function snimiKatalog(msg) {
+  if (msg.t === "welcome") {
+    // PIN ima svoje mesto (config.json), a stanje interneta zastari za minut.
+    const { t, servisniPin, internet, izKesa, ...ostalo } = msg;
+    kesiraniKatalog = ostalo;
+  } else if (msg.t === "catalog" && kesiraniKatalog) {
+    for (const polje of ["shop", "games", "tools"]) if (msg[polje]) kesiraniKatalog[polje] = msg[polje];
+  } else return;
+  try { snimiPotpisano(KATALOG_PATH, kesiraniKatalog, config.token); } catch {}
+}
+
+function pratiLokalnuSesiju(msg) {
+  switch (msg.t) {
+    case "welcome":
+      lokalna.postaviCenu(msg.settings?.ratePerHour);
+      snimiKatalog(msg);
+      break;
+    case "catalog": snimiKatalog(msg); break;
+    case "login_ok": lokalna.zapocni(msg); break;
+    case "balance": lokalna.sinhronizuj(msg); break;
+    case "offline_primljen": lokalna.potvrdi(msg); break;
+    case "locked":
+    case "to_login":
+    case "force_logout":
+      // Server je zatvorio sesiju - od sada vodi on. Zapis koji čeka potvrdu se
+      // ne briše ovde: server koji ga zna ne zatvara pre obračuna, a stariji
+      // server ga ionako ne bi pročitao.
+      if (!lokalna.cekaPotvrdu()) lokalna.obrisi();
+      break;
+  }
+}
+
+function posaljiLokalnoStanje() {
+  const s = lokalna.stanje();
+  if (!s || s.kraj) return;
+  sendToRenderer("server-msg", {
+    t: "lokalno_stanje", player: s.igrac,
+    balance: lokalna.procenaKredita(), remainingSeconds: lokalna.preostalo(),
+  });
+}
+
+function tikLokalneSesije() {
+  lokalna.tik();
+  if (!lokalna.aktivna() || naVezi()) return;
+  const ostalo = lokalna.preostalo();
+  // Upozorenja pred istek idu i bez servera: isti pragovi, isti zvuk.
+  if (ostalo !== null) proveriVreme(ostalo);
+  posaljiLokalnoStanje();
+  if (ostalo === 0) zavrsiBezServera("vreme");
+}
+
+function zavrsiBezServera(razlog) {
+  if (!lokalna.zavrsi(razlog)) return;
+  sesijaAktivna = false;
+  zavrsiSesiju();
+  if (razlog === "vreme") {
+    setPolicies(true);
+    sendToRenderer("server-msg", { t: "locked", reason: "time", bezServera: true });
+  } else {
+    sendToRenderer("server-msg", { t: "to_login", bezServera: true });
+  }
+  focusLauncher();
+}
+
 // SPOLJNA KOMANDA UVEK IMA ROK, I POKREĆE SE BEZ cmd.exe.
 //
 // `exec` pušta komandu KROZ cmd.exe, a njegov `timeout` gasi taj cmd - ne samu
@@ -1555,7 +1692,20 @@ ipcMain.handle("reset-config", (e, pin) => {
 });
 // Lokalna provera PIN-a - radi i kad server ne odgovara.
 ipcMain.handle("proveri-servisni-pin", (e, pin) => ({ ok: proveriPin(pin) }));
-ipcMain.handle("to-server", (e, msg) => { wsSend(msg); return true; });
+ipcMain.handle("to-server", (e, msg) => {
+  // Odjava bez servera: sesija se završava ovde, a server je obračuna kad se
+  // vrati. wsSend bi je inače tiho bacio i igrač bi ostao prijavljen.
+  if (msg?.t === "logout" && !naVezi() && lokalna.aktivna()) { zavrsiBezServera("odjava"); return true; }
+  wsSend(msg);
+  return true;
+});
+// Zaključan ekran posle isteklog vremena, dok servera nema: osoblje otključava
+// servisnim PIN-om. Server to sazna iz izveštaja i ne zaključava ponovo.
+ipcMain.handle("otkljucaj-bez-servera", (e, pin) => {
+  if (!proveriPin(pin)) return { ok: false };
+  lokalna.otkljucaj();
+  return { ok: true };
+});
 ipcMain.handle("launch-game", (e, { path: p, args, name, id, vrsta }) => launchGame(p, args, name, id, vrsta));
 ipcMain.handle("open-browser", (e, url) => { openBrowser(url); return true; });
 ipcMain.handle("focus-launcher", () => { focusLauncher(); return true; });
@@ -1776,6 +1926,13 @@ ipcMain.handle("renderer-ready", () => {
   if (ws && ws.readyState === WebSocket.OPEN) {
     sendToRenderer("ws-status", { connected: true });
     wsSend({ t: "hello" }); // server ponovo šalje welcome + trenutno stanje
+  } else {
+    // Bez servera ekran se crta iz poslednjeg kataloga, a sesija iz zapisa -
+    // inače bi launcher pokrenut dok server ne radi stajao na "Povezivanje" i
+    // kad je igrač usred plaćenog vremena.
+    sendToRenderer("ws-status", { connected: false });
+    if (kesiraniKatalog) sendToRenderer("server-msg", { ...kesiraniKatalog, t: "welcome", izKesa: true });
+    if (lokalna.aktivna()) posaljiLokalnoStanje();
   }
   return true;
 });
@@ -1802,6 +1959,7 @@ function flushToRenderer() {
 
 // ---------- App lifecycle ----------
 app.whenReady().then(() => {
+  ucitajRadBezServera();
   createWindow();
   registerHotkeys();
   setPolicies(true);
@@ -1809,6 +1967,7 @@ app.whenReady().then(() => {
   startWatchdog();
   connectWs();
   pratiRezoluciju();
+  setInterval(tikLokalneSesije, 1000);
   app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 

@@ -279,16 +279,29 @@ function toast(msg, type = "info", trajanje = 3000) {
       // svako novo stanje kredita - pa bi HUD ostao zamrznut i posle povratka
       // veze, dok naplata teče dalje.
       otpustiTocak("Veza je pukla usred vrtnje. Spin nije potrošen.");
-      // server pauzira naplatu dok nema veze - zaustavi i odbrojavanje,
-      // inače bi tajmer lažno otišao u crveno dok stojimo na "Povezivanje..."
-      stopTimer();
-      $("#connText").textContent = "Povezivanje sa serverom...";
-      // Poruka o vremenu ide samo igracu kome je veza pukla USRED sesije.
-      // Pri paljenju racunara nema sta da se cuva, pa bi samo zbunjivala.
-      $("#connSesija").classList.toggle("hidden", !S.player);
-      show("connScreen");
+      if (S.player) {
+        // RAD BEZ SERVERA: IGRAČ OSTAJE U SVOJOJ SESIJI.
+        //
+        // Do sada je ovde padao ceo ekran na "Povezivanje", sat je stajao, a
+        // igra iza toga je radila besplatno - a to se dobijalo i čupanjem
+        // sopstvenog kabla. Sada sesiju vodi launcher (vidi lokalna-sesija.js):
+        // sat ide dalje, stanje stiže svake sekunde kao "lokalno_stanje", a
+        // server obračuna kad se vrati. Shop, točak i promene na nalogu čekaju
+        // server - to igrač sazna kad ih pritisne.
+        if (!S.bezServera) {
+          S.bezServera = true;
+          toast("Server trenutno nije dostupan. Igraš dalje, a vreme se računa na ovom računaru.", "info", 9000);
+        }
+      } else {
+        stopTimer();
+        $("#connText").textContent = "Povezivanje sa serverom...";
+        show("connScreen");
+      }
     }
-    if (connected) $("#connSesija").classList.add("hidden");
+    if (connected && S.bezServera) {
+      S.bezServera = false;
+      toast("Server je ponovo dostupan.", "success");
+    }
   });
   window.crit.onHotkey(({ action }) => {
     if (action === "unlock") { if ($("#lockedScreen").classList.contains("active")) otkrijPinOsoblja(); }
@@ -552,13 +565,49 @@ function handleMsg(m) {
       if (S.tab === "shop" || S.tab === "home") renderContent();
       break;
     }
+    case "lokalno_stanje":
+      // Stanje sesije koju vodi launcher dok servera nema (vidi main.js).
+      if (!S.player) {
+        // Launcher je ponovo pokrenut usred sesije, a server i dalje ćuti:
+        // sesija se nastavlja iz zapisa, bez pozdrava i bez prijave. Katalog
+        // stiže iz poslednjeg zapamćenog (vidi main.js); ako ga nema, igrač i
+        // dalje vidi svoje vreme, samo bez pločica igara.
+        if (!m.player) break;
+        S.player = { id: m.player.id, username: m.player.username, displayName: m.player.displayName };
+        S.balance = m.balance; S.remaining = m.remainingSeconds;
+        S.bezServera = true;
+        enterDesktop();
+        updateServerStatus(S.wsOk);
+      } else {
+        S.balance = m.balance; S.remaining = m.remainingSeconds;
+        updateHud();
+      }
+      break;
     case "to_login":
       S.player = null; stopTimer(); document.body.classList.remove("desktop-active");
       $("#pPass").value = ""; $("#pUser").value = ""; $("#loginErr").textContent = "";
+      S.bezServera = false;
+      updateServerStatus(S.wsOk);
+      // Odjava bez servera: prijava ionako ne može da prođe, pa ekran kaže da
+      // se čeka server, umesto da primi lozinku i ćuti.
+      if (!S.wsOk) { $("#connText").textContent = "Povezivanje sa serverom..."; show("connScreen"); break; }
       show("loginScreen"); $("#pUser").focus(); resetIdle();
       break;
     case "login_ok":
       clearLoginPending();
+      // SESIJA KOJA SE VRAĆA posle prekida veze, a igrač je već na radnoj
+      // površini (dotle ju je vodio launcher): osveži stanje, ali ga ne vraćaj
+      // na početnu, ne prazni korpu i ne puštaj pozdrav usred igre.
+      if (m.nastavak && S.player && S.player.id === m.player?.id && $("#desktopScreen").classList.contains("active")) {
+        S.balance = m.balance; S.remaining = m.remainingSeconds;
+        if (m.vip) S.vip = m.vip;
+        if (m.profil) S.profil = m.profil;
+        if (m.tocak) S.tocak = m.tocak;
+        if (Array.isArray(m.porudzbine)) S.porudzbine = m.porudzbine;
+        S.bezServera = false;
+        updateHud(); startTimer(); updateServerStatus(S.wsOk);
+        break;
+      }
       S.player = m.player; S.balance = m.balance; S.remaining = m.remainingSeconds;
       S.skoroIgrane = Array.isArray(m.skoroIgrane) ? m.skoroIgrane : [];
       S.porudzbine = Array.isArray(m.porudzbine) ? m.porudzbine : [];
@@ -576,7 +625,7 @@ function handleMsg(m) {
       S.tocak = m.tocak || null;
       osveziZnackuNaloga();
       S.cart.clear(); S.nacinPlacanja = "credit"; S.nacinRucno = false;
-      playBoot(S.player?.displayName || S.player?.username);
+      if (!m.nastavak) playBoot(S.player?.displayName || S.player?.username);
       enterDesktop();
       break;
     case "login_err":
@@ -823,7 +872,11 @@ async function upisiVerziju() {
 function updateServerStatus(connected) {
   const el = $("#sbNet"); if (!el) return;
   el.classList.toggle("ok", connected);
-  el.querySelector(".sb-txt").textContent = connected ? "Server: povezan" : "Server: nema veze";
+  // Igrač usred sesije bez servera nije u kvaru: igra dalje i vreme se računa
+  // ovde. Zato žuta (pažnja), a ne crvena - crvena znači "ističe vreme".
+  const bez = !connected && !!S.player;
+  el.classList.toggle("bez", bez);
+  el.querySelector(".sb-txt").textContent = connected ? "Server: povezan" : bez ? "Bez servera: igraš dalje" : "Server: nema veze";
 }
 async function pollSys() {
   if (!window.crit.sysStats) return;
@@ -2683,6 +2736,7 @@ function otpustiTocak(razlog) {
 
 function zavrtiTocakKlik() {
   if (S.tocakVrti || !S.tocak?.moze) return;
+  if (!S.wsOk) { toast("Točak radi čim se server vrati.", "error"); return; }
   S.tocakVrti = true;
   const btn = $("#tocakSpin");
   if (btn) { btn.disabled = true; btn.textContent = "..."; }
@@ -2859,6 +2913,7 @@ function obojiUzorkePozadine() {
 
 // Salje izbor serveru. Menja se samo jedno polje, ostala ostaju kakva su bila.
 function posaljiMojuPozadinu(izmena) {
+  if (!S.wsOk) { toast("Pozadina se čuva čim se server vrati.", "error"); return; }
   const moja = S.mojaTekstura;
   const sad = {
     kljuc: moja?.kljuc || "kuca",
@@ -2895,6 +2950,7 @@ $("#content").addEventListener("click", (e) => {
   if (pfB || pfO) {
     const grupa = (pfB || pfO).parentElement;
     if (grupa && grupa.classList.contains("zakljucano")) { sfx.error(); return; }
+    if (!S.wsOk) { toast("Izgled profila se čuva čim se server vrati.", "error"); return; }
     window.crit.toServer(pfB
       ? { t: "moj_profil", boja: pfB.dataset.pfBoja }
       : { t: "moj_profil", okvir: pfO.dataset.pfOkvir });
@@ -3059,6 +3115,7 @@ function cartChange(id, delta) {
 }
 
 function saveAccountPassword() {
+  if (!S.wsOk) { toast("Lozinka se menja čim se server vrati.", "error"); return; }
   window.crit.toServer({ t: "change_password", oldPassword: $("#accOld").value, newPassword: $("#accNew").value });
   $("#accOld").value = ""; $("#accNew").value = "";
 }
@@ -3085,6 +3142,7 @@ function osveziPice(id) {
 let vipUToku = false;
 function kupiVip(btn) {
   if (vipUToku) return;
+  if (!S.wsOk) { toast("VIP se kupuje čim se server vrati.", "error"); return; }
   vipUToku = true;
   const stari = btn.textContent;
   btn.disabled = true;
@@ -3118,6 +3176,7 @@ let poId = null;
 const novPoId = () => { poId = null; };
 function sendOrder() {
   if (orderPending) return;
+  if (!S.wsOk) { toast("Porudžbina ide čim se server vrati. Za piće se do tada javi osoblju.", "error", 6000); return; }
   const items = [...S.cart].map(([id, qty]) => ({ id, qty }));
   if (!items.length) return;
   if (!poId) poId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -3169,8 +3228,19 @@ function sakrijPinOsoblja() {
 }
 $("#lockStaff").addEventListener("click", otkrijPinOsoblja);
 
-$("#lockUnlock").addEventListener("click", () => {
+$("#lockUnlock").addEventListener("click", async () => {
   const pin = $("#lockPin").value.trim(); if (!pin) return;
+  // Bez servera PIN osoblja ne može da se proveri. Proverava se servisni PIN,
+  // lokalno, a server kad se vrati ne zaključava ponovo (vidi main.js).
+  if (!S.wsOk && window.crit.otkljucajBezServera) {
+    const r = await window.crit.otkljucajBezServera(pin);
+    if (!r || !r.ok) { $("#lockErr").textContent = "Pogrešan servisni PIN."; return; }
+    $("#lockPin").value = ""; sakrijPinOsoblja();
+    S.player = null; stopTimer();
+    $("#connText").textContent = "Povezivanje sa serverom...";
+    show("connScreen");
+    return;
+  }
   window.crit.toServer({ t: "unlock_pin", pin });
 });
 $("#lockPin").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#lockUnlock").click(); });
