@@ -37,6 +37,9 @@ const PING_MS = 15000;
 
 export function initWs(server, { authComputer, authAdmin }) {
   const wss = new WebSocketServer({ server, path: "/ws" });
+  // Greske http servera ws prosledjuje ovde, a bez slusaoca bi ih bacio kao
+  // neuhvacene i server bi ostao ziv bez porta. Obradjuje ih index.js.
+  wss.on("error", () => {});
 
   const otkucaj = setInterval(() => {
     for (const ws of wss.clients) {

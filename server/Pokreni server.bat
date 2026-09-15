@@ -18,10 +18,18 @@ if not exist "node_modules" (
   call npm install --omit=dev --no-audit --no-fund
 )
 
+rem Server drzi NADZORNIK: dize ga posle pada i kad se zaglavi, i gasi ga
+rem uredno kad se ovaj prozor zatvori. Ako server vec radi u pozadini
+rem (zakazani zadatak), nadzornik to kaze i izlazi - drugi se ne pokrece.
 :loop
-node src\index.js
+node nadzornik.mjs
+if %errorlevel% equ 0 goto kraj
 echo.
-echo [%date% %time%] Server se zaustavio. Ponovo se pokrece za 3 sekunde.
+echo [%date% %time%] Nadzornik se zaustavio, kod %errorlevel%. Ponovo za 5 sekundi.
 echo Za izlaz zatvori ovaj prozor.
-timeout /t 3 /nobreak >nul
+timeout /t 5 /nobreak >nul
 goto loop
+
+:kraj
+echo.
+pause

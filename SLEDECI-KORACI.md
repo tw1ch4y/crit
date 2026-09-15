@@ -108,11 +108,33 @@ kablu, nikad sa mreže koju koriste gosti.
 
 ## 3. Server (glavni računar) - pre mašina
 
-1. Ugasi server.
+Ova verzija donosi **nadzornika**: server se od nje diže sam posle pada, zastoja,
+nestanka struje i gašenja silom, i nadograđuje se sa panela. Zato se **ona**
+postavlja rukom - poslednji put.
+
+1. Zatvori prozor servera.
 2. Napravi kopiju celog `server\data\` foldera sa strane.
-3. Iz paketa prepiši `server\src\` i `server\public\`. **`server\data\` ne diraj.**
-4. Pokreni server. Bazu sam prilagodi novoj verziji.
+3. Iz paketa (`1 - SERVER (glavni racunar)`) prepiši sve u folder servera
+   **osim `data\`**. Stari `start-server.bat` obriši ako postoji.
+4. Dvoklik na **`Podesi autostart.bat`** (sam traži administratora). Napravi
+   zadatke, digne server i sačeka da se javi - ako ne uspe, vrati sve kako je
+   bilo i kaže zašto. Ako za proveru na 5 minuta ispiše **[PAZNJA]**, zapiši
+   tačan tekst.
 5. Panel → Podešavanja → mora da piše **2.57.0**.
+6. **Proba koja se sa laptopa ne može pustiti** - zakazani zadatak menja Windows,
+   pa se isprobava tek ovde:
+   - Restartuj glavni računar i **ne prijavljuj se** na Windows. Sa telefona
+     otvori panel - mora da radi.
+   - PowerShell kao administrator, u folderu servera - ubij sam server:
+     `Stop-Process -Id (Get-Content data\nadzor.json | ConvertFrom-Json).dete -Force`
+     Panel mora da se vrati za nekoliko sekundi, a u **Logovi > Sistem** da piše
+     da je server pao i ponovo pokrenut.
+   - Isto, ali ubij nadzornika:
+     `Stop-Process -Id (Get-Content data\nadzor.json | ConvertFrom-Json).pid -Force`
+     Server nestaje sa njim. Za **najviše 5 minuta** mora da se vrati sam, a u
+     `data\nadzor.log` da piše da je prethodni nadzornik nestao bez gašenja.
+7. U BIOS-u glavnog računara *Restore on AC Power Loss* → **Power On**, a u
+   Windows Update-u *Active hours* na radno vreme (DEPLOY.md §7.2).
 
 > Od ove verzije otpremljene slike stoje uz bazu, u `server\data\uploads\`. Ako
 > su na tvom serveru još u `server\public\uploads\`, server ih **prenese sam** pri
@@ -193,9 +215,12 @@ nego da se pitaš zašto gost tvrdi da nije video upozorenje.
 
 Bez ustajanja od kase:
 
-1. Ovde: `node verzija.mjs <nova>` → `cd client && npm run build`
-2. Panel → **Instalacije** → *Postavi instalater* → izaberi `.exe` iz `dist\`
-3. *Pusti verziju u rad*
+1. Ovde: `node verzija.mjs <nova>` → `cd client && npm run build` → `node napravi-paket.mjs`
+2. Panel → **Instalacije** → **Nadogradnja servera** → *Postavi paket* → fajl
+   `.srvpak` iz `3 - NADOGRADNJA SA PANELA` → *Nadogradi*. Server se vrati za
+   dvadesetak sekundi; ako nova verzija ne proradi, sam vrati prethodnu.
+3. Panel → **Instalacije** → *Postavi instalater* → izaberi `.exe` iz `dist\`
+4. *Pusti verziju u rad*
 
 Računari je preuzimaju sami čim se oslobode. **Mašina na kojoj neko igra se ne
 dira** - dolazi na red kad gost ustane. Ako nešto ne prođe, u panelu piše zašto,
@@ -228,4 +253,7 @@ sekundi.
 - **HTTPS.** Dok ga nema, važi 2.4.
 - **Rezervacije računara.** Jedina veća funkcija iz plana koja nije urađena;
   radi se kad se ukaže potreba.
+- **Nova prijava dok server ne radi.** Igrači koji već igraju igraju dalje, ali
+  novi gost ne može da sedne dok se server ne vrati. Sledeće na redu: osoblje
+  servisnim PIN-om pušta sesiju za keš (PLAN.md).
 - **Druga igraonica.** Pre gradnje instalera: `node igraonica.mjs "Ime"`.

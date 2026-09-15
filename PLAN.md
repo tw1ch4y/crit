@@ -90,7 +90,7 @@
 
 ### Faza 8 - Pouzdanost
 - [x] Automatski **backup baze** (snapshot na start + na 15 min) + WAL checkpoint (2 min)
-- [x] **Otpornost na prekid** - naplata se pauzira kad klijent izgubi vezu; sesije se nastavljaju; downtime se ne naplaćuje; auto-restart servera (`start-server.bat` petlja); LAN radi bez interneta (vidi DEPLOY.md §7)
+- [x] **Otpornost na prekid** - naplata se pauzira kad klijent izgubi vezu; sesije se nastavljaju; downtime se ne naplaćuje; auto-restart servera (nadzornik, vidi Reviziju launchera niže); LAN radi bez interneta (vidi DEPLOY.md §7)
 - [x] Rotacija logova (čuva 365 dana, dnevno + na startu; otvorena smena zaštićena)
 - [x] **Jedan posao, jedan upis** - porudžbina, račun na kasi i nagradni točak se upisuju kao celina (SAVEPOINT, radi i ugnežđeno). Bez toga nestanak struje između skidanja zalihe i naplate ostavlja piće skinuto a kredit nenaplaćen, i vidi se tek kao neobjašnjiv manjak pri obračunu smene
 - [x] **Prostor na disku se održava sam** - logovi se seku po starosti *i po broju* (briše se najstariji da bi novi imao mesto); rezervne kopije se proređuju (gusto blizu, retko daleko: isti broj fajlova pokriva 46 dana umesto 7.5 sati) uz granicu ukupne veličine; pre svake kopije se gleda slobodan prostor. Stanje i granice su u *Podešavanja > Prostor na disku*. Izmereno na napunjenoj bazi: posle 5 godina rada baza 48 MB, kopije 1.4 GB, tvrda granica 2 GB
@@ -313,7 +313,39 @@
   čekaju server i to kažu. Provereno na tri nivoa: račun na brojkama
   (`test-lokalna-sesija`), pravi server (`test-offline-naplata`) i pravi launcher
   sa serverom koji se ubije usred igranja (`proba-bez-servera`)
-- [ ] **Novi gost dok server ne radi** - prijava bez servera namerno ne postoji:
+- [x] **SERVER KOJI SE TEŠKO GASI.** Server je živeo u prozoru: zatvoren prozor,
+  restart računara bez prijave na Windows ili zaglavljen proces koji petlja iz
+  `start-server.bat` nije mogla ni da primeti - i igraonica je ostajala bez
+  servera dok neko ne dođe. Sada ga drži **nadzornik** (`server/nadzornik.mjs`):
+  pad diže ponovo sa sve dužim razmakom, zaglavljen server (ne odgovara na
+  `/api/zdravlje` tri puta zaredom) gasi i diže, zauzet port ne diže u krug, a
+  drugi nadzornik ne može da krene. **Zakazani zadatak** ga pokreće pri paljenju,
+  pre prijave, kao SYSTEM i bez prozora; skripta posle pravljenja proveri da se
+  server stvarno javio i, ako nije, vrati sve kako je bilo. Server se gasi uredno
+  (baza prepisana i zatvorena), redovni poslovi kreću tek kad dobije port, a pad
+  i zastoj idu u Logove. Dve stvari je našla tek proba uživo. Prva: `ws` grešku
+  zauzetog porta baca kao neuhvaćenu pre našeg rukovaoca, pa je server ostajao
+  živ bez porta - sada izlazi sa kodom po kom ga nadzornik ne diže u krug. Druga:
+  nadzornik ugašen silom povuče i server (Windows gasi Node dete zajedno sa
+  roditeljem - izmereno), a „ponovo pri grešci" zakazanog zadatka važi za zadatak
+  koji ne krene, ne za program koji je posle ugašen. Zato drugi zadatak na 5
+  minuta pokreće `--provera`, koja diže samo nadzornika nestalog bez urednog
+  gašenja: namerno ugašen server ostaje ugašen. `VRATI-KOPIJU.bat` sada gasi
+  server tek posle potvrde (ko je odustao, ostajao je bez servera) i posle
+  vraćanja ga pali. **Zakazani zadaci se ne mogu isprobati sa razvojnog
+  računara** - proba je u SLEDECI-KORACI.md §3
+- [x] **Nadogradnja servera sa panela.** Server je bio jedini deo koji se
+  nadograđivao rukom, pored šanka, gde jedan pogrešan folder (`data\` umesto
+  `src\`) briše igraonicu. Sada serviser otpremi paket (`.srvpak`, pravi ga
+  `napravi-paket.mjs`), server proveri svaki fajl i putanju, napravi kopiju baze i
+  preda zamenu nadzorniku. Zamena se vodi zapisom na disku, pa se završi ili vrati
+  iz bilo kog koraka, i kad struja nestane usred nje. Nova verzija je potvrđena
+  tek kad se javi **svojim** brojem verzije; inače se za minut i po sama vraća
+  prethodna, i to piše u panelu i u Logovima. Launcheri tih dvadesetak sekundi
+  rade bez servera. Provereno uživo nad kopijom servera: uspešna nadogradnja,
+  podaci preživeli, namerno pokvarena verzija vraćena sama
+  (`test-nadogradnja-servera-uzivo`)
+- [ ] **Novi gost dok server ne radi** - *sledeće na redu*. Prijava bez servera namerno ne postoji:
   kredit zapamćen na jednom računaru ne zna šta je potrošeno na drugom, pa bi isti
   novac mogao da se potroši dvaput. Sledeće: osoblje servisnim PIN-om pušta
   sesiju za keš na tom računaru, a server je upiše u smenu kad se vrati
@@ -452,7 +484,11 @@ ostalo je pokriveno testovima (`testovi/README.md`).
   kako se ponaša njegov ugrađeni pregledač ni dijalozi za fajlove unutar kioska.
 - **Vizuelni pregled panela sa pravog telefona.** Emulacija pokazuje raspored,
   ali ne i kako izgleda na staklu u ruci.
-- **UPS na server i mrežnu opremu** (preporuka, nije softver).
+- **Autostart servera na glavnom računaru** - restart bez prijave, ubijen server
+  i ubijen nadzornik (SLEDECI-KORACI.md §3). Zakazani zadaci menjaju Windows, pa
+  se na razvojnom računaru ne prave.
+- **UPS na server i mrežnu opremu** i paljenje posle nestanka struje u BIOS-u
+  (preporuka, nije softver - DEPLOY.md §7.2).
 
 Nije urađeno namerno, sa razlogom zapisanim uz svaku stavku: rezervacije
 računara (Faza 5), gašenje bloatware-a i odlaganje Windows Update-a (DEPLOY.md

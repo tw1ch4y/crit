@@ -28,6 +28,15 @@ Prava baza iz `server/data/` se ne dira ni u jednom testu.
 | `promo` | promo baneri: kačenje, redosled, skrivanje, brisanje, trenutna primena na launcherima |
 | `veza` | namerno gađanje WebSocketa: pokvarene poruke, tuđi tokeni, brzo prekidanje veze, dve veze za isti računar |
 | `nadogradnja` | postojeća baza iz igraonice preživljava novu verziju servera |
+| `lokalna-sesija` | račun launchera bez servera, na brojkama: sat, zaključavanje na isteku, potpisan zapis na disku, pomeren sat Windows-a |
+| `offline-naplata` | pravi server prima izveštaj launchera posle prekida: naplati tačno razliku, ne naplaćuje dvaput, ne više od kredita, ne dira sesiju koju je osoblje zatvorilo |
+| `rad-bez-servera` | veze u launcheru koje rad bez servera spajaju u celinu - svaka od njih, kad pukne, izgleda kao da sat stoji a igra radi besplatno |
+| `nadzornik` | odluke nadzornika bez pravog servera: razmak između pokretanja, mirno vreme posle kog se broji ispočetka, zaglavljen server, zauzet port, zamena koda pre pokretanja |
+| `nadzornik-uzivo` | pravi nadzornik i pravi server: ubijen server se diže sam, drugi nadzornik ne diže drugi server, gašenje upiše bazu, zauzet port ne diže server u krug, a ubijen nadzornik povuče server i provera ih diže - ali ne i namerno ugašen |
+| `autostart-servera` | ono što se na razvojnom računaru ne pušta: zakazani zadaci (pri paljenju, SYSTEM, provera na 5 minuta, sami sebe provere i vrate), `.bat` skripte bez putanje u zagradama i sa CRLF |
+| `paket-servera` | paket za nadogradnju servera: otisak svakog fajla, podmetnute putanje, pokvaren paket i fajl koji se raspakuje u ogroman |
+| `zamena-servera` | zamena koda prekinuta posle svakog koraka - uvek se završi ili vrati, nikad pola staro pola novo |
+| `nadogradnja-servera-uzivo` | ceo put sa panela nad kopijom servera: prava servisera, nova verzija se diže, podaci preživljavaju, pokvarena verzija se vraća sama |
 
 ## Alati koji gledaju pravi launcher
 

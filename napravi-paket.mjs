@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { pathToFileURL } from "node:url";
 
 const ROOT = import.meta.dirname;
 // Ime igraonice stoji na jednom mestu (igraonica.json). Ovaj alat pravi i
@@ -70,7 +71,8 @@ function snimiBazu() {
   } finally { db.close(); }
 }
 snimiBazu();
-for (const f of ["package.json", "Pokreni server.bat", "Otvori port u firewall-u.bat", "Podesi autostart.bat", "VRATI-KOPIJU.bat"]) {
+for (const f of ["package.json", "nadzornik.mjs", "Pokreni server.bat", "Otvori port u firewall-u.bat", "Podesi autostart.bat",
+  "Ukloni autostart.bat", "podesi-autostart.ps1", "ukloni-autostart.ps1", "VRATI-KOPIJU.bat"]) {
   fs.copyFileSync(path.join(ROOT, "server", f), path.join(SRV, f));
 }
 
@@ -170,6 +172,49 @@ for (const f of ["package.json", "Pokreni server.bat", "Otvori port u firewall-u
     for (const u of upozorenja) console.log("    - " + u);
     console.log("  Pokreni prvo:  node postavi-bazu.mjs   pa opet napravi paket.\n");
   }
+}
+
+// ---- paket za nadogradnju servera sa panela ----
+//
+// Ista verzija servera, spakovana u jedan fajl koji se otpremi u panelu
+// (Instalacije > Nadogradnja servera). Pravi se od foldera koji je upravo
+// sklopljen gore, pa nosi tačno ono što ide u igraonicu - bez baze i bez slika
+// igraonice (to paket sam izostavlja, vidi server/src/paket-servera.js).
+//
+// Paket se odmah i pročita: pravi se jednom, a otvara u igraonici, gde je kasno
+// saznati da ne valja.
+const NAD = path.join(OUT, "3 - NADOGRADNJA SA PANELA");
+let imePaketaServera = null;
+{
+  const { napraviPaket, procitajPaket } = await import(pathToFileURL(path.join(ROOT, "server", "src", "paket-servera.js")).href);
+  const gz = napraviPaket(SRV);
+  const provera = procitajPaket(gz);
+  const verzijaServera = JSON.parse(fs.readFileSync(path.join(ROOT, "server", "package.json"), "utf8")).version;
+  if (provera.verzija !== verzijaServera) {
+    console.error(`\n  STOP - paket servera je ${provera.verzija}, a server/package.json kaže ${verzijaServera}.\n`);
+    process.exit(1);
+  }
+  fs.mkdirSync(NAD, { recursive: true });
+  imePaketaServera = `server-${provera.verzija}.srvpak`;
+  fs.writeFileSync(path.join(NAD, imePaketaServera), gz);
+  fs.writeFileSync(path.join(NAD, "PROCITAJ.txt"), [
+    `NADOGRADNJA SA PANELA - ${IME} ${provera.verzija}`,
+    "",
+    "Ovo je za igraonicu u kojoj server VEC radi preko nadzornika (verzija 2.58.0 ili novija).",
+    "Starija verzija se jos jednom nadogradjuje rucno - vidi SLEDECI-KORACI.",
+    "",
+    "SERVER",
+    `  1. Panel > Instalacije > Nadogradnja servera > Postavi paket servera > ${imePaketaServera}`,
+    "  2. Klik na 'Nadogradi server'.",
+    "     Server se gasi na desetak sekundi. Igraci igraju dalje, vreme se obracuna kad se vrati.",
+    "     Pre zamene se pravi kopija baze. Ako nova verzija ne proradi, vraca se stara sama.",
+    "",
+    "LAUNCHER",
+    `  3. Panel > Instalacije > Nadogradnja launchera > Postavi instalater`,
+    `     (instalater je u folderu '2 - LAUNCHER (racunari igraca)').`,
+    "  4. Klik na 'Pusti verziju u rad'. Racunari je preuzimaju sami, cim se oslobode.",
+    "",
+  ].join("\r\n"), "utf8");
 }
 
 // ---- launcher ----
@@ -492,6 +537,7 @@ console.log("Paket napravljen:", OUT);
 console.log("  velicina:", (velicina(OUT) / 1024 / 1024).toFixed(0), "MB");
 console.log("  racunara u bazi:", pcs.length);
 console.log("  instaler:", setup);
+console.log("  paket servera za panel:", imePaketaServera);
 if (obrisano) {
   console.log(`  ociscen dist: obrisano ${obrisano} starih instalera, oslobodjeno ${(oslobodjeno / 1073741824).toFixed(2)} GB`);
 }

@@ -17,16 +17,6 @@ echo   Trenutna baza se NE brise - snima se sa strane,
 echo   pa moze da se vrati ako se predomislis.
 echo.
 
-rem --- server mora da bude ugasen, inace bi pisao preko vracene baze ---
-tasklist /fi "imagename eq node.exe" | find /i "node.exe" >nul
-if not errorlevel 1 (
-  echo   [PAZNJA] node.exe je pokrenut - server verovatno jos radi.
-  echo   Zatvori prozor servera pa pokreni ovu skriptu ponovo.
-  echo.
-  pause
-  exit /b 1
-)
-
 if not exist "data\backups" (
   echo   Nema foldera sa kopijama ^(data\backups^).
   echo.
@@ -79,6 +69,29 @@ if /i not "%potvrda%"=="DA" (
   exit /b 0
 )
 
+rem --- server mora da bude ugasen, inace bi pisao preko vracene baze ---
+rem Gasi se tek POSLE potvrde: ko odustane ili pogresi broj, server radi dalje.
+rem Nadzornik se gasi uredno kad se u data\ pojavi fajl "nadzor-stani". Tako se
+rem gasi i onaj iz zakazanog zadatka, koji nema prozor - a za to ne treba
+rem administrator. Uredno gasenje brise i data\nadzor.json, pa ga provera na
+rem 5 minuta ne podize usred vracanja.
+tasklist /fi "imagename eq node.exe" | find /i "node.exe" >nul
+if errorlevel 1 goto serverUgasen
+echo   Server radi - gasim ga uredno...
+type nul > "data\nadzor-stani"
+for /l %%i in (1,1,30) do (
+  timeout /t 1 /nobreak >nul
+  tasklist /fi "imagename eq node.exe" | find /i "node.exe" >nul
+  if errorlevel 1 goto serverUgasen
+)
+del /q "data\nadzor-stani" 2>nul
+echo   [PAZNJA] node.exe i dalje radi - server se nije ugasio.
+echo   Zatvori prozor servera pa pokreni ovu skriptu ponovo.
+echo.
+pause
+exit /b 1
+:serverUgasen
+
 rem --- trenutnu bazu snimi sa strane pre nego sto je pregazis ---
 for /f "tokens=2 delims==" %%T in ('wmic os get localdatetime /value 2^>nul ^| find "="') do set "sada=%%T"
 set "pecat=%sada:~0,4%-%sada:~4,2%-%sada:~6,2%_%sada:~8,2%-%sada:~10,2%-%sada:~12,2%"
@@ -95,6 +108,7 @@ del /q "data\crit.db-shm" 2>nul
 
 copy /y "data\backups\!izabrana!" "data\crit.db" >nul
 if errorlevel 1 (
+  type nul > "data\nadzor-pokreni"
   echo.
   echo   [GRESKA] Kopiranje nije uspelo. Baza nije promenjena.
   echo.
@@ -103,7 +117,11 @@ if errorlevel 1 (
 )
 
 echo.
+rem Zahtev za paljenje: ako je autostart podesen, provera na 5 minuta digne server
+rem sama. Bez autostarta fajl samo ceka, a brise ga prvo pokretanje servera.
+type nul > "data\nadzor-pokreni"
 echo   Gotovo. Baza je vracena na: !izabrana!
-echo   Pokreni "Pokreni server.bat" i prijavi se na panel.
+echo   Ako je podesen autostart, server se sam podize za najvise 5 minuta.
+echo   Bez autostarta pokreni "Pokreni server.bat". Zatim se prijavi na panel.
 echo.
 pause

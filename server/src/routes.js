@@ -5,6 +5,7 @@ const backupDb = odrz.backupDb;
 import fs from "node:fs";
 import { verifyPassword, issueAdminToken, revokeAdminToken, requireAdmin, requireOwner, requireServiser } from "./auth.js";
 import * as nadg from "./nadogradnja.js";
+import * as nadgServera from "./nadogradnja-servera.js";
 import * as svc from "./service.js";
 
 export const router = express.Router();
@@ -926,6 +927,69 @@ router.delete("/nadogradnja/fajl", requireServiser, (req, res) => {
   res.json(svc.nadogradnjaStanje());
 });
 
+
+// ---------- NADOGRADNJA SERVERA ----------
+//
+// Vlasnik vidi koja verzija radi i da li čeka nova. Paket postavlja i pušta
+// SERVISER - isto pravilo kao za launcher: on je paket napravio i jedini zna da
+// li je ispravan. Ceo tok i zašto je bezbedan: nadogradnja-servera.js.
+router.get("/nadogradnja-servera", requireOwner, (req, res) => res.json(nadgServera.stanje()));
+
+// Paket ide kao tok, pravo u fajl - isto kao instalater launchera.
+router.put("/nadogradnja-servera/paket", requireServiser, (req, res) => {
+  const r = nadgServera.putanjaZaUpis();
+  const izlaz = fs.createWriteStream(r.privremena);
+  let pukao = false;
+  const propalo = (poruka) => {
+    if (pukao) return;
+    pukao = true;
+    try { izlaz.destroy(); } catch {}
+    try { fs.unlinkSync(r.privremena); } catch {}
+    if (!res.headersSent) res.status(400).json({ error: poruka });
+  };
+  req.on("aborted", () => propalo("Prenos je prekinut"));
+  req.on("error", (e) => propalo("Prenos nije uspeo: " + e.message));
+  izlaz.on("error", (e) => propalo("Upis nije uspeo: " + e.message));
+  req.pipe(izlaz);
+  izlaz.on("finish", () => {
+    if (pukao) return;
+    try {
+      if (!fs.statSync(r.privremena).size) return propalo("Stigao je prazan fajl");
+      fs.renameSync(r.privremena, r.konacna);
+    } catch (e) { return propalo("Fajl nije sačuvan: " + e.message); }
+    const st = nadgServera.stanjePaketa();
+    // Paket koji ne valja se ne čuva: sledeći klik na "Nadogradi" bi ga ionako
+    // odbio, a do tada bi u panelu stajalo kao da nešto čeka.
+    if (!st?.ispravan) {
+      nadgServera.obrisiPaket();
+      return res.status(400).json({ error: st?.greska || "Paket ne može da se pročita" });
+    }
+    nadgServera.obrisiIshod();
+    svc.logEvent({ category: "sistem", action: "nadogradnja_servera_paket", actor: req.admin.username,
+      detail: `Postavljen paket servera ${st.verzija} (${st.fajlova} fajlova)` });
+    res.json(nadgServera.stanje());
+  });
+});
+
+router.delete("/nadogradnja-servera/paket", requireServiser, (req, res) => {
+  nadgServera.obrisiPaket();
+  res.json(nadgServera.stanje());
+});
+
+router.post("/nadogradnja-servera/pokreni", requireServiser, (req, res) => {
+  const r = nadgServera.pripremi();
+  if (r.error) return res.status(400).json(r);
+  // Kopija baze PRE zamene: nova verzija prilagođava bazu pri prvom pokretanju,
+  // a vraćanje koda ne vraća izmene u bazi.
+  const kopija = backupDb();
+  svc.logEvent({ category: "sistem", action: "nadogradnja_servera", actor: req.admin.username,
+    detail: `Nadogradnja servera na ${r.verzija} - server se gasi na dvadesetak sekundi` +
+      (kopija ? `, kopija baze: ${kopija}` : "") });
+  res.json({ ok: true, verzija: r.verzija });
+  // Odgovor prvo stigne do panela, pa se tek onda zamoli nadzornik. On gasi
+  // server uredno (baza se upiše) i menja kod.
+  setTimeout(() => { try { process.send({ t: "nadogradi", verzija: r.verzija }); } catch {} }, 300);
+});
 
 // ---------- SKLADIŠTE / ODRŽAVANJE (vlasnik) ----------
 router.get("/skladiste", requireOwner, (req, res) => res.json(odrz.stanjeSkladista()));

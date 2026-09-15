@@ -139,8 +139,12 @@ proveri("pad se ZAPISUJE u logove, ne samo u konzolu",
 proveri("ista greska ne zatrpava log", /skoroZapisano/.test(idx));
 proveri("i sam upis je zasticen", /try \{\s*svc\.logEvent/.test(idx),
   "ako je baza uzrok pada, upis ne sme da napravi drugi pad");
+// Gleda se samo ono sto se izvrsi POSLE pada: zapisiPad i dva rukovaoca.
+// Uredno gasenje na zahtev (Ctrl+C, nadzornik, nadogradnja) sme da izadje - to
+// nije pad, i baza se pre toga upise.
+const posle = idx.slice(idx.indexOf("function zapisiPad"), idx.indexOf("\n", idx.indexOf('process.on("unhandledRejection"')));
 proveri("server ne gasi proces posle pada",
-  !/process\.exit/.test(idx.slice(idx.indexOf("uncaughtException"))),
+  posle.includes('process.on("uncaughtException"') && !/process\.exit/.test(posle),
   "gasenje bi ostavilo 13 racunara bez naplate usred smene");
 
 // ---- STANJE "CEKAM ODGOVOR" MORA DA SE SAMO OTPUSTI ----

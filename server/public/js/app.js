@@ -24,6 +24,7 @@ const state = {
   logFilter: "sve",
   installStatus: {},
   nadogradnja: null,
+  nadServera: null,
   shift: null,
   reportPeriod: "today",
   plPage: 1, plSearch: "", playersPage: null,
@@ -3305,6 +3306,125 @@ function nadogradnjaHtml(n) {
   </div>`;
 }
 
+// ---- NADOGRADNJA SERVERA ----
+// Tok je u server/src/nadogradnja-servera.js. Ovde samo: koja verzija radi, šta
+// čeka, i dugme - uz rečenicu šta se dešava sa igračima dok server ne radi.
+function nadogradnjaServeraHtml(n) {
+  if (!n) return "";
+  const p = n.paket;
+  const ishod = n.poslednjiIshod && n.poslednjiIshod.ok === false
+    ? `<div class="nad-nota upozorenje">${esc(n.poslednjiIshod.poruka || "Poslednja nadogradnja nije uspela.")}</div>` : "";
+  const nadzor = n.podNadzorom ? "" :
+    `<div class="nad-nota upozorenje">Server nije pokrenut preko nadzornika, pa ne može da se nadogradi odavde.
+      Pokreni ga sa "Pokreni server.bat" iz nove verzije ili podesi autostart.</div>`;
+  let telo;
+  if (!p) {
+    telo = `<div class="empty" style="padding:22px 18px">Nema paketa za nadogradnju.<br>
+      ${isServiser() ? "Paket (server-X.Y.Z.srvpak) je u folderu sa instalaterom." : "Paket postavlja serviser."}</div>`;
+  } else if (!p.ispravan) {
+    telo = `<div class="nad-nota upozorenje">${esc(p.greska || "Paket ne može da se pročita.")}</div>`;
+  } else {
+    telo = `<div class="nad-vrh">
+        <div><div class="faint" style="font-size:12px">Na čekanju</div>
+          <div style="font-size:19px;font-weight:700">${esc(p.verzija)}</div>
+          <div class="faint uz" style="font-size:12px">${p.fajlova} ${oblik(p.fajlova, "fajl", "fajla", "fajlova")}<i class="uz-tacka"></i>${velicinaFajla(p.velicina)}</div></div>
+      </div>
+      ${!p.noviji ? `<div class="nad-nota">Server već radi na ${esc(n.trenutna)} - paket nije noviji.</div>`
+        : n.podNadzorom ? `<div class="nad-nota">Server se gasi na dvadesetak sekundi. Igrači za to vreme igraju dalje, a vreme se obračuna kad se vrati.
+        Ako nova verzija ne proradi, vraća se ${esc(n.trenutna)} sama.</div>` : ""}`;
+  }
+  const mozeNadogradnja = isServiser() && p?.ispravan && p.noviji && n.podNadzorom;
+  return `<div class="card"><div class="card-head"><h2>Nadogradnja servera</h2>
+      <span class="pill gray mono">${esc(n.trenutna)}</span></div>
+    ${ishod}${nadzor}${telo}
+    ${isServiser() ? `<div class="nad-akcije">
+      <button class="btn" data-nads="postavi">${icon("download")} Postavi paket servera</button>
+      ${p ? `<button class="btn btn-danger" data-nads="obrisi">Ukloni paket</button>` : ""}
+      ${mozeNadogradnja ? `<button class="btn btn-primary" data-nads="pokreni">Nadogradi server na ${esc(p.verzija)}</button>` : ""}
+    </div>` : ""}
+  </div>`;
+}
+
+async function posaljiPaketServera(file) {
+  const r = await fetch("/api/nadogradnja-servera/paket", {
+    method: "PUT",
+    headers: { "Content-Type": "application/octet-stream", ...(state.token ? { Authorization: "Bearer " + state.token } : {}) },
+    body: file,
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || "Slanje nije uspelo");
+  return d;
+}
+
+// Posle klika na "Nadogradi" server se gasi i vraća. Panel čeka da se javi -
+// i to sa NOVOM verzijom - umesto da korisnik osvežava stranu i nagađa.
+async function sacekajNoviServer(verzija, stara) {
+  const doKad = Date.now() + 150000;
+  await new Promise((r) => setTimeout(r, 3000));
+  while (Date.now() < doKad) {
+    try {
+      const z = await fetch("/api/zdravlje", { cache: "no-store" }).then((x) => x.json());
+      if (z?.ok && z.verzija === verzija) return { ok: true };
+      if (z?.ok && z.verzija === stara && Date.now() > doKad - 60000) return { ok: false };
+    } catch {}
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  return { ok: false };
+}
+
+function nadogradnjaServeraKlik(e) {
+  const btn = e.target.closest("[data-nads]");
+  if (!btn) return;
+  const sta = btn.dataset.nads;
+  const osvezi = (n) => { state.nadServera = n; $("#nadServeraKarta").innerHTML = nadogradnjaServeraHtml(n); };
+
+  if (sta === "postavi") {
+    const ulaz = document.createElement("input");
+    ulaz.type = "file";
+    ulaz.accept = ".srvpak";
+    ulaz.addEventListener("change", async () => {
+      const f = ulaz.files?.[0];
+      if (!f) return;
+      await jednomKlik(btn, async () => {
+        try { osvezi(await posaljiPaketServera(f)); toast(`Paket ${f.name} je proveren i spreman`, "success"); }
+        catch (err) { toast(err.message, "error"); }
+      }, "Šaljem i proveravam...");
+    });
+    ulaz.click();
+    return;
+  }
+
+  if (sta === "obrisi") {
+    jednomKlik(btn, async () => {
+      try { osvezi(await api("/nadogradnja-servera/paket", "DELETE")); } catch (err) { toast(err.message, "error"); }
+    });
+    return;
+  }
+
+  if (sta === "pokreni") {
+    const n = state.nadServera;
+    jednomKlik(btn, async () => {
+      const ok = await confirmDialog(
+        "Server se gasi na dvadesetak sekundi i vraća sa novom verzijom. Igrači za to vreme igraju dalje, a vreme im se obračuna kad se vrati. " +
+        "Pre zamene se pravi kopija baze. Ako nova verzija ne proradi, vraća se stara sama.",
+        { title: "Nadograditi server?", istaknuto: `${n.trenutna} → ${n.paket.verzija}`, ok: "Nadogradi" });
+      if (!ok) return;
+      try {
+        const r = await api("/nadogradnja-servera/pokreni", "POST", {});
+        toast(`Server se nadograđuje na ${r.verzija}...`, "info");
+        const ishod = await sacekajNoviServer(r.verzija, n.trenutna);
+        if (ishod.ok) {
+          toast(`Server radi na ${r.verzija}. Strana se osvežava.`, "success");
+          setTimeout(() => location.reload(), 1500);
+        } else {
+          toast("Nova verzija se nije javila - pogledaj Logove. Ako je vraćena stara, server radi dalje na njoj.", "error");
+          try { osvezi(await api("/nadogradnja-servera")); } catch {}
+        }
+      } catch (err) { toast(err.message, "error"); }
+    }, "Nadograđujem...");
+  }
+}
+
 async function osveziNadogradnju() {
   const el = $("#nadKarta");
   if (!el) return;
@@ -3417,6 +3537,7 @@ async function renderInstall() {
     st.forEach((s) => (state.installStatus[s.computerId] = s));
   } catch {}
   try { state.nadogradnja = await api("/nadogradnja"); } catch { state.nadogradnja = null; }
+  try { state.nadServera = await api("/nadogradnja-servera"); } catch { state.nadServera = null; }
   window._programs = programs;
   const progRows = programs.map((p) => `<tr>
     <td><b>${esc(p.name)}</b>${p.note ? `<div class="faint" style="font-size:12px">${esc(p.note)}</div>` : ""}
@@ -3432,6 +3553,7 @@ async function renderInstall() {
         <button class="btn" id="quickInstall">${icon("send")} Instaliraj sa linka</button>
         <button class="btn btn-primary" id="addProg">${icon("plus")} Novi program</button>
       </div></div>
+    <div id="nadServeraKarta">${nadogradnjaServeraHtml(state.nadServera)}</div>
     <div id="nadKarta">${nadogradnjaHtml(state.nadogradnja)}</div>
     <div class="install-layout">
       <div class="card"><div class="card-head"><h2>Biblioteka programa</h2></div>
@@ -3445,6 +3567,7 @@ async function renderInstall() {
   $("#addProg").addEventListener("click", () => progModal());
   $("#quickInstall").addEventListener("click", quickInstallModal);
   $("#nadKarta").addEventListener("click", nadogradnjaKlik);
+  $("#nadServeraKarta").addEventListener("click", nadogradnjaServeraKlik);
   const ci = $("#clearInstall");
   if (ci) ci.addEventListener("click", async () => {
     try { await api("/install-status", "DELETE"); state.installStatus = {}; updateInstallStatus(); }

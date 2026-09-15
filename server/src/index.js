@@ -10,6 +10,7 @@ import { backupDb, odrzavanje } from "./odrzavanje.js";
 import { getAdmin } from "./auth.js";
 import { router } from "./routes.js";
 import * as nadg from "./nadogradnja.js";
+import * as nadgServera from "./nadogradnja-servera.js";
 import { initWs, setHandlers, broadcastPanels } from "./hub.js";
 import * as svc from "./service.js";
 import * as internet from "./internet.js";
@@ -71,6 +72,21 @@ app.use((req, res, next) => {
   // Panel radi na lokalnoj mrezi i nema sta da javlja spolja odakle se dolazi.
   res.setHeader("Referrer-Policy", "no-referrer");
   next();
+});
+
+// ZDRAVLJE - jedina adresa pod /api koja ne traži prijavu.
+//
+// Pita je nadzornik (nadzornik.mjs) na dvadeset sekundi: server koji ne
+// odgovara, a nije pao, diže se iznova. Proverava se i baza - server kome je
+// baza zaključana ili pokvarena "radi", ali ne može ništa. Ne otkriva ništa
+// osim da je živ i koja je verzija, koja ionako piše u adresama panela.
+app.get("/api/zdravlje", (req, res) => {
+  try {
+    db.prepare("SELECT 1").get();
+    res.set("Cache-Control", "no-store").json({ ok: true, verzija: VERZIJA, radi: Math.round(process.uptime()) });
+  } catch {
+    res.status(503).json({ ok: false });
+  }
 });
 
 // API
@@ -163,8 +179,29 @@ app.use((err, req, res, next) => {
 
 const server = http.createServer(app);
 
+// PORT ZAUZET ZNAČI DA SERVER VEĆ RADI, NE DA JE OVAJ PAO.
+//
+// Bez ovoga je drugi pokrenut server javljao grešku u prozor i OSTAJAO da radi
+// bez porta. Sada izlazi odmah, sa kodom po kom nadzornik zna da ga ne diže u
+// krug (KOD_PORT_ZAUZET u src/nadzor.js).
+//
+// Rukovalac se kači PRE WebSocket-a. `ws` grešku servera prosleđuje na sebe i,
+// ako stigne prvi, baca je kao neuhvaćenu - server je tada ostajao živ bez
+// porta, a nadzornik bi ga tek posle minut i po proglasio zaglavljenim.
+server.on("error", (e) => {
+  // Greška posle dobijenog porta ne gasi server usred smene: zapiše se, a on
+  // radi dalje sa računarima koji su već povezani.
+  if (server.listening) return zapisiPad("greška servera", e);
+  if (e?.code === "EADDRINUSE") {
+    console.error(`\nPort ${PORT} je zauzet - server verovatno vec radi. Ovaj se gasi.\n`);
+    process.exit(3);
+  }
+  zapisiPad("server ne može da sluša", e);
+  process.exit(1);
+});
+
 // ---- WebSocket ----
-initWs(server, {
+const wss = initWs(server, {
   authComputer: (token) => (token ? db.prepare("SELECT * FROM computers WHERE token = ?").get(token) : null),
   authAdmin: (token) => getAdmin(token),
 });
@@ -179,66 +216,74 @@ setHandlers({
   },
 });
 
-// ---- Naplata svakih 5s ----
-setInterval(() => {
-  try { svc.billingTick(); } catch (e) { console.error("billing:", e); }
-}, 5000);
-
-// ---- Zaštita: WAL checkpoint (2 min) + backup baze (15 min + na startu) ----
-// Racunari se nadograde sami cim se oslobode - vidi nadogradnjaTick.
-setInterval(() => {
-  try { svc.nadogradnjaTick(); } catch (e) { console.error("nadogradnja:", e.message); }
-}, 60 * 1000);
-
-// ---- Ima li igraonica internet ----
+// REDOVNI POSLOVI KREĆU TEK KAD SERVER DOBIJE PORT.
 //
-// Proverava SERVER, jednom, i javlja svima. Ranije je to radio svaki launcher
-// za sebe, svakih 30 sekundi, ucitavanjem google.com/favicon.ico - trinaest
-// masina, oko 37.000 poziva dnevno, i pogresan odgovor cim bas Google negde
-// zapne. Objasnjenje je u internet.js.
-internet.pokreni((ok) => svc.javiInternet(ok));
+// Naplata, kopije, održavanje i provera interneta su ranije kretali čim se fajl
+// učita - pre nego što se znalo da li je port slobodan. Drugi pokrenut server
+// (dupli klik, pa zakazani zadatak) je tako pravio kopiju i sekao logove nad
+// istom bazom, pa tek onda saznao da ne može da radi.
+function pokreniRedovnePoslove() {
+  // ---- Naplata svakih 5s ----
+  setInterval(() => {
+    try { svc.billingTick(); } catch (e) { console.error("billing:", e); }
+  }, 5000);
 
-setInterval(() => checkpoint(), 2 * 60 * 1000);
-setInterval(() => backupDb(), 15 * 60 * 1000);
-backupDb();
+  // ---- Zaštita: WAL checkpoint (2 min) + backup baze (15 min + na startu) ----
+  // Racunari se nadograde sami cim se oslobode - vidi nadogradnjaTick.
+  setInterval(() => {
+    try { svc.nadogradnjaTick(); } catch (e) { console.error("nadogradnja:", e.message); }
+  }, 60 * 1000);
 
-// ---- Održavanje: na startu i jednom dnevno ----
-//
-// Seče logove po starosti i po broju, proređuje rezervne kopije i pazi na
-// slobodan prostor. Objašnjenje granica i izmerene brojke su u odrzavanje.js.
-function odrzavanjeSada(razlog) {
-  const r = odrzavanje(svc.getActiveShift()?.id ?? null);
-  const obrisano = r.logovi.poStarosti + r.logovi.poBroju + r.pokretanja + r.kopije.obrisano;
-  if (obrisano) {
-    console.log(`održavanje (${razlog}): logovi -${r.logovi.poStarosti + r.logovi.poBroju}, ` +
-      `pokretanja igara -${r.pokretanja}, kopije -${r.kopije.obrisano} ` +
-      `(ostalo ${r.kopije.zadrzano} kopija, ${r.kopije.ukupnoMB} MB)`);
-  }
-  if (r.stanje.maloMesta) {
-    console.error(`PAŽNJA: na disku je ostalo samo ${r.stanje.slobodnoMB} MB. ` +
-      `Kad disk stane, server ne može da piše i igraonica staje.`);
-    svc.logEvent({ category: "sistem", action: "disk_malo", actor: "sistem",
-      detail: `Malo mesta na disku: ${r.stanje.slobodnoMB} MB slobodno` });
-  }
-  // KOPIJA VAN RAČUNARA - jedina zaštita od otkaza diska.
+  // ---- Ima li igraonica internet ----
   //
-  // Neuspeh mora da se čuje. USB se iščupa, mrežni disk se odjavi, a kopija
-  // tiho prestane da izlazi napolje - i to se otkrije tek onog dana kad zatreba.
-  // Zato zapis ide u Logove, gde vlasnik gleda, a ne samo u konzolu koju niko
-  // ne otvara.
-  const van = r.vanRacunara;
-  if (van?.ok) {
-    console.log(`kopija van računara: ${van.fajl} -> ${van.cilj}`);
-  } else if (van?.error) {
-    console.error(`PAŽNJA: kopija van računara nije uspela (${van.error}) - odredište ${van.cilj}`);
-    svc.logEvent({ category: "sistem", action: "kopija_van_pala", actor: "sistem",
-      detail: `Kopija van računara nije uspela: ${van.error}. Odredište: ${van.cilj}. ` +
-        `Dok ovo stoji, baza postoji samo na jednom disku.` });
+  // Proverava SERVER, jednom, i javlja svima. Ranije je to radio svaki launcher
+  // za sebe, svakih 30 sekundi, ucitavanjem google.com/favicon.ico - trinaest
+  // masina, oko 37.000 poziva dnevno, i pogresan odgovor cim bas Google negde
+  // zapne. Objasnjenje je u internet.js.
+  internet.pokreni((ok) => svc.javiInternet(ok));
+
+  setInterval(() => checkpoint(), 2 * 60 * 1000);
+  setInterval(() => backupDb(), 15 * 60 * 1000);
+  backupDb();
+
+  // ---- Održavanje: na startu i jednom dnevno ----
+  //
+  // Seče logove po starosti i po broju, proređuje rezervne kopije i pazi na
+  // slobodan prostor. Objašnjenje granica i izmerene brojke su u odrzavanje.js.
+  function odrzavanjeSada(razlog) {
+    const r = odrzavanje(svc.getActiveShift()?.id ?? null);
+    const obrisano = r.logovi.poStarosti + r.logovi.poBroju + r.pokretanja + r.kopije.obrisano;
+    if (obrisano) {
+      console.log(`održavanje (${razlog}): logovi -${r.logovi.poStarosti + r.logovi.poBroju}, ` +
+        `pokretanja igara -${r.pokretanja}, kopije -${r.kopije.obrisano} ` +
+        `(ostalo ${r.kopije.zadrzano} kopija, ${r.kopije.ukupnoMB} MB)`);
+    }
+    if (r.stanje.maloMesta) {
+      console.error(`PAŽNJA: na disku je ostalo samo ${r.stanje.slobodnoMB} MB. ` +
+        `Kad disk stane, server ne može da piše i igraonica staje.`);
+      svc.logEvent({ category: "sistem", action: "disk_malo", actor: "sistem",
+        detail: `Malo mesta na disku: ${r.stanje.slobodnoMB} MB slobodno` });
+    }
+    // KOPIJA VAN RAČUNARA - jedina zaštita od otkaza diska.
+    //
+    // Neuspeh mora da se čuje. USB se iščupa, mrežni disk se odjavi, a kopija
+    // tiho prestane da izlazi napolje - i to se otkrije tek onog dana kad zatreba.
+    // Zato zapis ide u Logove, gde vlasnik gleda, a ne samo u konzolu koju niko
+    // ne otvara.
+    const van = r.vanRacunara;
+    if (van?.ok) {
+      console.log(`kopija van računara: ${van.fajl} -> ${van.cilj}`);
+    } else if (van?.error) {
+      console.error(`PAŽNJA: kopija van računara nije uspela (${van.error}) - odredište ${van.cilj}`);
+      svc.logEvent({ category: "sistem", action: "kopija_van_pala", actor: "sistem",
+        detail: `Kopija van računara nije uspela: ${van.error}. Odredište: ${van.cilj}. ` +
+          `Dok ovo stoji, baza postoji samo na jednom disku.` });
+    }
+    return r;
   }
-  return r;
+  setInterval(() => odrzavanjeSada("dnevno"), 24 * 60 * 60 * 1000);
+  odrzavanjeSada("start");
 }
-setInterval(() => odrzavanjeSada("dnevno"), 24 * 60 * 60 * 1000);
-odrzavanjeSada("start");
 
 // ---- Start ----
 server.listen(PORT, () => {
@@ -247,6 +292,31 @@ server.listen(PORT, () => {
   console.log(`  ovaj racunar:  http://localhost:${PORT}`);
   for (const ip of ips) console.log(`  mreza/telefon: http://${ip}:${PORT}`);
   console.log("");
+  pokreniRedovnePoslove();
+  // Nadzornik javlja zašto je server pokrenut. Pad i zastoj idu u Logove, gde
+  // ih vlasnik vidi - inače bi server koji pada noću izgledao kao da radi.
+  const razlog = process.env.RAZLOG_POKRETANJA;
+  // Ishod nadogradnje sa panela. Uspeh javlja nova verzija sama; neuspeh je
+  // upisao nadzornik pre nego što je vratio staru, pa ga ovde čita stara.
+  if (razlog === "nadogradnja") {
+    svc.logEvent({ category: "sistem", action: "server_nadogradjen", actor: "nadzornik",
+      detail: `Server je nadograđen na ${nadgServera.trenutnaVerzija}` });
+    nadgServera.obrisiIshod();
+  }
+  const ishod = nadgServera.preuzmiIshod();
+  if (ishod && ishod.ok === false) {
+    svc.logEvent({ category: "sistem", action: "nadogradnja_vracena", actor: "nadzornik",
+      detail: String(ishod.poruka || "Nadogradnja servera nije uspela - vraćena je prethodna verzija").slice(0, 300) });
+  }
+  const PONOVO = {
+    pad: "Server je pao i nadzornik ga je ponovo pokrenuo. Razlog je u data/nadzor.log.",
+    zaglavljen: "Server nije odgovarao pa ga je nadzornik ponovo pokrenuo. Detalji su u data/nadzor.log.",
+    nadzornik: "Nadzornik servera je bio ugašen silom (npr. iz Task Manager-a), a sa njim i server. " +
+      "Provera na 5 minuta ih je ponovo pokrenula.",
+  };
+  if (Object.hasOwn(PONOVO, razlog || "")) {
+    svc.logEvent({ category: "sistem", action: "server_ponovo_pokrenut", actor: "nadzornik", detail: PONOVO[razlog] });
+  }
 });
 
 // Server radi na racunaru u igraonici, bez nadzora. Jedan neuhvacen previd ne
@@ -275,6 +345,39 @@ function zapisiPad(vrsta, e) {
 }
 process.on("uncaughtException", (e) => zapisiPad("neuhvacena greska", e));
 process.on("unhandledRejection", (e) => zapisiPad("neobradjeno odbijanje", e));
+
+// UREDNO GAŠENJE.
+//
+// Server se do sada gasio samo silom: zatvoren prozor, restart računara. Baza je
+// u WAL režimu pa se upisano ne gubi, ali poslednje izmene ostaju u pomoćnom
+// fajlu dok se ne prepišu - a VRATI-KOPIJU briše baš taj fajl. Sada se pre
+// izlaska sve prepiše u bazu i baza se zatvori.
+//
+// Stiže od nadzornika (poruka "ugasi"), na Ctrl+C, i kad se zatvori prozor.
+let gasiSe = false;
+function ugasiUredno(zasto) {
+  if (gasiSe) return;
+  gasiSe = true;
+  console.log(`\nServer se gasi (${zasto})...`);
+  try {
+    svc.logEvent({ category: "sistem", action: "server_ugasen", actor: "sistem", detail: `Server je uredno ugašen (${zasto})` });
+  } catch {}
+  let gotovo = false;
+  const kraj = () => {
+    if (gotovo) return;
+    gotovo = true;
+    try { checkpoint(); } catch {}
+    try { db.close(); } catch {}
+    process.exit(0);
+  };
+  // Veze se prekidaju odmah: launcheri tada pređu na rad bez servera u istom
+  // trenutku, umesto da čekaju ping. Posle tri sekunde se izlazi i ako nešto visi.
+  try { for (const k of wss.clients) k.terminate(); } catch {}
+  try { server.close(kraj); } catch { kraj(); }
+  setTimeout(kraj, 3000);
+}
+for (const signal of ["SIGINT", "SIGTERM", "SIGBREAK", "SIGHUP"]) process.on(signal, () => ugasiUredno(signal));
+process.on("message", (poruka) => { if (poruka?.t === "ugasi") ugasiUredno("nadzornik"); });
 
 function localIps() {
   const out = [];

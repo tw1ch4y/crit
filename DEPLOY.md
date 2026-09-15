@@ -7,12 +7,12 @@ Uputstvo za pravu instalaciju na svim računarima. Podeljeno na: glavni računar
 ## 1. Glavni računar - server
 
 ### 1.1 Instalacija
-```
-cd server
-npm install
-npm start
-```
-Zapamti IP adresu glavnog računara sa LAN mreže (piše se pri pokretanju, npr. `192.168.0.10`).
+Instaliraj **Node.js LTS** (https://nodejs.org). Folder servera stavi na
+**`C:\Crit\server`** - ne na Desktop i ne u Dokumente: te foldere često
+sinhronizuje OneDrive, a sinhronizacija ume da zaključa bazu usred rada.
+
+Prvi put pokreni `Pokreni server.bat` (dvoklik). U prozoru piše IP adresa
+glavnog računara na LAN mreži (npr. `192.168.0.10`) - zapamti je.
 Preporuka: postavi **fiksnu (statičku) IP adresu** glavnog računara u ruteru/mreži da se ne menja.
 
 ### 1.2 Otvaranje porta u firewall-u
@@ -22,15 +22,50 @@ netsh advfirewall firewall add rule name="Crit Server" dir=in action=allow proto
 ```
 (pokreni PowerShell/CMD kao administrator)
 
-### 1.3 Automatsko pokretanje servera pri paljenju
-Napravi `server/start-server.bat`:
-```bat
-@echo off
-cd /d "%~dp0"
-node src\index.js
-```
-Zatim: `Win + R` > `shell:startup` > napravi prečicu do `start-server.bat`.
-(ili preko Task Scheduler: "At startup", pokreni bat)
+### 1.3 Server koji se teško gasi - nadzornik i autostart
+
+Server se ne pokreće direktno, nego preko **nadzornika** (`nadzornik.mjs`) -
+malog procesa čiji je jedini posao da server bude živ.
+
+| Šta se desi | Šta se dešava dalje |
+|---|---|
+| server pukne | nadzornik ga digne ponovo posle 1, 2, 5, 10, 30 pa 60 s; posle 10 minuta mirnog rada broji ispočetka |
+| server se zaglavi (radi, a ne odgovara) | posle tri propuštene provere zaredom (oko minut i po) nadzornik ga ugasi i digne ponovo |
+| port je zauzet (već radi drugi server) | ne diže ga u krug - proba ponovo na 30 s |
+| neko pokrene drugog nadzornika | drugi odmah izađe; nikad ne rade dva servera nad istom bazom |
+| neko ugasi nadzornika silom (Task Manager) | server se ugasi sa njim; provera na 5 minuta ih digne ponovo |
+| restart računara, nestanak struje | pri paljenju zakazani zadatak digne nadzornika sam, i pre prijave na Windows |
+
+Sve piše u `server\data\nadzor.log`, a pad i zastoj i u panel (**Logovi >
+Sistem**) - server koji pada noću inače izgleda kao da radi.
+
+**Jednom:** dvoklik na `Podesi autostart.bat` (sam traži administratora). Pravi
+dva zakazana zadatka:
+
+- **pokretanje** - nadzornik se diže **pri paljenju računara, pre prijave na
+  Windows**, kao SYSTEM, bez prozora i bez vremenskog ograničenja. Server radi i
+  kad niko nije prijavljen, i nema prozora koji se zatvori slučajnim klikom;
+- **provera na 5 minuta** - digne nadzornika koji je ugašen silom. Na „ponovo
+  pri grešci" iz zakazanog zadatka se ne oslanjamo: Windows ga primenjuje na
+  zadatak koji ne uspe da krene, a ne na program koji je posle ugašen. Namerno
+  ugašen server provera ne diže (vidi niže).
+
+Pre toga zatvori prozor servera ako je otvoren (skripta to proveri i kaže).
+Posle pravljenja zadatka skripta pokrene server i **čeka da se stvarno javi**.
+Ako se ne javi za 30 sekundi, ukloni zadatke, vrati sve kako je bilo i ispiše
+poslednje redove iz `nadzor.log`. Ako Windows ne prihvati proveru na 5 minuta,
+skripta to ispiše kao **[PAZNJA]** - server se tada i dalje diže pri paljenju i
+posle pada. Staru prečicu iz `shell:startup` sklanja sama.
+
+- Bez autostarta (proba, servis): `Pokreni server.bat` - isti nadzornik, u prozoru.
+- Povratak na staro: `Ukloni autostart.bat` (uklanja oba zadatka).
+
+**Kad server treba namerno ugasiti** (npr. zamena diska): u `server\data\`
+napravi prazan fajl **`nadzor-stani`**. Nadzornik uredno ugasi server (baza se
+upiše do kraja) i izađe, a provera ga ne diže. Da se digne bez restarta računara,
+u istom folderu napravi prazan fajl **`nadzor-pokreni`** - provera ga digne za
+najviše 5 minuta. `VRATI-KOPIJU.bat` radi oba sam: gasi server tek kad potvrdiš
+kopiju, a posle vraćanja ga pali.
 
 ### 1.4 Pristup sa telefona
 Telefon mora biti na **istoj mreži** (WiFi koji ide na isti switch/ruter).
@@ -265,17 +300,40 @@ Sve granice se menjaju u *Podešavanja > Prostor na disku*, tu je i dugme
 
 ## 5.1 Nadogradnja na novu verziju
 
-**Server (glavni računar) - prvo on.** Radi se **posle zatvaranja**: server u
-toku rada drži naplatu.
+**Server (glavni računar) - prvo on, sa panela.**
 
-1. Ugasi server.
-2. Napravi kopiju celog `server/data/` foldera sa strane (server i sam pravi
-   kopiju pri pokretanju, ali ova je tvoja).
-3. Prepiši `server/src/` i `server/public/` novom verzijom. **`server/data/` ne
-   diraj** - tu su baza, slike i podešavanja.
-4. Pokreni server. Bazu sam prilagodi novoj verziji pri prvom pokretanju,
-   ništa se ne unosi ručno.
-5. U panelu otvori Podešavanja i proveri da piše nova verzija.
+Strana *Instalacije*, kartica **Nadogradnja servera**:
+
+1. **Postavi paket** - `server-X.Y.Z.srvpak` iz foldera `3 - NADOGRADNJA SA PANELA`
+   u paketu za USB. Postavlja ga **serviser**. Server odmah proveri svaki fajl
+   (otisak i putanju); paket koji ne valja se odbija i ne ostaje na serveru.
+2. Proveri šta piše: verzija paketa i verzija koja sada radi. Paket koji nije
+   noviji se ne pušta.
+3. **Nadogradi.** Server napravi kopiju baze, raspakuje novu verziju sa strane i
+   ugasi se uredno; nadzornik zameni kod i digne novu verziju. Panel sačeka i
+   osveži se sam.
+
+Server ne radi dvadesetak sekundi. Za to vreme launcheri rade bez njega - sat
+ide, igrači igraju - i sve se obračuna čim se vrati (§7.1). Zato sme i usred
+smene, mada je mirniji trenutak uvek bolji.
+
+**Kad nova verzija ne proradi** - ne javi se svojim brojem verzije za minut i po -
+nadzornik **sam vrati prethodnu**, a u panelu i u Logovima piše da nadogradnja
+nije uspela. Zamena se vodi zapisom na disku, pa se završi ili vrati čak i kad
+struja nestane usred nje. Prethodne verzije ostaju u
+`server\data\nadogradnja-servera\` (poslednje dve). `server\data\` se inače ne
+dira ni u jednom koraku.
+
+> **Jednom rukom.** Panel može da nadogradi samo server koji drži nadzornik, a
+> nadzornik stiže tek sa verzijom 2.58.0. Tu jednu verziju postavljaš ručno:
+>
+> 1. Zatvori prozor servera.
+> 2. Napravi kopiju celog `server\data\` foldera sa strane.
+> 3. Iz paketa (`1 - SERVER (glavni racunar)`) prepiši sve u folder servera
+>    **osim `data\`** - tu su baza, slike i podešavanja. Stari `start-server.bat`
+>    obriši ako postoji.
+> 4. `Podesi autostart.bat` (§1.3) - digne server i proveri da se javio.
+> 5. U panelu otvori Podešavanja i proveri da piše nova verzija.
 
 **Računari igrača - odjednom, sa panela.**
 
@@ -419,49 +477,92 @@ hiljadama pokušaja u sekundi, a igrači sede na istoj mreži kao server.
 - Svako zaključavanje se upisuje u **Logovi**. Ako tamo vidiš niz takvih
   zapisa sa jedne adrese, neko pokušava da uđe.
 
-## 7. Zaštitne mere / pouzdanost (nestanak struje, mreže)
+## 7. Zaštitne mere / pouzdanost (nestanak struje, mreže, kvar servera)
 
-Server je na jednom café računaru, pa je bitno da sve nastavi glatko posle prekida.
+Server je na jednom računaru u igraonici. Zato je sve napravljeno oko jednog
+pravila: **kad server ne radi, igraonica radi dalje, a novac se posle obračuna
+tačno.**
 
-**Računar kome je iščupan kabl**
+### 7.1 Kad server ne radi
+
+Razlog nije bitan - ugašen računar, pukao server, iščupan kabl, pao switch,
+nadogradnja:
+
+- **Igrači koji igraju, igraju dalje.** Launcher vodi sesiju sam: sat ide,
+  upozorenja pred istek stižu, računar se zaključa kad kredit istekne.
+- **Igrač sme da se odjavi** - ostatak kredita mu ostaje.
+- Zaključan računar osoblje otključava **servisnim PIN-om**.
+- Stanje sesije se piše na disk, potpisano, pa preživi i pad launchera i restart računara.
+- **Shop, točak i promene na nalogu** čekaju server i to kažu igraču.
+- **Nova prijava ne ide** dok se server ne vrati. Kredit zapamćen na jednom
+  računaru ne zna šta je potrošeno na drugom, pa bi isti novac mogao da se
+  potroši dvaput. Puštanje sesije za keš bez servera je sledeće na redu (PLAN.md).
+
+**Kad se server vrati**, svaki launcher javi koliko je sekundi sesija ukupno
+trajala, a server naplati razliku između toga i onoga što je već naplatio. Isti
+izveštaj poslat dvaput ne naplaćuje dvaput; računa se po nižoj od dve cene i
+nikad više od kredita; sesija koju je osoblje u međuvremenu zatvorilo se ne dira.
+Launcher se sam vraća na vezu svake 3 sekunde - niko ne obilazi mašine.
+
+### 7.2 Da server što ređe ne radi
+
+- **Nadzornik i autostart** (§1.3) - pad, zastoj, restart računara i nadzornik
+  ugašen silom: server preživi sam.
+- **UPS** na glavni računar i mrežnu opremu (ruter/switch). Kratak nestanak
+  struje se tada ne primeti, a dug daje minute za uredno gašenje.
+- **BIOS: paljenje posle nestanka struje.** U BIOS-u glavnog računara podesi
+  *Restore on AC Power Loss* (negde *After Power Failure*) na **Power On**.
+  Računar se upali sam kad struja dođe, a autostart digne server - bez ikoga u igraonici.
+- **Windows Update ne sme da restartuje usred rada.** Na glavnom računaru u
+  *Windows Update > Advanced options* podesi **Active hours** na radno vreme
+  igraonice. Restart van toga je bezopasan: server se digne sam.
+- **Spavanje isključeno** na glavnom računaru (*Power > Sleep: Never*). Računar
+  koji spava ne pušta ni server ni nadzornika.
+- **Glavni računar samo za server** - ne i igračka stanica sa launcherom.
+- **Statička IP adresa** - da launcheri i panel uvek nađu server na istoj adresi.
+
+### 7.3 Nestanak struje
+
+- **Na serveru:** baza je u WAL režimu, sa prepisivanjem na 2 minuta i kopijom
+  na 15 minuta, pa nagli prekid ne kvari upisano. Posle paljenja server se digne
+  sam i sesije se obračunaju kako piše u 7.1.
+- **Na računaru igrača:** sesija je upisana na disk i launcher je nastavi kad se
+  računar upali. Vreme dok je računar bio ugašen se ne naplaćuje - sat broji
+  samo dok launcher radi.
+
+### 7.4 Iščupan kabl
 
 Kad se računaru prekine mreža nasilno - iščupan kabl, zamrznut Windows, ruter se
 resetovao - TCP veza ne umire odmah. Ostaje otvorena i po nekoliko sati, jer
 nijedna strana nema šta da pošalje pa niko ne primeti da druge nema.
 
-Za igraonicu je to skupo dvaput: panel pokazuje računar kao **zauzet** pa radnik
-tamo ne posadi nikoga, a **naplata teče** iako za tim računarom niko ne sedi.
-
 Zato server pinguje svaku vezu na 15 sekundi i gasi onu koja ne odgovori do
-sledećeg ping-a. Gubitak se vidi za najviše pola minuta, računar odmah pređe u
-*van mreže*, a naplata staje sama. Kad se vrati, nastavlja se bez nadoknadnog
-računa za vreme dok ga nije bilo.
+sledećeg ping-a. Računar za najviše pola minuta pređe u *van mreže* u panelu,
+pa radnik vidi da nešto nije u redu.
 
-Launcher se sam vraća na vezu svake 3 sekunde, tako da niko ne mora da obilazi
-mašine posle restarta servera ili rutera.
+Iščupan kabl **ne donosi besplatno igranje**: launcher broji dalje (7.1), a kad
+se veza vrati, naplati se odigrano.
 
-**Automatski restart servera**
-- Pokreći server preko `server/start-server.bat` - on ima **restart petlju**: ako se node sruši, server se sam ponovo pokrene za 3s.
-- Da se pokrene i posle paljenja računara: `Win+R` > `shell:startup` > prečica do `start-server.bat` (ili Task Scheduler "At startup").
+### 7.5 Kad glavni računar potpuno otkaže
 
-**Nestanak struje na serveru**
-- Posle paljenja, server se sam digne (startup) i **nastavi aktivne sesije** čim se launcheri ponovo povežu.
-- Vreme dok je server bio ugašen se **NE naplaćuje** igračima (nema "catch-up" naplate).
-- Baza je u WAL režimu + checkpoint na 2 min > otpornija na nagli prekid; uz to postoje automatski backup-i.
-- **Preporuka: UPS** (besprekidno napajanje) na glavni računar i mrežnu opremu (ruter/switch) - dobija se par minuta da se sve uredno ugasi.
+Sve iznad pretpostavlja da se server vrati. Ako glavni računar ne može da se
+upali (disk, napajanje, matična ploča):
 
-**Nestanak struje / mreže na računaru igrača**
-- Dok je taj računar odsečen (nema veze sa serverom), njegova sesija se **ne naplaćuje** (naplata se pauzira).
-- Kad se računar vrati i launcher ponovo poveže, sesija se **nastavlja** i naplata kreće dalje.
-- Launcher sam pokušava ponovno povezivanje svake 2-3s.
+1. Igrači koji igraju ne primećuju ništa dok im ne istekne kredit (7.1).
+2. Uzmi drugi računar koji nije igrački (ili privremeno jedan igrački).
+3. Na njega instaliraj Node.js i prekopiraj folder servera iz paketa (§1.1).
+4. Vrati bazu: kopiju (`crit-….db`) stavi u `server\data\backups\` na novom
+   računaru, pa pokreni `VRATI-KOPIJU.bat`. Najsvežija je u `server\data\backups\`
+   na starom disku, ako se čita (pravi se na 15 minuta); inače kopija van računara.
+5. Daj mu **istu IP adresu** koju je imao glavni. Launcheri tada sami nađu server
+   i nastave: tokeni računara su u bazi, pa se na mašinama ništa ne podešava.
+6. `Podesi autostart.bat` na novom računaru (§1.3).
 
-**Internet nije potreban za rad**
+Dopune i prodaje upisane posle vraćene kopije nisu u njoj - uporedi sa kasom.
+
+### 7.6 Internet nije potreban za rad
 - Ceo osnovni rad (prijava, sesije, naplata, shop, panel) ide preko **lokalne mreže (LAN)** - radi i bez interneta.
 - Internet treba samo za: daljinsku instalaciju preko URL-a i pristup internetu iz launchera. Ako net padne, sve ostalo radi normalno.
-
-**Bitno**
-- Glavni (server) računar **ne treba** da bude i igračka stanica sa launcherom - neka radi samo server + panel.
-- Statička IP adresa glavnog računara (da se ne menja adresa panela/servera).
 
 ## 8. Paljenje računara na daljinu (Wake-on-LAN)
 

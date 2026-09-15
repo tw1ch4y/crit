@@ -15,3 +15,8 @@ alati/git-hooks/* text eol=lf
 *.ico binary
 *.woff2 binary
 *.db binary
+
+# cmd.exe na goli LF ume da ne nadje oznaku za goto i preskoci ili spoji redove,
+# pa .bat i .ps1 uvek idu sa CRLF - ma na kom racunaru se kod otvori ili klonira.
+*.bat text eol=crlf
+*.ps1 text eol=crlf
