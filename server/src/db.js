@@ -276,6 +276,11 @@ function migrate() {
   // može znati koja je gde instalirana - jedan računar se ponaša drugačije, a
   // nigde ne piše zašto. Upisuje se pri svakom povezivanju.
   if (!columnExists("computers", "launcher_version")) db.exec("ALTER TABLE computers ADD COLUMN launcher_version TEXT");
+  // Numeracija verzija koju launcher javlja uz verziju (vidi verzije.js).
+  // 0 = stara numeracija, ili launcher koji se nikad nije javio.
+  if (!columnExists("computers", "launcher_numeracija")) {
+    db.exec("ALTER TABLE computers ADD COLUMN launcher_numeracija INTEGER NOT NULL DEFAULT 0");
+  }
   // Da li je servisni PIN launchera na toj masini jos fabricki (1234). NULL =
   // launcher to ne javlja (starija verzija), sto NIJE isto sto i "u redu je".
   if (!columnExists("computers", "pin_fabricki")) db.exec("ALTER TABLE computers ADD COLUMN pin_fabricki INTEGER");

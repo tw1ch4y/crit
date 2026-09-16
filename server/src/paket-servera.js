@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 import { createHash } from "node:crypto";
+import { NUMERACIJA } from "./verzije.js";
 
 // ---------- PAKET ZA NADOGRADNJU SERVERA ----------
 //
@@ -16,7 +17,7 @@ import { createHash } from "node:crypto";
 // OBLIK (ceo sadržaj je gzip):
 //   8 bajtova   OZNAKA
 //   4 bajta     dužina opisa (big-endian)
-//   opis        JSON: { v, verzija, napravljen, fajlovi: [{ put, velicina, sha256 }] }
+//   opis        JSON: { v, numeracija, verzija, napravljen, fajlovi: [{ put, velicina, sha256 }] }
 //   fajlovi     sadržaji, jedan za drugim, redom iz opisa
 //
 // Bez tar-a i bez zavisnosti: server ima dve biblioteke i ne treba mu treća da
@@ -31,6 +32,8 @@ import { createHash } from "node:crypto";
 //     se raspakuje u desetine gigabajta ne sme da napuni disk servera
 //   - paket nosi package.json i src/index.js, i verzija u opisu je ista kao u
 //     package.json - inače bi panel pokazivao jednu verziju a radila bi druga
+//   - paket je iz tekuće numeracije (vidi verzije.js) - stari 2.58.0 je po
+//     broju "noviji" od v1.0.0, a nije
 
 export const OZNAKA = Buffer.from("SRVPAK01", "ascii");
 export const NAJVECI_RASPAKOVAN = 300 * 1024 * 1024;
@@ -81,6 +84,7 @@ export function napraviPaket(folderServera) {
   const sadrzaji = putevi.map((p) => fs.readFileSync(path.join(folderServera, ...p.split("/"))));
   const opis = {
     v: 1,
+    numeracija: NUMERACIJA,
     verzija: String(pkg.version),
     napravljen: new Date().toISOString(),
     fajlovi: putevi.map((put, i) => ({ put, velicina: sadrzaji[i].length, sha256: otisak(sadrzaji[i]) })),
@@ -119,6 +123,9 @@ export function procitajPaket(gz, { najvise = NAJVECI_RASPAKOVAN } = {}) {
   if (!opis || opis.v !== 1 || !/^\d+\.\d+\.\d+$/.test(String(opis.verzija)) || !Array.isArray(opis.fajlovi)) {
     throw greska("Paket je napravljen za drugu verziju programa ili je oštećen.");
   }
+  if ((Number(opis.numeracija) || 0) < NUMERACIJA) {
+    throw greska(`Paket ${opis.verzija} je iz stare numeracije (pre v1.0.0) i ne može da se pusti.`);
+  }
   if (opis.fajlovi.length === 0 || opis.fajlovi.length > NAJVISE_FAJLOVA) throw greska("Paket ima nemoguć broj fajlova.");
 
   const vidjeni = new Set();
@@ -149,6 +156,7 @@ export function procitajPaket(gz, { najvise = NAJVECI_RASPAKOVAN } = {}) {
 
   return {
     verzija: String(opis.verzija),
+    numeracija: Number(opis.numeracija),
     napravljen: String(opis.napravljen || ""),
     fajlovi,
     otisak: otisak(gz),

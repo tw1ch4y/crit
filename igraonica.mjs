@@ -169,7 +169,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(im
 
   console.log(`\nIgraonica: ${b.ime} -> ${novo.ime}\n`);
   for (const f of promenjeni) console.log(`  ${f}`);
-  console.log(`\n  instaler:  ${novo.launcher} Setup X.Y.Z.exe`);
+  console.log(`\n  instaler:  ${novo.launcher} Setup vX.Y.Z.exe`);
   console.log(`  folder:    %LOCALAPPDATA%\\Programs\\${novo.launcher}`);
   console.log(`  appId:     ${novo.appId}\n`);
 

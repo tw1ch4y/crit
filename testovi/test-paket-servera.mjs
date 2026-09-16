@@ -76,7 +76,7 @@ proveri("fajl sa drugom oznakom se odbija", !!e?.paket, e?.message);
 
 // ---- 3) PODMETNUTE PUTANJE ----
 const sastavi = (opis, sadrzaji) => {
-  const ob = Buffer.from(JSON.stringify(opis));
+  const ob = Buffer.from(JSON.stringify({ numeracija: 1, ...opis }));
   const d = Buffer.alloc(4);
   d.writeUInt32BE(ob.length);
   return zlib.gzipSync(Buffer.concat([P.OZNAKA, d, ob, ...sadrzaji]));
@@ -107,6 +107,10 @@ e = baca(() => P.procitajPaket(sastavi({ v: 1, verzija: "9.1.0", fajlovi: [...os
 proveri("isti fajl dvaput se odbija", e?.paket && /dvaput/.test(e.message), e?.message);
 e = baca(() => P.procitajPaket(sastavi({ v: 1, verzija: "9.1.0", fajlovi: osnova }, [pkg, idx, Buffer.from("visak")])));
 proveri("višak podataka na kraju se odbija", e?.paket && /višak/.test(e.message), e?.message);
+e = baca(() => P.procitajPaket(sastavi({ numeracija: undefined, v: 1, verzija: "9.1.0", fajlovi: osnova }, [pkg, idx])));
+proveri("paket iz stare numeracije se odbija", e?.paket && /stare numeracije/.test(e.message),
+  e?.message || "server-2.58.0.srvpak bi inače bio 'noviji' od v1.0.0");
+proveri("paket nosi numeraciju", p.numeracija === 1, String(p.numeracija));
 
 // ---- 4) FAJL KOJI SE RASPAKUJE U OGROMAN ----
 const bomba = zlib.gzipSync(Buffer.alloc(2 * 1024 * 1024));

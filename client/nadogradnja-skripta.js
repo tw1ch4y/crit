@@ -17,6 +17,12 @@ const OSIGURAC_SEK = 300;
 // prepoznaje da je launcher vratio osigurac, a ne instalacija.
 const KOD_OSIGURAC = "9999";
 
+// Numeracija verzija - isti broj kao NUMERACIJA u server/src/verzije.js, gde
+// piše i zašto postoji. Ide u ishod, da ishod ostao od stare numeracije ne bi
+// posle reinstalacije izgledao kao neuspela nadogradnja.
+const NUMERACIJA = 1;
+const ZNAK = "N" + NUMERACIJA;
+
 // SKRIPTA RADI BEZ KONZOLE - I TO OBARA DVA OBICNA NACINA DA SE NESTO SACEKA.
 //
 // Launcher je pokrece odvojeno, sakriveno i bez izlaza (detached, windowsHide,
@@ -63,7 +69,7 @@ function napraviSkriptu({ instalater, launcher, ishod, verzija }) {
     // instalacija pukne, vrati se STARA verzija, procita ovaj fajl i javi sta
     // je bilo. Bez toga bi neuspela nadogradnja izgledala isto kao da se nista
     // nije ni desilo.
-    `echo %ERRORLEVEL% ${verzija}> "${ishod}"`,
+    `echo %ERRORLEVEL% ${ZNAK} ${verzija}> "${ishod}"`,
     `del "${instalater}"`,
     `start "" "${launcher}"`,
     'del "%~f0"',
@@ -77,10 +83,10 @@ function napraviOsigurac({ launcher, ishod, verzija, sekundi = OSIGURAC_SEK }) {
   return [
     "@echo off",
     `ping -n ${sekundi + 1} 127.0.0.1 >nul`,
-    `if not exist "${ishod}" echo ${KOD_OSIGURAC} ${verzija}> "${ishod}"`,
+    `if not exist "${ishod}" echo ${KOD_OSIGURAC} ${ZNAK} ${verzija}> "${ishod}"`,
     `start "" "${launcher}"`,
     'del "%~f0"',
   ].join("\r\n");
 }
 
-module.exports = { napraviSkriptu, napraviOsigurac, OSIGURAC_SEK, KOD_OSIGURAC };
+module.exports = { napraviSkriptu, napraviOsigurac, OSIGURAC_SEK, KOD_OSIGURAC, NUMERACIJA };

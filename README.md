@@ -230,7 +230,7 @@ strane.
 Instalater se postavlja **jednom, na server**, a računari ga preuzimaju sami -
 umesto obilaska svih 13 mašina po svakoj verziji.
 
-1. **Postavi instalater** - `Crit Launcher Setup X.Y.Z.exe` iz `dist/`. Ime mora
+1. **Postavi instalater** - `Crit Launcher Setup vX.Y.Z.exe` iz `dist/`. Ime mora
    da sadrži verziju; po njoj se zna šta je novije. Postavlja ga **serviser**.
 2. **Pusti verziju u rad.** Dok to ne uradiš, nijedan računar je ne preuzima ni
    sa ispravnim tokenom - prekopiran fajl sam po sebi ne znači ništa.
@@ -317,5 +317,5 @@ Verzija stoji na dva mesta koja moraju da se poklapaju (`server/package.json` i
 
 ```
 node verzija.mjs            pokaže gde koja stoji
-node verzija.mjs 2.45.0     upiše svuda
+node verzija.mjs 1.0.1     upiše svuda
 ```

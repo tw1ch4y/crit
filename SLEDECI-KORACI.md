@@ -11,7 +11,7 @@ Ovde je ostalo ono što traži tvoj nalog, tvoju mrežu ili tvoje ruke. Redosled
 nije proizvoljan - svaki korak se oslanja na prethodni.
 
 Paket za USB je već napravljen: **`Desktop\CRIT-ZA-IGRAONICU`** (109 MB,
-instaler `Crit Launcher Setup 2.58.0.exe`).
+instaler `Crit Launcher Setup v1.0.0.exe`).
 
 ---
 
@@ -30,7 +30,7 @@ node alati/kopija-koda.mjs D:\kopije
 ```
 
 Jedan fajl, sve grane i svi commitovi. Vraćanje na bilo kom računaru sa git-om:
-`git clone "D:\kopije\crit-kod-2.58.0-....bundle" crit`
+`git clone "D:\kopije\crit-kod-1.0.0-....bundle" crit`
 
 > Odredište koje ne postoji alat **odbija**. Namerno: folder napravljen na
 > lokalnom disku izgledao bi kao uspela kopija, a bio bi na istom disku od kog
@@ -120,7 +120,7 @@ postavlja rukom - poslednji put.
    zadatke, digne server i sačeka da se javi - ako ne uspe, vrati sve kako je
    bilo i kaže zašto. Ako za proveru na 5 minuta ispiše **[PAZNJA]**, zapiši
    tačan tekst.
-5. Panel → Podešavanja → mora da piše **2.58.0**.
+5. Panel → Podešavanja → mora da piše **1.0.0**.
 6. **Proba koja se sa laptopa ne može pustiti** - zakazani zadatak menja Windows,
    pa se isprobava tek ovde:
    - Restartuj glavni računar i **ne prijavljuj se** na Windows. Sa telefona
@@ -168,7 +168,7 @@ skine, a nova da se instalira **sa naloga igrača**.
    sa kog je pokrenuta. Ako je pokreneš sa administratorskog, launchera na nalogu
    igrača **neće biti**.
 
-3. Pokreni `Crit Launcher Setup 2.58.0.exe`. Ne traži administratora.
+3. Pokreni `Crit Launcher Setup v1.0.0.exe`. Ne traži administratora.
 
 4. **Prepravi prečicu za automatsko pokretanje.** Stara pokazuje na
    `Program Files` - te putanje više nema.
@@ -181,7 +181,7 @@ skine, a nova da se instalira **sa naloga igrača**.
 
 5. Restartuj računar i sačekaj da se launcher digne sam.
 
-6. U panelu, strana **Računari**, kolona *verzija* mora da pokaže **2.58.0**.
+6. U panelu, strana **Računari**, kolona *verzija* mora da pokaže **1.0.0**.
 
 **Ako mašina još nije zaključana** (`zastita-ukljuci.bat` nikad pokrenut):
 desni klik → *Run as administrator*, pa odjava i ponovna prijava.

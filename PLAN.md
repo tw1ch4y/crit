@@ -159,7 +159,17 @@
   `close` javi rendereru da veze nema (iako nova radi) i zakaže još jedno
   povezivanje. Traka gore je treperila "povezivanje" dok je sve u redu - i to
   baš pri postavljanju mašine, kad radnik i gleda da li se povezalo
-- [x] **Verzija na jednom mestu** (`node verzija.mjs 2.45.0`) - dotad se ručno
+- [x] **Numeracija vraćena na v1.0.0** (2026-09-16, pre prve upotrebe). Stari
+  brojevi (do 2.58.0) su veći od novih, a nadogradnja bira najveći: stari
+  instaler zaostao na serveru bi pobedio novi, stari launcher bi izgledao kao da
+  je ispred svih, a odluka "puštena 2.57.0" bi jednog dana pustila novu 2.57.0
+  bez pitanja. Zato nova numeracija nosi znak (`Setup v1.0.0.exe`, `n=1` uz
+  verziju launchera, numeracija u paketu servera i uz puštenu verziju), a sve
+  bez znaka se vidi, ali se ne pušta i ne poredi (`server/src/verzije.js`).
+  Usput: panel je „najnoviji launcher" birao poređenjem teksta, po kom je 2.9.0
+  novije od 2.44.0, a stari instaler nije mogao da se obriše dok ništa nije
+  pušteno (`null === null`)
+- [x] **Verzija na jednom mestu** (`node verzija.mjs 1.0.1`) - dotad se ručno
   usklađivala u `server/` i `client/`, a promašaj se video tek kad paket odbije
   da nastane, posle celog build-a
 - [x] **Provera se pušta sama** - `pre-commit` (sintaksa + verzija, trenutno),

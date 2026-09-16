@@ -78,7 +78,10 @@ export function initWs(server, { authComputer, authAdmin }) {
       const verzija = (url.searchParams.get("v") || "").slice(0, 20);
       // Launcher koji je radio bez servera to najavljuje u samoj adresi. Tada
       // se sesija ne vraća dok ne stigne izveštaj - vidi clientOfflineIzvestaj.
-      handlers.onClientOpen(comp, ws, ip, verzija, { offline: url.searchParams.get("offline") === "1" });
+      // Numeracija verzija (vidi verzije.js). Launcher iz stare numeracije je ne
+      // šalje - to je 0.
+      const numeracija = Math.min(99, Math.max(0, parseInt(url.searchParams.get("n"), 10) || 0));
+      handlers.onClientOpen(comp, ws, ip, verzija, { offline: url.searchParams.get("offline") === "1", numeracija });
 
       ws.on("message", (buf) => {
         let msg;

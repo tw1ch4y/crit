@@ -93,7 +93,7 @@ Prvi put unesi:
 Podešavanje se pamti (`config.json` u user data folderu), tako da sledeći put ide direktno na login.
 
 > **Ovako se radi samo na razvojnom računaru.** U igraonici ide gotov instaler:
-> `Crit Launcher Setup X.Y.Z.exe` (pravi se sa `npm run build` u `client/`), pa
+> `Crit Launcher Setup vX.Y.Z.exe` (pravi se sa `npm run build` u `client/`), pa
 > na računarima igrača ne treba ni Node ni npm. Postupak je u
 > [POKRETANJE.md](POKRETANJE.md), korak 2.
 
@@ -304,7 +304,7 @@ Sve granice se menjaju u *Podešavanja > Prostor na disku*, tu je i dugme
 
 Strana *Instalacije*, kartica **Nadogradnja servera**:
 
-1. **Postavi paket** - `server-X.Y.Z.srvpak` iz foldera `3 - NADOGRADNJA SA PANELA`
+1. **Postavi paket** - `server-vX.Y.Z.srvpak` iz foldera `3 - NADOGRADNJA SA PANELA`
    u paketu za USB. Postavlja ga **serviser**. Server odmah proveri svaki fajl
    (otisak i putanju); paket koji ne valja se odbija i ne ostaje na serveru.
 2. Proveri šta piše: verzija paketa i verzija koja sada radi. Paket koji nije
@@ -325,7 +325,7 @@ struja nestane usred nje. Prethodne verzije ostaju u
 dira ni u jednom koraku.
 
 > **Jednom rukom.** Panel može da nadogradi samo server koji drži nadzornik, a
-> nadzornik stiže tek sa verzijom 2.58.0. Tu jednu verziju postavljaš ručno:
+> nadzornik stiže tek sa verzijom v1.0.0. Tu jednu verziju postavljaš ručno:
 >
 > 1. Zatvori prozor servera.
 > 2. Napravi kopiju celog `server\data\` foldera sa strane.
@@ -335,12 +335,20 @@ dira ni u jednom koraku.
 > 4. `Podesi autostart.bat` (§1.3) - digne server i proveri da se javio.
 > 5. U panelu otvori Podešavanja i proveri da piše nova verzija.
 
+**Brojevi verzija su vraćeni na v1.0.0** (pre prve upotrebe u igraonici). Sve
+do 2.58.0 je stara numeracija, a ti brojevi su *veći* od novih. Zato nova nosi
+znak: instaler se zove `... Setup v1.0.0.exe`, a paket servera i launcher nose
+numeraciju u sebi. Instaler bez „v" server ne pušta i ne poredi (vidi se u
+spisku i sme da se obriše), a paket servera iz stare numeracije odbija.
+Launcher iz stare numeracije se ne nadograđuje sam - u panelu stoji **ručno** i
+ide u poslednji obilazak (ispod).
+
 **Računari igrača - odjednom, sa panela.**
 
 Instalater se postavlja **jednom**, na server, a računari ga preuzimaju sami.
 Strana *Instalacije*, kartica **Nadogradnja launchera**:
 
-1. **Postavi instalater** - izaberi `Crit Launcher Setup X.Y.Z.exe` iz `dist/`.
+1. **Postavi instalater** - izaberi `Crit Launcher Setup vX.Y.Z.exe` iz `dist/`.
    Ime mora da sadrži verziju; po njoj se zna šta je novije. Postavlja ga
    **serviser** - on ga je i napravio, pa jedini može da zna da li valja.
 2. Proveri šta piše: verzija, veličina, i koliko računara zaostaje.
@@ -402,7 +410,7 @@ mesto na disku.
    launchera.
 2. Prijavi se na **nalog igrača** - nova instalacija ide u njegov profil, pa se
    pokreće **odatle**, ne sa administratorskog naloga.
-3. Pokreni `Crit Launcher Setup X.Y.Z.exe`. Ne traži administratora.
+3. Pokreni `Crit Launcher Setup vX.Y.Z.exe`. Ne traži administratora.
 4. Proveri da prečica u `Startup` folderu tog naloga pokazuje na novu putanju
    (`%LOCALAPPDATA%\Programs\Crit Launcher\`), pa restartuj računar i vidi da se
    launcher digao sam.

@@ -521,6 +521,7 @@ export function computersSnapshot() {
       ip: c.ip || null,
       mac: c.mac || null,
       verzija: c.launcher_version || null,
+      numeracija: c.launcher_numeracija || 0,
       // null = launcher to ne javlja (starija verzija); true = PIN je fabrički
       pinFabricki: c.pin_fabricki == null ? null : !!c.pin_fabricki,
       connectedAt: connectedSince.get(c.id) || null,
@@ -918,8 +919,12 @@ export function onClientOpen(comp, ip, verzija, opcije = {}) {
   // "ovaj racunar ima launcher stariji od 2.22".
   db.prepare("UPDATE computers SET last_seen = ?, ip = COALESCE(?, ip), launcher_version = COALESCE(?, launcher_version) WHERE id = ?")
     .run(Date.now(), ip || null, verzija || null, comp.id);
+  // Numeracija se upisuje uz verziju: launcher koji javi verziju bez numeracije
+  // je iz stare (vidi verzije.js).
+  const numeracija = Number(opcije.numeracija) || 0;
+  if (verzija) db.prepare("UPDATE computers SET launcher_numeracija = ? WHERE id = ?").run(numeracija, comp.id);
   // Racunar koji se vratio sa novom verzijom je dokaz da je nadogradnja prosla.
-  nadogradnjaPoPovratku(comp, verzija);
+  nadogradnjaPoPovratku(comp, verzija, numeracija);
   sendWelcomeState(comp.id);
   pushComputers();
 }
@@ -4000,14 +4005,17 @@ export function nadogradnjaStanje() {
   const st = nad.stanje();
   const racunari = db.prepare("SELECT * FROM computers ORDER BY id").all().map((c) => {
     const v = c.launcher_version || null;
+    const stara = (c.launcher_numeracija || 0) < nad.NUMERACIJA;
     return {
       id: c.id,
       name: c.name,
       verzija: v,
       online: isClientOnline(c.id),
       slobodan: smeNadogradnju(c),
-      // Bez verzije (launcher stariji od 2.22) racunamo da zaostaje - i jeste.
-      zaostaje: st.ima ? (!v || nad.uporediVerzije(v, st.verzija) < 0) : false,
+      // Launcher iz stare numeracije, ili koji se nikad nije javio, ne
+      // nadograđuje se sam (odbija "manji" broj). Zaostaje, ali ide ručno.
+      staraNumeracija: stara,
+      zaostaje: st.ima ? (stara || !v || nad.uporediVerzije(v, st.verzija) < 0) : false,
       status: nadogradnjaStatus.get(c.id) || null,
     };
   });
@@ -4016,13 +4024,15 @@ export function nadogradnjaStanje() {
     fajlovi: nad.listaFajlova(),
     racunari,
     zaostalih: racunari.filter((r) => r.zaostaje).length,
+    rucno: racunari.filter((r) => r.staraNumeracija).length,
+    zaAutomatski: racunari.filter((r) => r.zaostaje && !r.staraNumeracija).length,
   };
 }
 
 // Sta se salje racunaru. Adresu za preuzimanje launcher sklapa SAM, od servera
 // na koji je vec vezan - ovde ide samo sta i koliko. Vidi main.js.
 function najava(st) {
-  return { t: "nadogradnja", verzija: st.verzija, sha256: st.sha256, velicina: st.velicina };
+  return { t: "nadogradnja", verzija: st.verzija, numeracija: nad.NUMERACIJA, sha256: st.sha256, velicina: st.velicina };
 }
 
 export function posaljiNadogradnju(ids, actor = "vlasnik", automatski = false) {
@@ -4032,9 +4042,11 @@ export function posaljiNadogradnju(ids, actor = "vlasnik", automatski = false) {
 
   const svi = db.prepare("SELECT * FROM computers ORDER BY id").all();
   const trazeni = ids && ids.length ? svi.filter((c) => ids.includes(c.id)) : svi;
-  let poslato = 0, zauzeto = 0, vecImaju = 0;
+  let poslato = 0, zauzeto = 0, vecImaju = 0, rucno = 0;
   for (const c of trazeni) {
     const v = c.launcher_version || null;
+    // Stara numeracija odbija "manji" broj - takav računar ide ručno.
+    if ((c.launcher_numeracija || 0) < nad.NUMERACIJA) { rucno++; continue; }
     if (v && nad.uporediVerzije(v, st.verzija) >= 0) { vecImaju++; continue; }
     if (!smeNadogradnju(c)) { zauzeto++; continue; }
     const ranije = nadogradnjaPoslato.get(c.id);
@@ -4050,7 +4062,7 @@ export function posaljiNadogradnju(ids, actor = "vlasnik", automatski = false) {
       detail: `Nadogradnja na ${st.verzija} poslata na ${poslato} računara` +
         (zauzeto ? ` (${zauzeto} zauzeto ili offline)` : "") + (automatski ? " (automatski)" : "") });
   }
-  return { ok: true, poslato, zauzeto, vecImaju };
+  return { ok: true, poslato, zauzeto, vecImaju, rucno };
 }
 
 // Racunari se nadograde SAMI, cim se oslobode.
@@ -4088,9 +4100,11 @@ function clientNadogradnjaStatus(computerId, msg) {
 // Racunar koji instalira gasi svoj launcher, pa ne moze da javi "gotovo je".
 // Jedini pouzdan dokaz je da se vratio i predstavio NOVOM verzijom; tek tada
 // se u panelu upisuje da je nadogradnja uspela.
-function nadogradnjaPoPovratku(comp, verzija) {
+function nadogradnjaPoPovratku(comp, verzija, numeracija) {
   const cekao = nadogradnjaStatus.get(comp.id);
   if (!cekao || !verzija) return;
+  // Isti broj iz druge numeracije nije dokaz ničega.
+  if (numeracija !== nad.NUMERACIJA) return;
   if (nad.uporediVerzije(verzija, cekao.verzija) < 0) return;
   nadogradnjaStatus.set(comp.id, { verzija, state: "gotovo", message: "Nadogradnja uspela", ts: Date.now() });
   nadogradnjaPoslato.delete(comp.id);

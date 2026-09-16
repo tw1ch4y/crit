@@ -10,7 +10,7 @@ const WebSocket = require("ws");
 const { ocistiSesiju, racunarJeZasticen, STOP_FAJL } = require("./ciscenje.js");
 const { snimiStanje, ugasiNoveProcese, pokreniStrazu, spisakZaPanel, ugasiProces } = require("./procesi.js");
 const winPod = require("./windows-podesavanja.js");
-const { napraviSkriptu, napraviOsigurac, KOD_OSIGURAC } = require("./nadogradnja-skripta.js");
+const { napraviSkriptu, napraviOsigurac, KOD_OSIGURAC, NUMERACIJA } = require("./nadogradnja-skripta.js");
 const { LokalnaSesija, snimiPotpisano, ucitajPotpisano } = require("./lokalna-sesija.js");
 
 const DEV = process.argv.includes("--dev");
@@ -328,6 +328,9 @@ function connectWs() {
   // znati zasto se jedna ponasa drugacije.
   const url = config.host.replace(/^http/i, "ws") + "/ws?kind=client&token=" + encodeURIComponent(config.token)
     + "&v=" + encodeURIComponent(app.getVersion())
+    // Numeracija ide uz verziju (vidi server/src/verzije.js): bez nje server
+    // ovaj launcher vidi kao stari i ne šalje mu nadogradnju.
+    + "&n=" + NUMERACIJA
     // Radio je bez servera i ima šta da javi: server tada ne vraća sesiju dok
     // izveštaj ne stigne (vidi clientOfflineIzvestaj na serveru).
     + (lokalna.izvestaj() ? "&offline=1" : "");
@@ -880,7 +883,7 @@ function otisakFajla(put) {
 }
 
 // Zasto se ova masina NE SME nadograditi sada. Prazan odgovor znaci da sme.
-function nadogradnjaSmeta(verzija) {
+function nadogradnjaSmeta(verzija, numeracija) {
   // Razvojni racunar se ne dira - ni ovde, kao ni pri ciscenju.
   if (racunarJeZasticen()) return `zaštićen računar (${STOP_FAJL})`;
   // Nepakovan launcher radi iz izvornog koda. Instalater bi pored njega
@@ -889,6 +892,9 @@ function nadogradnjaSmeta(verzija) {
   if (!PAKOVAN) return "launcher radi iz izvornog koda, ne iz instalacije";
   if (sesijaAktivna) return "igrač je prijavljen";
   if (spawnedGames.size) return "igra je pokrenuta";
+  // Instaler iz druge numeracije se ne pokreće, ma koji broj imao: stari
+  // 2.57.0 je po broju "noviji" od v1.0.0, a nije.
+  if (numeracija !== NUMERACIJA) return "instaler je iz druge numeracije verzija";
   if (!verzijaNovija(verzija, app.getVersion())) return `već ima verziju ${app.getVersion()}`;
   return "";
 }
@@ -898,7 +904,7 @@ function primiNadogradnju(msg) {
   if (nadogradnjaUToku) return;
   if (!verzija || !/^[\d.]+$/.test(verzija)) return;
 
-  const smeta = nadogradnjaSmeta(verzija);
+  const smeta = nadogradnjaSmeta(verzija, Number(msg.numeracija) || 0);
   if (smeta) {
     // Ovo NIJE greska: server pita ponovo cim se masina oslobodi. Zato se samo
     // javi razlog, da vlasnik u panelu vidi zasto ta jedna masina jos ceka.
@@ -995,7 +1001,10 @@ function javiIshodNadogradnje() {
   let red;
   try { red = fs.readFileSync(NADOGRADNJA_ISHOD, "utf8").trim(); } catch { return; }
   try { fs.unlinkSync(NADOGRADNJA_ISHOD); } catch {}
-  const [kod, verzija = ""] = red.split(/\s+/);
+  const [kod, znak, verzija = ""] = red.split(/\s+/);
+  // Ishod bez znaka numeracije je ostao od stare numeracije (pre reinstalacije)
+  // - to nije neuspela nadogradnja ovog launchera.
+  if (znak !== "N" + NUMERACIJA) return;
   if (!verzija) return;
   if (!verzijaNovija(verzija, app.getVersion())) return; // stigli smo do nje - proslo je
 

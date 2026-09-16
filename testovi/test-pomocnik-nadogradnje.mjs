@@ -117,7 +117,7 @@ proveri("launcher se vratio posle instalacije", fs.existsSync(MARKER), `posle ${
 proveri("CEKALO SE DA INSTALACIJA ZAVRSI", fs.existsSync(MARKER) && Date.now() - pocetak >= 6000,
   `vratio se za ${Date.now() - pocetak} ms, a instalacija traje 3 s uz 3 s cekanja na gasenje - ` +
   "ranije se vracao odmah i prekidao instalaciju nasred");
-proveri("zapisan je izlazni kod instalacije", /^0\s+9\.9\.9$/.test(citajIshod()), `ishod: "${citajIshod()}"`);
+proveri("zapisan je izlazni kod instalacije", /^0\s+N1\s+9\.9\.9$/.test(citajIshod()), `ishod: "${citajIshod()}"`);
 proveri("skripta je obrisala samu sebe", !fs.existsSync(s1));
 proveri("instalater je pospremljen", !fs.existsSync(dobar), "inace u Temp fascikli ostaje po sto megabajta");
 
@@ -132,7 +132,7 @@ fs.writeFileSync(s2, napraviSkriptu({ instalater: los, launcher: LAUNCHER, ishod
 pusti(s2);
 cekao = await cekajFajl(MARKER, 30000);
 proveri("launcher se vratio i posle pukle instalacije", fs.existsSync(MARKER), `posle ${cekao} ms nije`);
-proveri("kod greske je sacuvan", /^1603\s+9\.9\.9$/.test(citajIshod()), `ishod: "${citajIshod()}"`);
+proveri("kod greske je sacuvan", /^1603\s+N1\s+9\.9\.9$/.test(citajIshod()), `ishod: "${citajIshod()}"`);
 
 // ---- 3) OSIGURAC: INSTALACIJA KOJA SE NIKAD NE ZAVRSAVA ----
 //

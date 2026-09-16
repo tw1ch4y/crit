@@ -120,9 +120,9 @@ proveri(`panel nosi verziju ${verzija}`, html.includes(`?v=${verzija}`),
 // Instaler mora da bude iste verzije kao i server - inače u igraonicu odlazi
 // launcher koji ne odgovara panelu.
 const cli = path.join(PAKET, "2 - LAUNCHER (racunari igraca)");
-const setup = fs.existsSync(cli) ? fs.readdirSync(cli).find((f) => /^Crit Launcher Setup .*\.exe$/i.test(f)) : null;
+const setup = fs.existsSync(cli) ? fs.readdirSync(cli).find((f) => /^Crit Launcher Setup v.*\.exe$/i.test(f)) : null;
 proveri("instaler je u paketu", !!setup, String(setup));
-proveri(`instaler je verzija ${verzija}`, !!setup && setup.includes(verzija), String(setup));
+proveri(`instaler je verzija ${verzija}`, !!setup && setup.includes(`v${verzija}.exe`), String(setup));
 
 // ---- SLIKE STOJE UZ BAZU ----
 proveri("slike su u data/uploads", fs.existsSync(path.join(SRV, "data", "uploads")),

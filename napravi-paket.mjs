@@ -195,18 +195,18 @@ let imePaketaServera = null;
     process.exit(1);
   }
   fs.mkdirSync(NAD, { recursive: true });
-  imePaketaServera = `server-${provera.verzija}.srvpak`;
+  imePaketaServera = `server-v${provera.verzija}.srvpak`;
   fs.writeFileSync(path.join(NAD, imePaketaServera), gz);
   fs.writeFileSync(path.join(NAD, "PROCITAJ.txt"), [
     `NADOGRADNJA SA PANELA - ${IME} ${provera.verzija}`,
     "",
-    "Ovo je za igraonicu u kojoj server VEC radi preko nadzornika (verzija 2.58.0 ili novija).",
+    "Ovo je za igraonicu u kojoj server VEC radi preko nadzornika (verzija v1.0.0 ili novija).",
     "Starija verzija se jos jednom nadogradjuje rucno - vidi SLEDECI-KORACI.",
     "",
     "SERVER",
     `  1. Panel > Instalacije > Nadogradnja servera > Postavi paket servera > ${imePaketaServera}`,
     "  2. Klik na 'Nadogradi server'.",
-    "     Server se gasi na desetak sekundi. Igraci igraju dalje, vreme se obracuna kad se vrati.",
+    "     Server se gasi na dvadesetak sekundi. Igraci igraju dalje, vreme se obracuna kad se vrati.",
     "     Pre zamene se pravi kopija baze. Ako nova verzija ne proradi, vraca se stara sama.",
     "",
     "LAUNCHER",
@@ -237,7 +237,7 @@ if (!setup) { console.error("Nema instalera u dist/ - pokreni prvo build launche
 // nosio staru verziju launchera, a niko to nije video dok se ne instalira.
 {
   const verzija = JSON.parse(fs.readFileSync(path.join(ROOT, "client", "package.json"), "utf8")).version;
-  const uImenu = new RegExp("^" + LAUNCHER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + " Setup ([\\d.]+)\\.exe$").exec(setup)?.[1];
+  const uImenu = new RegExp("^" + LAUNCHER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + " Setup v([\\d.]+)\\.exe$").exec(setup)?.[1];
   if (uImenu !== verzija) {
     console.error(`\n  STOP - instaler ne odgovara verziji projekta.`);
     console.error(`    client/package.json:  ${verzija}`);
@@ -253,13 +253,16 @@ fs.copyFileSync(path.join(dist, setup), path.join(CLI, setup));
 // posle petnaestak verzija to je vise od gigabajta. Projekat stoji u OneDrive
 // folderu, pa se sve to jos i sinhronizuje u oblak.
 // Cuvaju se poslednja DVA: tekuci i prethodni, da moze da se vrati unazad.
+// Instaleri iz stare numeracije (bez "v" u imenu, vidi server/src/verzije.js)
+// se brišu svi: server ih ne pušta, a ovde bi zauzeli mesto dva poslednja.
 const CUVA_SE = 2;
+const jeNov = (f) => / Setup v\d+\.\d+\.\d+\.exe$/.test(f);
 const sviInstaleri = fs.readdirSync(dist)
   .filter((f) => f.startsWith(`${LAUNCHER} Setup`) && f.endsWith(".exe"))
   .map((f) => ({ f, vreme: fs.statSync(path.join(dist, f)).mtimeMs }))
   .sort((a, b) => b.vreme - a.vreme);
 let oslobodjeno = 0, obrisano = 0;
-for (const { f } of sviInstaleri.slice(CUVA_SE)) {
+for (const { f } of [...sviInstaleri.filter((x) => !jeNov(x.f)), ...sviInstaleri.filter((x) => jeNov(x.f)).slice(CUVA_SE)]) {
   try {
     oslobodjeno += fs.statSync(path.join(dist, f)).size;
     fs.rmSync(path.join(dist, f), { force: true });

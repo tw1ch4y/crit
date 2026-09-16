@@ -73,7 +73,10 @@ proveri("u traci je tisa od ostalog", /\.sb-verzija \{[^}]*opacity/.test(css));
 proveri("panel ima kolonu Launcher", panel.includes("<th>Launcher</th>"));
 proveri("panel istice racunar koji zaostaje", panel.includes("const zaostao = najnovija"),
   "inace se rucno uporedjuje 13 redova");
-proveri("prazno polje je objasnjeno", panel.includes("Launcher stariji od 2.22 ne javlja verziju"));
+proveri("prazno polje je objasnjeno", panel.includes("Launcher se nije javio ili ne javlja verziju"));
+proveri("najnovija se trazi poredjenjem brojeva, ne teksta", panel.includes(".sort(porediVerzije)"),
+  "kao tekst je 2.9.0 novije od 2.44.0");
+proveri("launcher iz stare numeracije je oznacen", panel.includes("(stara)</span>"));
 
 // ---- UPUTSTVO ZA OBILAZAK NE SME DA ZAOSTANE IZA KODA ----
 //

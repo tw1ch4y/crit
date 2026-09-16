@@ -108,6 +108,8 @@ proveri("pakovanje upozorava ako baza nije spremna", paket.includes("baza mozda 
   const paket = citajIzvor("napravi-paket.mjs");
   proveri("paket poredi verziju instalera sa projektom",
     /Crit Launcher Setup \(\[\\d\.\]\+\)\\\.exe\$/.test(paket) || paket.includes("uImenu !== verzija"));
+  proveri("paket uzima samo instaler nove numeracije (Setup v...)", paket.includes(' Setup v([\\\\d.]+)'),
+    "instaler bez \"v\" server ne pušta - takav paket ne bi mogao da se nadogradi sa panela");
   proveri("neslaganje verzija zaustavlja pravljenje paketa",
     /uImenu !== verzija[\s\S]{0,400}process\.exit\(1\)/.test(paket),
     "inace bi u igraonicu otisla stara verzija launchera");

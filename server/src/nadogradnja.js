@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { DATA_DIR, getSetting, setSetting } from "./db.js";
+import { NUMERACIJA, uporediVerzije, verzijaIzImena, izStareNumeracije, brojIzImena } from "./verzije.js";
 
 // ---------- NADOGRADNJA LAUNCHERA ----------
 //
@@ -23,29 +24,9 @@ import { DATA_DIR, getSetting, setSetting } from "./db.js";
 
 export const FOLDER = path.join(DATA_DIR, "nadogradnja");
 
-// Verzije se porede po BROJEVIMA, ne kao tekst.
-//
-// "2.9.0" i "2.44.0": kao tekst je "2.9" vece, jer je "9" > "4". Po tom
-// poredjenju bi cela igraonica ostala na 2.9.0 i nikad ne bi uzela 2.44.0 -
-// nadogradnja bi tiho stala, a niko ne bi imao razloga da posumnja.
-export function uporediVerzije(a, b) {
-  const raspakuj = (v) => String(v || "").trim().split(/[.\-+]/).map((d) => parseInt(d, 10));
-  const x = raspakuj(a), y = raspakuj(b);
-  for (let i = 0; i < Math.max(x.length, y.length); i++) {
-    const p = Number.isFinite(x[i]) ? x[i] : 0;
-    const q = Number.isFinite(y[i]) ? y[i] : 0;
-    if (p !== q) return p < q ? -1 : 1;
-  }
-  return 0;
-}
-
-// Verzija iz imena fajla: "Crit Launcher Setup 2.45.0.exe" -> "2.45.0".
-// Trazi se tri broja odvojena tackama; sve ostalo u imenu je svejedno, pa
-// igraonica sme da preimenuje instalater po svom brendu.
-export function verzijaIzImena(ime) {
-  const m = String(ime || "").match(/(\d+\.\d+\.\d+)/);
-  return m ? m[1] : null;
-}
+// Poređenje verzija i numeracija stoje u verzije.js (bez baze, pa ih koriste i
+// alati za pakovanje). Ovde se samo prosleđuju dalje.
+export { NUMERACIJA, uporediVerzije, verzijaIzImena, izStareNumeracije };
 
 // Racunanje otiska je citanje celog instalatera - oko sto megabajta. Panel
 // stanje trazi pri svakom osvezavanju, pa bi bez pamcenja server na svakih
@@ -91,7 +72,14 @@ export function nadjiInstalater() {
 // Da stoji samo "pusteno: da", prekopiran nov fajl bi nasledio odobrenje
 // prethodnog i odmah krenuo na sve masine - bas ono sto pravilo 1 sprecava.
 // Ovako svaka nova verzija trazi svoju odluku.
-export const pustenaVerzija = () => getSetting("nadogradnja_pustena") || null;
+//
+// Uz broj ide i oznaka numeracije (vidi verzije.js): odluka zapisana u staroj
+// numeraciji ne važi, jer je ista brojka u novoj drugi program.
+const OZNAKA_PUSTENE = `n${NUMERACIJA}:`;
+export const pustenaVerzija = () => {
+  const v = String(getSetting("nadogradnja_pustena") || "");
+  return v.startsWith(OZNAKA_PUSTENE) ? v.slice(OZNAKA_PUSTENE.length) || null : null;
+};
 
 export function stanje() {
   const inst = nadjiInstalater();
@@ -114,7 +102,7 @@ export function pusti(verzija) {
   if (verzija && verzija !== inst.verzija) {
     return { error: `Na serveru je verzija ${inst.verzija}, a puštena je tražena ${verzija}` };
   }
-  setSetting("nadogradnja_pustena", inst.verzija);
+  setSetting("nadogradnja_pustena", OZNAKA_PUSTENE + inst.verzija);
   return { ok: true, verzija: inst.verzija };
 }
 
@@ -136,7 +124,10 @@ export function spremiFolder() {
 export function putanjaZaUpis(ime) {
   const cisto = path.basename(String(ime || "")).replace(/[^\w .()\-]/g, "");
   if (!/\.exe$/i.test(cisto)) return { error: "Instalater mora biti .exe fajl" };
-  if (!verzijaIzImena(cisto)) return { error: "Ime fajla mora da sadrži verziju, na primer 2.45.0" };
+  if (izStareNumeracije(cisto)) {
+    return { error: "Ovo je instalater iz stare numeracije (pre v1.0.0) i ne može da se pusti. Napravi nov - njegovo ime ima \"v\" ispred broja." };
+  }
+  if (!verzijaIzImena(cisto)) return { error: "Ime fajla mora da sadrži verziju, na primer Setup v1.0.1.exe" };
   spremiFolder();
   return { ime: cisto, konacna: path.join(FOLDER, cisto), privremena: path.join(FOLDER, cisto + ".deo") };
 }
@@ -146,8 +137,10 @@ export function obrisi(ime) {
   if (!/\.exe$/i.test(cisto)) return { error: "Neispravno ime fajla" };
   const put = path.join(FOLDER, cisto);
   if (!fs.existsSync(put)) return { error: "Taj fajl ne postoji" };
-  // Verzija koja se upravo deli masinama ne sme da nestane ispod njih.
-  if (verzijaIzImena(cisto) === pustenaVerzija()) {
+  // Verzija koja se upravo deli masinama ne sme da nestane ispod njih. Stari
+  // instaler nema verziju, a ni pustena ne mora da postoji - null nije jednako null.
+  const verzija = verzijaIzImena(cisto);
+  if (verzija && verzija === pustenaVerzija()) {
     return { error: "Ta verzija je puštena u rad. Prvo je povuci, pa onda obriši." };
   }
   fs.unlinkSync(put);
@@ -158,11 +151,17 @@ export function obrisi(ime) {
 export function listaFajlova() {
   let fajlovi = [];
   try { fajlovi = fs.readdirSync(FOLDER); } catch { return []; }
+  // Stari instaleri se prikazuju (da bi mogli da se obrišu), ali posle novih.
+  // Fajl koji nestane između čitanja foldera i čitanja veličine se preskače -
+  // inače bi jedno brisanje oborilo celu stranu.
   return fajlovi
-    .filter((i) => /\.exe$/i.test(i) && verzijaIzImena(i))
+    .filter((i) => /\.exe$/i.test(i) && (verzijaIzImena(i) || izStareNumeracije(i)))
     .map((ime) => {
-      const st = fs.statSync(path.join(FOLDER, ime));
-      return { ime, verzija: verzijaIzImena(ime), velicina: st.size, vreme: st.mtimeMs };
+      let st;
+      try { st = fs.statSync(path.join(FOLDER, ime)); } catch { return null; }
+      const stara = !verzijaIzImena(ime);
+      return { ime, verzija: stara ? brojIzImena(ime) : verzijaIzImena(ime), stara, velicina: st.size, vreme: st.mtimeMs };
     })
-    .sort((a, b) => uporediVerzije(b.verzija, a.verzija));
+    .filter(Boolean)
+    .sort((a, b) => (a.stara - b.stara) || uporediVerzije(b.verzija, a.verzija));
 }

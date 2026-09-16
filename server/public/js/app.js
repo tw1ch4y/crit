@@ -129,6 +129,16 @@ function oblik(n, jedan, dva, mnogo) {
   return mnogo;
 }
 
+// Verzije se porede po brojevima: kao tekst je "2.9.0" veće od "2.44.0".
+function porediVerzije(a, b) {
+  const x = String(a || "").split(".").map((d) => parseInt(d, 10) || 0);
+  const y = String(b || "").split(".").map((d) => parseInt(d, 10) || 0);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0) ? -1 : 1;
+  }
+  return 0;
+}
+
 // Prazna tabela. Ranije je svaka pisala samo jedan sivi red teksta usred belog
 // polja - izgledalo je kao da se strana nije učitala. Sada svuda isto: ikona,
 // šta fali i šta se radi da bi se pojavilo.
@@ -3173,11 +3183,17 @@ async function renderComputers() {
   const onlineCount = comps.filter((c) => c.online).length;
   // Verzija launchera po racunaru. Kad se jedan racunar ponasa drugacije od
   // ostalih, prvo se gleda da li je zaostao za ostalima - a to se ranije nije
-  // videlo nigde. Racunari sa launcherom starijim od 2.22 je ne salju.
-  const najnovija = comps.map((c) => c.verzija).filter(Boolean).sort().pop();
+  // videlo nigde.
+  //
+  // "Najnovija" se trazi poredjenjem BROJEVA, i samo u novoj numeraciji: kao
+  // tekst je 2.9.0 novije od 2.44.0, a stari 2.57.0 je po broju veci od v1.0.0.
+  const najnovija = comps.filter((c) => c.verzija && c.numeracija >= 1).map((c) => c.verzija).sort(porediVerzije).pop();
   const verzijaCel = (c) => {
-    if (!c.verzija) return '<span class="faint" title="Launcher stariji od 2.22 ne javlja verziju">-</span>';
-    const zaostao = najnovija && c.verzija !== najnovija;
+    if (!c.verzija) return '<span class="faint" title="Launcher se nije javio ili ne javlja verziju">-</span>';
+    if (!(c.numeracija >= 1)) {
+      return `<span class="pill red" title="Launcher iz stare numeracije (pre v1.0.0) - ne nadograđuje se sam, instaliraj ga ručno">${esc(c.verzija)} (stara)</span>`;
+    }
+    const zaostao = najnovija && porediVerzije(c.verzija, najnovija) < 0;
     return `<span class="${zaostao ? "pill amber" : "faint"}"${zaostao ? ` title="Ostali racunari imaju ${esc(najnovija)}"` : ""}>${esc(c.verzija)}</span>`;
   };
   const rows = comps.map((c) => `<tr><td><b>${esc(c.name)}</b></td>
@@ -3264,13 +3280,15 @@ function nadogradnjaHtml(n) {
     return `<div class="nad-masina${r.slobodan ? "" : " zauzeta"}" title="${esc(r.status?.message || "")}">
       <b>${esc(r.name)}</b>
       <span class="mono faint">${r.verzija ? esc(r.verzija) : "nepoznata"}</span>
-      ${s ? `<span class="pill ${s[1]} ${zivo ? "pulse" : ""}">${s[0]}</span>`
-          : `<span class="pill ${r.slobodan ? "blue" : "gray"}">${r.online ? (r.slobodan ? "spreman" : "zauzet") : "ugašen"}</span>`}
+      ${r.staraNumeracija
+        ? `<span class="pill red" title="${r.verzija ? "Launcher iz stare numeracije - ne nadograđuje se sam" : "Launcher se nikad nije javio"}">ručno</span>`
+        : s ? `<span class="pill ${s[1]} ${zivo ? "pulse" : ""}">${s[0]}</span>`
+        : `<span class="pill ${r.slobodan ? "blue" : "gray"}">${r.online ? (r.slobodan ? "spreman" : "zauzet") : "ugašen"}</span>`}
     </div>`;
   }).join("")}</div>` : "";
 
   const fajlovi = isServiser() && n.fajlovi?.length ? `<div class="nad-fajlovi">${n.fajlovi.map((f) => `
-    <div class="nad-fajl"><span class="mono">${esc(f.ime)}</span><span class="faint">${velicinaFajla(f.velicina)}</span>
+    <div class="nad-fajl"><span class="mono">${esc(f.ime)}</span>${f.stara ? `<span class="pill red" title="Instaler iz stare numeracije (pre v1.0.0) - server ga ne pušta">stara numeracija</span>` : ""}<span class="faint">${velicinaFajla(f.velicina)}</span>
       <button class="btn btn-sm btn-danger" data-nad="obrisi" data-ime="${esc(f.ime)}" title="Obriši">${icon("trash")}</button></div>`).join("")}</div>` : "";
 
   if (!n.ima) {
@@ -3278,6 +3296,7 @@ function nadogradnjaHtml(n) {
       <div class="empty" style="padding:28px 18px">Na serveru nema instalatera launchera.<br>
         ${isServiser() ? "Postavi ga ovde i računari će ga preuzeti sami, čim se oslobode."
                        : "Instalater postavlja serviser."}</div>
+      ${fajlovi}
       ${isServiser() ? `<div class="nad-akcije"><button class="btn btn-primary" data-nad="postavi">${icon("download")} Postavi instalater</button></div>` : ""}
     </div>`;
   }
@@ -3289,19 +3308,21 @@ function nadogradnjaHtml(n) {
         <div style="font-size:19px;font-weight:700">${esc(n.verzija)}</div>
         <div class="faint mono uz" style="font-size:12px">${esc(n.fajl)}<i class="uz-tacka"></i>${velicinaFajla(n.velicina)}</div></div>
       <div><div class="faint" style="font-size:12px">Zaostaje</div>
-        <div style="font-size:19px;font-weight:700">${n.zaostalih} ${n.zaostalih === 1 ? "računar" : "računara"}</div>
-        <div class="faint" style="font-size:12px">od ${n.racunari.length}</div></div>
+        <div style="font-size:19px;font-weight:700">${n.zaostalih} ${oblik(n.zaostalih, "računar", "računara", "računara")}</div>
+        <div class="faint" style="font-size:12px">od ${n.racunari.length}${n.rucno ? `, ručno ${n.rucno}` : ""}</div></div>
     </div>
     ${n.pusteno ? `<div class="nad-nota">Računari je preuzimaju sami, čim se oslobode. Onaj na kom neko igra se ne dira.</div>`
                 : `<div class="nad-nota upozorenje">Dok verzija nije puštena u rad, nijedan računar je ne preuzima.</div>`}
     ${spisak}
+    ${n.rucno ? `<div class="nad-nota upozorenje">Računari označeni sa „ručno" se ne nadograđuju sami: launcher im je iz
+      stare numeracije (pre v1.0.0) ili se nikad nije javio. Na njima se launcher instalira ručno.</div>` : ""}
     ${fajlovi}
     <div class="nad-akcije">
       ${isServiser() ? `<button class="btn" data-nad="postavi">${icon("download")} Postavi instalater</button>` : ""}
       ${isServiser() ? (n.pusteno
         ? `<button class="btn btn-danger" data-nad="povuci">Povuci iz rada</button>`
         : `<button class="btn btn-primary" data-nad="pusti">Pusti verziju ${esc(n.verzija)} u rad</button>`) : ""}
-      ${n.pusteno && n.zaostalih ? `<button class="btn" data-nad="posalji">${icon("send")} Pošalji slobodnima odmah</button>` : ""}
+      ${n.pusteno && n.zaAutomatski ? `<button class="btn" data-nad="posalji">${icon("send")} Pošalji slobodnima odmah</button>` : ""}
     </div>
   </div>`;
 }
@@ -3478,7 +3499,7 @@ function nadogradnjaKlik(e) {
       const ok = await confirmDialog(
         `Računari će je preuzeti i instalirati sami, čim se oslobode. ` +
         `Računar na kom neko igra se ne dira - on dolazi na red kasnije.`,
-        { title: "Pustiti verziju u rad?", istaknuto: `${n.verzija} → ${n.zaostalih} računara`, ok: "Pusti u rad" });
+        { title: "Pustiti verziju u rad?", istaknuto: `${n.verzija} → ${n.zaAutomatski} ${oblik(n.zaAutomatski, "računar", "računara", "računara")}`, ok: "Pusti u rad" });
       if (!ok) return;
       try {
         state.nadogradnja = await api("/nadogradnja/pusti", "POST", { verzija: n.verzija });

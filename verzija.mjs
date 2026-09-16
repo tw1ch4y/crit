@@ -1,7 +1,7 @@
 // Menja verziju projekta na SVA mesta odjednom.
 //
 //   node verzija.mjs           samo ispiše gde koja stoji
-//   node verzija.mjs 2.45.0    upiše svuda
+//   node verzija.mjs 1.0.1    upiše svuda
 //
 // ZAŠTO POSTOJI
 //
@@ -40,7 +40,7 @@ if (!nova) {
     console.log(`  ${v.padEnd(10)} ${path.relative(KOREN, m.put).padEnd(22)} ${m.opis}`);
   }
   console.log(vrednosti.size === 1
-    ? `\nSve se poklapa (${[...vrednosti][0]}).\n\nZa novu verziju:  node verzija.mjs 2.45.0\n`
+    ? `\nSve se poklapa (${[...vrednosti][0]}).\n\nZa novu verziju:  node verzija.mjs 1.0.1\n`
     : `\nNE POKLAPA SE. Paket neće moći da se napravi dok je ovako.\nIspravi sa:  node verzija.mjs <verzija>\n`);
   process.exit(vrednosti.size === 1 ? 0 : 1);
 }
@@ -48,7 +48,7 @@ if (!nova) {
 // Format se proverava, jer electron-builder od neispravne verzije pravi
 // instaler čudnog imena i to se otkrije tek pri pakovanju.
 if (!/^\d+\.\d+\.\d+$/.test(nova)) {
-  console.error(`\nNeispravna verzija: "${nova}". Očekuje se oblik 2.45.0 (tri broja).\n`);
+  console.error(`\nNeispravna verzija: "${nova}". Očekuje se oblik 1.0.1 (tri broja).\n`);
   process.exit(1);
 }
 
@@ -66,7 +66,7 @@ for (const m of MESTA) {
 //
 // `SLEDECI-KORACI.md` se čita rukom, pred trinaest mašina: u njemu piše koji se
 // instaler pokreće i koja verzija mora da stoji u panelu posle toga. Dok se
-// menjao ručno, zaostajao je iza koda - pa je uputstvo tražilo 2.45.0, a u
+// menjao ručno, zaostajao je iza koda - pa je uputstvo tražilo 1.0.1, a u
 // paketu je stajao 2.49.0. Čovek koji to zatekne ili prekuca pogrešno ili
 // pomisli da je uzeo pogrešan paket, i to usred obilaska.
 //

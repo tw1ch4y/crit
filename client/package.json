@@ -1,6 +1,6 @@
 {
   "name": "crit-launcher",
-  "version": "2.58.0",
+  "version": "1.0.0",
   "description": "Crit igraonica - launcher za racunare igraca",
   "main": "main.js",
   "author": "Crit",
@@ -19,6 +19,7 @@
   "build": {
     "appId": "rs.crit.launcher",
     "productName": "Crit Launcher",
+    "artifactName": "${productName} Setup v${version}.${ext}",
     "directories": {
       "output": "../dist"
     },
