@@ -13,6 +13,8 @@ import { radniFolder, podigniServer, citajIzvor } from "./_okruzenje.mjs";
 // istom disku, gora je od nikakve - vlasnik gleda zeleno stanje i ne radi ništa.
 const BASE = "http://127.0.0.1:8173";
 const DATA = radniFolder("kopija-van-data");
+// Kratak rok za odredište koje ne odgovara - vidi odeljak 11.
+process.env.ROK_ODREDISTA_MS = "1500";
 await podigniServer(DATA, 8173);
 
 let pao = 0, prosao = 0;
@@ -143,6 +145,38 @@ await api(`/api/games/${igra.id}`, "DELETE");
 await api("/api/kopija-van/sada", "POST");
 proveri("kopija ne brise za serverom", fs.existsSync(path.join(slikeTamo, imeSlike)),
   "izbrisana igra ne sme da povuce sliku i iz rezervne kopije");
+
+// ---- 11) ODREDISTE KOJE NE ODGOVARA NE SME DA ZAUSTAVI SERVER ----
+//
+// Mrezni folder ciji racunar spava ume da drzi poziv i po minut. Dok je
+// kopiranje bilo sinhrono, za to vreme je stajao ceo server - naplata, panel,
+// launcheri - a nadzornik bi ga posle minut i po proglasio zaglavljenim i ubio.
+// Ovde se odrediste "zaledi" (odgovor nikad ne stigne) i gleda sta server radi.
+{
+  const fsp = (await import("node:fs/promises")).default;
+  const pravi = fsp.stat;
+  fsp.stat = (p, ...ost) => (String(p).startsWith(ODREDISTE) ? new Promise(() => {}) : pravi(p, ...ost));
+  try {
+    const pocetak = Date.now();
+    const cekanje = api("/api/kopija-van/sada", "POST");
+    await new Promise((r) => setTimeout(r, 200));
+    const zdrav = await fetch(BASE + "/api/zdravlje").then((r) => r.ok).catch(() => false);
+    proveri("dok odrediste ne odgovara, server radi", zdrav && Date.now() - pocetak < 1200, `${Date.now() - pocetak} ms`);
+    const odg = await cekanje;
+    proveri("posle roka stize greska, poziv ne visi", odg.status === 500 && /ne odgovara/.test(odg.body.error || ""),
+      JSON.stringify(odg.body));
+    proveri("i panel stoji na 'pala'", (await api("/api/kopija-van")).body.stanje === "pala");
+    const drugo = await api("/api/kopija-van/sada", "POST");
+    proveri("dok prethodni poziv visi, novo kopiranje se ne pokusava",
+      drugo.status === 500 && /jo[sš] nije zavr[sš]eno/.test(drugo.body.error || ""), JSON.stringify(drugo.body));
+  } finally {
+    fsp.stat = pravi;
+  }
+}
+const src2 = citajIzvor("server/src/odrzavanje.js");
+proveri("nijedan sinhroni poziv ne dira odrediste",
+  !/function kopirajSada[\s\S]*?existsSync\(cilj\)/.test(src2) && !/copyFileSync\(izvor\.p/.test(src2),
+  "sinhroni poziv ka mreznom folderu zaustavlja ceo server");
 
 fs.rmSync(ODREDISTE, { recursive: true, force: true });
 console.log(`\n${prosao}/${prosao + pao} proslo`);

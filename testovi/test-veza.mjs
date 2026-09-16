@@ -116,6 +116,18 @@ proveri("nema duplih sesija", snap.computers.filter((c) => c.player?.username ==
 proveri("panel i dalje radi", (await api("/api/snapshot")).computers.length > 0);
 proveri("naplata nije stala", typeof (await api("/api/shift")) !== "undefined");
 
+// ---- zapis sa racunara stize u Logove ----
+// Launcher javlja blokirano pokretanje skinutog programa. Server te poruke ranije
+// nije ni citao, pa vlasnik nije mogao da vidi ko to pokusava.
+k.w.send(JSON.stringify({ t: "log_klijent", tekst: "Blokirano pokretanje preuzetog programa: zlo.exe" }));
+k.w.send(JSON.stringify({ t: "log_klijent", tekst: "Blokirano pokretanje preuzetog programa: zlo.exe" }));
+k.w.send(JSON.stringify({ t: "log_klijent", tekst: "x".repeat(5000) }));
+await cekaj(500);
+const zapisi = (await api("/api/logs?limit=100")).filter((l) => l.action === "klijent_zapis");
+proveri("blokiran program sa racunara stize u Logove", zapisi.some((l) => /zlo\.exe/.test(l.detail || "")), JSON.stringify(zapisi));
+proveri("isti zapis se ne ponavlja odmah", zapisi.filter((l) => /zlo\.exe/.test(l.detail || "")).length === 1);
+proveri("predugacak tekst se skracuje", zapisi.every((l) => (l.detail || "").length <= 200));
+
 // ---- prevelika poruka zatvara samo tu vezu ----
 // Podrazumevana granica biblioteke je 100 MB; toliko bi jedan klijent drzao u
 // memoriji servera.

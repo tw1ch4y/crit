@@ -857,25 +857,35 @@ router.post("/backup", requireOwner, (req, res) => {
 // i jedno i drugo - zato odredište van računara (USB, drugi disk, mrežni
 // folder) nije luksuz nego jedina zaštita od te jedne greške.
 router.get("/kopija-van", requireOwner, (req, res) => res.json(odrz.kopijaVanPodesavanja()));
-router.post("/kopija-van", requireOwner, (req, res) => {
-  const r = odrz.postaviKopijuVan(req.body?.putanja);
-  if (r.error) return res.status(400).json(r);
-  svc.logEvent({ category: "podesavanja", action: "kopija_van", actor: req.admin.username,
-    detail: r.putanja ? `Kopija van računara: ${r.putanja}` : "Kopija van računara isključena" });
-  // Prva kopija ide odmah, da vlasnik istog trena vidi da odredište radi.
-  if (r.putanja) odrz.kopirajVanRacunara();
-  res.json(odrz.kopijaVanPodesavanja());
+// Rute su asinhrone jer odredište ume da ne odgovara - vidi odrzavanje.js.
+// Express 4 grešku iz asinhrone rute ne hvata sam, pa se hvata ovde.
+router.post("/kopija-van", requireOwner, async (req, res) => {
+  try {
+    const r = await odrz.postaviKopijuVan(req.body?.putanja);
+    if (r.error) return res.status(400).json(r);
+    svc.logEvent({ category: "podesavanja", action: "kopija_van", actor: req.admin.username,
+      detail: r.putanja ? `Kopija van računara: ${r.putanja}` : "Kopija van računara isključena" });
+    // Prva kopija ide odmah, da vlasnik istog trena vidi da odredište radi.
+    if (r.putanja) await odrz.kopirajVanRacunara();
+    res.json(odrz.kopijaVanPodesavanja());
+  } catch (e) {
+    if (!res.headersSent) res.status(500).json({ error: "Podešavanje nije sačuvano: " + String(e?.message || e).slice(0, 120) });
+  }
 });
-router.post("/kopija-van/sada", requireOwner, (req, res) => {
-  const r = odrz.kopirajVanRacunara();
-  if (r.error) return res.status(500).json({ error: `Kopiranje nije uspelo (${r.error}). Proveri da li je disk priključen.` });
-  if (r.preskoceno) return res.status(400).json({ error: `Preskočeno: ${r.preskoceno}` });
-  // Slike idu zajedno sa bazom, pa i brojka o njima mora nazad: vlasnik koji
-  // vidi samo "kopija napravljena" ne zna da li su omoti i pozadine otišle.
-  const koliko = (r.slike?.novih || 0) + (r.slike?.preskoceno || 0);
-  svc.logEvent({ category: "sistem", action: "kopija_van", actor: req.admin.username,
-    detail: `Kopija odneta van računara: ${r.fajl}${koliko ? ` + ${koliko} slika` : ""} -> ${r.cilj}` });
-  res.json({ ok: true, slike: r.slike || null, ...odrz.kopijaVanPodesavanja() });
+router.post("/kopija-van/sada", requireOwner, async (req, res) => {
+  try {
+    const r = await odrz.kopirajVanRacunara();
+    if (r.error) return res.status(500).json({ error: `Kopiranje nije uspelo (${r.error}). Proveri da li je disk priključen.` });
+    if (r.preskoceno) return res.status(400).json({ error: `Preskočeno: ${r.preskoceno}` });
+    // Slike idu zajedno sa bazom, pa i brojka o njima mora nazad: vlasnik koji
+    // vidi samo "kopija napravljena" ne zna da li su omoti i pozadine otišle.
+    const koliko = (r.slike?.novih || 0) + (r.slike?.preskoceno || 0);
+    svc.logEvent({ category: "sistem", action: "kopija_van", actor: req.admin.username,
+      detail: `Kopija odneta van računara: ${r.fajl}${koliko ? ` + ${koliko} slika` : ""} -> ${r.cilj}` });
+    res.json({ ok: true, slike: r.slike || null, ...odrz.kopijaVanPodesavanja() });
+  } catch (e) {
+    if (!res.headersSent) res.status(500).json({ error: "Kopiranje nije uspelo: " + String(e?.message || e).slice(0, 120) });
+  }
 });
 
 // ---------- NADOGRADNJA LAUNCHERA ----------

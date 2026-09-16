@@ -15,6 +15,7 @@
 // obriše profile na računaru na kom se program piše.
 
 const fs = require("node:fs");
+const fsp = require("node:fs/promises");
 const path = require("node:path");
 const { execFile } = require("node:child_process");
 
@@ -119,23 +120,34 @@ const REG_KOMANDE = [
 const KORPA_KOMANDA = ["powershell", ["-NoProfile", "-NonInteractive", "-Command",
   "Clear-RecycleBin -Force -ErrorAction SilentlyContinue"]];
 
-function obrisi(meta, log, licneDozvoljene) {
+// BRISANJE JE ASINHRONO.
+//
+// Profil pregledača su desetine hiljada fajlova. Dok se brisao sa `rmSync`,
+// glavni proces launchera je posle svake odjave stajao sekundama: ekran ne
+// reaguje, nadzor prozora stoji, server ne dobija otkucaj. Iz stolice to
+// izgleda kao da se računar zakočio.
+//
+// Ceo profil se briše sa ponovnim pokušajima: pregledač koji se upravo gasi još
+// drži svoje fajlove, a pola obrisan profil ume da ostavi kolačiće prijave.
+// Sadržaj Temp-a ide bez ponavljanja - tu su zaključani fajlovi normalni, a
+// čekanje na svaki bi trajalo minutima.
+async function obrisi(meta, log, licneDozvoljene) {
   const { put, opis, sadrzaj, licno } = meta;
   if (!put || put.length < 8) return; // odbrana od prazne/kratke putanje
   if (licno && !licneDozvoljene) { log(`  preskočeno (nije uključeno): ${opis}`); return; }
   if (uOblaku(put)) { log(`  preskočeno (sinhronizuje se sa oblakom): ${opis}`); return; }
-  if (!fs.existsSync(put)) { log(`  preskočeno (ne postoji): ${opis}`); return; }
+  try { await fsp.access(put); } catch { log(`  preskočeno (ne postoji): ${opis}`); return; }
 
   if (SUVO) { log(`  [PROBNI RAD] obrisao bih: ${opis}  ->  ${put}`); return; }
 
   try {
     if (sadrzaj) {
       // briše sadržaj, ali ostavlja samu fasciklu
-      for (const e of fs.readdirSync(put)) {
-        try { fs.rmSync(path.join(put, e), { recursive: true, force: true }); } catch {}
+      for (const e of await fsp.readdir(put)) {
+        try { await fsp.rm(path.join(put, e), { recursive: true, force: true }); } catch {}
       }
     } else {
-      fs.rmSync(put, { recursive: true, force: true });
+      await fsp.rm(put, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
     }
     log(`  obrisano: ${opis}`);
   } catch (e) {
@@ -167,21 +179,23 @@ function ocistiSesiju({ dozvoljeno, resourcesPath, execPath, dirname, log = () =
 
   log(SUVO ? "čišćenje sesije (PROBNI RAD - ništa se ne briše)" : "čišćenje sesije");
   const licneDozvoljene = pod.ciscenjeLicnihFascikli === true;
-  for (const m of mete(process.env)) obrisi(m, log, licneDozvoljene);
-
-  if (!SUVO) {
-    for (const [program, argumenti] of REG_KOMANDE) {
-      execFile(program, argumenti, { windowsHide: true, timeout: 10000 }, () => {});
+  // Odluka DA LI se čisti je gore i vraća se odmah; samo brisanje ide dalje,
+  // meta za metom, i pozivalac ga čeka kroz `posao`.
+  const posao = (async () => {
+    for (const m of mete(process.env)) await obrisi(m, log, licneDozvoljene);
+    if (!SUVO) {
+      for (const [program, argumenti] of REG_KOMANDE) {
+        execFile(program, argumenti, { windowsHide: true, timeout: 10000 }, () => {});
+      }
+      execFile(KORPA_KOMANDA[0], KORPA_KOMANDA[1], { windowsHide: true, timeout: 60000 },
+        () => log("  ispražnjena korpa za otpatke"));
+    } else {
+      log("  [PROBNI RAD] obrisao bih Steam AutoLoginUser iz registry-ja");
+      log("  [PROBNI RAD] ispraznio bih korpu za otpatke");
     }
-    execFile(KORPA_KOMANDA[0], KORPA_KOMANDA[1], { windowsHide: true, timeout: 60000 },
-      () => log("  ispražnjena korpa za otpatke"));
-  } else {
-    log("  [PROBNI RAD] obrisao bih Steam AutoLoginUser iz registry-ja");
-    log("  [PROBNI RAD] ispraznio bih korpu za otpatke");
-  }
-
-  log("čišćenje završeno");
-  return { radjeno: !SUVO, probni: SUVO };
+    log("čišćenje završeno");
+  })();
+  return { radjeno: !SUVO, probni: SUVO, posao };
 }
 
 module.exports = { ocistiSesiju, mete, SUVO, racunarJeZasticen, STOP_FAJL };

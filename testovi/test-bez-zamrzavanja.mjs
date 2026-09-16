@@ -75,6 +75,19 @@ proveri("neuspela provera igre znači da igra RADI", /cb\(err \? true :/.test(ma
   "obrnut odgovor šalje launcher preko žive igre - a to je menjalo rezoluciju");
 proveri("provere igre se ne preklapaju", /if \(proveraIgreUToku\) return;/.test(main));
 
+// ---- 3b) BRISANJE TRAGOVA NE ZAUSTAVLJA LAUNCHER ----
+//
+// Profil pregledača su desetine hiljada fajlova; sinhrono brisanje je posle
+// svake odjave zaustavljalo glavni proces na sekunde.
+const brisanje = telo(cisc, "async function obrisi(");
+proveri("tragovi se brisu asinhrono", brisanje.length > 100 && !/Sync\(/.test(brisanje),
+  "rmSync nad profilom pregledaca je zaustavljao launcher posle svake odjave");
+proveri("ceo profil se brise sa ponovnim pokusajima", /maxRetries/.test(brisanje),
+  "pregledac koji se gasi jos drzi fajlove - pola obrisan profil ostavlja prijave");
+proveri("prijava ceka da se tragovi obrisu",
+  /msg\?\.t === "login" && posaoCiscenja\) await posaoCiscenja/.test(main),
+  "novi gost bi inace zatekao tudje prijave, ili bi mu brisanje odnelo njegov profil");
+
 // ---- 4) TEMPERATURA ----
 const temp = telo(main, "function cpuTemp() {");
 proveri("temperatura odustaje posle neuspeha", /neuspeha >= 3/.test(temp),

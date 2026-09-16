@@ -8,7 +8,8 @@ contextBridge.exposeInMainWorld("crit", {
   launchGame: (g) => ipcRenderer.invoke("launch-game", g),
   openBrowser: (url) => ipcRenderer.invoke("open-browser", url),
   focusLauncher: () => ipcRenderer.invoke("focus-launcher"),
-  adminExit: () => ipcRenderer.invoke("admin-exit"),
+  // PIN ide uz izlaz: glavni proces ga proverava i sam (vidi main.js).
+  adminExit: (pin) => ipcRenderer.invoke("admin-exit", pin),
   ready: () => ipcRenderer.invoke("renderer-ready"),
   onServerMsg: (cb) => ipcRenderer.on("server-msg", (e, m) => cb(m)),
   onWsStatus: (cb) => ipcRenderer.on("ws-status", (e, s) => cb(s)),

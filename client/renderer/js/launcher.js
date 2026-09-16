@@ -306,6 +306,8 @@ function toast(msg, type = "info", trajanje = 3000) {
   window.crit.onHotkey(({ action }) => {
     if (action === "unlock") { if ($("#lockedScreen").classList.contains("active")) otkrijPinOsoblja(); }
     else if (action === "exit") openPin("Admin izlaz iz launchera", true);
+    // Prečica za novo podešavanje ide kroz isti PIN kao dugme - vidi main.js.
+    else if (action === "setup") openPin("Servisni PIN - promena adrese servera", false, "setup");
   });
   window.crit.onServerMsg(handleMsg);
   if (window.crit.onBlokirano) {
@@ -3291,7 +3293,13 @@ async function pinPrihvacen() {
     connFailTicks = 0;
     return;
   }
-  if (S.pendingExit) { S.pendingExit = false; window.crit.adminExit(); }
+  if (S.pendingExit) {
+    S.pendingExit = false;
+    const pin = $("#pinInput").value.trim();
+    $("#pinInput").value = "";
+    const ok = await window.crit.adminExit(pin);
+    if (ok === false) toast("Izlaz nije dozvoljen - PIN nije potvrđen.", "error");
+  }
 }
 $("#pinInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#pinOk").click(); });
 

@@ -100,5 +100,22 @@ proveri("prekid veze bez igraca pokriva ekran", /show\("connScreen"\)/.test(rend
 proveri("igrac bez veze nema besplatno vreme", /function tikLokalneSesije\(\)/.test(main) && /zavrsiBezServera\("vreme"\)/.test(main),
   "iscupan kabl je do sada zaustavljao sat, a igra je radila dalje");
 
+// ---- 7) GLAVNI PROCES CUVA IZLAZ I ADRESU SAM ----
+//
+// Ekran je stvar za kojom sedi igrac. Sve sto vodi napolje ili na drugi server
+// mora da se proveri i u glavnom procesu, ne samo na ekranu.
+proveri("precica za novo podesavanje ne brise nista sama",
+  /Alt\+Shift\+R", \(\) => \{[\s\S]{0,160}sendToRenderer\("hotkey", \{ action: "setup" \}\)/.test(main) &&
+  !/Alt\+Shift\+R", \(\) => \{[\s\S]{0,160}resetConfig\(\)/.test(main),
+  "igrac izvuce kabl, pritisne precicu i preusmeri racunar na svoj server");
+proveri("ekran na precicu otvara isti PIN kao dugme", /action === "setup"\) openPin\(/.test(rend));
+proveri("izlaz iz launchera se proverava i u glavnom procesu",
+  /ipcMain\.handle\("admin-exit", \(e, pin\) => \{\s*if \(!proveriPin\(pin\) && Date\.now\(\) > pinPotvrdjenDo\)/.test(main));
+proveri("potvrdu PIN-a sa servera glavni proces vidi sam", /msg\.t === "pin_ok"\) pinPotvrdjenDo = /.test(main));
+proveri("ekran salje PIN uz izlaz",
+  /const pin = \$\("#pinInput"\)\.value\.trim\(\);[\s\S]{0,80}adminExit\(pin\)/.test(rend) && /adminExit: \(pin\) =>/.test(preload));
+proveri("nova adresa se prima samo dok racunar nije podesen",
+  /ipcMain\.handle\("save-config", \(e, c\) => \{[\s\S]{0,400}if \(config\.configured\) return \{ ok: false/.test(main));
+
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 process.exit(pao ? 1 : 0);

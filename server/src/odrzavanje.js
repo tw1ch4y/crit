@@ -16,6 +16,7 @@
 //   2. rezervne kopije se prorede kroz vreme i imaju granicu ukupne veličine
 //   3. pre pravljenja kopije se gleda koliko je diska ostalo
 import fs from "node:fs";
+import fsp from "node:fs/promises";
 import path from "node:path";
 import { db, DATA_DIR, getSetting, setSetting } from "./db.js";
 
@@ -254,6 +255,42 @@ const KOPIJA_GRESKA = "kopija_van_greska";
 export const KOPIJA_VAN_ZADRZI = 7;   // koliko dana unazad stoji na odredištu
 const KOPIJA_VAN_ZASTARELA = 2 * 86400000; // starija od ovoga = panel crveni
 
+// ODREDIŠTE NE SME DA ZAUSTAVI SERVER.
+//
+// Odredište je po prirodi nepouzdano: iščupan USB, mrežni folder čiji računar
+// spava. Na Windows-u sinhroni poziv ka mrežnoj putanji koja ne odgovara ume da
+// stoji i po minut - a za to vreme ceo server stoji: naplata, panel, launcheri.
+// Nadzornik takav server posle minut i po proglasi zaglavljenim i ubije, a pri
+// sledećem pokretanju održavanje opet krene od kopije - i krug se zatvara.
+//
+// Zato sve što dira odredište ide asinhrono i sa rokom. Poziv koji pređe rok i
+// dalje zauzima jednu nit za rad sa diskom (ne može da se prekine), a tih niti je
+// malo i dele ih svi fajlovi servera - pa se, dok takav poziv ne završi, novo
+// kopiranje ni ne pokušava.
+const ROK_ODREDISTA_MS = Number(process.env.ROK_ODREDISTA_MS) || 20000;
+const ROK_KOPIRANJA_MS = 10 * 60 * 1000; // sama baza preko spore mreže
+let zaglavljeno = 0; // pozivi ka odredištu koji su prešli rok, a još nisu završeni
+
+function saRokom(obecanje, ms, sta) {
+  let tajmer, istekao = false;
+  const rok = new Promise((_, ne) => {
+    tajmer = setTimeout(() => {
+      istekao = true;
+      zaglavljeno++;
+      ne(Object.assign(new Error(`${sta}: odredište ne odgovara`), { code: "ROK" }));
+    }, ms);
+    tajmer.unref?.();
+  });
+  obecanje.then(() => {}, () => {}).finally(() => {
+    clearTimeout(tajmer);
+    if (istekao) zaglavljeno--;
+  });
+  return Promise.race([obecanje, rok]);
+}
+// Stat koji "ne postoji" vraća kao null, a rok i dalje baca.
+const statIliNista = (p, sta) => saRokom(fsp.stat(p), ROK_ODREDISTA_MS, sta)
+  .catch((e) => { if (e?.code === "ROK") throw e; return null; });
+
 export function kopijaVanPodesavanja() {
   const putanja = getSetting(KOPIJA_PUT, "") || "";
   const kad = Number(getSetting(KOPIJA_KAD, "")) || null;
@@ -272,7 +309,7 @@ export function kopijaVanPodesavanja() {
   return { putanja, ukljucena: !!putanja, poslednja: kad, greska, stanje, zadrzi: KOPIJA_VAN_ZADRZI };
 }
 
-export function postaviKopijuVan(putanja) {
+export async function postaviKopijuVan(putanja) {
   const p = String(putanja ?? "").trim();
   if (!p) {
     setSetting(KOPIJA_PUT, "");
@@ -283,12 +320,13 @@ export function postaviKopijuVan(putanja) {
   // pisalo tek u ponoć, pogrešno otkucana putanja bi se otkrila tek onog dana
   // kad kopija zatreba - a tada je kasno.
   try {
-    fs.mkdirSync(p, { recursive: true });
+    await saRokom(fsp.mkdir(p, { recursive: true }), ROK_ODREDISTA_MS, "pravljenje foldera");
     const proba = path.join(p, ".crit-proba");
-    fs.writeFileSync(proba, "proba");
-    fs.unlinkSync(proba);
+    await saRokom(fsp.writeFile(proba, "proba"), ROK_ODREDISTA_MS, "probni upis");
+    await saRokom(fsp.unlink(proba), ROK_ODREDISTA_MS, "brisanje probe");
   } catch (e) {
-    return { error: `Ne mogu da pišem u "${p}": ${e.code || e.message}. Proveri da li je disk priključen i da putanja postoji.` };
+    const razlog = e?.code === "ROK" ? "odredište ne odgovara" : (e?.code || e?.message);
+    return { error: `Ne mogu da pišem u "${p}": ${razlog}. Proveri da li je disk priključen i da putanja postoji.` };
   }
   setSetting(KOPIJA_PUT, p);
   setSetting(KOPIJA_GRESKA, "");
@@ -302,22 +340,25 @@ export function postaviKopijuVan(putanja) {
 // NIŠTA SE NE BRIŠE sa odredišta. Slika obrisana na serveru (izbačena igra)
 // ostaje u kopiji, i to je namerno: kopija treba da preživi i grešku vlasnika,
 // a nekoliko zaostalih fajlova košta megabajt.
-function kopirajSlike(cilj) {
+async function kopirajSlike(cilj) {
   const izvor = path.join(DATA_DIR, "uploads");
   let imena = [];
   try { imena = fs.readdirSync(izvor); } catch { return { preskoceno: "nema slika" }; }
   const dir = path.join(cilj, "slike");
-  try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { return { greska: e.code || e.message }; }
+  try { await saRokom(fsp.mkdir(dir, { recursive: true }), ROK_ODREDISTA_MS, "folder za slike"); }
+  catch (e) { if (e?.code === "ROK") throw e; return { greska: e?.code || e?.message }; }
   let novih = 0, preskoceno = 0;
   for (const ime of imena) {
     const s = path.join(izvor, ime), d = path.join(dir, ime);
+    let izv;
+    try { izv = fs.statSync(s); } catch { continue; } // lokalni disk
+    if (!izv.isFile()) continue;
+    const tamo = await statIliNista(d, "provera slike");
+    if (tamo && tamo.size === izv.size) { preskoceno++; continue; }
     try {
-      const izv = fs.statSync(s);
-      if (!izv.isFile()) continue;
-      if (fs.existsSync(d) && fs.statSync(d).size === izv.size) { preskoceno++; continue; }
-      fs.copyFileSync(s, d);
+      await saRokom(fsp.copyFile(s, d), ROK_ODREDISTA_MS, "kopiranje slike");
       novih++;
-    } catch {}
+    } catch (e) { if (e?.code === "ROK") throw e; }
   }
   return { novih, preskoceno };
 }
@@ -325,9 +366,23 @@ function kopirajSlike(cilj) {
 // Prepiše najsvežiju kopiju na odredište i proredi tamošnje.
 // Nikad ne baca: odredište je po prirodi nepouzdano (iščupan USB, mreža pala),
 // a to ne sme da obori održavanje ni server.
+//
+// Dva poziva odjednom (dnevno održavanje i dugme u panelu) dele isti posao -
+// inače bi dva kopiranja pisala isti fajl.
+let kopiranjeUToku = null;
 export function kopirajVanRacunara() {
+  if (!kopiranjeUToku) kopiranjeUToku = kopirajSada().finally(() => { kopiranjeUToku = null; });
+  return kopiranjeUToku;
+}
+
+async function kopirajSada() {
   const cilj = getSetting(KOPIJA_PUT, "") || "";
   if (!cilj) return { preskoceno: "nije podešeno" };
+  if (zaglavljeno > 0) {
+    const poruka = "odredište ne odgovara (prethodno kopiranje još nije završeno)";
+    setSetting(KOPIJA_GRESKA, poruka);
+    return { error: poruka, cilj };
+  }
   const sve = spisakKopija();
   if (!sve.length) return { preskoceno: "nema kopija" };
   const izvor = sve[0];
@@ -336,54 +391,63 @@ export function kopirajVanRacunara() {
     //
     // Folder se pravi jednom, kad ga vlasnik upiše i dok gleda u ekran. Ako ga
     // ovde nema, to znači da je nestao medij - iščupan USB, odjavljen mrežni
-    // disk. Sa `mkdirSync` bi se u tom trenutku napravio NOV PRAZAN folder na
+    // disk. Sa `mkdir` bi se u tom trenutku napravio NOV PRAZAN folder na
     // sistemskom disku, kopija bi se uredno upisala u njega i javilo bi se da
     // je sve u redu. Vlasnik bi mesecima gledao zeleno stanje, a jedini primerak
     // baze bi i dalje bio na jednom disku - i to bi se otkrilo tek onog dana kad
     // kopija zatreba. Zato je nepostojeće odredište GREŠKA, ne posao.
-    if (!fs.existsSync(cilj)) {
+    const st = await statIliNista(cilj, "provera odredišta");
+    if (!st || !st.isDirectory()) {
       throw Object.assign(new Error("odredište nije dostupno"), { code: "NEMA_ODREDISTA" });
     }
     const dest = path.join(cilj, izvor.f);
     // Ista kopija se ne prepisuje drugi put - dnevno pokretanje bi inače
     // svaki put nanovo pisalo isti fajl na USB bez potrebe.
-    if (!fs.existsSync(dest) || fs.statSync(dest).size !== izvor.velicina) {
-      fs.copyFileSync(izvor.p, dest);
+    const postojeca = await statIliNista(dest, "provera kopije");
+    if (!postojeca || postojeca.size !== izvor.velicina) {
+      await saRokom(fsp.copyFile(izvor.p, dest), ROK_KOPIRANJA_MS, "kopiranje baze");
     }
     // Na odredištu se drži poslednjih nekoliko, da USB ne nabuja.
-    const tamo = fs.readdirSync(cilj)
+    const tamo = (await saRokom(fsp.readdir(cilj), ROK_ODREDISTA_MS, "čitanje odredišta"))
       .filter((f) => f.startsWith("crit-") && f.endsWith(".db"))
       .map((f) => ({ f, p: path.join(cilj, f) }))
       .sort((a, b) => (a.f < b.f ? 1 : -1)); // ime nosi vreme, pa se ređa po njemu
     let obrisano = 0;
-    for (const k of tamo.slice(KOPIJA_VAN_ZADRZI)) { try { fs.unlinkSync(k.p); obrisano++; } catch {} }
+    for (const k of tamo.slice(KOPIJA_VAN_ZADRZI)) {
+      try { await saRokom(fsp.unlink(k.p), ROK_ODREDISTA_MS, "brisanje stare kopije"); obrisano++; }
+      catch (e) { if (e?.code === "ROK") throw e; }
+    }
     // SLIKE IDU ZAJEDNO SA BAZOM.
     //
     // Baza bez slika je pola kopije: redovi pokazuju na `/uploads/...`, a tih
     // fajlova nema - pa se svaki omot, svaka slika pića i svih pet pozadina
     // kucaju ispočetka. Vlasnik bi pri tom gledao zeleno "kopija uredna".
-    const slike = kopirajSlike(cilj);
+    const slike = await kopirajSlike(cilj);
     setSetting(KOPIJA_KAD, String(Date.now()));
     setSetting(KOPIJA_GRESKA, "");
     return { ok: true, fajl: izvor.f, cilj, obrisano, slike };
   } catch (e) {
-    const poruka = e.code === "NEMA_ODREDISTA"
+    const poruka = e?.code === "NEMA_ODREDISTA"
       ? "odredište nije dostupno (disk nije priključen ili je folder obrisan)"
-      : `${e.code || e.message}`;
+      : e?.code === "ROK"
+        ? "odredište ne odgovara (mrežni disk ili USB se ne javlja)"
+        : `${e?.code || e?.message}`;
     setSetting(KOPIJA_GRESKA, poruka);
     return { error: poruka, cilj };
   }
 }
 
 // Sve odjednom: jednom dnevno i pri pokretanju servera.
+//
+// Kopija van računara NIJE deo ovoga: ona je asinhrona (vidi gore) i pozivalac
+// je pokreće posebno, da čekanje na odredište ne zadrži ostatak održavanja.
 export function odrzavanje(aktivnaSmenaId = null) {
   const o = podesavanja();
   const logovi = ocistiLogove(o, aktivnaSmenaId);
   const pokretanja = ocistiPokretanja(o);
   const kopije = srediKopije(o);
-  const vanRacunara = kopirajVanRacunara();
   const s = stanjeSkladista();
-  return { logovi, pokretanja, kopije, vanRacunara, stanje: s };
+  return { logovi, pokretanja, kopije, stanje: s };
 }
 
 // Da li uopšte sme da se pravi nova kopija.

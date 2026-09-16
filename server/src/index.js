@@ -6,7 +6,7 @@ import os from "node:os";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { db, checkpoint } from "./db.js";
-import { backupDb, odrzavanje } from "./odrzavanje.js";
+import { backupDb, odrzavanje, kopirajVanRacunara } from "./odrzavanje.js";
 import { getAdmin } from "./auth.js";
 import { router } from "./routes.js";
 import * as nadg from "./nadogradnja.js";
@@ -270,15 +270,19 @@ function pokreniRedovnePoslove() {
     // tiho prestane da izlazi napolje - i to se otkrije tek onog dana kad zatreba.
     // Zato zapis ide u Logove, gde vlasnik gleda, a ne samo u konzolu koju niko
     // ne otvara.
-    const van = r.vanRacunara;
-    if (van?.ok) {
-      console.log(`kopija van računara: ${van.fajl} -> ${van.cilj}`);
-    } else if (van?.error) {
-      console.error(`PAŽNJA: kopija van računara nije uspela (${van.error}) - odredište ${van.cilj}`);
-      svc.logEvent({ category: "sistem", action: "kopija_van_pala", actor: "sistem",
-        detail: `Kopija van računara nije uspela: ${van.error}. Odredište: ${van.cilj}. ` +
-          `Dok ovo stoji, baza postoji samo na jednom disku.` });
-    }
+    //
+    // Ide asinhrono: odredište ume da ne odgovara, a server za to vreme mora da
+    // radi (vidi kopirajVanRacunara).
+    kopirajVanRacunara().then((van) => {
+      if (van?.ok) {
+        console.log(`kopija van računara: ${van.fajl} -> ${van.cilj}`);
+      } else if (van?.error) {
+        console.error(`PAŽNJA: kopija van računara nije uspela (${van.error}) - odredište ${van.cilj}`);
+        svc.logEvent({ category: "sistem", action: "kopija_van_pala", actor: "sistem",
+          detail: `Kopija van računara nije uspela: ${van.error}. Odredište: ${van.cilj}. ` +
+            `Dok ovo stoji, baza postoji samo na jednom disku.` });
+      }
+    }).catch(() => {});
     return r;
   }
   setInterval(() => odrzavanjeSada("dnevno"), 24 * 60 * 60 * 1000);

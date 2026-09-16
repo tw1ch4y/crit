@@ -1312,6 +1312,29 @@ function klijentProblem(computerId, msg) {
   broadcastPanels({ t: "event", kind: "klijent-problem", text: `${comp?.name || "Računar"}: ${opis || vrsta}` });
 }
 
+// Launcher javlja ono što osoblje treba da zna: blokirano pokretanje programa
+// skinutog kroz pregledač, očišćeni tragovi prethodnog igrača. Ove poruke server
+// ranije nije ni čitao - blokiran program je postojao samo na ekranu igrača, a
+// vlasnik nije mogao da vidi ko to pokušava i na kom računaru.
+//
+// Tekst stiže sa računara igrača, pa se skraćuje i prigušuje kao i kvarovi.
+function klijentZapis(computerId, msg) {
+  const tekst = String(msg?.tekst || "").replace(/\s+/g, " ").trim().slice(0, 200);
+  if (!tekst) return;
+  const sada = Date.now();
+  // Mapa sa pamćenjem ne sme da raste bez kraja: imena programa su razna.
+  if (skoroJavljeno.size > 500) {
+    for (const [k, ts] of skoroJavljeno) if (sada - ts > 10 * 60000) skoroJavljeno.delete(k);
+  }
+  const kljuc = `zapis|${computerId}|${tekst}`;
+  if (sada - (skoroJavljeno.get(kljuc) || 0) < 60000) return;
+  skoroJavljeno.set(kljuc, sada);
+  const comp = computerById(computerId);
+  const p = comp?.current_player_id ? playerById(comp.current_player_id) : null;
+  logEvent({ category: "racunar", action: "klijent_zapis", actor: p?.username || "launcher",
+    target: comp?.name || "?", detail: tekst });
+}
+
 // Sta se najvise igralo u zadatom periodu.
 export function najigranije(from, to, limit = 10) {
   return db.prepare(`
@@ -1352,6 +1375,8 @@ export function handleClientMessage(computerId, msg) {
       return igraNeRadi(computerId, msg);
     case "klijent_problem":
       return klijentProblem(computerId, msg);
+    case "log_klijent":
+      return klijentZapis(computerId, msg);
     case "procesi_lista":
     case "proces_ugasen":
       return odgovorNaZahtev(msg);

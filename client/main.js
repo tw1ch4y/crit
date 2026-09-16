@@ -319,6 +319,9 @@ function connectWs() {
     const stara = ws;
     ws = null;
     try { stara.removeAllListeners(); } catch {}
+    // Veza koja se još povezuje na close() javi grešku - a slušaoca više nema,
+    // pa bi to bila neuhvaćena greška i lažna prijava kvara u panelu.
+    try { stara.on("error", () => {}); } catch {}
     try { stara.close(); } catch {}
     try { stara.terminate(); } catch {}
   }
@@ -410,9 +413,15 @@ function localNics() {
   return out;
 }
 
+// Server je upravo potvrdio PIN osoblja (verify_pin -> pin_ok). Vidi admin-exit:
+// potvrdu glavni proces vidi kroz svoju vezu, pa ekran ne može da je izmisli.
+const PIN_VAZI_MS = 15000;
+let pinPotvrdjenDo = 0;
+
 // server komande koje main obrađuje lokalno
 function handleServerMsg(msg) {
   pratiLokalnuSesiju(msg);
+  if (msg.t === "pin_ok") pinPotvrdjenDo = Date.now() + PIN_VAZI_MS;
   // Servisni PIN stiže uz "welcome" (pri svakom povezivanju) i zasebno kad ga
   // vlasnik promeni u panelu - da nova vrednost važi odmah, ne tek posle
   // restarta svakog računara.
@@ -717,25 +726,30 @@ function zavrsiSesiju() {
 
 // Čišćenje tragova prethodnog igrača. Ne radi ništa u --dev/--no-lock režimu,
 // niti ako "ciscenjeSesije" nije uključeno u podesavanja.json.
-let ciscenjeUToku = false;
+//
+// Brisanje je asinhrono (vidi ciscenje.js) - profil pregledača su desetine
+// hiljada fajlova, i dok se brisao sinhrono, launcher je posle svake odjave
+// stajao sekundama. Nova prijava zato ČEKA da se ovo završi (vidi to-server):
+// inače bi novi gost zatekao tuđe prijave, ili bi mu brisanje odnelo njegov
+// tek otvoren profil.
+let posaoCiscenja = null;
 function ocistiTragove() {
-  if (ciscenjeUToku) return;
-  ciscenjeUToku = true;
-  setTimeout(() => {
-    try {
-      const r = ocistiSesiju({
-        dozvoljeno: !NO_LOCK,
-        resourcesPath: process.resourcesPath,
-        execPath: process.execPath,
-        dirname: __dirname,
-        log: (m) => console.log(m),
-      });
-      if (r.radjeno) wsSend({ t: "log_klijent", tekst: "Očišćeni tragovi prethodnog igrača" });
-    } catch (e) {
-      console.error("čišćenje:", e.message);
-    }
-    ciscenjeUToku = false;
-  }, 1500); // sačekaj da se pregledači i igre stvarno ugase
+  if (posaoCiscenja) return;
+  posaoCiscenja = new Promise((res) => setTimeout(res, 1500)) // da se pregledači i igre stvarno ugase
+    .then(obrisiTragoveSada)
+    .catch((e) => console.error("čišćenje:", e?.message || e))
+    .finally(() => { posaoCiscenja = null; });
+}
+async function obrisiTragoveSada() {
+  const r = ocistiSesiju({
+    dozvoljeno: !NO_LOCK,
+    resourcesPath: process.resourcesPath,
+    execPath: process.execPath,
+    dirname: __dirname,
+    log: (m) => console.log(m),
+  });
+  await r.posao;
+  if (r.radjeno) wsSend({ t: "log_klijent", tekst: "Očišćeni tragovi prethodnog igrača" });
 }
 
 // ---------- Daljinska instalacija (preuzmi sa URL-a i pokreni tiho) ----------
@@ -1687,6 +1701,10 @@ function closeBrowser() {
 // ---------- IPC ----------
 ipcMain.handle("get-config", () => ({ host: config.host, token: config.token, configured: config.configured }));
 ipcMain.handle("save-config", (e, c) => {
+  // Nova adresa se prima samo dok launcher NIJE podešen - a u to stanje se
+  // ulazi tek posle servisnog PIN-a (reset-config). Inače bi jedan poziv sa
+  // ekrana preusmerio podešen računar na tuđ server, bez ikakve provere.
+  if (config.configured) return { ok: false, error: "Računar je već podešen. Promena ide preko servisnog PIN-a." };
   const r = saveConfig(c);
   if (r.ok) connectWs();
   return r;
@@ -1701,10 +1719,12 @@ ipcMain.handle("reset-config", (e, pin) => {
 });
 // Lokalna provera PIN-a - radi i kad server ne odgovara.
 ipcMain.handle("proveri-servisni-pin", (e, pin) => ({ ok: proveriPin(pin) }));
-ipcMain.handle("to-server", (e, msg) => {
+ipcMain.handle("to-server", async (e, msg) => {
   // Odjava bez servera: sesija se završava ovde, a server je obračuna kad se
   // vrati. wsSend bi je inače tiho bacio i igrač bi ostao prijavljen.
   if (msg?.t === "logout" && !naVezi() && lokalna.aktivna()) { zavrsiBezServera("odjava"); return true; }
+  // Prijava čeka da se obrišu tragovi prethodnog igrača - vidi ocistiTragove.
+  if (msg?.t === "login" && posaoCiscenja) await posaoCiscenja;
   wsSend(msg);
   return true;
 });
@@ -1728,11 +1748,16 @@ function registerHotkeys() {
   // Admin izlaz iz launchera (prompt za PIN)
   globalShortcut.register("CommandOrControl+Alt+Shift+Q", () => { focusLauncher(); sendToRenderer("hotkey", { action: "exit" }); });
 
-  // Ponovno podešavanje adrese/tokena. Radi samo kad NEMA veze sa serverom -
-  // tada osoblju i treba, a igraču ne vredi ništa (i dalje je zaključan u launcheru).
+  // Ponovno podešavanje adrese/tokena. Radi samo kad NEMA veze sa serverom, i
+  // samo uz servisni PIN - isti prozor kao dugme "Promeni adresu servera".
+  //
+  // Prečica je ranije brisala podešavanje ODMAH. Veza se prekida čupanjem kabla,
+  // pa je put bio: izvuci kabl, pritisni prečicu, upiši adresu svog servera i
+  // igraj besplatno na računaru igraonice.
   globalShortcut.register("CommandOrControl+Alt+Shift+R", () => {
     if (ws && ws.readyState === WebSocket.OPEN) return;
-    resetConfig();
+    focusLauncher();
+    sendToRenderer("hotkey", { action: "setup" });
   });
   if (DEV) return;
 
@@ -1803,7 +1828,18 @@ function setPolicies(on) {
   }
 }
 
-ipcMain.handle("admin-exit", () => {
+// IZLAZ IZ KIOSKA SE PROVERAVA I OVDE, NE SAMO NA EKRANU.
+//
+// Ekran traži PIN i tek onda zove izlaz. Ali ekran je stvar za kojom sedi igrač,
+// i pretpostavka da u njega nikad ništa neće biti ubačeno ne sme da bude jedina
+// brava - isto pravilo kao za pokretanje igara (vidi smePokretanje). Izlaz
+// prolazi uz ispravan servisni PIN, ili ako je server upravo potvrdio PIN osoblja.
+ipcMain.handle("admin-exit", (e, pin) => {
+  if (!proveriPin(pin) && Date.now() > pinPotvrdjenDo) {
+    javiProblem("izlaz_odbijen", "Izlaz iz launchera je zatražen bez ispravnog PIN-a - odbijen");
+    return false;
+  }
+  pinPotvrdjenDo = 0;
   app.isQuitting = true;
   killAllGames();
   app.quit();
