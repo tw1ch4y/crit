@@ -24,7 +24,7 @@ await podigniServer(DATA, 8201);
 const { proveri, kraj } = brojac();
 
 const svc = await import("../server/src/service.js");
-const { db } = await import("../server/src/db.js");
+const { db, setSetting } = await import("../server/src/db.js");
 const cekaj = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const token = (await fetch(BASE + "/api/login", { method: "POST", headers: { "content-type": "application/json" },
@@ -85,9 +85,63 @@ proveri("svima je skinuto priblizno isto",
 proveri("iznos odgovara proteklom vremenu i ceni",
   skinuto[0] > 0.02 && skinuto[0] < 0.5, String(skinuto[0]));
 
+// ---- NAPLATA JE TACNA I NA DUZE VREME ----
+//
+// Stanje se vodi u parama, a jedan prolaz od pet sekundi vredi delic pare. Dok
+// se svaki prolaz zaokruzivao zasebno, sat od 120 din je kostao 122,40, a sat od
+// 80 din 79,20 - koliko se promasi zavisilo je od cene.
+{
+  const pravoVreme = Date.now;
+  let sat = pravoVreme();
+  const kredit = () => db.prepare("SELECT balance FROM players WHERE id=?").get(igraci[0].id).balance;
+  const trosak = () => db.prepare("SELECT cost FROM sessions WHERE id=?").get(sesije[0]).cost;
+  const satIgranja = () => { for (let i = 0; i < 720; i++) { sat += 5000; svc.billingTick(); } };
+  try {
+    Date.now = () => sat;
+    for (const cena of [120, 80, 100]) {
+      setSetting("rate_per_hour", String(cena));
+      svc.billingTick();
+      const kPre = kredit(), tPre = trosak();
+      satIgranja();
+      const skinuto = Math.round((kPre - kredit()) * 100) / 100;
+      proveri(`sat igranja pri ${cena} din/h kosta ${cena} din`, Math.abs(skinuto - cena) <= 0.02, `skinuto ${skinuto}`);
+      proveri(`i sesija poskupljuje tacno koliko je skinuto (${cena})`,
+        Math.abs((trosak() - tPre) - (kPre - kredit())) < 0.001, `sesija +${trosak() - tPre}, kredit -${kPre - kredit()}`);
+    }
+  } finally {
+    Date.now = pravoVreme;
+    setSetting("rate_per_hour", "120");
+  }
+}
+
+// ---- VIP DOBIJA DVOSTRUKO ISKUSTVO I OD VREMENA ----
+//
+// Mnozilac je stajao samo u dodajXp, koju prava potrosnja nije zvala: VIP je
+// placao "dvostruko iskustvo" i dobijao obicno.
+{
+  const pravoVreme = Date.now;
+  let sat = pravoVreme();
+  const xp = (i) => db.prepare("SELECT xp FROM players WHERE id=?").get(igraci[i].id).xp;
+  try {
+    Date.now = () => sat;
+    setSetting("vip_xp", "2");
+    db.prepare("UPDATE players SET vip_do=? WHERE id=?").run(sat + 30 * 86400000, igraci[0].id);
+    svc.billingTick();
+    const vipPre = xp(0), obicanPre = xp(1);
+    for (let i = 0; i < 360; i++) { sat += 5000; svc.billingTick(); } // pola sata = 60 din
+    proveri("VIP za pola sata igranja dobija dvostruko iskustvo", Math.abs((xp(0) - vipPre) - 120) <= 0.1, String(xp(0) - vipPre));
+    proveri("obican igrac za isto vreme dobija obicno", Math.abs((xp(1) - obicanPre) - 60) <= 0.1, String(xp(1) - obicanPre));
+  } finally {
+    Date.now = pravoVreme;
+    db.prepare("UPDATE players SET vip_do=NULL WHERE id=?").run(igraci[0].id);
+  }
+}
+
 // ---- TELO PETLJE JE ZASTICENO ----
 const src = citajIzvor("server/src/service.js");
-const petlja = src.slice(src.indexOf("export function billingTick"), src.indexOf("export function billingTick") + 4500);
+proveri("nijedna potrosnja ne racuna iskustvo mimo VIP mnozioca", !/noviXp = round2\(\(Number\(/.test(src),
+  "svaka putanja novca mora da ide kroz xpPosleTrosenja");
+const petlja = src.slice(src.indexOf("export function billingTick"), src.indexOf("export function billingTick") + 8000);
 proveri("svaka sesija se obradjuje pod svojom zastitom",
   /for \(const s of active\) \{[\s\S]{0,600}try \{/.test(petlja),
   "greska na trecoj masini bi inace preskocila sve iza nje, i to pri svakom prolazu");

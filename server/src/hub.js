@@ -35,8 +35,13 @@ export function setHandlers(h) {
 // duze bi se videlo na racunu.
 const PING_MS = 15000;
 
+// Najveća poruka koju launcher šalje je spisak procesa za daljinski task
+// manager - desetine kilobajta. Podrazumevana granica biblioteke je 100 MB:
+// jedan pokvaren ili zlonameran klijent bi toliko držao u memoriji servera.
+export const NAJVECA_PORUKA = 2 * 1024 * 1024;
+
 export function initWs(server, { authComputer, authAdmin }) {
-  const wss = new WebSocketServer({ server, path: "/ws" });
+  const wss = new WebSocketServer({ server, path: "/ws", maxPayload: NAJVECA_PORUKA });
   // Greske http servera ws prosledjuje ovde, a bez slusaoca bi ih bacio kao
   // neuhvacene i server bi ostao ziv bez porta. Obradjuje ih index.js.
   wss.on("error", () => {});
@@ -54,6 +59,10 @@ export function initWs(server, { authComputer, authAdmin }) {
     // Sveza veza vazi kao ziva do prvog ping-a koji ostane bez odgovora.
     ws.zivo = true;
     ws.on("pong", () => { ws.zivo = true; });
+    // Greška na jednoj vezi (pokvaren okvir, prevelika poruka) je njena stvar:
+    // biblioteka tada sama zatvara tu vezu. Bez slušaoca bi se ista greška
+    // bacila kao neuhvaćena i punila zapis servera.
+    ws.on("error", () => {});
     const url = new URL(req.url, "http://x");
     const kind = url.searchParams.get("kind"); // "client" | "panel"
     const token = url.searchParams.get("token");
@@ -130,6 +139,17 @@ export function izbaciPanel(adminId) {
     izbaceno++;
   }
   return izbaceno;
+}
+
+// Zatvara vezu računara koji je uklonjen iz igraonice. Token mu više ne važi,
+// ali već otvorena veza bi inače radila dalje.
+export function izbaciRacunar(computerId) {
+  const ws = clients.get(computerId);
+  if (!ws) return false;
+  clients.delete(computerId);
+  try { ws.send(JSON.stringify({ t: "error", message: "Računar je uklonjen iz igraonice" })); } catch {}
+  try { ws.close(); } catch {}
+  return true;
 }
 
 export function broadcastPanels(obj) {

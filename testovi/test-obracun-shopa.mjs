@@ -36,8 +36,10 @@ const artikli = await api("/api/shop");
 const kola = artikli.find((i) => i.name.startsWith("Coca-Cola")); // 130
 const voda = artikli.find((i) => i.name.startsWith("Voda"));      // 80
 
-await api("/api/shift/open", "POST", { openingCash: 0 });
+// Igrac sa kreditom se pravi PRE smene: pocetni kredit je uplata na kasi, pa bi
+// inace usao u pazar ove smene - a ovde se proverava samo shop.
 const igrac = await api("/api/players", "POST", { username: "pera", password: "pera1234", balance: 5000 });
+await api("/api/shift/open", "POST", { openingCash: 0 });
 
 // launcher jednog racunara
 const comps = await api("/api/computers");

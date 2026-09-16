@@ -28,11 +28,22 @@ const spoji = (v) => new Promise((res) => {
   setTimeout(() => res(null), 2500);
 });
 const verzijaSad = async () => (await api("/api/computers")).find((c) => c.id === pc.id)?.verzija;
+const numeracijaSad = async () => (await api("/api/computers")).find((c) => c.id === pc.id)?.numeracija;
 
 const a = await spoji("2.22.0");
 await cekaj(400);
 proveri("verzija stize do panela", (await verzijaSad()) === "2.22.0", `dobijeno: ${JSON.stringify(await verzijaSad())}`);
 a?.close(); await cekaj(250);
+
+// Launcher nove numeracije to javlja uz verziju, a panel mora da ga dobije -
+// inače svaki launcher prikazuje kao "stari".
+const n1 = await new Promise((res) => {
+  const w = new WebSocket(`${WSB}/ws?kind=client&token=${encodeURIComponent(pc.token)}&v=2.22.0&n=1`);
+  w.once("open", () => res(w)); w.once("error", () => res(null));
+});
+await cekaj(400);
+proveri("numeracija stize do panela", (await numeracijaSad()) === 1, `dobijeno: ${JSON.stringify(await numeracijaSad())}`);
+n1?.close(); await cekaj(250);
 
 // Stariji launcher ne salje nista. To ne sme da obrise ono sto vec znamo -
 // racunar se u medjuvremenu mogao samo restartovati, a poslednja poznata

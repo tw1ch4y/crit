@@ -214,20 +214,21 @@ router.get("/players", (req, res) => {
 });
 
 router.post("/players", (req, res) => {
-  const r = svc.createPlayer(req.body || {});
+  const r = svc.createPlayer(req.body || {}, { adminId: req.admin.adminId, adminUsername: req.admin.username });
   if (r.error) return res.status(400).json(r);
-  svc.logEvent({ category: "nalozi", action: "player_create", actor: req.admin.username, target: req.body?.username, detail: `Kreiran nalog igrača${Number(req.body?.balance) > 0 ? `, kredit ${Number(req.body.balance)}` : ""}`, amount: Number(req.body?.balance) || null });
+  // Iznos ne ide ovde: početni kredit je već zapisan kao dopuna (createPlayer),
+  // pa bi se inače pojavio dvaput.
+  svc.logEvent({ category: "nalozi", action: "player_create", actor: req.admin.username, target: req.body?.username, detail: `Kreiran nalog igrača${Number(req.body?.balance) > 0 ? `, kredit ${Number(req.body.balance)}` : ""}` });
   res.json(r);
 });
 
 router.post("/players/guests", (req, res) => {
-  const r = svc.createGuests(req.body?.count, req.body?.balance);
+  const r = svc.createGuests(req.body?.count, req.body?.balance, { adminId: req.admin.adminId, adminUsername: req.admin.username });
   if (r.error) return res.status(400).json(r);
   const imena = r.players.map((p) => p.username).join(", ");
   svc.logEvent({
     category: "nalozi", action: "player_create", actor: req.admin.username, target: imena,
     detail: `Otvoreni gostujući nalozi (${r.players.length})${Number(req.body?.balance) > 0 ? `, kredit ${Number(req.body.balance)} po nalogu` : ""}`,
-    amount: Number(req.body?.balance) > 0 ? Number(req.body.balance) * r.players.length : null,
   });
   res.json(r);
 });
@@ -350,6 +351,7 @@ router.post("/players/:id/ban", (req, res) => {
   const id = Number(req.params.id);
   const banned = !!req.body?.banned;
   const r = svc.setPlayerBanned(id, banned);
+  if (r.error) return res.status(404).json(r);
   svc.logEvent({ category: "nalozi", action: banned ? "ban" : "unban", actor: req.admin.username, target: pName(id), detail: banned ? "Blokiran nalog" : "Odblokiran nalog" });
   res.json(r);
 });
@@ -367,7 +369,7 @@ router.delete("/players/:id", requireOwner, (req, res) => {
   const nm = pName(id);
   const r = svc.deletePlayer(id);
   if (r.error) return res.status(400).json(r);
-  svc.logEvent({ category: "nalozi", action: "player_delete", actor: req.admin.username, target: nm, detail: "Trajno obrisan nalog igrača" });
+  svc.logEvent({ category: "nalozi", action: "player_delete", actor: req.admin.username, target: nm, detail: "Obrisan nalog igrača (istorija novca ostaje)" });
   res.json(r);
 });
 
@@ -384,7 +386,7 @@ router.get("/computers", (req, res) => {
   const tokens = new Map(db.prepare("SELECT id, token FROM computers").all().map((r) => [r.id, r.token]));
   res.json(svc.computersSnapshot().map((c) => ({
     id: c.id, name: c.name, status: c.status, online: c.online,
-    ip: c.ip, mac: c.mac, verzija: c.verzija, pinFabricki: c.pinFabricki, lastSeen: c.lastSeen, token: tokens.get(c.id),
+    ip: c.ip, mac: c.mac, verzija: c.verzija, numeracija: c.numeracija, pinFabricki: c.pinFabricki, lastSeen: c.lastSeen, token: tokens.get(c.id),
   })));
 });
 
@@ -417,10 +419,11 @@ router.post("/computers/bulk", requireOwner, (req, res) => {
 });
 
 router.delete("/computers/:id", requireOwner, (req, res) => {
-  const nm = cName(Number(req.params.id));
-  db.prepare("DELETE FROM computers WHERE id=?").run(Number(req.params.id));
-  svc.logEvent({ category: "racunar", action: "delete", actor: req.admin.username, target: nm, detail: "Obrisan računar" });
-  res.json({ ok: true });
+  const r = svc.obrisiRacunar(Number(req.params.id));
+  if (r.error) return res.status(r.nema ? 404 : 400).json({ error: r.error });
+  svc.logEvent({ category: "racunar", action: "delete", actor: req.admin.username, target: r.ime,
+    detail: r.ugasen ? "Uklonjen računar (sesije i porudžbine ostaju u istoriji)" : "Obrisan računar" });
+  res.json(r);
 });
 
 router.put("/computers/:id", requireOwner, (req, res) => {
@@ -438,12 +441,14 @@ router.put("/computers/:id", requireOwner, (req, res) => {
 router.post("/computers/:id/lock", (req, res) => {
   const id = Number(req.params.id);
   const r = svc.lockComputer(id, req.admin.adminId);
+  if (r.error) return res.status(404).json(r);
   svc.logEvent({ category: "racunar", action: "lock", actor: req.admin.username, target: cName(id), detail: "Zaključan računar" });
   res.json(r);
 });
 router.post("/computers/:id/unlock", (req, res) => {
   const id = Number(req.params.id);
   const r = svc.unlockComputer(id, req.admin.adminId);
+  if (r.error) return res.status(404).json(r);
   svc.logEvent({ category: "racunar", action: "unlock", actor: req.admin.username, target: cName(id), detail: "Otključan računar" });
   res.json(r);
 });
@@ -455,7 +460,10 @@ router.post("/computers/:id/logout", (req, res) => {
 });
 router.post("/computers/:id/message", (req, res) => {
   const id = Number(req.params.id);
-  const text = String(req.body?.text || "");
+  // Poruka ide preko ekrana igrača i u Logove - bez granice bi jedan zalepljen
+  // tekst zatrpao i jedno i drugo.
+  const text = String(req.body?.text || "").trim().slice(0, 500);
+  if (!text) return res.status(400).json({ error: "Poruka je prazna" });
   const r = svc.sendMessageToComputer(id, text);
   svc.logEvent({ category: "racunar", action: "message", actor: req.admin.username, target: cName(id), detail: `Poruka: ${text}` });
   res.json(r);
@@ -601,7 +609,8 @@ router.delete("/shop/:id/image", requireOwner, (req, res) => {
   res.json(r);
 });
 router.delete("/shop/:id", requireOwner, (req, res) => {
-  svc.deleteShopItem(Number(req.params.id));
+  const r = svc.deleteShopItem(Number(req.params.id));
+  if (r.error) return res.status(r.error === "Artikal ne postoji" ? 404 : 400).json(r);
   svc.logEvent({ category: "podesavanja", action: "shop_delete", actor: req.admin.username, detail: "Obrisan artikal iz shopa" });
   svc.pushCatalog();
   res.json({ ok: true });
@@ -747,7 +756,11 @@ router.post("/programs", requireOwner, (req, res) => {
   svc.logEvent({ category: "podesavanja", action: "program_add", actor: req.admin.username, target: req.body?.name, detail: "Dodat program u biblioteku" });
   res.json(r);
 });
-router.put("/programs/:id", requireOwner, (req, res) => res.json(svc.updateProgram(Number(req.params.id), req.body || {})));
+router.put("/programs/:id", requireOwner, (req, res) => {
+  const r = svc.updateProgram(Number(req.params.id), req.body || {});
+  if (r.error) return res.status(r.error === "Program ne postoji" ? 404 : 400).json(r);
+  res.json(r);
+});
 router.delete("/programs/:id", requireOwner, (req, res) => { svc.deleteProgram(Number(req.params.id)); res.json({ ok: true }); });
 router.get("/install-status", requireOwner, (req, res) => res.json(svc.getInstallStatus()));
 router.delete("/install-status", requireOwner, (req, res) => res.json(svc.clearInstallStatus()));
@@ -757,6 +770,8 @@ router.post("/install", requireOwner, (req, res) => {
   if (programId) { prog = db.prepare("SELECT * FROM programs WHERE id=?").get(Number(programId)); if (!prog) return res.status(400).json({ error: "Program ne postoji" }); }
   else prog = { name, url, args };
   if (!prog.name || !prog.url) return res.status(400).json({ error: "Naziv i link su obavezni" });
+  // Računar preuzima i pokreće ono što stoji na tom linku - samo http(s).
+  if (!/^https?:\/\//i.test(String(prog.url))) return res.status(400).json({ error: "Link mora počinjati sa http:// ili https://" });
   res.json(svc.sendInstall(ids, prog, req.admin.username));
 });
 
@@ -773,6 +788,7 @@ router.post("/settings", requireOwner, (req, res) => {
   // Negativna cena po satu bi igračima DODAVALA kredit dok sede, a negativno
   // mirovanje bi ih odjavljivalo odmah - oba se odbijaju pre upisa.
   const brojevi = { ratePerHour: "Cena po satu", idleMinutes: "Odjava zbog mirovanja" };
+  const PIN = /^\d{4,8}$/;
   // U bazu ide PROVERENA vrednost, ne ono što je stiglo u zahtevu. Ranije je
   // provera radila nad Number(...) a upisivala se sirova vrednost, pa je
   // ratePerHour: true prolazilo kao ispravno i završavalo kao NULL u bazi -
@@ -784,10 +800,18 @@ router.post("/settings", requireOwner, (req, res) => {
     if (typeof sirovo === "object") return res.status(400).json({ error: `${k}: neispravna vrednost` });
     if (brojevi[k]) {
       const v = Number(sirovo);
-      if (!Number.isFinite(v) || v < 0) return res.status(400).json({ error: `${brojevi[k]}: unesi broj veći ili jednak nuli` });
+      if (!Number.isFinite(v) || v < 0 || !svc.ispravanIznos(v)) return res.status(400).json({ error: `${brojevi[k]}: unesi broj veći ili jednak nuli` });
       zaUpis[dbKey] = v;
     } else {
-      zaUpis[dbKey] = String(sirovo).trim();
+      const tekst = String(sirovo).trim();
+      // Prazan PIN za otključavanje je otključavao računar praznim unosom.
+      if (k === "unlockPin" && !PIN.test(tekst)) return res.status(400).json({ error: "PIN za otključavanje mora imati 4 do 8 cifara" });
+      if (k === "servisniPin" && tekst && !PIN.test(tekst)) {
+        return res.status(400).json({ error: "Servisni PIN mora imati 4 do 8 cifara (ili ostavi prazno)" });
+      }
+      if (k === "cafeName" && (!tekst || tekst.length > 40)) return res.status(400).json({ error: "Naziv igraonice: od 1 do 40 znakova" });
+      if (k === "currency" && (!tekst || tekst.length > 8)) return res.status(400).json({ error: "Valuta: od 1 do 8 znakova" });
+      zaUpis[dbKey] = tekst;
     }
   }
   const changed = [];
@@ -1050,7 +1074,7 @@ router.get("/report", (req, res) => {
   const cashRevenue = db.prepare("SELECT COALESCE(SUM(total),0) s FROM orders WHERE payment='cash' AND status!='cancelled' AND created_at>=?").get(from).s;
   const topups = db.prepare("SELECT COALESCE(SUM(amount),0) s FROM transactions WHERE type='topup' AND created_at>=?").get(from).s;
   const activeSessions = db.prepare("SELECT COUNT(*) c FROM sessions WHERE status='active'").get().c;
-  const playersCount = db.prepare("SELECT COUNT(*) c FROM players").get().c;
+  const playersCount = db.prepare("SELECT COUNT(*) c FROM players WHERE obrisan IS NULL").get().c;
   res.json({
     sessionRevenue: svc.round2(sessionRevenue),
     shopRevenue: svc.round2(shopRevenue),

@@ -145,4 +145,20 @@ proveri("najbolji dan se racuna", p3.rekordi.najboljiDan?.iznos >= 1800,
 proveri("omiljen dan u nedelji postoji", p3.rekordi.omiljenDan != null && p3.rekordi.omiljenDan >= 0 && p3.rekordi.omiljenDan <= 6,
   String(p3.rekordi.omiljenDan));
 
+// ---- 5) NEDELJA ZAREDOM: isti kljuc kao u bazi ----
+//
+// Posete se grupisu po SQLite-ovom %W, a niz se broji poredjenjem sa kljucem iz
+// JS-a. Ranija formula se razilazila svake nedelje (dan) - niz je pucao vikendom.
+{
+  const upit = db.prepare("SELECT strftime('%Y-%W', ?/1000, 'unixepoch', 'localtime') w");
+  let razlika = 0, prvi = "";
+  for (let dan = 0; dan < 3 * 366; dan++) {
+    for (const [h, m] of [[0, 20], [12, 0], [23, 50]]) {
+      const t = new Date(2025, 0, 1 + dan, h, m).getTime();
+      if (svc.kljucNedelje(t) !== upit.get(t).w) { razlika++; if (!prvi) prvi = `${new Date(t)} js=${svc.kljucNedelje(t)} sqlite=${upit.get(t).w}`; }
+    }
+  }
+  proveri("kljuc nedelje je isti kao u bazi, svakog dana kroz tri godine", razlika === 0, `${razlika} razlika, npr. ${prvi}`);
+}
+
 kraj();

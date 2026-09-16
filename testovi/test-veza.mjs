@@ -116,6 +116,17 @@ proveri("nema duplih sesija", snap.computers.filter((c) => c.player?.username ==
 proveri("panel i dalje radi", (await api("/api/snapshot")).computers.length > 0);
 proveri("naplata nije stala", typeof (await api("/api/shift")) !== "undefined");
 
+// ---- prevelika poruka zatvara samo tu vezu ----
+// Podrazumevana granica biblioteke je 100 MB; toliko bi jedan klijent drzao u
+// memoriji servera.
+const velika = await spoji("client", comps[comps.length - 1].token);
+let zatvorena = false;
+velika.w?.on("close", () => { zatvorena = true; });
+try { velika.w?.send("x".repeat(3 * 1024 * 1024)); } catch {}
+for (let i = 0; i < 50 && !zatvorena; i++) await cekaj(100);
+proveri("prevelika poruka zatvara tu vezu", velika.otvoren && zatvorena);
+proveri("a server radi dalje", await ziv());
+
 try { k.w.close(); b.w?.close(); } catch {}
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 process.exit(pao ? 1 : 0);

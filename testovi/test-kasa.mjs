@@ -93,7 +93,26 @@ await api(`/api/orders/${o.orderId || o.id}/status`, "POST", { status: "cancelle
 const posle2 = (await api("/api/shift")).totals;
 proveri("otkazana kes porudzbina izlazi iz pazara",
   blizu(posle2.shopCash, pre2.shopCash - 130, 0.01), `${pre2.shopCash} -> ${posle2.shopCash}`);
+// Otkazivanje je vratilo novac i pice - "vracena" porudzbina to ne bi ponovila.
+const vracanje = await api(`/api/orders/${o.orderId || o.id}/status`, "POST", { status: "delivered" });
+proveri("otkazana porudzbina ne moze da se vrati", !!vracanje?.error, JSON.stringify(vracanje));
+const posle3 = (await api("/api/shift")).totals;
+proveri("i pazar ostaje bez nje", blizu(posle3.shopCash, posle2.shopCash, 0.01), `${posle2.shopCash} -> ${posle3.shopCash}`);
 await api("/api/shift/close", "POST", { closingCash: null });
+
+// ---- pocetni kredit pri otvaranju naloga je novac u kasi ----
+//
+// Gost koji otvara nalog plati kao i onaj koji dopunjava. Dok se taj iznos
+// upisivao samo uz otvaranje naloga, obracun ga nije ocekivao - radnik je uvece
+// imao visak koji ne ume da objasni.
+await api("/api/shift/open", "POST", { openingCash: 0 });
+await api("/api/players", "POST", { username: "nov-sa-kreditom", password: "test1234", balance: 400 });
+await api("/api/players/guests", "POST", { count: 2, balance: 150 });
+const s3 = (await api("/api/shift")).totals;
+proveri("pocetni kredit novog naloga ulazi u dopune smene", blizu(s3.topups, 400 + 2 * 150, 0.01), `${s3.topups} != 700`);
+proveri("i u pazar", blizu(s3.revenue, 700, 0.01), String(s3.revenue));
+const z3 = await api("/api/shift/close", "POST", { closingCash: 700 });
+proveri("kasa se poklapa kad je gost platio pri otvaranju naloga", blizu(z3.summary.difference, 0, 0.01), String(z3.summary.difference));
 
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 process.exit(pao ? 1 : 0);

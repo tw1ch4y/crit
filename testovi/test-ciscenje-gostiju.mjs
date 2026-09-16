@@ -68,10 +68,22 @@ await new Promise((r) => setTimeout(r, 4000));
 proveri("gost koji je danas igrao se ne nudi ni kad ostane bez kredita",
   !(await spremniZa()).includes(sedi.username), JSON.stringify(await spremniZa()));
 
+// --- gost koji je platio i potrosio: istorija novca mora da ostane ---
+const potrosen = (await api("/api/players/guests", "POST", { count: 1, balance: 90 })).players[0];
+await api(`/api/players/${potrosen.id}/topup`, "POST", { amount: -90 });
+ostari(potrosen.username);
+const dopunePre = (await api("/api/stats?period=today"))?.revenue?.topups;
+
 // --- samo ciscenje ---
 const r = await api("/api/players/guests/ocisti", "POST");
 const posle = await svi();
-proveri("obrisao tacno dva stara prazna naloga", r.obrisano === 2, String(r.obrisano));
+proveri("obrisao tacno tri stara prazna naloga", r.obrisano === 3, String(r.obrisano));
+const dopunePosle = (await api("/api/stats?period=today"))?.revenue?.topups;
+proveri("brisanje naloga ne menja izvestaj", dopunePre === dopunePosle && dopunePre >= 90,
+  `${dopunePre} -> ${dopunePosle} - izvestaj za prosli period ne sme da se menja`);
+proveri("obrisan nalog nestaje iz spiska", !posle.includes(potrosen.username), JSON.stringify(posle));
+const dopunaObrisanom = await api(`/api/players/${potrosen.id}/topup`, "POST", { amount: 10 });
+proveri("obrisan nalog ne moze da se dopuni", !!dopunaObrisanom?.error, JSON.stringify(dopunaObrisanom));
 proveri("gost sa kreditom ostao", posle.includes(saKreditom.players[0].username));
 proveri("gost koji je igrao ostao", posle.includes(sedi.username));
 proveri("redovan igrac ostao", posle.includes("pera-redovni"));

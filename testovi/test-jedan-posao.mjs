@@ -103,7 +103,11 @@ for (const [gde, sablon] of [
   // Uz orderId i stanje, isti posao vraca i prelazak nivoa (XP se dodaje u
   // ISTOM upisu kao kredit) - zato se ne trazi tacan spisak polja.
   ["porudzbina igraca", /orderId, newBal[^}]*\} = uJednomPoslu/],
-  ["racun na kasi", /orderId, javiIgracu \} = uJednomPoslu/],
+  ["racun na kasi", /orderId, javiIgracu[^}]*\} = uJednomPoslu/],
+  // Zapis iz kog se racuna "Shop" u obracunu smene je deo istog posla - i za
+  // porudzbinu sa racunara i za racun na kasi.
+  ["zapis porudzbine", /const l = upisiLog\(\{ category: "shop", action: "order"/],
+  ["zapis racuna na kasi", /const l = upisiLog\(\{ category: "shop", action: "pos"/],
   ["nagradni tocak", /bal = uJednomPoslu/],
   // Ove cetiri su bile propustene: svaka je pomerala novac u dva ili tri
   // odvojena upisa. Dopuna je najskuplja - kroz nju prolazi svaki dinar koji

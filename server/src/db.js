@@ -312,6 +312,11 @@ function migrate() {
   // naloge i gasi istekle - a taj posao se preskoci onog dana kad server ne radi,
   // pa gost ostane VIP zauvek. Rok se ne kvari: prosao je ili nije.
   if (!columnExists("players", "vip_do")) db.exec("ALTER TABLE players ADD COLUMN vip_do INTEGER");
+  // OBRISAN NALOG (vreme brisanja). Nalog se ne briše fizički: uz njega idu
+  // transakcije i sesije iz kojih se računaju izveštaji. Vidi deletePlayer.
+  if (!columnExists("players", "obrisan")) db.exec("ALTER TABLE players ADD COLUMN obrisan INTEGER");
+  // Isto za računar: uz njega idu sesije i porudžbine. Vidi obrisiRacunar.
+  if (!columnExists("computers", "obrisan")) db.exec("ALTER TABLE computers ADD COLUMN obrisan INTEGER");
   // KOLIKO JE SEKUNDI SESIJE NAPLAĆENO.
   //
   // Launcher broji sekunde i dok servera nema, pa kad se vrati javi koliko je
