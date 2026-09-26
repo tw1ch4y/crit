@@ -18,17 +18,14 @@ import * as internet from "./internet.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8095;
 const PUBLIC = path.join(__dirname, "..", "public");
-// Verzija ide u adrese style.css i app.js. Bez toga pregledac posle nadogradnje
-// i dalje pokazuje staru, kesirawanu stranu - vlasnik zameni fajlove i zakune
-// se da se "nista nije promenilo". Sa ovim se pri svakoj novoj verziji povuku
-// svezi fajlovi, a stari se i dalje kesiraju dok verzija stoji.
+// Verzija ide u adrese style.css i app.js, da pregledač posle nadogradnje
+// učita nove fajlove.
 let VERZIJA = "0";
 try { VERZIJA = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")).version || "0"; } catch {}
 
 const app = express();
-// Slike stizu kao base64, sto naduva sadrzaj za oko trecinu - limit mora da
-// bude iznad najvece dozvoljene slike (8 MB pozadina) da bi korisnik dobio
-// razumljivu poruku umesto grube greske iz parsera.
+// Slike stižu kao base64 (oko trećinu veće), pa je granica iznad najveće
+// dozvoljene slike (8 MB).
 app.use(express.json({ limit: "12mb" }));
 app.use((err, req, res, next) => {
   if (err?.type === "entity.too.large") {
@@ -38,21 +35,12 @@ app.use((err, req, res, next) => {
   next();
 });
 
-// ---- Zastitna zaglavlja ----
+// ---- Zaštitna zaglavlja ----
 //
-// Panel prikazuje ono sto ljudi upisuju: imena igraca, nazive igara, beleske uz
-// nalog. Sve to prolazi kroz `esc()` pre nego sto udje u stranu, i to je prva
-// brana. Ovo je druga: i da jedno jedino mesto ikad promasi, ubacena skripta ne
-// moze da se pokrene jer pregledac izvrsava samo skripte sa ovog servera.
-//
-// Zasto je to vazno bas ovde: iz panela se upisuje kredit. Skripta koja se
-// izvrsi u vlasnikovom pregledacu ne mora nista da provaljuje - ona VEC jeste
-// vlasnik.
-//
-// `style-src` mora da dozvoli inline: panel sklapa HTML sa `style="..."` na
-// desetinama mesta, a sara pozadine se postavlja kao `background-image`.
-// `img-src data:` je zbog te sare (SVG kao data adresa) i zbog pregleda slike
-// pre slanja (FileReader).
+// Sve što korisnici upisuju prolazi kroz `esc()`; CSP je druga brana, pa
+// pregledač izvršava samo skripte sa ovog servera. `style-src` dozvoljava
+// inline stilove (panel ih koristi, šara je `background-image`), a
+// `img-src data:` je za šaru i pregled slike pre slanja.
 app.use((req, res, next) => {
   res.setHeader("Content-Security-Policy", [
     "default-src 'self'",
@@ -66,20 +54,15 @@ app.use((req, res, next) => {
     "form-action 'self'",
     "frame-ancestors 'none'",
   ].join("; "));
-  // Pregledac ne sme da nagadja vrstu fajla: slika koju je neko postavio, a
-  // koja "lici" na skriptu, ne sme da se izvrsi kao skripta.
+  // Pregledač ne nagađa vrstu fajla.
   res.setHeader("X-Content-Type-Options", "nosniff");
   // Panel radi na lokalnoj mrezi i nema sta da javlja spolja odakle se dolazi.
   res.setHeader("Referrer-Policy", "no-referrer");
   next();
 });
 
-// ZDRAVLJE - jedina adresa pod /api koja ne traži prijavu.
-//
-// Pita je nadzornik (nadzornik.mjs) na dvadeset sekundi: server koji ne
-// odgovara, a nije pao, diže se iznova. Proverava se i baza - server kome je
-// baza zaključana ili pokvarena "radi", ali ne može ništa. Ne otkriva ništa
-// osim da je živ i koja je verzija, koja ionako piše u adresama panela.
+// Zdravlje - jedina adresa pod /api bez prijave. Pita je nadzornik; proverava
+// se i baza. Vraća samo da je server živ i verziju.
 app.get("/api/zdravlje", (req, res) => {
   try {
     db.prepare("SELECT 1").get();
@@ -91,24 +74,13 @@ app.get("/api/zdravlje", (req, res) => {
 
 // API
 app.use("/api", router);
-// Nepoznata adresa pod /api vraca JSON, ne Express-ovu HTML stranicu. Panel sve
-// odgovore cita kao JSON, pa bi na HTML javio nerazumljivu gresku umesto jasnog
-// "ta adresa ne postoji" - a to se desi kad panel i server nisu iste verzije.
+// Nepoznata adresa pod /api vraća JSON, ne HTML stranicu.
 app.use("/api", (req, res) => res.status(404).json({ error: `Nepoznata adresa: ${req.method} /api${req.path}` }));
 
 // ---- Preuzimanje launchera (nadogradnja) ----
 //
-// Jedina adresa van /api koja nesto daje, i jedina koju racunari zovu bez
-// prijave osoblja. Zato se ovde traze tri stvari, i to ovim redom:
-//
-//  1. Token racunara. Nije panelski token - masina ga dobija pri postavljanju
-//     i drzi ga u svojim podesavanjima. Bez njega niko sa mreze ne moze da
-//     skine instalater, pa ni da ga razgleda.
-//  2. Verzija mora da bude PUSTENA. Fajl koji stoji u folderu, a covek ga jos
-//     nije odobrio, ne postoji za spoljni svet.
-//  3. Salje se tacno ona verzija koja je pustena. Racunar je najavljen otisak
-//     vec zapamtio i proverice ga; ako mu stigne bilo sta drugo, odbice da to
-//     pokrene.
+// Zahteva token računara i puštenu verziju, a šalje tačno puštenu verziju
+// (računar proverava najavljen sha256).
 app.get("/nadogradnja/launcher.exe", (req, res) => {
   const token = String(req.query.token || "");
   const comp = token ? db.prepare("SELECT id FROM computers WHERE token = ?").get(token) : null;
@@ -122,22 +94,19 @@ app.get("/nadogradnja/launcher.exe", (req, res) => {
   res.setHeader("Content-Length", st.velicina);
   res.setHeader("X-Crit-Verzija", st.verzija);
   res.setHeader("X-Crit-Sha256", st.sha256);
-  // Instalater se ne kesira: isto ime fajla posle nove gradnje znaci drugi
-  // sadrzaj, a posrednik koji vrati stari bi vratio i staru gresku.
+  // Instalater se ne kešira: isto ime posle nove gradnje je drugi sadržaj.
   res.setHeader("Cache-Control", "no-store");
   if (req.method === "HEAD") return res.end();
 
   const tok = fs.createReadStream(put);
   tok.on("error", () => { if (!res.headersSent) res.status(500).end(); else res.destroy(); });
-  // Racunar koji prekine preuzimanje (restart, iscupan kabl) ne sme da ostavi
-  // otvoren tok koji dalje cita sa diska.
+  // Prekinuto preuzimanje zatvara tok.
   res.on("close", () => tok.destroy());
   tok.pipe(res);
 });
 
-// index.html se sklapa u hodu: verzija se ubaci u adrese CSS-a i JS-a, pa
-// pregledac za svaku novu verziju povuce sveze fajlove. Sama strana se ne
-// kesira - uvek se trazi ponovo, a ona onda referise verzionirane fajlove.
+// index.html se sklapa u hodu, sa verzijom u adresama CSS-a i JS-a; sama
+// strana se ne kešira.
 const posaljiPanel = (req, res) => {
   fs.readFile(path.join(PUBLIC, "index.html"), "utf8", (e, html) => {
     if (e) return res.status(500).send("Panel nije nađen");
@@ -148,29 +117,16 @@ const posaljiPanel = (req, res) => {
 app.get("/", posaljiPanel);
 app.get("/index.html", posaljiPanel);
 
-// OTPREMLJENE SLIKE STOJE UZ BAZU, NE U PROGRAMU.
-//
-// Omoti, slike pica, pozadine i baneri su podaci igraonice - zato zive u folderu
-// sa podacima (vidi UPLOADS u service.js): kopiraju se sa bazom, ne mesaju se sa
-// paketom pri nadogradnji, i ne izlaze iz izolovane instance.
-//
-// Mora PRE `express.static(PUBLIC)`: stara instalacija ima iste fajlove i na
-// starom mestu, pa bi se inace servirala zatecena kopija umesto one koju je
-// vlasnik upravo otpremio. Slika se ne menja pod istim imenom (svako otpremanje
-// dobija nov vremenski pecat), pa sme da se kesira dugo.
+// Otpremljene slike su u folderu sa podacima (UPLOADS u service.js). Ruta je
+// pre `express.static(PUBLIC)`, jer stara instalacija ima slike i na starom
+// mestu. Svaka slika dobija nov naziv, pa sme dugo da se kešira.
 app.use("/uploads", express.static(svc.UPLOADS, { maxAge: "7d", fallthrough: true }));
 
-// Staticki panel. express.static sam salje ETag, pa pregledac na svaki fajl
-// pita "je li se promenio" i dobija 304 ako nije - jeftino, a nikad ne servira
-// staru verziju. Uz verziju u adresi (?v=) to znaci: nova verzija = svez fajl,
-// ista verzija = brza provera.
+// Statički panel; ETag i verzija u adresi.
 app.use(express.static(PUBLIC));
 
-// Zastitna mreza: nijedna ruta ne sme da posalje stack trace klijentu.
-// Express podrazumevano na neuhvacenu gresku vrati HTML sa celim stack trace-om
-// i apsolutnim putanjama fajlova - panel to prikaze kao nerazumljivu bujicu
-// teksta, a i nema razloga da iko spolja vidi kako je server sastavljen.
-// Greska i dalje ide u log servera, gde joj je mesto.
+// Neuhvaćena greška: klijent dobija JSON bez stack trace-a, a greška ide u
+// log servera.
 app.use((err, req, res, next) => {
   console.error(`[greska] ${req.method} ${req.originalUrl}:`, err?.stack || err);
   if (res.headersSent) return next(err);
@@ -179,18 +135,11 @@ app.use((err, req, res, next) => {
 
 const server = http.createServer(app);
 
-// PORT ZAUZET ZNAČI DA SERVER VEĆ RADI, NE DA JE OVAJ PAO.
-//
-// Bez ovoga je drugi pokrenut server javljao grešku u prozor i OSTAJAO da radi
-// bez porta. Sada izlazi odmah, sa kodom po kom nadzornik zna da ga ne diže u
-// krug (KOD_PORT_ZAUZET u src/nadzor.js).
-//
-// Rukovalac se kači PRE WebSocket-a. `ws` grešku servera prosleđuje na sebe i,
-// ako stigne prvi, baca je kao neuhvaćenu - server je tada ostajao živ bez
-// porta, a nadzornik bi ga tek posle minut i po proglasio zaglavljenim.
+// Zauzet port znači da server već radi: ovaj izlazi sa kodom po kom ga
+// nadzornik ne diže u krug (KOD_PORT_ZAUZET u nadzor.js). Rukovalac se kači
+// pre WebSocket-a, jer `ws` inače baca istu grešku kao neuhvaćenu.
 server.on("error", (e) => {
-  // Greška posle dobijenog porta ne gasi server usred smene: zapiše se, a on
-  // radi dalje sa računarima koji su već povezani.
+  // Greška posle dobijenog porta se zapisuje; server radi dalje.
   if (server.listening) return zapisiPad("greška servera", e);
   if (e?.code === "EADDRINUSE") {
     console.error(`\nPort ${PORT} je zauzet - server verovatno vec radi. Ovaj se gasi.\n`);
@@ -216,40 +165,28 @@ setHandlers({
   },
 });
 
-// REDOVNI POSLOVI KREĆU TEK KAD SERVER DOBIJE PORT.
-//
-// Naplata, kopije, održavanje i provera interneta su ranije kretali čim se fajl
-// učita - pre nego što se znalo da li je port slobodan. Drugi pokrenut server
-// (dupli klik, pa zakazani zadatak) je tako pravio kopiju i sekao logove nad
-// istom bazom, pa tek onda saznao da ne može da radi.
+// Redovni poslovi kreću tek kad server dobije port, da drugi pokrenut
+// primerak ne dira bazu.
 function pokreniRedovnePoslove() {
   // ---- Naplata svakih 5s ----
   setInterval(() => {
     try { svc.billingTick(); } catch (e) { console.error("billing:", e); }
   }, 5000);
 
-  // ---- Zaštita: WAL checkpoint (2 min) + backup baze (15 min + na startu) ----
-  // Racunari se nadograde sami cim se oslobode - vidi nadogradnjaTick.
+  // Računari se nadograđuju čim se oslobode (nadogradnjaTick).
   setInterval(() => {
     try { svc.nadogradnjaTick(); } catch (e) { console.error("nadogradnja:", e.message); }
   }, 60 * 1000);
 
-  // ---- Ima li igraonica internet ----
-  //
-  // Proverava SERVER, jednom, i javlja svima. Ranije je to radio svaki launcher
-  // za sebe, svakih 30 sekundi, ucitavanjem google.com/favicon.ico - trinaest
-  // masina, oko 37.000 poziva dnevno, i pogresan odgovor cim bas Google negde
-  // zapne. Objasnjenje je u internet.js.
+  // Internet proverava server i javlja svim launcherima (internet.js).
   internet.pokreni((ok) => svc.javiInternet(ok));
 
   setInterval(() => checkpoint(), 2 * 60 * 1000);
   setInterval(() => backupDb(), 15 * 60 * 1000);
   backupDb();
 
-  // ---- Održavanje: na startu i jednom dnevno ----
-  //
-  // Seče logove po starosti i po broju, proređuje rezervne kopije i pazi na
-  // slobodan prostor. Objašnjenje granica i izmerene brojke su u odrzavanje.js.
+  // Održavanje na startu i jednom dnevno: logovi, rezervne kopije, slobodan
+  // prostor (odrzavanje.js).
   function odrzavanjeSada(razlog) {
     const r = odrzavanje(svc.getActiveShift()?.id ?? null);
     const obrisano = r.logovi.poStarosti + r.logovi.poBroju + r.pokretanja + r.kopije.obrisano;
@@ -264,15 +201,8 @@ function pokreniRedovnePoslove() {
       svc.logEvent({ category: "sistem", action: "disk_malo", actor: "sistem",
         detail: `Malo mesta na disku: ${r.stanje.slobodnoMB} MB slobodno` });
     }
-    // KOPIJA VAN RAČUNARA - jedina zaštita od otkaza diska.
-    //
-    // Neuspeh mora da se čuje. USB se iščupa, mrežni disk se odjavi, a kopija
-    // tiho prestane da izlazi napolje - i to se otkrije tek onog dana kad zatreba.
-    // Zato zapis ide u Logove, gde vlasnik gleda, a ne samo u konzolu koju niko
-    // ne otvara.
-    //
-    // Ide asinhrono: odredište ume da ne odgovara, a server za to vreme mora da
-    // radi (vidi kopirajVanRacunara).
+    // Kopija van računara. Neuspeh ide u Logove. Kopiranje je asinhrono, da
+    // odredište koje ne odgovara ne zaustavi server.
     kopirajVanRacunara().then((van) => {
       if (van?.ok) {
         console.log(`kopija van računara: ${van.fajl} -> ${van.cilj}`);
@@ -297,11 +227,10 @@ server.listen(PORT, () => {
   for (const ip of ips) console.log(`  mreza/telefon: http://${ip}:${PORT}`);
   console.log("");
   pokreniRedovnePoslove();
-  // Nadzornik javlja zašto je server pokrenut. Pad i zastoj idu u Logove, gde
-  // ih vlasnik vidi - inače bi server koji pada noću izgledao kao da radi.
+  // Nadzornik javlja zašto je server pokrenut; pad i zastoj idu u Logove.
   const razlog = process.env.RAZLOG_POKRETANJA;
-  // Ishod nadogradnje sa panela. Uspeh javlja nova verzija sama; neuspeh je
-  // upisao nadzornik pre nego što je vratio staru, pa ga ovde čita stara.
+  // Ishod nadogradnje sa panela. Neuspeh je upisao nadzornik pre vraćanja
+  // stare verzije.
   if (razlog === "nadogradnja") {
     svc.logEvent({ category: "sistem", action: "server_nadogradjen", actor: "nadzornik",
       detail: `Server je nadograđen na ${nadgServera.trenutnaVerzija}` });
@@ -323,13 +252,8 @@ server.listen(PORT, () => {
   }
 });
 
-// Server radi na racunaru u igraonici, bez nadzora. Jedan neuhvacen previd ne
-// sme da ugasi proces usred smene i ostavi 13 racunara bez naplate - greska se
-// zapise, a server nastavlja da radi.
-//
-// Zapis ide i u LOGOVE, ne samo u konzolu. Prozor sa serverom niko ne gleda i
-// cesto je minimizovan; ako nesto pukne u devet uvece, vlasnik to sutra vidi u
-// panelu (Logovi > Sistem) umesto da nagadja zasto se nesto cudno ponasalo.
+// Neuhvaćena greška ne gasi server; zapisuje se u konzolu i u Logove
+// (Logovi > Sistem), najviše jednom u minuti za istu grešku.
 const skoroZapisano = new Map(); // poruka -> ts
 function zapisiPad(vrsta, e) {
   const tekst = String(e?.stack || e || "").slice(0, 400);
@@ -350,14 +274,8 @@ function zapisiPad(vrsta, e) {
 process.on("uncaughtException", (e) => zapisiPad("neuhvacena greska", e));
 process.on("unhandledRejection", (e) => zapisiPad("neobradjeno odbijanje", e));
 
-// UREDNO GAŠENJE.
-//
-// Server se do sada gasio samo silom: zatvoren prozor, restart računara. Baza je
-// u WAL režimu pa se upisano ne gubi, ali poslednje izmene ostaju u pomoćnom
-// fajlu dok se ne prepišu - a VRATI-KOPIJU briše baš taj fajl. Sada se pre
-// izlaska sve prepiše u bazu i baza se zatvori.
-//
-// Stiže od nadzornika (poruka "ugasi"), na Ctrl+C, i kad se zatvori prozor.
+// Uredno gašenje: WAL se prepisuje u bazu i baza se zatvara. Stiže od
+// nadzornika (poruka "ugasi"), na Ctrl+C i pri zatvaranju prozora.
 let gasiSe = false;
 function ugasiUredno(zasto) {
   if (gasiSe) return;
@@ -374,8 +292,8 @@ function ugasiUredno(zasto) {
     try { db.close(); } catch {}
     process.exit(0);
   };
-  // Veze se prekidaju odmah: launcheri tada pređu na rad bez servera u istom
-  // trenutku, umesto da čekaju ping. Posle tri sekunde se izlazi i ako nešto visi.
+  // Veze se prekidaju odmah, pa launcheri prelaze na rad bez servera. Posle
+  // tri sekunde izlazi se u svakom slučaju.
   try { for (const k of wss.clients) k.terminate(); } catch {}
   try { server.close(kraj); } catch { kraj(); }
   setTimeout(kraj, 3000);

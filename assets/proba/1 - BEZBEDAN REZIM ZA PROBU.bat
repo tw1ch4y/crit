@@ -37,7 +37,7 @@ echo.
 echo  Gotovo. Pokreni Crit Launcher.
 echo.
 echo  Ako si vec uneo pogresnu adresu servera, prvo je obrisi sa:
-echo    Program Files\Crit Launcher\resources\resetuj-launcher.bat
+echo    %%LOCALAPPDATA%%\Programs\Crit Launcher\resources\resetuj-launcher.bat
 echo.
 echo  Izlaz iz launchera dok probas:  Ctrl+Alt+Shift+Q  pa PIN 1234
 echo.

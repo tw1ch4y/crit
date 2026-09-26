@@ -5,19 +5,12 @@ import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { KOREN, radniFolder, podigniServer, ucitajWebSocket, citajIzvor } from "./_okruzenje.mjs";
 const WebSocket = await ucitajWebSocket();
-// NADOGRADNJA LAUNCHERA SE NE OBILAZI PESKE
+// Nadogradnja launchera preko servera.
 //
-// Svaka izmena launchera je do sada znacila obilazak svih trinaest masina:
-// USB, instalacija, cekanje, sledeca. Pola sata za ispravku od jednog reda -
-// pa se ispravke odlazu dok se "ne skupi nekoliko", a poznata greska nedeljama
-// radi u igraonici.
+// Server drzi instaler, a racunari ga sami preuzimaju i pokrecu. Proverava se da
+// odbija sve sto ne treba:
 //
-// Sad server drzi instalater, a racunari ga sami uzimaju. To je i najopasnija
-// stvar u celom programu: jedan fajl koji se sam pokrece sa punim pravima na
-// svih trinaest masina. Zato se ovde ne proverava da li radi kad je sve u redu,
-// nego da li ODBIJA kad nesto nije:
-//
-//   - fajl koji covek nije pustio u rad ne postoji za spoljni svet
+//   - fajl koji nije pusten u rad ne postoji za spoljni svet
 //   - racunar na kom neko sedi se ne dira
 //   - bez tokena racunara se ne skida nista
 //   - verzije se porede kao brojevi ("2.44" je novije od "2.9")
@@ -236,11 +229,8 @@ proveri("povratak sa novom verzijom beleži uspeh", st.racunari.find((x) => x.id
 
 // ---- 9) ZAUZET RACUNAR DOLAZI NA RED CIM SE OSLOBODI ----
 //
-// Ovo je cela obecana korist: niko ne obilazi masine. Da preskocen racunar
-// ostane preskocen zauvek, nadogradnja bi bila gora od pesacenja - jer bi
-// izgledala kao da je zavrsena, a jedna masina bi tiho ostala na staroj
-// verziji. Server proverava u razmaku (nadogradnjaTick), a ta provera radi
-// bas ono sto se ovde poziva.
+// Preskocen racunar se nadogradjuje kad se oslobodi; server to proverava u
+// razmaku (nadogradnjaTick), a ovde se poziva ista provera.
 pc2.poruke.length = 0;
 await V(`/api/computers/${comps[1].id}/logout`, "POST");
 await cekaj(600);
@@ -283,6 +273,10 @@ proveri("launcher proverava otisak pre pokretanja",
   /otisakFajla\(dest\) !== String\(msg\.sha256\)/.test(main));
 proveri("launcher proverava i velicinu", /st\.size !== Number\(msg\.velicina\)/.test(main));
 proveri("launcher ne nadogradjuje dok igrac sedi", /if \(sesijaAktivna\) return "igrač je prijavljen"/.test(main));
+proveri("posle preuzimanja se ponovo pita da li neko sedi",
+  /const smetaSada = nadogradnjaSmeta\(verzija, Number\(msg\.numeracija\) \|\| 0\);[\s\S]{0,200}"preskoceno", smetaSada/.test(main),
+  "preuzimanje traje i minut - instalater bi ugasio launcher igracu koji je u medjuvremenu seo");
+proveri("prijava se ne prima dok instalacija krece", /if \(msg\?\.t === "login" && instalacijaKrece\) return false;/.test(main));
 proveri("launcher ne nadogradjuje dok igra radi", /if \(spawnedGames\.size\) return "igra je pokrenuta"/.test(main));
 proveri("RAZVOJNI RACUNAR SE NE NADOGRADJUJE", /if \(racunarJeZasticen\(\)\) return `zaštićen računar/.test(main),
   "isti fajl koji cuva od ciscenja cuva i od instalacije");
@@ -303,17 +297,9 @@ proveri("launcher i server imaju istu numeraciju", skripta.NUMERACIJA === nad.NU
 
 // ---- 12) INSTALACIJA MORA DA BUDE PO KORISNIKU ----
 //
-// Sve gore radi do poslednjeg koraka, a taj korak zavisi od jedne recu u
-// package.json. Sa `perMachine: true` instaler ide u Program Files i trazi
-// administratora; launcher radi pod nalogom igraca, pa Windows podigne UAC
-// prozor i ceka klik koji za kasom niko nece dati. Nadogradnja tada ne prolazi
-// nigde, a razlog se ne vidi ni u jednoj poruci - izgleda kao da mreza ne valja.
-//
-// Launcheru administrator ni ne treba: politike pise u HKCU, `powercfg` menja
-// korisnikov plan, a autostart je precica u Startup folderu tog korisnika.
-// Program Files je cuvao samo sam fajl launchera od igraca - a igrac koji ume
-// da pokrene svoj program pod svojim nalogom ionako moze da ugasi launcher i
-// obrise precicu, pa kiosk pada i bez diranja Program Files-a.
+// Sa `perMachine: true` instaler trazi administratora i UAC ceka klik, pa tiha
+// nadogradnja ne prolazi. Launcheru administrator ne treba: politike su u HKCU,
+// `powercfg` menja korisnikov plan, a autostart je po korisniku.
 const pkg = JSON.parse(citajIzvor("client/package.json"));
 proveri("instalacija je po korisniku, ne po masini", pkg.build?.nsis?.perMachine === false,
   "sa perMachine: true nadogradnja ceka UAC koji niko nece odobriti");

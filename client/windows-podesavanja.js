@@ -1,21 +1,9 @@
-// PODEŠAVANJA KOJA IGRAČ SME DA MENJA
+// Podešavanja koja igrač sme da menja sa svog naloga: miš i zvuk.
 //
-// Igrač sedne za računar i zatekne tuđa podešavanja: miš od prethodnog gosta,
-// ubrzanje pokazivača uključeno, zvuk na nuli. Windows podešavanja su u kiosku
-// zaključana i s razlogom, pa mu je jedini izlaz da zove radnika.
-//
-// ŠTA SME DA UĐE OVDE - tri uslova, sva tri moraju:
-//   1. menja se PO KORISNIKU (HKCU ili sesija), ne za ceo računar
-//   2. vraća se odmah, istim dugmetom
-//   3. ne traži administratora
-//
-// Zato ovde NEMA rezolucije ni osvežavanja ekrana. Windows ume da prihvati
-// režim koji monitor ne prikaže: ekran ostane crn, a igrač u kiosku nema čime
-// da vrati staro. Dobitak ne vredi te cene; ko hoće drugu rezoluciju, javi se
-// radniku.
-//
-// Sve se vraća na zatečeno kad se igrač odjavi - igraonica ne sme da pamti
-// podešavanja jednog gosta za sledećeg.
+// Uslov za svako podešavanje ovde: menja se po korisniku (HKCU ili sesija),
+// vraća se odmah i ne traži administratora. Rezolucija zato nije tu - režim
+// koji monitor ne prikaže ostavio bi crn ekran bez načina za povratak.
+// Na odjavi se vraća zatečeno stanje.
 const { execFile } = require("node:child_process");
 
 const PS = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"];
@@ -39,16 +27,10 @@ async function psJson(skripta, opcije) {
 
 // ---------------------------------------------------------------- MIŠ -----
 //
-// Brzina je HKCU\Control Panel\Mouse\MouseSensitivity (1-20, fabrički 10).
-//
-// Ubrzanje ("Enhance pointer precision") su TRI vrednosti: MouseSpeed i dva
-// praga. Sve tri moraju na nulu - gašenje samo jedne ostavlja ubrzanje upola.
-// Za igru je to najvažnija stavka na ovom spisku: dok je uključeno, isti potez
-// rukom daje različit pomeraj u igri, pa se nišan ne može naučiti.
-//
-// Upis u registar sam po sebi ne menja ništa dok sesija traje - Windows te
-// vrednosti čita pri prijavi. Zato se odmah zove i SystemParametersInfo, koji
-// primeni promenu na živoj sesiji.
+// Brzina: HKCU\Control Panel\Mouse\MouseSensitivity (1-20, fabrički 10).
+// Ubrzanje ("Enhance pointer precision") su tri vrednosti, MouseSpeed i dva
+// praga, i sve tri idu na nulu. Registar Windows čita pri prijavi, pa se
+// promena primenjuje i kroz SystemParametersInfo.
 const MIS_API = `
 Add-Type -Namespace Crit -Name Mis -MemberDefinition @'
   [DllImport("user32.dll", SetLastError=true)]
@@ -74,8 +56,8 @@ async function citajMis() {
 async function primeniMis({ brzina, ubrzanje }) {
   const b = Math.max(1, Math.min(20, Math.round(Number(brzina) || 10)));
   const u = ubrzanje ? 1 : 0;
-  // SPI_SETMOUSESPEED = 0x0071, SPI_SETMOUSE = 0x0004
-  // SPIF_UPDATEINIFILE(1) | SPIF_SENDCHANGE(2) = 3, da promena i ostane zapisana.
+  // SPI_SETMOUSESPEED = 0x0071, SPI_SETMOUSE = 0x0004;
+  // SPIF_UPDATEINIFILE | SPIF_SENDCHANGE = 3.
   const r = await psPokreni(`
     ${MIS_API}
     $p = "HKCU:\\Control Panel\\Mouse"
@@ -92,10 +74,8 @@ async function primeniMis({ brzina, ubrzanje }) {
 
 // --------------------------------------------------------------- ZVUK -----
 //
-// Jačina zvuka ide kroz IAudioEndpointVolume. Nema je ni u Electron-u ni u
-// običnom PowerShell-u, pa se COM sučelje opisuje ovde. Ako na nekoj mašini ne
-// prođe, jačina se javi kao nepoznata i launcher tu stavku sakrije - ostatak
-// podešavanja i dalje radi.
+// Jačina ide kroz COM interfejs IAudioEndpointVolume. Ako na nekom računaru
+// ne prođe, jačina je nepoznata i launcher tu stavku ne prikazuje.
 const ZVUK_API = `
 Add-Type -ErrorAction SilentlyContinue @'
 using System.Runtime.InteropServices;
@@ -132,7 +112,8 @@ async function citajZvuk() {
   const r = await psPokreni(`${ZVUK_API}
     [int][math]::Round([Zvuk]::Citaj() * 100)`);
   if (!r.ok) return { jacina: null, greska: r.greska };
-  const n = Number(r.izlaz);
+  // Prazan izlaz nije nula (Number("") je 0).
+  const n = r.izlaz === "" ? NaN : Number(r.izlaz);
   return { jacina: Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : null };
 }
 
@@ -143,13 +124,63 @@ async function primeniZvuk({ jacina }) {
   return r.ok ? { ok: true } : { ok: false, greska: r.greska };
 }
 
-// ------------------------------------------------------------- SPOLJA -----
+// ------------------------------------------- PREČICE PRISTUPAČNOSTI -----
+//
+// Pet puta Shift, desni Shift držan osam sekundi i Num Lock držan pet sekundi
+// otvaraju Windows prozor sa vezom ka Podešavanjima. Gasi se samo prečica;
+// funkcija ostaje kakva jeste. SystemParametersInfo sa SPIF_UPDATEINIFILE
+// važi odmah i ostaje u HKCU\Control Panel\Accessibility. Na izlazu iz
+// kioska prečice se vraćaju na fabričko stanje Windows-a.
+const PRISTUP_API = `
+Add-Type -Namespace Crit -Name Pristup -MemberDefinition @'
+  [StructLayout(LayoutKind.Sequential)] public struct Dva { public uint cbSize; public uint dwFlags; }
+  [StructLayout(LayoutKind.Sequential)] public struct Filter { public uint cbSize; public uint dwFlags; public uint a; public uint b; public uint c; public uint d; }
+  [DllImport("user32.dll", SetLastError=true)] public static extern bool SystemParametersInfo(uint akcija, uint velicina, ref Dva p, uint upis);
+  [DllImport("user32.dll", SetLastError=true)] public static extern bool SystemParametersInfo(uint akcija, uint velicina, ref Filter p, uint upis);
+'@ -ErrorAction SilentlyContinue
+`;
 
-// Sve odjednom, za prikaz u launcheru. Jedan deo koji ne uspe ne obara ostale:
-// mašina na kojoj zvuk ne prođe i dalje treba da dobije podešavanja miša.
-async function procitajSve() {
-  const [mis, zvuk] = await Promise.all([citajMis(), citajZvuk()]);
-  return { mis, zvuk };
+// Bitovi HOTKEYACTIVE (4) i CONFIRMHOTKEY (8) su isti za sve tri strukture.
+// SPI_GET/SET: STICKYKEYS 0x3A/0x3B, TOGGLEKEYS 0x34/0x35, FILTERKEYS 0x32/0x33.
+function skriptaPristupacnosti(ukljucene) {
+  return `${PRISTUP_API}
+    function Precica([uint32]$v) {
+      if (${ukljucene ? "$true" : "$false"}) { return [uint32]($v -bor 12) }
+      if ($v -band 4) { $v = $v - 4 }
+      if ($v -band 8) { $v = $v - 8 }
+      return [uint32]$v
+    }
+    $s = New-Object 'Crit.Pristup+Dva'; $s.cbSize = 8
+    $t = New-Object 'Crit.Pristup+Dva'; $t.cbSize = 8
+    $f = New-Object 'Crit.Pristup+Filter'; $f.cbSize = 24
+    if (-not [Crit.Pristup]::SystemParametersInfo(0x3A, 8, [ref]$s, 0)) { throw 'StickyKeys se ne cita' }
+    if (-not [Crit.Pristup]::SystemParametersInfo(0x34, 8, [ref]$t, 0)) { throw 'ToggleKeys se ne cita' }
+    if (-not [Crit.Pristup]::SystemParametersInfo(0x32, 24, [ref]$f, 0)) { throw 'FilterKeys se ne cita' }
+    $s.dwFlags = Precica $s.dwFlags
+    $t.dwFlags = Precica $t.dwFlags
+    $f.dwFlags = Precica $f.dwFlags
+    [void][Crit.Pristup]::SystemParametersInfo(0x3B, 8, [ref]$s, 3)
+    [void][Crit.Pristup]::SystemParametersInfo(0x35, 8, [ref]$t, 3)
+    [void][Crit.Pristup]::SystemParametersInfo(0x33, 24, [ref]$f, 3)
+    'ok'`;
 }
 
-module.exports = { citajMis, primeniMis, citajZvuk, primeniZvuk, procitajSve };
+async function precicePristupacnosti(ukljucene) {
+  const r = await psPokreni(skriptaPristupacnosti(!!ukljucene));
+  return r.ok ? { ok: true } : { ok: false, greska: r.greska };
+}
+
+// ------------------------------------------------------------- SPOLJA -----
+
+// Sve odjednom; deo koji ne uspe ne obara ostale.
+async function procitajSve() {
+  const [mis, zvuk] = await Promise.all([citajMis(), citajZvuk()]);
+  // Nepročitan miš je null, ne fabrička vrednost, da se na odjavi ne upiše
+  // broj koji niko nije pročitao.
+  return { mis: mis.greska ? null : mis, zvuk };
+}
+
+module.exports = {
+  citajMis, primeniMis, citajZvuk, primeniZvuk, procitajSve,
+  precicePristupacnosti, skriptaPristupacnosti,
+};

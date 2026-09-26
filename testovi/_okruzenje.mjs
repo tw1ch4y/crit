@@ -21,13 +21,9 @@ process.on("uncaughtException", pukloJe("greska"));
 process.on("unhandledRejection", pukloJe("odbijeno obecanje"));
 
 // Svaka suita dobija svoj folder i svoj port, pa mogu da se puste jedna za drugom.
-// Cist radni folder za jednu probu.
-//
-// Na Windows-u se stari folder ponekad ne da obrisati: Electron iz prethodne
-// probe jos drzi fajl, ili OneDrive bas u tom trenutku sinhronizuje. Ranije je
-// tu letela EPERM greska i cela proba je pucala pre nego sto je isla i sta da
-// proveri - a problem nije bio u programu nego u zaostaloj bravi. Zato se u tom
-// slucaju uzima folder sa drugim imenom umesto da se odustane.
+// Cist radni folder za jednu probu. Ako Windows ne da da se stari obrise
+// (Electron iz prethodne probe drzi fajl, OneDrive sinhronizuje), uzima se folder
+// sa drugim imenom.
 export function radniFolder(ime) {
   const osnovni = path.join(OVDE, ".radno", ime);
   for (const p of [osnovni, `${osnovni}-${Date.now()}`]) {
@@ -41,20 +37,10 @@ export function radniFolder(ime) {
   }
 }
 
-// GDE JE ELECTRON.
-//
-// Alati su ga pokretali preko `node_modules/.bin/electron.cmd`, a `.cmd` na
-// Windows-u trazi `shell: true`. To donosi tri stvari, sve tri lose:
-//
-//   1. spawn vraca cmd.exe, ne electron.exe - pa kill() ubije samo omotac, a
-//      launcher nastavi da radi i udje u sledecu probu (vidi ugasiLaunchere)
-//   2. Node na svaki takav poziv ispise DeprecationWarning, koji onda stoji u
-//      ispisu svake probe i navikne coveka da preskace redove
-//   3. argumenti se nadovezuju kao tekst umesto da se prosledjuju - putanja sa
-//      razmakom bi se raspala
-//
-// Prava izvrsna datoteka stoji u `electron/dist`, a njeno ime pise u `path.txt`
-// koji sam paket ostavlja. Odatle se pokrece bez ijednog omotaca.
+// Putanja do electron.exe iz `electron/dist` (ime pise u `path.txt`).
+// Pokretanje preko `node_modules/.bin/electron.cmd` trazi `shell: true`: kill()
+// tada gasi samo cmd.exe, Node ispisuje DeprecationWarning, a argumenti sa
+// razmakom se raspadaju.
 export function putanjaElektrona() {
   const dir = path.join(KOREN, "client", "node_modules", "electron");
   try {
@@ -67,16 +53,9 @@ export function putanjaElektrona() {
     process.platform === "win32" ? "electron.cmd" : "electron");
 }
 
-// GASI LAUNCHERE KOJE JE PROBA POKRENULA.
-//
-// Ranije se pokretalo preko cmd.exe omotaca, pa je kill() ubijao samo omotac a
-// launcher je nastavljao da radi.
-// Dva launchera sa istim tokenom se onda otimaju o vezu: server zatvori stariju,
-// a onaj kome je zatvorena se za tri sekunde vrati i zatvori drugu. Proba to
-// vidi kao "veza stalno puca" iako je kriva samo proba.
-//
-// Gasi se ISKLJUCIVO electron.exe pokrenut iz node_modules ovog projekta.
-// Na radnom racunaru Electron koriste i pravi programi i njih ovo ne dodiruje.
+// Gasi launchere koje je proba pokrenula: iskljucivo electron.exe iz
+// node_modules ovog projekta, ne i druge Electron programe na racunaru. Zaostao
+// launcher sa istim tokenom bi otimao vezu sledecoj probi.
 export function ugasiLaunchere() {
   if (process.platform !== "win32") return 0;
   const nas = path.join(KOREN, "client", "node_modules", "electron").toLowerCase();
@@ -119,16 +98,10 @@ export function brojac() {
       if (uslov) { prosao++; console.log("  OK   " + naziv); }
       else { pao++; console.log("  PAO  " + naziv + (detalj ? "  -> " + detalj : "")); }
     },
-    // IZLAZ SE NE ŽURI.
-    //
-    // `process.exit` odmah po poslednjoj proveri ume da obori Node na Windows-u:
-    // "Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)". Uzrok su veze
-    // koje `fetch` drži otvorenim ka podignutom serveru - gase se u pozadini, a
-    // izlaz ih zatekne nasred gašenja.
-    //
-    // Posledica nije bezazlena: suita ispiše "19/19 proslo" pa vrati izlazni kod
-    // 127, i pokretač je vidi kao PALU. Zelena provera koja se prijavljuje kao
-    // crvena je gora od nikakve - posle dva takva niko više ne gleda rezultat.
+    // Izlaz se odlaže. `process.exit` odmah posle poslednje provere ume da obori
+    // Node na Windows-u ("Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)")
+    // jer se veze koje drži `fetch` još gase; suita tada vrati kod 127 iako je sve
+    // prošlo.
     async kraj() {
       console.log(`\n${prosao}/${prosao + pao} proslo`);
       await new Promise((r) => setTimeout(r, 300));

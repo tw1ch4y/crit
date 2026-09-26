@@ -1,321 +1,107 @@
-# CRIT - sistem za igraonicu
+# Crit
 
-Kompletan launcher i upravljački sistem za igraonicu **Crit**.
+Sistem za vođenje igraonice: naplata vremena, kiosk launcher na računarima
+igrača, shop, kasa i obračun smene, sa panelom za osoblje na računaru i
+telefonu. Radi u lokalnoj mreži, bez interneta i bez spoljnih servisa.
 
-Sastoji se iz dva dela:
+| Deo | Gde radi | Namena |
+|---|---|---|
+| **Server i panel** (`server/`) | glavni računar | baza, naplata, porudžbine, kasa, izveštaji, nadogradnje |
+| **Launcher** (`client/`) | svaki računar igrača | prijava igrača, igre i prečice, shop, zaključavanje računara |
 
-| Deo | Gde se pokreće | Šta radi |
-|-----|----------------|----------|
-| **`server/`** | Glavni računar | Server + admin panel (desktop i telefon), baza, naplata vremena, shop |
-| **`client/`** | Svaki računar igrača | Kiosk launcher: login igrača, igre, internet, shop, otključavanje |
+## Dokumentacija
 
-Računari su povezani LAN kablom preko switcha. Launcheri se povezuju na server preko lokalne mreže.
+| Dokument | Sadržaj |
+|---|---|
+| [docs/INSTALACIJA.md](docs/INSTALACIJA.md) | postavljanje mreže, servera i računara igrača, zaštita kioska |
+| [docs/ODRZAVANJE.md](docs/ODRZAVANJE.md) | svakodnevni rad, kopije, nadogradnje, kvarovi i oporavak |
+| [docs/PROVERA.md](docs/PROVERA.md) | provera pred otvaranje na pravim računarima |
+| [docs/RAZVOJ.md](docs/RAZVOJ.md) | razvoj, provere, izdavanje verzije, plan |
+| [CHANGELOG.md](CHANGELOG.md) | izmene po verzijama |
 
----
+## Mogućnosti
 
-## Brzo pokretanje (test na jednom računaru)
+**Igrači i naplata**
+- Nalozi sa kreditom u dinarima; vreme se uvek računa kao *kredit ÷ cena po
+  satu*, pa panel, launcher i zaključan ekran pokazuju isti broj.
+- Brzi gosti: do deset naloga odjednom sa četvorocifrenom lozinkom.
+- Vremenski paketi (npr. 5 sati za 500): razlika do cene po satu vodi se kao
+  popust i ne ulazi u pazar.
+- Upozorenja pred istek (30, 15, 10, 5, 2 i 1 minut) preko igre i zvukom;
+  računar se zaključa kad kredit istekne.
+- Odjava zbog mirovanja, sa odbrojavanjem od 60 sekundi.
+- Iskustvo i nivoi, značke, rang lista, VIP članarina i nagradni točak.
 
-### 1. Server (glavni računar)
+**Launcher**
+- Kiosk preko celog ekrana; radna površina se ne vidi ni dok igra radi.
+- Police igara po kategorijama, prečice (Steam, Discord, YouTube...), shop sa
+  plaćanjem sa kredita ili kešom, praćenje porudžbina.
+- Pokreće samo ono što je u katalogu sa servera; programe pokrenute iz
+  Preuzimanja, Temp-a i sa radne površine gasi.
+- Posle igrača briše prijave na pregledače, Steam, Epic, Riot, Battle.net, EA,
+  Ubisoft, Discord, Spotify, Minecraft i Roblox, kao i privremene fajlove.
+- Miš i zvuk po igraču; po odjavi se vraća zatečeno stanje.
+- Radi i kad server ne radi: vreme se broji lokalno, a server posle naplati
+  odigrano.
 
-```
-cd server
-npm install        (samo prvi put)
-npm start
-```
+**Panel**
+- Kontrolna tabla uživo: stanje svakog računara, preostalo vreme, dopuna sa
+  kartice računara, grupne akcije, paljenje preko mreže (Wake-on-LAN).
+- Kasa, porudžbine sa zvučnim signalom, zalihe pića sa upozorenjem.
+- Smene sa obračunom kase (očekivano, prebrojano, razlika sa objašnjenjem).
+- Izveštaji: promet, najigranije igre, zarada po računaru.
+- Logovi svih radnji osoblja sa novcem i računarima.
+- Izgled launchera po igraonici: znak, boja, pozadine ekrana, promo baneri.
+- Nadogradnja servera i launchera iz panela, bez obilaska računara.
 
-U konzoli piše adrese panela, npr:
-```
-Crit server radi na portu 8095
-  ovaj racunar:  http://localhost:8095
-  mreza/telefon: http://192.168.0.10:8095
-```
-
-Otvori panel u browseru. Prijava: **admin / admin** (obavezno promeni šifru u Podešavanjima).
-
-### 2. Launcher (računar igrača)
-
-```
-cd client
-npm install        (samo prvi put)
-npm run dev        (test u prozoru - NE preko celog ekrana)
-```
-
-Pri prvom pokretanju launcher traži:
-- **Adresa servera** - npr. `http://192.168.0.10:8095` (IP glavnog računara)
-- **Token računara** - nalazi se u panelu > **Računari**
-
-Za pravi rad na računarima igrača koristi `npm start` (kiosk preko celog ekrana).
-
-> Kompletno postavljanje (autostart, zaključavanje sistema, više računara) je u **[DEPLOY.md](DEPLOY.md)**.
-
----
-
-## Kako radi (ukratko)
-
-- **Nalozi** - praviš ih u panelu (Igrači > Novi nalog). Svaki igrač ima korisničko ime, lozinku i **kredit u dinarima**.
-- **Brzi gost** - za grupu koja uđe sa ulice bez naloga. Otvara do deset naloga odjednom (`gost-01`, `gost-02`...) sa četvorocifrenom lozinkom koja se izdiktira gostima. Kad se potroše, vlasnik ih čisti jednim dugmetom; briše samo one bez kredita, starije od dan, koji nisu za računarom.
-- **Naplata** - dok je igrač prijavljen, kredit se troši po ceni na sat (Podešavanja > Cena po satu). Kad kredit padne na nulu, računar se **automatski zaključa**.
-
-### Šta igrač sme da menja
-
-Windows podešavanja su na računarima igrača zaključana, pa igrač do skoro nije
-imao kako da namesti ni miša. U launcheru, **Nalog > Miš i zvuk**, stoji ono što
-je za igru bitno a bezbedno je menjati:
-
-- **brzina pokazivača** i **ubrzanje pokazivača**. Ubrzanje je za pucačine
-  najvažnije: dok je uključeno, brži potez rukom pomeri pokazivač dalje, pa se
-  nišan ne može naučiti. Fabrički se drži isključeno.
-- **jačina zvuka** celog računara
-- **zvuci i animacije u samom launcheru** (animacije se gase na slabijoj mašini)
-
-Sve važi samo dok je igrač prijavljen. **Kad se odjavi, launcher vraća ono što
-je zatekao**, pa sledeći gost ne nasleđuje tuđa podešavanja.
-
-> **Rezolucije i osvežavanja ekrana namerno nema.** Windows ume da prihvati
-> režim koji monitor ne prikaže: ekran ostane crn, a igrač u kiosku nema čime da
-> vrati staro. Ko traži drugu rezoluciju, javi se osoblju.
-
-### Kredit i vreme
-
-Sistem čuva **samo kredit u dinarima**. Vreme se nigde ne pamti nego se uvek
-računa: `preostalo vreme = kredit ÷ cena po satu`. Zato se svuda - u panelu, u
-launcheru, na tajmeru i na zaključanom ekranu - vidi isti broj.
-
-Iz toga slede tri stvari koje je dobro znati unapred:
-
-- **Promena cene po satu menja preostalo vreme svima koji trenutno igraju.**
-  Ko je uplatio 600 pri ceni 120 ima pet sati; čim cena pređe na 150, isti taj
-  kredit vredi četiri. Panel te zato upozori pre nego što sačuvaš izmenu, i
-  pokaže primer na brojkama. Kredit se pri tome ne dira - menja se cena, ne
-  novac koji je gost uplatio.
-- **Vremenski paket je kredit, ne sat.** "5 sati za 500" pri ceni 120 upisuje
-  600 kredita: 500 ide u kasu kao naplata, a 100 se vodi kao **popust** i ne
-  ulazi u pazar. Zato radniku na kraju smene ne fali tih 100 dinara.
-- **Kredit se troši i na piće.** Isti novac plaća i vreme i shop, pa gost koji
-  kupi dva pića ima kraće vreme. Pri poručivanju bira "sa kredita" ili "kešom";
-  keš ne dira nalog.
-
-Pri dopuni panel odmah pokazuje koliko je uneti iznos vremena i koliko će gost
-imati posle nje, tako da radnik ne mora da računa pred gostom.
-- **Dopuna** - na kasi, preko panela (Igrači > Dopuni), ili direktno sa kartice računara na kontrolnoj tabli.
-- **Mirovanje** - ako igrač ustane i zaboravi da se odjavi, launcher to prijavi, igrač dobije odbrojavanje od 60 s na ekranu, pa se sesija zatvara i računar oslobađa. Prag se podešava (Podešavanja > Odjava zbog mirovanja), 0 isključuje.
-- **Zalihe** - kad piće padne na 5 komada i kad se isprazni, osoblje dobije zvučno javljanje, a na kontrolnoj tabli stoji traka sa spiskom za dopunu. Klik na artikal u traci odmah otvara dopunu.
-- **Igre koje se stvarno igraju** - svako pokretanje se beleži. Igraču se njegove poslednje igre pomeraju na početak police, a vlasnik u Izveštajima vidi spisak najigranijih (koliko puta i koliko različitih igrača), pa zna šta ima smisla držati na disku.
-- **Shop** - u tabu Shop u launcheru, sa slikom svake limenke. Igrač pri poručivanju bira **sa kredita** ili **kešom**; keš ne dira nalog, radnik naplaćuje kad donese. Porudžbina stiže u panel (Porudžbine) uz zvučni signal, a keš porudžbina je posebno označena da radnik zna da naplati. Iste slike vidi i radnik na Kasi, da ne promaši artikal u žurbi.
-- **Moje porudžbine** - igrač u tabu Nalog vidi šta je poručio i dokle je stiglo (Primljeno / Sprema se / Doneto). Dok porudžbina nije doneta, na tabu stoji brojka, pa se vidi i iz igre.
-- **Nagradni točak** - jednom nedeljno besplatan spin za svakog ko je za tih 7 dana potrošio bar prag (fabrički 1200 din). Stoji kao widget u traci na vrhu početne, sa trakom napretka do praga; klik otvara pop-up sa točkom koji se vrti. Najveća nagrada je 250 din kredita. **Ishod bira server**, igrač ga ne može namestiti. Prag, nagrade i njihove šanse podešava vlasnik (Podešavanja > Nagradni točak).
-- **Vremenski paketi** - unapred plaćeno vreme jeftinije od cene na sat (fabrički 5 sati za 500 din). Osoblje ih prodaje jednim klikom pri dopuni kredita. Vlasnik ih pravi i menja u Podešavanjima.
-- **Slike igara i prečica** - svaka igra ima omot (600x800) za policu; prečice imaju sliku 256x256. Igra može da ima i baner (2800x400), koji služi kao rezervna pozadina ekrana prijave ako nije okačena posebna. Panel na stranama Igre i Internet alati pokazuje kojoj stavci slika fali i ispisuje mere. Steam, Epic, Battle.net, YouTube, Twitch, Discord, TeamSpeak, Google i Spotify imaju ugrađen logo, njima slika nije potrebna.
-- **Promo baneri** - brendirane slike (2200x200, odnos 11:1) u traci na vrhu početne, levo od nagradnog točka. Više njih se smenjuje samo, na 8 sekundi, sa tačkicama dole desno. Launcher ne crta ništa preko njih, pa sve piše na samoj slici. Baner se u traku uklapa i nikad se ne seče. Dok ih nema, tu stoji znak igraonice. Kače se u panelu (Izgled launchera).
-- **Izgled launchera** - vlasnik u panelu (Izgled launchera) kači pozadinu za svaki ekran: prijava, početna, shop, nalog, zaključan ekran. Preporučena dimenzija 2560x1440 (16:9). Slika se odmah primeni na svim računarima, bez reinstalacije.
-- **Zaključavanje** - osoblje može da zaključa/otključa svaki računar iz panela, ili lokalno hotkey-om.
+**Pouzdanost**
+- Nadzornik diže server posle pada, zastoja i restarta, i pre prijave na
+  Windows.
+- Kopija baze na 15 minuta i jednom dnevno van računara.
+- Svaka promena novca je jedan upis: prekid usred posla ne ostavlja pola
+  porudžbine ili dopune.
 
 ## Uloge u panelu
 
-Tri, i idu odozdo nagore. Viša uvek sme sve što sme niža.
-
-- **Radnik** - svakodnevni rad: kontrolna tabla (pun nadzor i kontrola računara), igrači (kreiranje/dopuna), porudžbine, kasa. Cene, podešavanja, shop/igre katalog, logovi i radnici su mu **zaključani**.
-- **Vlasnik** - sve u svojoj igraonici: cene, sva podešavanja, shop, igre, računari, izgled, logovi, upravljanje radnicima.
-- **Serviser** - onaj ko je program postavio i ko ga održava. Vidi se na spisku Radnici, označen, ali ga vlasnik **ne menja i ne uklanja**. Postavlja se sa glavnog računara:
-
-```bash
-node alati/serviser.mjs <ime> <lozinka>
-```
-
-> **Zašto odvojeno.** Vlasnik je gazda svoje igraonice, ali ne i programa. Serviserski nalog postoji da bi podrška mogla da uđe i onog dana kad se vlasnik sam zaključa — i da bi kasnije uslovi pod kojima program radi mogli da stoje van naloga onoga na koga se odnose.
->
-> Nalog se **vidi** namerno: nalog sa pristupom tuđim podacima ne sme da bude sakriven od onoga čiji su podaci. I da budemo iskreni do kraja — na računaru koji vlasnik fizički drži nijedna uloga nije neprobojna. Ova podela postoji da uloge budu **jasne** i da svaki potez bude **zapisan**, ne da vlasnika zaključa iz sopstvenog računara.
-
-## Izgled po igraonici
-
-Program je jedan, izgled je svačiji. Sve se podešava iz panela i menja se
-**svuda odjednom** — u panelu i na svim launcherima, bez obilaska mašina:
-
-| Šta | Gde |
+| Uloga | Prava |
 |---|---|
-| Naziv igraonice | Podešavanja |
-| **Znak (logo)** | Izgled launchera > Znak i boja |
-| **Boja** | isto — biraš jednu, nijanse se izvode iz nje |
-| Pozadine svih pet ekrana | Izgled launchera |
-| Šara i njeno kretanje | Izgled launchera |
-| Promo baneri | Izgled launchera |
-| Omoti i baneri igara | Igre |
+| Radnik | kontrolna tabla, igrači i dopune, porudžbine, kasa |
+| Vlasnik | sve u igraonici: cene, podešavanja, katalog, izgled, logovi, radnici |
+| Serviser | održavanje programa i nadogradnje; vidi se na spisku radnika i vlasnik ga ne može ukloniti |
 
-> Zelena, zlatna i status boje se **ne menjaju** izborom boje kuće. Zelena znači
-> „ima kredita", zlatna „nagrada", crvena u launcheru „ističe vreme" — to su
-> značenja, ne ukras.
-
-Radnike dodaje vlasnik u panelu > **Radnici**. Svako menja svoju lozinku klikom na svoj profil (na širokom ekranu dole levo, na telefonu gore desno).
-
-Kad radnik ode, vlasnik mu **oduzima pristup** istom stranom. Prijava prestaje odmah i panel koji je ostavio otvoren se zatvara sam. Nalog se pri tom gasi a ne briše, jer smene i dopune moraju da ostanu potpisane njegovim imenom - manjak u kasi mora da ima ime. Ugašen nalog stoji precrtan na spisku i može da se vrati.
+Viša uloga sme sve što sme niža. Niko ne menja nalog iste ili više uloge.
 
 ## Statusi računara
 
 | Status | Značenje |
-|--------|----------|
-| **Online** | Neko je prijavljen i igra |
-| **Standby** | Računar upaljen, launcher radi, niko ne igra |
-| **Zaključan** | Zaključan (isteklo vreme ili osoblje) - čeka otključavanje |
-| **Offline** | Računar ugašen ili launcher nije povezan |
+|---|---|
+| Online | igrač je prijavljen |
+| Standby | launcher radi, niko nije prijavljen |
+| Zaključan | isteklo vreme ili zaključalo osoblje |
+| Bez veze | sesija je otvorena, a računar se ne javlja |
+| Offline | računar je ugašen ili launcher nije povezan |
 
-## Daljinska kontrola (sa glavnog računara)
+## Brzo pokretanje (razvoj)
 
-Na kontrolnoj tabli, za svaki računar (`⋯ Više`) ili grupno (čekiraj > traka dole):
-- Poruka, Zaključaj / Otključaj, Odjavi igrača
-- **Ugasi, Restartuj, Odjava Windows (logoff), Task Manager**
-- Grupno: selektuj sve > **"Kraj smene - ugasi sve"**, zaključaj sve, poruka svima
-
-Prikaz uživo: ko je prijavljen, preostalo vreme (odbrojava), u koliko se prijavio i koliko već igra.
-
-## Daljinska instalacija programa (panel > Instalacije)
-
-Vlasnik može daljinski da instalira program/igru na računare:
-1. **Instalacije > Novi program** (ili Brza instalacija): unesi naziv i **direktan link (URL)** do instalacije, po potrebi **tihe argumente** (npr. `/S`, `/silent`, `/qn` za .msi).
-2. Klik **Instaliraj > izaberi računare > Pošalji**.
-3. Launcher na svakom računaru skine fajl i pokrene ga; status se prati uživo (Preuzimanje > Instalacija > Završeno / Greška).
-
-Uslovi da radi bez greške:
-- Instalacija mora da podržava **tihu (silent) instalaciju** - argumenti se razlikuju po programu (`/S` NSIS, `/silent` Inno, `/qn` MSI...).
-- Za instalacije koje traže administratorska prava, launcher treba da bude pokrenut kao administrator.
-- Računar mora biti **online** (launcher povezan) da bi primio instalaciju.
-
-## Kopija koda van računara
-
-Baza igraonice ide van računara sama (*Podešavanja > Kopija van računara*). Sam
-program to nije imao - izvorni kod i cela istorija izmena postoje samo na
-razvojnom laptopu. Otkaz tog diska znači da igraonica nastavi da radi (server je
-na drugoj mašini), ali da se program više ne može ni ispraviti ni nadograditi.
-
-```
-node alati/kopija-koda.mjs D:\kopije
+```bash
+cd server && npm install && npm start      # panel: http://localhost:8095, admin / admin
+cd client && npm install && npm run dev    # launcher u prozoru
+node testovi/pokreni-sve.mjs               # sve provere
 ```
 
-Pravi jedan fajl sa **svim granama i svim commitovima**, proveri da je čitav, i
-obriše najstarije (čuva poslednjih pet). Vraćanje na bilo kom računaru sa git-om:
-
-```
-git clone "D:\kopije\crit-kod-2.44.0-2026-09-02.bundle" crit
-```
-
-Odredište koje ne postoji je **greška, ne poziv da se napravi** - folder
-napravljen na lokalnom disku izgledao bi kao uspela kopija, a bio bi na istom
-disku od kog čuva. Isto pravilo kao za kopiju baze.
-
-> Ovo nije zamena za privatni repozitorijum nego ono što radi odmah, bez ijednog
-> naloga.
-
-## Ime igraonice (za drugu igraonicu)
-
-Ime stoji na jednom mestu, u `igraonica.json`. Menja se alatom:
-
-```
-node igraonica.mjs                 pokaže gde koje ime stoji i da li se slaže
-node igraonica.mjs "Nova Igraonica"  upiše svuda
-```
-
-Upisuje se u instaler (`appId`, ime instalera i foldera instalacije, prečica),
-u imena paketa, u alate za oporavak (`POPRAVI-RACUNAR.bat` i ostali zovu
-launcher po imenu procesa) i u podrazumevani naziv igraonice u bazi.
-
-Unutrašnja imena **ostaju** (`crit.db`, `CRIT_DATA_DIR`, imena funkcija): ne vidi
-ih nijedan korisnik, a preimenovanje baze bi ostavilo sve postojeće podatke sa
-strane.
-
-> Na mašinama gde je stara verzija već instalirana: prvo `DEINSTALIRAJ-LAUNCHER.bat`
-> (drugo ime = Windows je vidi kao drugi program pa nastaje pored stare), pa se
-> posle instalacije ponovo unose adresa servera i token.
-
-## Nadogradnja launchera (panel > Instalacije)
-
-Instalater se postavlja **jednom, na server**, a računari ga preuzimaju sami -
-umesto obilaska svih 13 mašina po svakoj verziji.
-
-1. **Postavi instalater** - `Crit Launcher Setup vX.Y.Z.exe` iz `dist/`. Ime mora
-   da sadrži verziju; po njoj se zna šta je novije. Postavlja ga **serviser**.
-2. **Pusti verziju u rad.** Dok to ne uradiš, nijedan računar je ne preuzima ni
-   sa ispravnim tokenom - prekopiran fajl sam po sebi ne znači ništa.
-3. Dalje ide samo: svaki računar se nadogradi **čim se oslobodi**.
-
-Šta drži da bude bezbedno:
-- **Računar na kom neko igra se ne dira.** Nadogradnja gasi launcher, a usred
-  plaćenog sata to je oduzeto vreme gostu. Zauzeta mašina čeka svoj red.
-- **U poruci nema linka.** Adresu preuzimanja računar sklapa sam, od servera na
-  koji je već vezan i svojim tokenom - podmetnuta poruka ne može da mu pokrene
-  tuđi `.exe`.
-- **Otisak mora da se poklopi.** Uz najavu ide sha256; ako se ne slaže, fajl se
-  briše i ništa se ne pokreće.
-- **Računar se vraća i kad instalacija ne uspe** - posle pet minuta ga vrati
-  osigurač, a u panelu piše zašto nije prošlo.
-
-Instalacija je **po korisniku** (`perMachine: false`) - bez toga bi instaler tražio
-administratora, pa bi nadogradnja stigla do mašine i tu čekala UAC prozor koji za
-kasom niko neće odobriti. Zbog te promene je potreban **jedan poslednji ručni
-obilazak** svih mašina; postupak je u DEPLOY.md §5.1.
-
-## Prečice na tastaturi (na računaru igrača)
-
-| Prečica | Radnja |
-|---------|--------|
-| `Ctrl + Alt + U` | Otključavanje računara (traži PIN osoblja) |
-| `Ctrl + Alt + Home` | Vrati launcher u prvi plan (izlaz iz igre) |
-| `Ctrl + Alt + Shift + Q` | Admin izlaz iz launchera (traži PIN) |
-
-PIN osoblja se menja u panelu > Podešavanja.
+Pokrenut iz izvornog koda, launcher ne menja Windows (politike, napajanje,
+čišćenje sesije). Detalji su u [docs/RAZVOJ.md](docs/RAZVOJ.md).
 
 ## Struktura
 
 ```
-crit/
-  server/                  Node server + panel
-    src/                   index, db, service, hub, routes, auth
-    public/                panel (HTML/CSS/JS)
-    data/crit.db           SQLite baza (pravi se automatski)
-  client/                  Electron launcher
-    main.js                kiosk prozor, WebSocket, hotkeys, pokretanje igara
-    preload.js
-    renderer/              UI launchera
-  assets/sabloni/          SVG šabloni u tačnim dimenzijama za dizajn slika
-  testovi/                 provera sistema, pokreni PROVERI-SISTEM.bat
-  README.md
-  DEPLOY.md                detaljno postavljanje i zaključavanje sistema
-```
-
-## Razvojni računar se ne dira
-
-Launcher menja Windows na računaru igrača: politike u registru, plan napajanja,
-gašenje pokrenutih programa i **čišćenje tragova sesije** (profili pregledača,
-prijave na Steam i ostale, korpa za otpatke). Poslednje je nepovratno.
-
-Zato to radi **samo kad je pokrenut iz instalacije**. `npm start`, `npm run dev`
-i alati iz `testovi/` ne diraju Windows i to ispišu u konzoli.
-
-> Na računaru na kom razvijaš, napravi prazan fajl **`CRIT-NE-DIRAJ.txt`** u
-> svom korisničkom folderu (`%USERPROFILE%`). Dok stoji, taj računar se ne čisti
-> nikad — ni ako se sve druge zaštite zaobiđu. Detalji: DEPLOY.md §3.3.
-
-## Provera posle izmena
-
-`testovi/PROVERI-SISTEM.bat` prolazi kroz **preko 1400 provera** (obračun smene,
-neispravni unosi, mirovanje, gosti, igre, nadogradnja baze, kočnica protiv
-pogađanja lozinki, izgled launchera, font) i kaže drži li sistem. Svaka suita
-diže svoju praznu bazu, prava baza se ne dira.
-
-Uz to postoje alati koji puštaju **pravi launcher u Electronu** i mere ono što
-se iz koda ne vidi — raspored na oba ekrana, da li animacije rade, da li font
-ima naša slova, prolazi li porudžbina od klika do baze. Detalji u
-`testovi/README.md`.
-
-Provera se pušta i **sama**: `git commit` proverava sintaksu izmenjenih fajlova
-i poklapanje verzije (traje trenutak), `git push` pušta ceo paket, a GitHub
-Actions ga pušta na svaku izmenu (`.github/workflows/provera.yml`). Sve što
-zavisi od pamćenja se preskoči baš onog dana kad je najpotrebnije.
-
-## Verzija
-
-Verzija stoji na dva mesta koja moraju da se poklapaju (`server/package.json` i
-`client/package.json`). Ne diraj ih ručno:
-
-```
-node verzija.mjs            pokaže gde koja stoji
-node verzija.mjs 1.0.1     upiše svuda
+server/          server, panel i alati za glavni računar
+  src/           API, naplata, baza, WebSocket, održavanje
+  public/        panel
+client/          launcher (Electron) i alati za računar igrača
+  renderer/      ekran launchera
+testovi/         automatske provere i alati sa pravim launcherom
+alati/           kopija koda, provera paketa, serviserski nalog, git hook-ovi
+assets/          logo, šabloni za dizajn, proba na jednom računaru
+docs/            dokumentacija
 ```

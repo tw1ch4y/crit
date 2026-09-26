@@ -117,8 +117,8 @@ proveri("panel i dalje radi", (await api("/api/snapshot")).computers.length > 0)
 proveri("naplata nije stala", typeof (await api("/api/shift")) !== "undefined");
 
 // ---- zapis sa racunara stize u Logove ----
-// Launcher javlja blokirano pokretanje skinutog programa. Server te poruke ranije
-// nije ni citao, pa vlasnik nije mogao da vidi ko to pokusava.
+// Launcher javlja blokirano pokretanje skinutog programa, a server to upisuje u
+// Logove.
 k.w.send(JSON.stringify({ t: "log_klijent", tekst: "Blokirano pokretanje preuzetog programa: zlo.exe" }));
 k.w.send(JSON.stringify({ t: "log_klijent", tekst: "Blokirano pokretanje preuzetog programa: zlo.exe" }));
 k.w.send(JSON.stringify({ t: "log_klijent", tekst: "x".repeat(5000) }));

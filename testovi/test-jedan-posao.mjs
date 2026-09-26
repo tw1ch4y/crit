@@ -1,15 +1,11 @@
 import { radniFolder, podigniServer, citajIzvor, KOREN } from "./_okruzenje.mjs";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
-// JEDAN POSAO, JEDAN UPIS
+// Jedan posao, jedan upis.
 //
-// Porudzbina nije jedan upis nego pet: red u orders, stavke, skidanje zalihe,
-// novo stanje kredita i zapis u transactions. Dok je svaki sam sebe potvrdjivao,
-// nestanak struje izmedju treceg i cetvrtog je ostavljao pice skinuto sa stanja
-// a kredit nenaplacen - i to bi se otkrilo tek pri obracunu smene.
-//
-// Ovde se NE proverava samo da je kod obmotan, nego da se izmene stvarno vracaju
-// unazad kad posao pukne na pola.
+// Porudzbina su pet upisa: red u orders, stavke, zaliha, kredit i transactions.
+// Proverava se da se izmene stvarno vrate unazad kad posao pukne na pola, ne
+// samo da je kod obmotan.
 const BASE = "http://127.0.0.1:8157";
 const DATA = radniFolder("posao-data");
 await podigniServer(DATA, 8157);
@@ -120,8 +116,13 @@ for (const [gde, sablon] of [
   ["vracanje pica na stanje", /const naStanje = cancelling \? vratiStock\(orderId\) : \[\];/],
   ["kraj sesije", /log = uJednomPoslu\(\(\) => \{\s*\n\s*let l = null;/],
 ]) proveri(`${gde} je jedan posao`, sablon.test(src));
+// Stanje za igraca izlazi iz transakcije kao vrednost i salje se tek posle nje.
+const kasa = src.slice(src.indexOf("export function createPosOrder"));
+const krajPosla = kasa.indexOf("} catch (e) {", kasa.indexOf("uJednomPoslu("));
+const javljanje = kasa.indexOf('sendClient(comp.id, { t: "balance"');
 proveri("igracu se javlja tek posle potvrde upisa",
-  /Javljanje igraču ide POSLE potvrde upisa/.test(src),
+  kasa.indexOf("uJednomPoslu(") > 0 && krajPosla > 0 && javljanje > krajPosla &&
+  /if \(javiIgracu && player\) \{/.test(kasa.slice(krajPosla, javljanje)),
   "inace bi mu pisalo novo stanje kredita za racun koji nije prosao");
 proveri("brisanje igraca ide kroz zajednicki posao, ne kroz sirov BEGIN",
   !/db\.exec\("BEGIN"\)/.test(src),
@@ -129,11 +130,8 @@ proveri("brisanje igraca ide kroz zajednicki posao, ne kroz sirov BEGIN",
 
 // ---- 6) ZAPIS U LOGU JE DEO POSLA SA NOVCEM ----
 //
-// Obracun smene se ne racuna iz tabele transakcija nego IZ LOGOVA (po
-// shift_id). Zato zapis u logu nije beleska o dopuni - on JESTE dopuna, koliko
-// se kase tice. Dok je log isao iz rute, posle posla, pad izmedju njih je
-// ostavljao kredit na nalogu koji nijedan obracun ne pominje: radnik na kraju
-// smene ima visak koji ne ume da objasni.
+// Obracun smene se racuna iz logova (po shift_id), pa se zapis o dopuni upisuje
+// u istom poslu kao i sama dopuna.
 proveri("log se upisuje bez javljanja panelima (moze u posao)", /function upisiLog\(/.test(src));
 proveri("javljanje ide tek posle potvrde upisa", /function javiLog\(/.test(src));
 proveri("dopuna sama pise svoj log", /upisiLog\(\{\s*\n?\s*category: "novac", action: amount >= 0 \? "topup" : "deduct"/.test(src));

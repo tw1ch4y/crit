@@ -1,8 +1,6 @@
-# UKLANJANJE AUTOSTARTA SERVERA - vidi podesi-autostart.ps1
-#
-# Server se uredno gasi (fajl data\nadzor-stani), brisu se oba zadatka - i
-# provera na 5 minuta - i server se od tada pokrece rucno, sa "Pokreni
-# server.bat", kao ranije.
+# Uklanja autostart servera (vidi podesi-autostart.ps1): gasi server uredno
+# preko data\nadzor-stani i brise oba zadatka. Posle toga server se pokrece sa
+# "Pokreni server.bat".
 
 $Ime = "Crit Server"
 $ImeProvere = "Crit Server - provera"
@@ -30,7 +28,7 @@ if (Radi-Neki) {
     Start-Sleep -Seconds 1
   }
 }
-# Provera prva: da ne digne nadzornika izmedju dva brisanja.
+# Provera se brise prva, da ne digne nadzornika izmedju dva brisanja.
 foreach ($z in @($ImeProvere, $Ime)) {
   Stop-ScheduledTask -TaskName $z -ErrorAction SilentlyContinue
   Unregister-ScheduledTask -TaskName $z -Confirm:$false -ErrorAction SilentlyContinue

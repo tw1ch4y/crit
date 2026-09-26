@@ -1,9 +1,6 @@
-// Tok porudzbine kroz launcher, od klika do "poruceno" - u pravom Electronu i
-// preko PRAVOG WebSocketa ka serveru, ne kroz lazni most.
-//
-// Do sada je porudzbina bila proverena samo sa strane servera. Ovde se klikce
-// ono sto igrac stvarno klikce: dugme "Dodaj", izbor kes/kredit, "Poruci" -
-// i onda se gleda sta je stiglo u bazu i sta je igrac video na ekranu.
+// Tok porudzbine kroz launcher, od klika do "poruceno", u pravom Electronu i
+// preko pravog WebSocketa. Klikce se "Dodaj", izbor kes/kredit i "Poruci", pa
+// se proverava sta je stiglo u bazu i sta igrac vidi.
 //
 //   node proba-porudzbine.mjs            (server na 8096)
 import fs from "node:fs";
@@ -70,10 +67,8 @@ app.whenReady().then(async () => {
   const racunari = await api("/api/computers");
   const racunar = racunari[0];
 
-  // Racunar se PRVO oslobadja. Ako je na njemu ostala sesija od ranije probe,
-  // server na prijavu novog igraca vrati staru sesiju (zastita od duple
-  // prijave) - pa bi ceo test merio tudje porudzbine i delovalo bi da kredit
-  // ne radi. Tako je i palo prvi put.
+  // Racunar se prvo oslobadja: sesija zaostala od prethodne probe bi se vratila
+  // novom igracu (zastita od duple prijave), pa bi test merio tudje porudzbine.
   await api(\`/api/computers/\${racunar.id}/logout\`, "POST").catch(() => null);
   await cekaj(400);
 
@@ -127,10 +122,8 @@ app.whenReady().then(async () => {
   await klik("[data-add]");
   await cekaj(400);
   await cekaj(500);
-  // Kad pice udje u korpu, kartica zameni dugme "Dodaj" brojacem -/1/+.
-  // Zato se druga kolicina dodaje PLUSOM, ne ponovnim "Dodaj" - prvi pokusaj
-  // ovog testa je klikao "Dodaj" dvaput i dobio dva RAZLICITA pica, jer je
-  // prvi [data-add] u redosledu vec bio zamenjen brojacem.
+  // Kad pice udje u korpu, kartica zameni dugme "Dodaj" brojacem -/1/+, pa se
+  // druga kolicina dodaje plusom: ponovni "Dodaj" bi pogodio sledece pice.
   const posleDodavanja = await vidi(\`(() => ({
     imaBrojac: !!document.querySelector(".pice.izabrano [data-inc]"),
     imaDodaj: !!document.querySelector(".pice.izabrano [data-add]"),

@@ -1,16 +1,7 @@
 import { radniFolder, podigniServer, brojac, citajIzvor } from "./_okruzenje.mjs";
-// UBACENA SKRIPTA NE SME DA SE POKRENE U PANELU
-//
-// Panel prikazuje ono sto ljudi upisuju: imena igraca, nazive igara, beleske uz
-// nalog, nazive artikala. Sve to prolazi kroz `esc()` pre nego sto udje u
-// stranu, i to je prva brana.
-//
-// Ovo je druga. I da jedno jedino mesto ikad promasi escape, pregledac odbija
-// da izvrsi skriptu koja nije dosla sa ovog servera.
-//
-// Zasto bas ovde: iz panela se upisuje kredit. Skripta koja se izvrsi u
-// vlasnikovom pregledacu ne mora nista da provaljuje - ona VEC jeste vlasnik.
-// Jedan promasen escape u imenu igraca bio bi dovoljan.
+// CSP u panelu: pregledac ne izvrsava skriptu koja nije dosla sa ovog servera.
+// To je druga brana pored `esc()`; iz panela se upisuje kredit, pa bi ubacena
+// skripta u vlasnikovom pregledacu imala njegova prava.
 const BASE = "http://127.0.0.1:8183";
 await podigniServer(radniFolder("zaglavlja-data"), 8183);
 const { proveri, kraj } = brojac();
@@ -71,12 +62,8 @@ proveri("pravilo se salje kao zaglavlje", /setHeader\("Content-Security-Policy"/
 
 // ---- ISTO PRAVILO I NA EKRANU IGRACA ----
 //
-// Launcher prikazuje isti sadrzaj sa servera: nazive igara, imena, artikle.
-// Tu ne postoji zaglavlje (strana se ucitava sa diska), pa pravilo stoji kao
-// <meta> oznaka u samoj strani.
-//
-// Provereno sa 17 alata na pravom Electronu - svi ekrani, svako dugme, porudzbina,
-// tocak i obavestenja rade sa ovim pravilom.
+// Launcher se ucitava sa diska i nema zaglavlje, pa CSP stoji kao <meta> u
+// strani.
 const launcher = citajIzvor("client/renderer/index.html");
 const meta = launcher.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)"/)?.[1] || "";
 proveri("launcher ima pravilo o sadrzaju", !!meta, "nema <meta> sa Content-Security-Policy");

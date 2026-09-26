@@ -1,21 +1,10 @@
 import { radniFolder, podigniServer, citajIzvor, brojac } from "./_okruzenje.mjs";
-// RANG LISTA IGRAONICE
+// Rang lista igraonice i mesto igraca na njoj.
 //
-// Nije spisak najboljih nego TVOJE mesto u njemu. Gola tabela prvih deset radi
-// samo za tih deset: jedanaesti je pogleda jednom, vidi da mu do vrha fali pola
-// godine, i vise je ne otvori - a on je onaj koga je trebalo pokrenuti.
-//
-// Ovde se cuva ono od cega lista zivi ili umire:
-//
-//   1. da se MESTO poklopi sa spiskom. Mesto se racuna prebrojavanjem onih
-//      ispred (jedan upit), a spisak se cita drugim upitom. Ako im se redosled
-//      razlikuje makar u poslednjem kriterijumu, igrac ce videti da je sedmi, a
-//      na spisku stajati sesti - i lista prestaje da vredi.
-//   2. da "do sledeceg mesta ti fali X" bude tacno. To je jedina recenica zbog
-//      koje neko dodje u utorak.
-//   3. da privremeni gosti (gost-01, gost-02...) ne uzmu listu. Prave se po
-//      nekoliko dnevno i posle brisu.
-//   4. da blokiran nalog ne stoji na spisku.
+//   1. mesto (prebrojavanje onih ispred) se poklapa sa redosledom spiska
+//   2. "do sledeceg mesta ti fali X" je tacno
+//   3. privremeni gosti (gost-01, gost-02...) nisu na listi
+//   4. blokiran nalog nije na listi
 const BASE = "http://127.0.0.1:8197";
 await podigniServer(radniFolder("rang-data"), 8197);
 const { proveri, kraj } = brojac();

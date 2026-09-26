@@ -2,21 +2,12 @@ import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
 import { KOREN, radniFolder, ugasiLaunchere, putanjaElektrona } from "./_okruzenje.mjs";
-// OTKLJUCAVANJE NE SME DA UGASI LAUNCHER
+// Otkljucavanje ne sme da ugasi launcher.
 //
-// Osoblje ima dve prece: Ctrl+Alt+U otkljucava racunar, a Ctrl+Alt+Shift+Q
-// izlazi iz launchera. Obe traze PIN, i to su dva razlicita posla.
-//
-// Zamka: cim se otvori prozor za admin izlaz, launcher upamti "izlazim". Ako se
-// racunar u tom trenutku otkljuca BILO KAKO - radnik sa panela, "Otkljucaj sve",
-// ili sam igrac ukuca PIN na zakljucanom ekranu - launcher bi se UGASIO umesto
-// da se otkljuca. Masina bi ostala bez launchera do sledeceg paljenja.
-//
-// A to nije redak splet okolnosti nego svakodnevni: na zakljucanom ekranu stoje
-// DVA polja za PIN, radnik ukuca u ono koje mu je blize.
-//
-// Ovo se ne moze proveriti iz koda - trazi pravi Electron i pravu poruku sa
-// servera. Zato ovde launcher zaista mora da PREZIVI otkljucavanje.
+// Ctrl+Alt+U otkljucava racunar, Ctrl+Alt+Shift+Q izlazi iz launchera; oba traze
+// PIN. Dok je prozor za izlaz otvoren, otkljucavanje na bilo koji nacin (panel,
+// "Otkljucaj sve", PIN na zakljucanom ekranu) mora samo da otkljuca racunar.
+// Trazi pravi Electron i pravu poruku sa servera.
 //
 //   node proba-admin-izlaz.mjs
 const PORT = 8205;

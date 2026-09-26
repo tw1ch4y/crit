@@ -8,15 +8,7 @@ const pocetak = izvor.indexOf("function poredakIgara()");
 const kraj = izvor.indexOf("\n}", pocetak) + 2;
 if (pocetak < 0) { console.error("nisam nasao poredakIgara u launcher.js"); process.exit(1); }
 
-// POSLEDNJE IGRANA JE PRVA - uvek, bez izuzetka.
-//
-// Igrac sedne i trazi ono sto je sinoc igrao. Ko je poslednji put pokrenuo CS2,
-// zatice ga prvog, u istoj kartici i istog oblika kao sve ostale.
-//
-// Ranije je ovo radilo SAMO kad traka "Nastavi gde si stao" nije bila
-// prikazana, jer bi se iste igre pojavile i u traci i odmah ispod nje. Ta traka
-// je uklonjena (igre ne idu u baner), pa sortiranje vazi uvek - a to je i jedini
-// oblik u kom je korisno.
+// Poslednje igrana igra je prva na polici, uvek, u istoj kartici kao ostale.
 const S = { games: [], skoroIgrane: [], promo: [] };
 const poredak = new Function("S", izvor.slice(pocetak, kraj) + "\nreturn poredakIgara;")(S);
 
@@ -51,10 +43,8 @@ proveri("prazan katalog ne puca", poredak().length === 0);
 
 // ---- SORTIRANJE VAZI UVEK, I KAD JE OKACEN PROMO BANER ----
 //
-// Promo baner i redosled na polici nemaju veze jedno sa drugim. Ranije jesu:
-// dok su poslednje igre stajale u samom baneru, polica se namerno nije
-// sortirala. Sad ne sme da postoji nijedno stanje u kom igrac otvori launcher a
-// ono sto je sinoc igrao nije prvo.
+// Promo baner i redosled na polici su nezavisni: ono sto je igrac poslednje
+// igrao je uvek prvo.
 S.games = [
   { id: 1, name: "CS2" }, { id: 2, name: "Fortnite" },
   { id: 3, name: "GTA V" }, { id: 4, name: "Valorant" },

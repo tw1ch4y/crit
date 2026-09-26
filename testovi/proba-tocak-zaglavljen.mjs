@@ -2,22 +2,12 @@ import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
 import { KOREN, radniFolder, ugasiLaunchere, putanjaElektrona } from "./_okruzenje.mjs";
-// TOCAK KOJI SE ZAVRTEO A ODGOVOR NIJE STIGAO
+// Tocak koji se zavrteo a odgovor nije stigao.
 //
-// Klik na "Zavrti" odmah postavlja da vrtnja traje, a ODGOVOR SE CEKA SA
-// SERVERA. Dok vrtnja traje, launcher NAMERNO ne dira prikazano stanje kredita
-// - server nagradu doda odmah, a tocak se vrti pet sekundi, pa bi se brojka
-// promenila pre nego sto igrac sazna sta je dobio.
-//
-// Zamka: ako odgovor NIKAD ne stigne - veza pukne u tih pet sekundi, server se
-// restartuje, ruter se resetuje - vrtnja ostaje "u toku" ZAUVEK. Od tog trenutka
-// se svako novo stanje kredita odbacuje, pa HUD stoji zamrznut dok naplata tece
-// dalje. Igrac gleda "1200 din, ostalo 10:00" dok mu vreme stvarno curi, i
-// racunar se zakljuca bez ijednog upozorenja.
-//
-// Ovo se ne moze proveriti iz koda: trazi pravi Electron, pravi klik i pravu
-// puknutu vezu. Zato ovde server GINE pre klika, pa se gleda da li se launcher
-// sam izvuce.
+// Dok vrtnja traje, launcher ne menja prikazan kredit (nagrada se objavljuje
+// posle animacije). Ako odgovor ne stigne (pukla veza, restart servera), vrtnja
+// ne sme da ostane "u toku", jer bi HUD stajao zamrznut dok naplata tece. Server
+// se gasi pre klika i proverava se da se launcher sam izvuce.
 //
 //   node proba-tocak-zaglavljen.mjs
 const PORT = 8204;
@@ -135,8 +125,8 @@ app.whenReady().then(async () => {
   await new Promise((r) => setTimeout(r, 1500));
   upisi({ korak: "vraceno", wsOk: await js("S.wsOk === true"), vrti: await js("S.tocakVrti === true") });
 
-  // Dopuna sa servera MORA da stigne do HUD-a. Ovo je prava posledica: dok je
-  // vrtnja "u toku", svako novo stanje se odbacuje i brojka stoji zamrznuta.
+  // Dopuna sa servera mora da stigne do HUD-a: dok je vrtnja "u toku", svako
+  // novo stanje se odbacuje i brojka stoji zamrznuta.
   fs.writeFileSync(IZLAZ + ".dopuni", "1");
   await new Promise((r) => setTimeout(r, 4000));
   upisi({ korak: "posle-dopune",

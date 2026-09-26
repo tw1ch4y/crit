@@ -1,17 +1,11 @@
 import { radniFolder, podigniServer, ucitajWebSocket, citajIzvor } from "./_okruzenje.mjs";
 const WebSocket = await ucitajWebSocket();
-// KREDIT I VREME: JEDAN POJAM, JEDAN RACUN
+// Kredit i vreme: jedan racun.
 //
-// Igraonica naplacuje vreme, ali NE cuva vreme. Cuva se kredit u dinarima, a
-// vreme je uvek izvedeno: kredit podeljen cenom po satu. To je jednostavno i
-// tacno, ali ima dve posledice koje moraju da rade kako treba:
+// Cuva se kredit u dinarima; vreme je kredit podeljen cenom po satu.
 //
-//   1. svako mesto koje pokazuje vreme mora da racuna isto - panel, launcher,
-//      HUD, zakljucan ekran. Dva razlicita racuna znace da igrac i radnik
-//      gledaju razlicite brojeve i svadjaju se oko toga ko je u pravu.
-//   2. promena cene po satu menja preostalo vreme SVIMA koji igraju, odmah.
-//
-// Ovde se proverava ceo lanac na pravim brojevima.
+//   1. panel, launcher, HUD i zakljucan ekran racunaju isto
+//   2. promena cene po satu odmah menja preostalo vreme svima koji igraju
 const BASE = "http://127.0.0.1:8199";
 const WSB = "ws://127.0.0.1:8199";
 const DATA = radniFolder("kredit-data");

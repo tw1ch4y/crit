@@ -11,10 +11,8 @@ await podigniServer(DATA, 8112);
 let pao = 0, prosao = 0;
 const proveri = (n, u, d = "") => { if (u) { prosao++; console.log("  OK   " + n); } else { pao++; console.log("  PAO  " + n + (d ? "  -> " + d : "")); } };
 const cekaj = (ms) => new Promise((r) => setTimeout(r, ms));
-// Slike stoje uz bazu, u folderu ove izolovane instance - pa je sve sto se
-// ovde nadje napravio bas ovaj test. Ranije je folder bio zajednicki sa
-// projektom, pa se spisak morao snimati na pocetku da fajlovi tudjeg servera
-// ne obore test.
+// Slike stoje uz bazu, u folderu ove izolovane instance, pa je sve sto se
+// ovde nadje napravio ovaj test.
 const UPLOADS = path.join(DATA, "uploads");
 const prePromo = new Set(fs.readdirSync(UPLOADS));
 

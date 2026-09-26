@@ -1,22 +1,17 @@
 import { createHmac, createHash, timingSafeEqual } from "node:crypto";
 
-// ---------- OBRAČUN VREMENA ODIGRANOG BEZ SERVERA ----------
+// ---------- OBRAČUN VREMENA BEZ SERVERA ----------
 //
-// Launcher vodi sesiju i kad servera nema (vidi client/lokalna-sesija.js), a
-// kad se vrati, javlja koliko je sekundi sesija ukupno trajala. Ovde se odlučuje
-// koliko se od toga naplaćuje. Namerno bez baze i bez mreže: to je račun sa
-// novcem, pa se proverava sam, na brojkama.
+// Launcher javlja koliko je sekundi sesija ukupno trajala (client/
+// lokalna-sesija.js); ovde se odlučuje koliko se naplaćuje. Bez baze i mreže,
+// pa se proverava na brojkama.
 //
-// Pravila:
-//
-//  1. Naplaćuje se RAZLIKA između sekundi koje je launcher odbrojao i sekundi
-//     koje je server već naplatio. Isti izveštaj poslat dvaput daje nulu.
-//  2. Po nižoj od dve cene: onoj koju je igrač video i onoj koja sad važi. Ako
-//     je vlasnik u međuvremenu podigao cenu, igrač to nije mogao da zna.
+//  1. Naplaćuje se razlika između sekundi launchera i već naplaćenih; isti
+//     izveštaj dvaput daje nulu.
+//  2. Po nižoj od dve cene: onoj koju je igrač video i trenutnoj.
 //  3. Nikad više nego što igrač ima.
-//  4. Sesija koju je osoblje u međuvremenu zatvorilo se ne dira - tada je bilo
-//     razloga, a računar to nije mogao da čuje.
-//  5. Izveštaj koji ne prolazi potpis ne naplaćuje ništa, ali se zapisuje.
+//  4. Sesija koju je osoblje u međuvremenu zatvorilo se ne naplaćuje.
+//  5. Izveštaj koji ne prolazi potpis ne naplaćuje ništa i zapisuje se.
 
 export const TOLERANCIJA_SEKUNDI = 3;
 // Duže od nedelju dana jedna sesija ne traje - veći broj je pokvaren zapis.

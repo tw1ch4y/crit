@@ -2,14 +2,9 @@ import { radniFolder, podigniServer, ucitajWebSocket, citajIzvor, KOREN } from "
 import { pathToFileURL } from "node:url";
 import path from "node:path";
 const WebSocket = await ucitajWebSocket();
-// VREME I NAPLATA
-// Naplata racuna razliku izmedju dva prolaza, a prolaz je na 5 sekundi. Sve
-// sto pomeri sistemski sat menja tu razliku - a razlika je novac.
-//
-// Racunar za igre cesto ima sat u strani (prazna baterija na maticnoj), pa ga
-// Windows pri pokretanju sinhronizuje i sat preskoci. Bez ogranicenja bi ta
-// razlika bila naplacena kao odigrano vreme: na trinaest racunara odjednom, a
-// igraci bi u istoj sekundi ostali bez kredita i niko ne bi znao zasto.
+// Vreme i naplata: naplata racuna razliku izmedju dva prolaza (na 5 sekundi).
+// Sat koji preskoci (sinhronizacija posle prazne baterije na maticnoj) ne sme da
+// se naplati kao odigrano vreme.
 const BASE = "http://127.0.0.1:8139", WSB = "ws://127.0.0.1:8139";
 const DATA = radniFolder("sat-data");
 await podigniServer(DATA, 8139);

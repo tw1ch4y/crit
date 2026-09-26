@@ -1,43 +1,16 @@
-// VIP - ČLANARINA KOJA SE KUPUJE
+// VIP članarina.
 //
-// RANG SE ZARAĐUJE, VIP SE KUPUJE. To su dve odvojene stvari i to je cela
-// zamisao:
+// Rang (nivoi.js) se zarađuje igranjem i besplatan je; VIP se kupuje i nosi
+// pogodnosti:
 //
-//   Rang (nivoi.js) dolazi od igranja. Besplatan je i on je STATUS - ono čime
-//   se gost hvali. Ne košta kuću ništa.
+//   dvostruk XP          brže napredovanje u rangu
+//   izgled               boje, okviri i šare koje ne daje nijedan nivo
+//   oznaka VIP           pored imena
+//   niži prag za točak   jedina pogodnost koja košta; podesiva
+//   prednost na kasi     VIP porudžbina ide na vrh spiska
 //
-//   VIP se plaća. Nosi POGODNOSTI, i on je PRIHOD. Dok je VIP bio nagrada za
-//   peti nivo, bio je trošak, i to baš na najboljim gostima - kuća je davala
-//   popust onima koji bi ionako došli.
-//
-// ŠTA VIP SME DA NOSI
-//
-// Pravilo pri biranju pogodnosti: mora da bude nešto što je gostu OČIGLEDNO
-// vredno, a kuću košta malo ili nimalo. Zato je od pet pogodnosti samo jedna
-// (niži prag za točak) stvarni trošak, i taj je ograničen i podesiv.
-//
-//   dvostruk XP        Ne košta ništa. Rang je ono do čega je stalo baš onima
-//                      koji bi VIP i kupili - a brže napredovanje ne uzima
-//                      kući ni dinar.
-//   izgled             Boje, okviri i šare koje se ne mogu dobiti nijednim
-//                      nivoom. Nula dinara, a vidi se svima na rang listi.
-//   oznaka VIP         Status pored imena. Nula dinara.
-//   niži prag za točak Jedina stavka koja košta. Svima je prag 1200 nedeljno;
-//                      VIP-u je niži (podesivo). Trošak je ograničen tablom
-//                      nagrada, koju vlasnik i inače podešava.
-//   prednost na kasi   VIP porudžbina ide na vrh spiska radniku. Nula dinara,
-//                      a gost to oseti odmah.
-//
-// ZAŠTO SE PLAĆA KREDITOM
-//
-// Kredit je gost već platio kešom na kasi. Kad njime kupi VIP, taj novac je već
-// u kasi - ovo ne uzima ništa, nego pretvara stajaći kredit u prihod. Uz to je
-// samousluga: ne traži radnika, radi u tri ujutru, i gost ne mora da ustane.
-//
-// SVE SE PROVERAVA NA SERVERU
-//
-// Launcher zaključane stvari prikazuje sivo, ali launcher stoji na računaru
-// igrača. Svaka pogodnost se proverava ovde, pri svakoj upotrebi.
+// Plaća se kreditom (gost ga je već uplatio na kasi), samouslužno iz
+// launchera. Svaka pogodnost se proverava na serveru.
 
 export const PODRAZUMEVANO = {
   ukljucen: false,
@@ -62,9 +35,7 @@ export const POGODNOSTI = [
     opis: "Tvoja porudžbina ide na vrh spiska kod osoblja." },
 ];
 
-// Boje i okviri koje NIJEDAN nivo ne otključava - samo VIP. Odvojeni su od
-// spiska u nivoi.js baš zato da se ne mogu zaraditi igranjem: kad bi se mogli,
-// VIP bi bio samo prečica, a prečica se ne kupuje.
+// Boje i okviri koje ne otključava nijedan nivo, samo VIP.
 export const VIP_BOJE = {
   plamen:  { naziv: "Plamen",  heks: "#ff6a3d", vip: true },
   led:     { naziv: "Led",     heks: "#7ad7ff", vip: true },
@@ -92,9 +63,7 @@ export function danaOstalo(vipDo, sada = Date.now()) {
   return Math.ceil((broj(vipDo, 0) - sada) / 86400000);
 }
 
-// Novi rok. Kupovina dok VIP JOŠ TRAJE se nadovezuje na postojeći rok, ne
-// počinje ispočetka - inače bi gost koji obnovi dan ranije izgubio taj dan, i
-// to bi naučio da čeka da mu istekne. Čekanje je tačno ono što se ne želi.
+// Novi rok: kupovina dok VIP još traje nadovezuje se na postojeći rok.
 export function novRok(vipDo, dana, sada = Date.now()) {
   const d = Math.max(1, Math.floor(broj(dana, PODRAZUMEVANO.dana)));
   const od = vaziVip(vipDo, sada) ? broj(vipDo, sada) : sada;
@@ -109,7 +78,7 @@ export function xpMnozilac(jeVip, podesen) {
   return m >= 1 ? m : 1;
 }
 
-// Prag za besplatan spin. VIP prag NIKAD nije viši od običnog: kad bi vlasnik
+// Prag za besplatan spin. VIP prag nikad nije viši od običnog: kad bi vlasnik
 // greškom upisao veći broj, VIP bi postao kazna.
 export function pragZaSpin({ jeVip, prag, vipPrag }) {
   const obican = Math.max(0, broj(prag, 1200));

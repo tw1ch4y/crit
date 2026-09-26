@@ -61,30 +61,12 @@ proveri("plan se VRAĆA pri admin izlazu", /planNapajanja\(false\)/.test(main),
 proveri("vraća se na Balanced", main.includes("381b4222-f694-41f0-9685-ff5bb260df2e"));
 proveri("ne dira Windows na programerskoj mašini", /function planNapajanja[\s\S]{0,120}if \(NO_LOCK/.test(main));
 
-// ---- 4) plan projekta ne sme da laže ----
-// Stavke koje su odavno gotove stajale su kao neurađene - vlasnik onda ne zna
-// šta ga još čeka.
-const plan = citajIzvor("PLAN.md");
-for (const gotovo of ["Plan napajanja na **High Performance**", "Vremenski paketi", "Autostart servera"]) {
-  const red = plan.split("\n").find((l) => l.includes(gotovo));
-  proveri(`plan zna da je gotovo: ${gotovo.replace(/\*/g, "").slice(0, 34)}`, !!red && red.startsWith("- [x]"), red?.slice(0, 60));
-}
-// Svaka neurađena stavka mora da kaže U KOM JE STANJU. Bez toga se posle dva
-// meseca ne razlikuje ono što je namerno odbačeno od onoga što je ispalo iz
-// glave - a jedino drugo traži da se nešto uradi.
-//
-// Rečnik se širio kako su se pojavljivala nova stanja, i to je u redu dok je
-// svako od njih STVARNO drugačije:
-//   "sledeće na redu" / "planirano" - prihvaćeno, čeka red (plan je u početku
-//     imao samo gotovo i odbačeno, pa je prvu takvu stavku odbijao)
-//   "odluka" - ne čeka posao nego ODGOVOR vlasnika; dok ga nema, nema šta da se
-//     radi, a to nije isto što i "nije stiglo"
-proveri("neurađeno stoji uz razlog zašto",
-  plan.split("\n").filter((l) => l.startsWith("- [ ]")).every((l) => /NIJE urađeno|ne planira se|preporuka|Nije potrebna|sledeće na redu|planirano|odluka/.test(l)),
-  "stavka bez objašnjenja ne kaže da li je zaboravljena, odbačena ili čeka red");
+// ---- 4) uputstvo ----
 proveri("odlaganje ažuriranja je objašnjeno u uputstvu",
-  /Active hours/.test(citajIzvor("DEPLOY.md")),
+  /Active hours/.test(citajIzvor("docs/INSTALACIJA.md")),
   "restart nasred turnira je najskuplji kvar u igraonici");
+proveri("plan razvoja kaže šta namerno nije urađeno",
+  /Namerno nije urađeno/.test(citajIzvor("docs/RAZVOJ.md")));
 
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 process.exit(pao ? 1 : 0);

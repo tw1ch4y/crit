@@ -1,25 +1,13 @@
 import { citajIzvor, brojac } from "./_okruzenje.mjs";
-// UPOZORENJE PRE NEGO STO VREME ISTEKNE
+// Upozorenje pre isteka vremena.
 //
-// Povod je prijava sa masine: "u jednom trenutku mi se u potpunosti zakljucalo
-// kad mi je isteklo vreme bez ikakvog prethodnog upozorenja".
+// Pusta se prava funkcija iz client/main.js (izvucena iz izvora) sa laznim
+// prozorom i zvukom:
 //
-// Ovde se pusta PRAVA funkcija iz client/main.js (izvucena iz izvora, ne
-// prepisana) sa laznim prozorom i laznim zvukom, pa se meri sta bi igrac
-// stvarno dobio.
-//
-// Dve greske koje su se ovako nasle:
-//
-//   1. TIHO PAMCENJE JE GUTALO I PRAG U KOM JE IGRAC BAS TADA BIO. Pri prijavi
-//      se pragovi obelezavaju "tiho" da se gostu sa 12 minuta ne kaze da ima 30.
-//      Ali uslov je bio `min <= p`, pa je gost koji se prijavi sa 45 sekundi
-//      tiho potrosio SVIH sest pragova - ukljucujuci i onaj od jednog minuta.
-//      Posle toga nema sta da se javi i ekran se prosto zakljuca. Isto se desi
-//      ako veza pukne i vrati se pred kraj sesije.
-//
-//   2. UPOZORENJE JE BILO SAMO SLIKA. Igrac je u punom ekranu; prozor preko igre
-//      Windows iznad EKSKLUZIVNOG punog ekrana cesto ne iscrta uopste. Zvuk se
-//      cuje uvek, pa sada ide uz svaki prag.
+//   1. pri prijavi se tiho obelezavaju samo pragovi koji su vec prosli; prag u
+//      kom je igrac bas tada (npr. poslednji minut) se javlja
+//   2. uz svako upozorenje ide i zvuk, jer se prozor preko ekskluzivnog punog
+//      ekrana ne iscrta uvek
 const { proveri, kraj } = brojac();
 const izvor = citajIzvor("client/main.js");
 
@@ -67,8 +55,8 @@ const napravi = () => {
 
 // ---- 2) PRIJAVA SA MALO VREMENA ----
 //
-// Ovo je greska iz prijave: gost sa 45 sekundi nije dobijao NISTA, pa mu se
-// ekran prosto zakljucao.
+// Gost koji se prijavi sa 45 sekundi mora da dobije upozorenje pre nego sto se
+// ekran zakljuca.
 {
   const t = napravi();
   t.proveriVreme(45, true);             // prijava sa 45 sekundi

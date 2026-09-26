@@ -1,18 +1,16 @@
-// Gašenje programa koje je igrač pokrenuo tokom svoje sesije.
+// Gašenje programa koje je igrač pokrenuo tokom sesije.
 //
-// Zašto ovako: igre se često pokreću preko svog pokretača (Steam, Riot, Epic),
-// pa .exe koji smo mi pokrenuli izađe, a igra nastavi pod sasvim drugim imenom.
-// Gašenje "po imenu" tu ne pomaže. Zato pamtimo šta je radilo PRE prijave
-// igrača i na kraju sesije gasimo samo ono što se u međuvremenu pojavilo.
+// Igre se često pokreću preko pokretača (Steam, Riot, Epic) i nastavljaju pod
+// drugim imenom, pa se gašenje ne radi po imenu: pamti se šta je radilo pre
+// prijave, a na kraju sesije gasi ono što se pojavilo u međuvremenu.
 
 const { execFile, spawn } = require("node:child_process");
 const path = require("node:path");
 
-// Ništa iz Windows fascikle se ne dira - tu su sistemski procesi.
-// Ovo je glavna kočnica: i ako se lista pokvari, sistem ostaje netaknut.
+// Procesi iz Windows fascikle se nikad ne diraju, ma šta bilo na spiskovima.
 const ZASTICENE_PUTANJE = [/\\Windows\\/i];
 
-// Programi koje ne gasimo iako su se pojavili tokom sesije.
+// Programi koji se ne gase iako su se pojavili tokom sesije.
 const ZASTICENA_IMENA = new Set([
   "explorer.exe", "crit launcher.exe", "electron.exe",
   "onedrive.exe", "searchhost.exe", "startmenuexperiencehost.exe",
@@ -23,19 +21,12 @@ const ZASTICENA_IMENA = new Set([
   "audiodg.exe", "taskhostw.exe", "smartscreen.exe",
 ]);
 
-// SVAKA SPOLJNA KOMANDA IMA ROK - I POKREĆE SE BEZ cmd.exe.
-//
-// Ovde je stajao `exec`, koji komandu pušta KROZ cmd.exe. Njegov `timeout` gasi
-// taj cmd, a ne PowerShell ili taskkill ispod njega: zaglavljena komanda ostaje
-// da visi i posle roka. `execFile` pokreće program direktno, pa rok gasi baš njega.
+// Komande idu kroz execFile sa rokom (vidi pokreniKomandu u main.js).
 const ROK_POPISA = 20000;
 const ROK_GASENJA = 10000;
 
-// Vraća [{ ime, putanja, pid, memorija }]
-//
-// Izlaz ide kao UTF-8. PowerShell 5.1 inače piše u kodnoj strani konzole, pa
-// putanja naloga sa č, ć ili đ u imenu stigne izmenjena - i program iz
-// Preuzimanja takvog naloga se nikad ne prepozna kao program iz Preuzimanja.
+// Vraća [{ ime, putanja, pid, memorija }]. Izlaz je UTF-8, inače putanje sa
+// č, ć ili đ stižu izmenjene.
 function popisProcesa(cb) {
   const ps =
     "[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false; " +
@@ -108,21 +99,17 @@ function ugasiNoveProcese(pocetniPidovi, { suvo = false, nediraj = null, log = (
   });
 }
 
-// Igrač skine .exe kroz pregledač i pokrene ga - tako zaobilazi launcher i
-// instalira šta hoće. Igre nikad ne rade iz Preuzimanja ni iz Temp fascikle,
-// pa je pokretanje odatle siguran znak da nešto nije u redu.
+// Program pokrenut iz Preuzimanja, Temp-a ili sa radne površine je skinut
+// kroz pregledač; igre odatle ne rade.
 function zabranjenaPutanja(putanja, env) {
   const p = String(putanja || "").toLowerCase();
   if (!p) return false;
-  // naša daljinska instalacija ide kroz Temp - nju ne diramo
+  // Daljinska instalacija iz panela ide kroz Temp i ne dira se.
   if (p.includes("\\crit-install\\")) return false;
 
   const HOME = String(env.USERPROFILE || "").toLowerCase();
   const TEMP = String(env.TEMP || "").toLowerCase();
-  // Zavrsna kosa crta je bitna: bez nje "...\downloads" hvata i
-  // "...\downloads-igre\game.exe", pa bi se uredno instalirana igra u folderu
-  // takvog imena gasila igracu usred partije. Poredi se FOLDER, ne pocetak
-  // teksta.
+  // Završna kosa crta: "...\downloads\" ne sme da uhvati i "...\downloads-igre\".
   const uz = (s) => (s.endsWith("\\") ? s : s + "\\");
   const mesta = [
     HOME && uz(path.join(HOME, "downloads").toLowerCase()),
@@ -132,34 +119,17 @@ function zabranjenaPutanja(putanja, env) {
   return mesta.some((m) => p.startsWith(m));
 }
 
-// ---- STRAŽA NAD PREUZETIM PROGRAMIMA ----
+// ---- Straža nad preuzetim programima ----
 //
-// Ovo se ranije radilo iz nadzora launchera, NA SVAKE ČETIRI SEKUNDE, celu
-// sesiju: novi PowerShell koji preko WMI popiše sve procese na računaru.
+// Jedan pomoćni PowerShell proces za celu sesiju, na sniženom prioritetu.
+// Popis ide kroz .NET (bez WMI), a javljaju se samo procesi koje još nije
+// video. Sam se gasi kad launchera nema; kad zaćuti, launcher ga diže
+// ponovo, a kad pada u krug, pauzira i javlja osoblju.
 //
-// Izmereno na brzom laptopu u mirovanju: pola sekunde do sekunde procesora po
-// pozivu, i to skoro sve na samo pokretanje PowerShell-a, ne na upit. Na mašini
-// koja uz to vrti igru - više. Igrač to oseća kao trzaj slike na svake četiri
-// sekunde. A poziv nije imao rok: kad WMI zapne (a ume), svaki sledeći krug je
-// dodavao još jedan zaglavljen PowerShell od desetak MB naviše, dok memorija ne
-// nestane. Retko - i baš tako da računar deluje zamrznut.
+// Odluka šta se gasi (zabranjenaPutanja, zasticen) je ovde u JS-u.
 //
-// Sada:
-//   - JEDAN pomoćni proces za celu sesiju, na sniženom prioritetu (igra ima
-//     prednost za procesor)
-//   - popis ide iz samog .NET-a u tom procesu, bez WMI i bez novog procesa
-//   - javlja samo procese koje do tada nije video, pa je posle prvog kruga
-//     posao skoro nula
-//   - sam se gasi čim launchera nema (i ako launcher pukne bez pozdrava), da
-//     ne ostane siroče koje radi do gašenja računara
-//   - kad zaćuti, launcher ga gasi i diže iznova; kad pada u krug, staje i
-//     javlja osoblju jednom
-//
-// Odluka ŠTA se gasi ostaje ovde u JS-u (zabranjenaPutanja, zasticen) - ona je
-// pokrivena testovima. Pomoćni proces samo javlja šta vidi.
-//
-// Skripta ne sme da ima dvostruke navodnike: ide kao argument za -Command, a
-// PowerShell 5.1 ih na komandnoj liniji tumači nedosledno.
+// Skripta nema dvostruke navodnike: PowerShell 5.1 ih u argumentu za -Command
+// tumači nedosledno.
 function skriptaStraze(roditelj, razmakMs) {
   return [
     "$ErrorActionPreference = 'SilentlyContinue'",
@@ -192,8 +162,7 @@ function skriptaStraze(roditelj, razmakMs) {
 
 const PS_STRAZA = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"];
 
-// .NET daje ime bez nastavka ("skinuto"), a spisak zaštićenih i ostatak
-// programa rade sa imenom kakvo daje WMI ("skinuto.exe").
+// .NET daje ime bez nastavka ("skinuto"), ostatak koda radi sa "skinuto.exe".
 function imeProcesa(ime) {
   const n = String(ime || "").toLowerCase();
   return n && !n.endsWith(".exe") ? n + ".exe" : n;
@@ -232,8 +201,7 @@ function pokreniStrazu({
       if (zaustavljena) return;
       if (!greska) { gasim.delete(p.pid); obavesti(p.ime, p); return; }
       if (pokusaj < 3) { setTimeout(() => blokiraj(p, pokusaj + 1), pauzaPokusaja); return; }
-      // Tri puta odbijeno ili je program u međuvremenu sam izašao. Igraču se
-      // ne javlja da je ugašeno nešto što možda nije.
+      // Tri odbijanja ili je program sam izašao; igraču se ne javlja ništa.
       gasim.delete(p.pid);
       log(`nije ugašen: ${p.ime} (${String(greska.message || greska).slice(0, 80)})`);
     });
@@ -297,7 +265,7 @@ function pokreniStrazu({
     d.on("exit", kraj);
   };
 
-  // Straža koja ćuti je zaglavljena. Ne čeka se da proradi sama.
+  // Straža koja ne daje znak života se gasi i diže ponovo.
   const nadzor = setInterval(() => {
     if (dete && Date.now() - poslednjiZnak > rokTisine) {
       log("straža ne javlja znak života - diže se iznova");
@@ -321,16 +289,9 @@ function pokreniStrazu({
   };
 }
 
-// ---- DALJINSKI TASK MANAGER (osoblje ga gleda iz panela) ----
+// ---- Daljinski spisak procesa (panel) ----
 //
-// Radnik sa glavnog racunara vidi sta radi na izabranoj masini i moze da ugasi
-// zaglavljenu igru. Ranije je "Task Manager" iz panela otvarao Task Manager NA
-// racunaru igraca - radnik bi morao da ustane i ode do te masine, a igrac bi u
-// medjuvremenu imao Task Manager pred sobom.
-//
-// Sistemski procesi se javljaju kao zasticeni i NE mogu da se ugase odavde.
-// Ovo je ista kocnica koja vazi i za ciscenje sesije: i ako spisak pukne,
-// Windows ostaje netaknut.
+// Sistemski procesi su označeni kao zaštićeni i ne mogu da se ugase odavde.
 function spisakZaPanel() {
   return new Promise((res) => {
     popisProcesa((lista) => {
@@ -349,9 +310,9 @@ function spisakZaPanel() {
   });
 }
 
-// Gasi JEDAN proces po PID-u. Pre gasenja se ponovo proverava da nije
-// sistemski: spisak koji radnik gleda moze da bude star nekoliko sekundi, a za
-// to vreme se PID moze osloboditi i dodeliti necem drugom.
+// Gasi jedan proces po PID-u. Zaštita se proverava ponovo, jer je spisak
+// koji radnik gleda star nekoliko sekundi, a PID je mogao da pripadne drugom
+// procesu.
 function ugasiProces(pid) {
   return new Promise((res) => {
     const broj = Number(pid);

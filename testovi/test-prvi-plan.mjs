@@ -1,29 +1,13 @@
 import { citajIzvor, brojac } from "./_okruzenje.mjs";
-// LAUNCHER NE SME DA UPADNE PREKO ZIVE IGRE
+// Launcher ne sme da uleti preko igre koja jos radi.
 //
-// Povod je prijava sa masine: "imao sam problem sa rezolucijom kao da je
-// zabagovao par puta launcher".
+// Kad igra u punom ekranu izgubi fokus (ucitavanje mape, obavestenje, alt-tab),
+// fokus dobija zastor iza nje. Launcher koji tada izadje napred izbaci igru iz
+// ekskluzivnog punog ekrana i promeni rezoluciju.
 //
-// STA SE DESAVALO
-//
-// Dok igra radi, launcher se sklanja a iza njega stoji zastor (pun ekran crne
-// pozadine) da igrac nikad ne vidi Windows desktop. Kad se igra zatvori,
-// Windows dodeli fokus sledecem prozoru - a to je bas zastor. To je bio znak
-// "igra je gotova", pa je posle 400 ms launcher ulazio napred: pun ekran, iznad
-// svega, sa fokusom.
-//
-// Ali igra u punom ekranu izgubi prvi plan i kad je ziva: pri ucitavanju mape,
-// uz Windows obavestenje, uz alt-tab, pa i zbog NASEG obavestenja o vremenu.
-// Launcher bi tada uleteo preko nje, igra bi ispala iz ekskluzivnog punog
-// ekrana i EKRAN BI PROMENIO REZOLUCIJU. Igrac se vrati u igru - rezolucija se
-// promeni opet. Iz stolice: "launcher bagira".
-//
-// STA SE OVDE CUVA
-//
-//   1. da fokus zastora vise nije dokaz nego nagovestaj
-//   2. da se pre preuzimanja prvog plana PITA sistem radi li igra jos
-//   3. da prozori prate promenu rezolucije - obavestenje koje ostane na staroj
-//      koordinati zavrsi van ekrana, pa upozorenje o vremenu niko ne vidi
+//   1. fokus zastora je nagovestaj, ne dokaz da je igra gotova
+//   2. pre preuzimanja prvog plana pita se sistem da li igra jos radi
+//   3. prozori prate promenu rezolucije (obavestenje ne ostaje van ekrana)
 const { proveri, kraj } = brojac();
 const main = citajIzvor("client/main.js");
 
@@ -54,7 +38,7 @@ proveri("i on trazi da fokus potraje", /Date\.now\(\) - zastorFokusOd >= POTVRDA
 
 // ---- 2) PROZORI PRATE PROMENU REZOLUCIJE ----
 //
-// Igre menjaju rezoluciju. Mera je ranije uzeta jednom, pri pravljenju prozora.
+// Igre menjaju rezoluciju, pa se mera ekrana uzima pri svakom prikazu.
 proveri("obavestenje racuna meru pri svakom prikazu",
   /function overlayMere\(\)/.test(main) && /o\.setBounds\(overlayMere\(\)\)/.test(main),
   "na ekranu od 2560 obavestenje stoji na x=950; kad igra spusti na 1280, ono je van ekrana");

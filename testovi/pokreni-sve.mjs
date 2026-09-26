@@ -46,12 +46,10 @@ for (const { naziv, izlaz } of palo) {
 
 console.log(`\nukupno: ${ukupnoProslo} proslo, ${ukupnoPalo} palo`);
 if (!ukupnoPalo) {
-  // Radne baze ostaju samo kad ima sta da se gleda, da ne stoje u folderu bez potrebe.
+  // Radne baze ostaju samo kad ima sta da se gleda.
   //
-  // Brisanje ne sme da obori pokretac: ako je server za pregled jos upaljen, on
-  // drzi svoju bazu otvorenom i Windows ne da da se folder obrise. Ranije je tu
-  // letela EPERM greska sa stack trace-om POSLE sto su svi testovi prosli - pa
-  // je izlazni kod govorio da je palo, a nista nije palo.
+  // Brisanje ne sme da obori pokretac: server za pregled ume da drzi svoju bazu
+  // otvorenom, pa Windows ne da da se folder obrise (EPERM).
   try {
     fs.rmSync(path.join(OVDE, ".radno"), { recursive: true, force: true });
   } catch {

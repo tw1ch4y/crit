@@ -1,20 +1,11 @@
 import { citajIzvor, brojac } from "./_okruzenje.mjs";
-// TEKST MORA DA SE ČITA
+// Čitljivost teksta u launcheru i panelu:
 //
-// Ovo nije stvar ukusa. Launcher se gleda sa metar udaljenosti, iz stolice, na
-// ekranu koji je cele smene upaljen - a panel se gleda i sa telefona, u mraku,
-// dok neko drugi ceka za kasom. Dva broja odlucuju da li se sitno slovo cita:
+//   kontrast prema podlozi  najmanje 4.5:1 za sitan tekst
+//   velicina                najmanje 11px
 //
-//   ODNOS PREMA PODLOZI - koliko je slovo svetlije od onoga na cemu stoji.
-//     Ispod 4.5:1 sitan tekst pocinje da se gubi. Trece stepen teksta je bio
-//     3.75:1 u launcheru i 4.08:1 u panelu, a na svetlijim plocama 2.6:1 - i
-//     bas su njime pisane oznake koje kazu STA je broj pored njih.
-//
-//   VELICINA - 9px sa razmaknutim velikim slovima izgleda uredno na slici, a
-//     iz stolice se ne procita. Donja granica je 11px.
-//
-// Racun je iz WCAG-a (relativna svetlina, pa odnos), isti onaj po kom se meri
-// da li boja kuce upada u tudje znacenje (vidi zamerkeNaBoju u service.js).
+// Racun je iz WCAG-a (relativna svetlina, pa odnos), isti kao u zamerkeNaBoju
+// u service.js.
 const { proveri, kraj } = brojac();
 
 const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
@@ -76,17 +67,8 @@ for (const [gde, putanja, podloge] of [
 
 // ---- 3) LESTVICA VELIČINA ----
 //
-// Launcher je nosio 23 razlicite velicine slova: 11, 11.5, 12, 12.5, 13, 13.5,
-// 14, 14.5, 15, 15.5, 16, 17, 18, 19, 20, 22, 24, 25, 26, 30, 34, 36, 64. Panel
-// 19 svojih. Nista od toga se ne vidi kao greska, ali se vidi kao razlika: dve
-// oznake istog reda, jedna 11 a druga 11.5, i cela strana izgleda kao da je
-// pravljena u vise navrata. To je razlika izmedju "radi" i "uradjeno".
-//
-// Lestvica: 11 12 13 14 15 17 19 24 30 36 44 64. Nije proizvoljna - svaki korak
-// postoji zato sto je u programu vec bio potreban, samo su medjukoraci spusteni
-// na najblizi (najvise 2px razlike). Nova vrednost van lestvice znaci ili da
-// treba novi korak (pa se dodaje ovde, svesno), ili da je neko meruckao dok mu
-// ne "legne" - a od toga se lestvica i raspala.
+// Lestvica: 11 12 13 14 15 17 19 24 30 36 44 64. Nova vrednost van lestvice se
+// dodaje ovde i u komentar u CSS-u, ili se zaokruzi na najblizi korak.
 const LESTVICA = [11, 12, 13, 14, 15, 17, 19, 24, 30, 36, 44, 64];
 const IZUZECI = [
   // Donja navigacija panela na telefonu: petnaest stavki u sirinu ekrana.

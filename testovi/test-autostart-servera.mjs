@@ -2,13 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { citajIzvor, brojac, KOREN } from "./_okruzenje.mjs";
 import * as N from "../server/src/nadzor.js";
-// SERVER KOJI SE TEŠKO GASI - ONO ŠTO SE NE MOŽE PUSTITI OVDE
-//
-// Zakazani zadatak menja Windows, pa se na razvojnom računaru ne pravi. Ovde se
-// čuva sve što se može proveriti bez njega: da server ima zdravlje, da se gasi
-// uredno, da skripte prave zadatak koji preživi restart i sam sebe proveri, i da
-// nijedna skripta ne pukne na zagradi iz imena foldera. Ponašanje nadzornika sa
-// pravim serverom meri test-nadzornik-uzivo.mjs.
+// Autostart servera, bez pravljenja zakazanog zadatka (to menja Windows
+// razvojnog računara): zdravlje servera, uredno gašenje, skripte za zadatak i
+// zagrade u imenu foldera. Nadzornika sa pravim serverom meri
+// test-nadzornik-uzivo.mjs.
 const { proveri, kraj } = brojac();
 const bezCR = (s) => s.replace(/\r\n/g, "\n");
 const idx = bezCR(citajIzvor("server/src/index.js"));

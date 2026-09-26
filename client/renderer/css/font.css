@@ -1,11 +1,6 @@
-/* FONT
-   Chakra Petch je ugradjen u paket, ne skida se sa interneta i ne zavisi od
-   toga sta je instalirano na racunaru igraca. Licenca (OFL) je uz fajlove.
-   Dva podskupa po debljini: "latin" nosi obicna slova, "latin-ext" nosi
-   c c s z dj. Pregledac skida latin-ext tek kad naidje na takvo slovo, pa
-   engleska imena igara ne placu nista.
-   Ako latin-ext ikad izostane, srpska slova bi tiho pala na sistemski font i
-   mesala bi se dva pisma u istoj reci - zato ih testovi izricito proveravaju. */
+/* Chakra Petch, ugrađen u paket (licenca OFL je uz fajlove). Dva podskupa po
+   debljini: "latin" i "latin-ext" (č ć š ž đ); latin-ext se učitava tek kad se
+   takvo slovo pojavi. Testovi proveravaju da latin-ext postoji. */
 @font-face {
   font-family: "Chakra Petch"; font-style: normal; font-weight: 400; font-display: swap;
   src: url("../fonts/chakra-petch-400-latin-ext.woff2") format("woff2");

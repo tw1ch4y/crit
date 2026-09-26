@@ -17,53 +17,28 @@ import * as vip from "./vip.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// OTPREMLJENE SLIKE SU PODACI IGRAONICE, NE DEO PROGRAMA.
-//
-// Stajale su u `server/public/uploads` - unutar samog programa, pored panela.
-// Odatle su sledile tri stvari, i sve tri su bile prave greške:
-//
-//   1. NISU SE ČUVALE. Rezervna kopija je jedan `crit.db` i ništa više. Kad disk
-//      otkaže, baza se vrati sa USB-a i u njoj stoje redovi koji pokazuju na
-//      `/uploads/game-2-...png` - a tih fajlova nema. Svaki omot, svaka slika
-//      pića, svih pet pozadina i svi baneri se kucaju ispočetka, ručno.
-//   2. IZOLACIJA JE IMALA RUPU. `CRIT_DATA_DIR` odvaja bazu, ali ne i slike, pa
-//      je svaki test koji otpremi sliku pisao u pravi projekat. Testovi su to
-//      rešavali tako što sami brišu za sobom - a to je zaobilaženje, ne rešenje:
-//      test koji pukne na pola ne stigne da počisti.
-//   3. NADOGRADNJA SERVERA IH JE MEŠALA. Uputstvo kaže "prepiši server\src i
-//      server\public" - a u `public` su bile i slike iz paketa, koje se onda
-//      pomešaju sa onima koje je igraonica sama otpremila.
-//
-// Sada stoje uz bazu, u folderu sa podacima. Isti folder se kopira van računara,
-// isti se preskače pri nadogradnji, i isti se izoluje u testu.
+// Otpremljene slike su podaci igraonice i stoje uz bazu (DATA_DIR/uploads):
+// ulaze u kopiju van računara, nadogradnja ih ne dira, a izolovana instanca
+// (CRIT_DATA_DIR) ima svoje.
 export const UPLOADS = path.join(DATA_DIR, "uploads");
 fs.mkdirSync(UPLOADS, { recursive: true });
 
-// Iz zapisanog `/uploads/ime.png` pravi putanju do fajla. Ide kroz basename
-// namerno: vrednost dolazi iz baze, a `path.join` sa "../.." u imenu bi izašao
-// iz foldera i obrisao nešto sasvim drugo.
+// Putanja do fajla iz zapisanog `/uploads/ime.png`. Samo basename, da vrednost
+// iz baze ne izađe iz foldera ("../..").
 const putanjaSlike = (url) => {
   const ime = path.basename(String(url || "").trim());
   return ime && ime !== "." && ime !== ".." ? path.join(UPLOADS, ime) : null;
 };
-// Brisanje stare slike pri zameni. Nikad ne baca - fajl je mogao biti obrisan
-// ručno, a zbog toga izmena artikla ne sme da padne.
+// Brisanje stare slike pri zameni; fajl je možda već obrisan, pa ne baca.
 const obrisiSliku = (url) => {
   const p = putanjaSlike(url);
   if (p) { try { fs.unlinkSync(p); } catch {} }
 };
 
-// SELIDBA SA STAROG MESTA.
-//
-// Igraonica koja je radila na staroj verziji ima slike u `server/public/uploads`.
-// Prenose se jednom, pri prvom pokretanju nove verzije: baza već pokazuje na
-// `/uploads/<ime>`, pa je dovoljno da fajl bude na novom mestu. Kopira se, ne
-// premešta - ako nešto pođe naopako, stara kopija je i dalje tu.
+// Selidba slika sa starog mesta (server/public/uploads), jednom, pri prvom
+// pokretanju nove verzije. Kopira se, ne premešta.
 (function preseliStareSlike() {
-  // Samo za PRAVU instalaciju koja se nadograđuje. Izolovana instanca (test,
-  // proba, pregled) po definiciji nema šta da nasledi, a bez ovog uslova bi
-  // svaki test u svoj folder prepisao sve slike igraonice - osam megabajta po
-  // pokretanju, i to iz podataka koje test ne sme ni da vidi.
+  // Samo za pravu instalaciju; izolovana instanca (test, proba) nema šta da nasledi.
   if (process.env.CRIT_DATA_DIR) return;
   const staro = path.join(__dirname, "..", "public", "uploads");
   if (staro === UPLOADS) return;
@@ -82,7 +57,7 @@ const obrisiSliku = (url) => {
   if (preneto) console.log(`Slike prenete uz bazu: ${preneto} (staro mesto ostaje netaknuto)`);
 })();
 
-// ID trenutno otvorene smene (keširano; inicijalizuje se na dnu fajla)
+// ID otvorene smene (keširan; postavlja se na dnu fajla).
 let activeShiftId = null;
 
 // Pomoćne
@@ -98,27 +73,13 @@ export function settingsObj() {
   };
 }
 
-// SERVISNI PIN SE UPISUJE JEDNOM, U PANELU, I STIŽE NA SVE RAČUNARE.
-//
-// Taj PIN čuva ulaz u podešavanja launchera i izlaz iz kioska KAD SERVER NE
-// RADI - zato mora da se proveri lokalno, bez servera, i zato mora da stoji na
-// samoj mašini.
-//
-// Ranije se upisivao ručno, u `podesavanja.json` pored programa, na svakoj
-// mašini posebno. To nije bila nezgodna procedura nego loš dizajn: PIN koji se
-// menja na trinaest mesta ne promeni se nigde. Ostajao je fabrički `1234`, a to
-// je baš onaj PIN kojim igrač koji iščupa mrežni kabl preusmerava računar na
-// svoj server.
-//
-// ŠALJE SE HEŠ, NE SAM PIN. Server nikad ne šalje `unlock_pin` klijentima i to
-// je namerno; isto pravilo važi i ovde. Launcher čuva heš i proverava unos
-// prema njemu, pa PIN ne putuje mrežom niti stoji u čitljivom obliku na
-// računaru igrača - a i dalje radi kad servera nema.
+// Servisni PIN launchera. Upisuje se u panelu i stiže na sve računare kao
+// heš sa soli; launcher proverava unos prema hešu i kad server ne radi. Sam
+// PIN (kao ni `unlock_pin`) se klijentima ne šalje.
 export function servisniPinZaKlijenta() {
   const pin = String(getSetting("servisni_pin", "") || "").trim();
   if (!pin) return null; // nije podešen - launcheri rade po starom
-  // So se pamti uz PIN, da svi računari dobiju isti heš i da se ne menja na
-  // svakom povezivanju (inače bi launcher pisao config.json bez potrebe).
+  // So se čuva uz PIN, da svi računari dobiju isti heš.
   let so = getSetting("servisni_pin_so", "");
   if (!so) { so = randomBytes(16).toString("hex"); setSetting("servisni_pin_so", so); }
   return { hes: scryptSync(pin, Buffer.from(so, "hex"), 32).toString("hex"), so };
@@ -132,11 +93,8 @@ export function posaljiServisniPin() {
     detail: p ? "Servisni PIN je poslat svim povezanim launcherima" : "Servisni PIN je obrisan - launcheri se vraćaju na lokalni" });
 }
 
-// Da li vlasnik jos uvek ima fabricku lozinku (admin / admin).
-// Panel je dostupan sa svakog telefona na mrezi, a preko njega se dopunjuje
-// kredit - ko udje sa admin/admin moze sebi da upise koliko hoce. Dosad je o
-// tome pisalo samo u konzoli servera, koju niko ne cita.
-// Racuna se jednom i pamti: provera je scrypt, ne sme na svaki zahtev.
+// Da li nalog admin još ima fabričku lozinku; panel to prikazuje crveno.
+// Računa se jednom i pamti, jer je provera scrypt.
 let _fabricka = null;
 export function fabrickaLozinkaVlasnika() {
   if (_fabricka !== null) return _fabricka;
@@ -150,9 +108,7 @@ export function fabrickaLozinkaVlasnika() {
 export function zaboraviProveruLozinke() { _fabricka = null; }
 
 function rate() {
-  // Ako cena po satu ikako ispadne ne-broj (rucna izmena baze, stara kopija),
-  // NaN bi prosao kroz naplatu i svakom igracu spustio stanje na nulu, pa bi im
-  // sistem redom zakljucao racunare. Nula znaci "ne naplacuj" i bar je bezopasna.
+  // Neispravna cena (ručna izmena baze) postaje 0, odnosno "bez naplate".
   const r = Number(getSetting("rate_per_hour", "120"));
   return Number.isFinite(r) && r > 0 ? r : 0;
 }
@@ -181,27 +137,18 @@ function addTransaction(playerId, type, amount, balanceAfter, adminId, note) {
   ).run(playerId, type, amount, balanceAfter, adminId || null, note || null, Date.now());
 }
 
-// Logovi / audit
+// Logovi
 //
-// UPIS I JAVLJANJE SU RAZDVOJENI, i to namerno.
-//
-// Obračun smene se ne računa iz tabele `transactions` nego IZ LOGOVA (po
-// shift_id). Zato zapis u logu nije beleška o dopuni - on JESTE dopuna, koliko
-// se kase tiče. Kad se novac i taj zapis upisuju odvojeno, pad između njih
-// ostavlja kredit na nalogu koji nijedan obračun ne pominje: radnik na kraju
-// smene ima manjak koji ne ume da objasni, a gost je uredno platio.
-//
-// `upisiLog` je zato upis BEZ javljanja i BEZ gutanja greške - da može da uđe u
-// isti posao sa novcem i da ga obori ako ne prođe. Javljanje panelima ide POSLE
-// potvrde upisa (`javiLog`), jer bi inače radnik u feedu video dopunu koje u
-// bazi nema.
+// Obračun smene se računa iz logova (po shift_id), pa je zapis o novcu deo
+// samog posla sa novcem: `upisiLog` ne guta grešku i ide u istu transakciju.
+// Panelima se javlja tek posle upisa (`javiLog`).
 function upisiLog({ category, action, actor = "sistem", target = null, detail = null, amount = null }) {
   const ts = Date.now();
   db.prepare("INSERT INTO logs (ts, category, action, actor, target, detail, amount, shift_id) VALUES (?,?,?,?,?,?,?,?)")
     .run(ts, category, action, actor, target, detail, amount == null ? null : Math.round(amount * 100) / 100, activeShiftId);
   return { ts, category, action, actor, target, detail, amount };
 }
-// Javi panelima zapis koji je već potvrđeno upisan.
+// Javlja panelima zapis koji je upisan.
 function javiLog(log) {
   if (log) try { broadcastPanels({ t: "log", log }); } catch {}
 }
@@ -219,10 +166,8 @@ export function getLogs({ category, search, limit = 200 } = {}) {
   return db.prepare(sql).all(...args);
 }
 
-// Rotacija logova - baza radi godinama, ne sme da raste bez granice.
-// Bezbedno je: zatvorene smene čuvaju svoje konačne brojke u tabeli `shifts`,
-// a otvorena smena se nikad ne dira.
-// stranična lista logova (ne učitava celu bazu)
+// Stranična lista logova. Stare logove seče održavanje (odrzavanje.js);
+// zatvorene smene čuvaju svoje brojke u `shifts`.
 export function logsPage({ category, search, page = 1, per = 25 } = {}) {
   const cond = [], args = [];
   if (category && category !== "sve") { cond.push("category = ?"); args.push(category); }
@@ -236,7 +181,7 @@ export function logsPage({ category, search, page = 1, per = 25 } = {}) {
   return { items, total, page, pages, per };
 }
 
-// SMENE (shifts)
+// Smene
 export function getActiveShift() {
   return db.prepare("SELECT * FROM shifts WHERE status='open' ORDER BY id DESC LIMIT 1").get() || null;
 }
@@ -245,7 +190,7 @@ function shiftTotals(shiftId, openedAt, until = Date.now()) {
   const one = (sql) => db.prepare(sql).get(shiftId).s;
   const topups = one("SELECT COALESCE(SUM(amount),0) s FROM logs WHERE shift_id=? AND category='novac' AND amount>0");
   const deductsNeg = one("SELECT COALESCE(SUM(amount),0) s FROM logs WHERE shift_id=? AND category='novac' AND amount<0");
-  // otkazane porudžbine se poništavaju kroz log sa pozitivnim iznosom (order_cancel)
+  // Otkazane porudžbine se poništavaju zapisom sa pozitivnim iznosom (order_cancel).
   const shop = one("SELECT COALESCE(SUM(-amount),0) s FROM logs WHERE shift_id=? AND category='shop' AND amount IS NOT NULL");
   const sessions = one("SELECT COALESCE(SUM(-amount),0) s FROM logs WHERE shift_id=? AND category='sesija' AND amount IS NOT NULL");
   const shopCash = db.prepare("SELECT COALESCE(SUM(total),0) s FROM orders WHERE payment='cash' AND status!='cancelled' AND created_at>=? AND created_at<=?").get(openedAt, until).s;
@@ -257,25 +202,15 @@ function shiftTotals(shiftId, openedAt, until = Date.now()) {
     shopCash: round2(shopCash),
     shopCredit: round2(shop - shopCash),
     sessions: round2(sessions),
-    // PAZAR = novac koji je stvarno ušao u kasu tokom smene.
-    // Kupovina sa naloga NIJE nov novac (taj novac je ušao ranije, pri dopuni),
-    // pa se ne sabira ovde - inače bi se isti dinar brojao dvaput.
+    // Pazar je novac koji je stvarno ušao u kasu. Kupovina sa naloga nije nov
+    // novac (ušao je pri dopuni), pa se ne sabira.
     revenue: round2(topups - deducts + shopCash),
   };
 }
 
-// NOVAC NAPLAĆEN VAN SMENE (danas)
-//
-// Obračun smene se računa iz logova po shift_id. Kad smena nije otvorena, log
-// ostaje bez nje - novac je uredno zapisan i vidi se u Izveštajima, ali ne
-// pripada nijednom obračunu.
-//
-// Za radnika to znači da na kraju dana ima keš u kasi koji obračun ne pominje,
-// pa izgleda kao višak koji niko ne ume da objasni. A uputstvo za otvaranje
-// igraonice smenu ni ne pominje, tako da će se to desiti baš prvog dana.
-//
-// Zato se ovaj iznos računa i pokazuje: na kontrolnoj tabli dok smena nije
-// otvorena, i u obračunu pri zatvaranju smene, gde se kasa i broji.
+// Novac naplaćen danas dok smena nije bila otvorena. Ne pripada nijednom
+// obračunu, pa se prikazuje posebno: na kontrolnoj tabli i pri zatvaranju
+// smene.
 export function novacVanSmene(odKada = null) {
   const pocetakDana = odKada ?? new Date().setHours(0, 0, 0, 0);
   try {
@@ -296,8 +231,7 @@ export function activeShiftInfo() {
 
 export function openShift(adminId, username, openingCash) {
   if (getActiveShift()) return { error: "Smena je već otvorena" };
-  // Tekst umesto broja je ranije postajao nula bez reči - a početno stanje kase
-  // je osnova celog obračuna.
+  // Tekst umesto broja se odbija.
   const pocetno = openingCash === "" || openingCash == null ? 0 : Number(openingCash);
   if (!ispravanIznos(pocetno) || pocetno < 0) return { error: "Početno stanje kase mora biti broj veći ili jednak nuli" };
   const now = Date.now();
@@ -316,8 +250,7 @@ export function closeShift(username, closingCash) {
   const t = shiftTotals(s.id, s.opened_at, now);
   const expectedCash = round2(s.opening_cash + t.topups - t.deducts + t.shopCash);
   const closing = closingCash === null || closingCash === undefined || closingCash === "" ? null : Number(closingCash);
-  // Tekst umesto broja je davao NaN, razlika se zaokruživala na nulu i smena se
-  // zatvarala kao da se kasa poklopila.
+  // Tekst umesto broja se odbija.
   if (closing != null && (!ispravanIznos(closing) || closing < 0)) {
     return { error: "Prebrojano stanje kase mora biti broj veći ili jednak nuli" };
   }
@@ -326,12 +259,7 @@ export function closeShift(username, closingCash) {
     .run(now, closing, t.topups, t.deducts, t.shop, t.revenue, t.shopCash, t.sessions, s.id);
   logEvent({ category: "sistem", action: "shift_close", actor: username, detail: `Zatvorena smena #${s.id} - pazar ${t.revenue}`, amount: t.revenue });
 
-  // MANJAK I VIŠAK IDU U LOGOVE, ZASEBNO.
-  //
-  // Logovi su jedino mesto koje se pretražuje unazad. Dok je razlika stajala
-  // samo u obračunu te smene, niko je nije mogao naći bez otvaranja svake
-  // smene ponaosob - a manjak u kasi je baš ono što se traži unazad, i po
-  // radniku i po danu.
+  // Manjak i višak idu i u logove, da mogu da se pretražuju unazad.
   if (diff != null && Math.abs(diff) >= 0.5) {
     logEvent({
       category: "novac",
@@ -341,8 +269,7 @@ export function closeShift(username, closingCash) {
       detail: diff < 0
         ? `Manjak u kasi: prebrojano ${closing}, očekivano ${expectedCash}`
         : `Višak u kasi: prebrojano ${closing}, očekivano ${expectedCash}`,
-      // Iznos NIJE u polju amount: tamo se sabira pazar, pa bi manjak
-      // pokvario obračun smene u kojoj je zapisan. Stoji u opisu.
+      // Iznos je u opisu, ne u polju amount, jer se amount sabira u pazar.
     });
   }
   activeShiftId = null;
@@ -358,12 +285,7 @@ export function closeShift(username, closingCash) {
   };
 }
 
-// OBJAŠNJENJE UZ SMENU.
-//
-// Kad se kasa ne poklopi, uvek postoji razlog: vraćen novac gostu, kusur uzet
-// iz kase za sitno, radnik se prebrojao. Bez mesta da se to zapiše, razlika
-// ostaje gola brojka koju posle mesec dana niko ne ume da objasni, a izgleda
-// kao krađa. Kolona je u bazi stajala od početka, ali se nigde nije koristila.
+// Objašnjenje uz smenu (npr. razlog manjka).
 export function zabeleziUzSmenu(id, tekst) {
   const s = db.prepare("SELECT id FROM shifts WHERE id=?").get(id);
   if (!s) return { error: "Smena ne postoji" };
@@ -375,11 +297,7 @@ export function zabeleziUzSmenu(id, tekst) {
 export function shiftsList(limit = 50) {
   return db.prepare("SELECT * FROM shifts ORDER BY id DESC LIMIT ?").all(Math.min(200, Number(limit) || 50))
     .map((s) => {
-      // RAZLIKA IDE U SAM SPISAK.
-      //
-      // To je jedino zbog čega vlasnik i otvara ovu stranu: da vidi gde se kasa
-      // nije poklopila. Dok je stajala samo u detalju, morao je da klikne na
-      // svaku smenu posebno - a njih je šezdesetak mesečno, pa se ne gleda.
+      // Razlika u kasi ide u sam spisak smena.
       const zatvorena = s.status === "closed" && s.total_topups != null;
       const ocekivano = zatvorena
         ? round2(s.opening_cash + (s.total_topups || 0) - (s.total_deducts || 0) + (s.total_shop_cash || 0))
@@ -396,16 +314,11 @@ export function shiftsList(limit = 50) {
     });
 }
 
-// Izveštaji / statistika
+// Izveštaji
 export function stats(from, to) {
   const g2 = (sql) => db.prepare(sql).get(from, to).s;
-  // Trošak sesije se u `transactions` upisuje tek pri završetku, pa "ukupan
-  // promet" nije video nikoga ko trenutno igra - a "zarada po računaru" niže
-  // čita `sessions.cost` i vidi ga. Dva broja na istoj strani se onda nisu
-  // poklapala, i to najviše baš uveče, kad su sve mašine pune.
-  //
-  // Aktivne sesije se dodaju samo kad period ide DO SADA (Danas / 7 / 30 dana).
-  // Za zatvoren period u prošlosti nemaju šta da traže.
+  // Trošak sesije se u `transactions` upisuje tek na kraju sesije, pa se za
+  // period koji traje do sada dodaju i aktivne sesije.
   const sadaUPeriodu = to >= Date.now() - 60000;
   const uToku = sadaUPeriodu
     ? db.prepare("SELECT COALESCE(SUM(cost),0) s FROM sessions WHERE status='active' AND started_at<=?").get(to).s
@@ -414,22 +327,17 @@ export function stats(from, to) {
   const shopRev = g2("SELECT COALESCE(SUM(total),0) s FROM orders WHERE status!='cancelled' AND created_at BETWEEN ? AND ?");
   const shopCash = g2("SELECT COALESCE(SUM(total),0) s FROM orders WHERE payment='cash' AND status!='cancelled' AND created_at BETWEEN ? AND ?");
   const topups = g2("SELECT COALESCE(SUM(amount),0) s FROM transactions WHERE type='topup' AND created_at BETWEEN ? AND ?");
-  // VIP ČLANARINA. Isti novac kao sesija ili piće: gost ga je uplatio na kasi, a
-  // ovde ga je potrošio. Da ne ulazi u promet, VIP bi u izveštaju izgledao kao
-  // da ne donosi ništa - pa bi ga vlasnik prvi ugasio, baš onu stvar koja se
-  // prodaje sama i ne traži radnika.
+  // VIP članarina je promet kao i sesija ili piće.
   const vipRev = g2("SELECT COALESCE(SUM(-amount),0) s FROM transactions WHERE type='vip' AND created_at BETWEEN ? AND ?");
-  // Poklonjen kredit: nagradni točak i popust na vremenski paket. Ne ulazi u
-  // pazar (nije novac u kasi), ali vlasnik mora da vidi koliko ga je koštao -
-  // inače se trošak nigde ne pojavljuje i točak izgleda kao da je besplatan.
+  // Poklonjen kredit (nagradni točak, popust na paket) ne ulazi u pazar, ali se
+  // prikazuje kao trošak.
   const poklonjeno = g2("SELECT COALESCE(SUM(amount),0) s FROM transactions WHERE type='bonus' AND created_at BETWEEN ? AND ?");
   const sessCount = db.prepare("SELECT COUNT(*) c FROM sessions WHERE started_at BETWEEN ? AND ?").get(from, to).c;
   const playSec = db.prepare("SELECT COALESCE(SUM(COALESCE(ended_at, ?) - started_at),0) s FROM sessions WHERE started_at BETWEEN ? AND ?").get(Date.now(), from, to).s;
 
   const dayFmt = "strftime('%Y-%m-%d', created_at/1000, 'unixepoch', 'localtime')";
   const hourFmt = "CAST(strftime('%H', created_at/1000, 'unixepoch', 'localtime') AS INTEGER)";
-  // Prima koliko god nizova - promet je zbir svega što je gost ostavio, a
-  // izvora je vremenom postalo više (sesije, piće, članarina).
+  // Zbir po periodu iz više izvora (sesije, piće, članarina).
   const merge = (...nizovi) => {
     const map = {};
     for (const niz of nizovi) for (const r of niz) map[r.k] = (map[r.k] || 0) + r.v;
@@ -452,16 +360,16 @@ export function stats(from, to) {
   const byComputer = db.prepare("SELECT c.name n, COALESCE(SUM(s.cost),0) rev, COUNT(*) cnt FROM sessions s JOIN computers c ON c.id=s.computer_id WHERE s.started_at BETWEEN ? AND ? GROUP BY c.id ORDER BY rev DESC")
     .all(from, to).map((r) => ({ name: imeRacunara(r.n), revenue: round2(r.rev), sessions: r.cnt }));
 
-  // Novi igrači u periodu - vlasniku pokazuje da li mesto raste.
+  // Novi igrači u periodu.
   const newPlayers = db.prepare("SELECT COUNT(*) c FROM players WHERE created_at BETWEEN ? AND ?").get(from, to).c;
-  // Najprometniji sat (danas) ili dan (nedelja/mesec) - kad je najveća gužva.
+  // Najprometniji sat (danas) ili dan (nedelja, mesec).
   const vrhSat = byHour.reduce((a, h) => (h.revenue > a.revenue ? h : a), { label: "", revenue: 0 });
   const vrhDan = byDay.reduce((a, h) => (h.revenue > a.revenue ? h : a), { label: "", revenue: 0 });
   return {
     revenue: { session: round2(sessionRev), shop: round2(shopRev), shopCash: round2(shopCash), shopCredit: round2(shopRev - shopCash), topups: round2(topups), poklonjeno: round2(poklonjeno), vip: round2(vipRev), total: round2(sessionRev + shopRev + vipRev) },
     sessions: {
       count: sessCount, minutes: Math.round(playSec / 60000),
-      // Prosečan promet po sesiji - koliko u proseku ostavi jedan gost.
+      // Prosečan promet i trajanje po sesiji.
       avg: sessCount ? round2(sessionRev / sessCount) : 0,
       avgMin: sessCount ? Math.round(playSec / 60000 / sessCount) : 0,
     },
@@ -472,13 +380,13 @@ export function stats(from, to) {
   };
 }
 
-// pun obračun jedne smene (radi i za otvorenu - računa do sada)
+// Pun obračun jedne smene (za otvorenu - do sada).
 export function shiftDetail(id) {
   const s = db.prepare("SELECT * FROM shifts WHERE id=?").get(id);
   if (!s) return null;
   const until = s.closed_at || Date.now();
-  // Zatvorena smena koristi brojke zapamćene pri zatvaranju - obračun mora da
-  // ostane isti zauvek, bez obzira na kasnije izmene ili rotaciju logova.
+  // Zatvorena smena koristi brojke zapamćene pri zatvaranju, da se obračun
+  // kasnije ne menja.
   const stored = s.status === "closed" && s.total_revenue != null && s.total_shop_cash != null;
   const t = stored
     ? {
@@ -502,7 +410,7 @@ export function shiftDetail(id) {
   };
 }
 
-// Snapshoti za panel
+// Snimci stanja za panel
 export function computersSnapshot() {
   const rows = db.prepare("SELECT * FROM computers WHERE obrisan IS NULL ORDER BY name").all();
   return rows.map((c) => {
@@ -545,15 +453,11 @@ const mapPlayer = (p) => ({
   username: p.username,
   displayName: p.display_name,
   balance: round2(p.balance),
-  // Nivo ide uz igraca svuda gde se igrac prikazuje. Osoblje tako vidi ko je
-  // stalan gost, a da ne otvara nista - to je jedini podatak o vernosti koji
-  // program uopste ima.
+  // Nivo ide uz igrača svuda gde se prikazuje.
   nivo: nivoZa(p.xp).nivo,
   nivoNaziv: nivoZa(p.xp).naziv,
   xp: Math.round(Number(p.xp) || 0),
-  // VIP ide uz igraca iz istog razloga kao i nivo, ali nosi i posao: gost koji
-  // je platio clanarinu ocekuje da ga osoblje prepozna a da on to ne trazi.
-  // Racuna se iz roka, ne iz zastavice - istekao je ili nije, i niko ga ne gasi.
+  // VIP se računa iz roka (vip_do), ne iz zastavice.
   vip: vip.vaziVip(p.vip_do),
   vipDana: vip.danaOstalo(p.vip_do),
   vipDo: p.vip_do || null,
@@ -570,7 +474,7 @@ export function playersSnapshot() {
     .map(mapPlayer);
 }
 
-// stranična lista igrača (za tabelu - ne učitava celu bazu)
+// Stranična lista igrača.
 export function playersPage({ page = 1, per = 25, search = "" } = {}) {
   const cond = search ? "WHERE obrisan IS NULL AND (username LIKE ? OR display_name LIKE ?)" : "WHERE obrisan IS NULL";
   const args = search ? [`%${search}%`, `%${search}%`] : [];
@@ -587,16 +491,9 @@ export function playersPage({ page = 1, per = 25, search = "" } = {}) {
 
 export function ordersSnapshot(includeDone = false) {
   const where = includeDone ? "" : "WHERE o.status IN ('pending','preparing')";
-  // PREDNOST NA KASI - jedina pogodnost VIP-a koja se ne vidi igracu nego se
-  // OSETI. Obecana je u spisku pogodnosti, pa mora i da postoji: radnik radi
-  // odozgo nadole, i "prednost" znaci tacno to - dok ceka, VIP porudzbina stoji
-  // iznad ostalih.
-  //
-  // Redja se u SQL-u, a ne posle citanja, da granica od 100 redova ne bi
-  // odsekla bas onu koja treba da bude prva.
-  //
-  // Istorija se NE predredja: zavrsene porudzbine su evidencija i citaju se po
-  // vremenu, kao izvod.
+  // VIP porudžbine koje čekaju idu na vrh spiska (prednost na kasi). Redosled
+  // se zadaje u SQL-u, da ga granica od 100 redova ne preseče. Istorija ide po
+  // vremenu.
   const redosled = includeDone
     ? "o.created_at DESC"
     : "CASE WHEN p.vip_do > ? THEN 0 ELSE 1 END, o.created_at DESC";
@@ -613,8 +510,7 @@ export function ordersSnapshot(includeDone = false) {
   return orders.map((o) => ({
     id: o.id,
     player: o.username ? imeIgraca(o.username) : null,
-    // Radnik mora da VIDI zasto je ova prva, inace izgleda kao da se spisak
-    // premesta sam od sebe.
+    // Radnik vidi zašto je porudžbina prva.
     vip: vip.vaziVip(o.vip_do),
     computer: o.computer_name ? imeRacunara(o.computer_name) : null,
     total: round2(o.total),
@@ -627,8 +523,7 @@ export function ordersSnapshot(includeDone = false) {
   }));
 }
 
-// Porudzbine ovog igraca za njegov pregled u launcheru. Kratka poruka o statusu
-// zna da promakne dok je igrac u igri, pa mora negde i da stoji.
+// Porudžbine igrača za prikaz u launcheru.
 export function igracevePorudzbine(playerId, limit = 6) {
   const rows = db.prepare(
     `SELECT id, total, status, payment, created_at FROM orders
@@ -644,15 +539,14 @@ export function igracevePorudzbine(playerId, limit = 6) {
   }));
 }
 
-// Posalje igracu svez spisak njegovih porudzbina (ako je jos za racunarom).
+// Šalje igraču svež spisak porudžbina, ako je još za računarom.
 function posaljiPorudzbineIgracu(playerId) {
   if (!playerId) return;
   const comp = db.prepare("SELECT id FROM computers WHERE current_player_id = ?").get(playerId);
   if (comp) sendClient(comp.id, { t: "moje_porudzbine", porudzbine: igracevePorudzbine(playerId) });
 }
 
-// Spisak rezervnih kopija. Kopija koja se ne vidi i ne moze da se preuzme je
-// pola posla - vlasnik mora da zna sta ima i da moze da odnese van racunara.
+// Spisak rezervnih kopija za panel (pregled i preuzimanje).
 export function listaKopija() {
   const dir = path.join(DATA_DIR, "backups");
   try {
@@ -666,7 +560,7 @@ export function listaKopija() {
   } catch { return []; }
 }
 
-// Putanja do kopije, uz proveru da ime ne izlazi iz foldera sa kopijama.
+// Putanja do kopije, uz proveru da ime ne izlazi iz foldera.
 export function putanjaKopije(fajl) {
   if (!/^crit-[\w-]+\.db$/.test(String(fajl || ""))) return null;
   const p = path.join(DATA_DIR, "backups", fajl);
@@ -680,20 +574,9 @@ export function gamesList() {
   return db.prepare("SELECT * FROM games ORDER BY sort, name").all();
 }
 
-// KATEGORIJA SE PIŠE JEDNOM, PA SE PONAVLJA
-//
-// Polje za kategoriju je obično polje za kucanje, i tako mora da ostane - niko
-// ne zna unapred šta će igraonica prodavati. Ali čovek koji u utorak upiše
-// "Piće" u četvrtak upiše "piće" ili "Pice", pa u launcheru stoje dve police za
-// istu stvar, obe sa po tri artikla.
-//
-// Ovde se hvata ono što je SIGURNO ista reč: razmak, veliko/malo slovo i
-// kvačice (ko kuca "pice" misli "Piće"). Kad se poklopi, uzima se POSTOJEĆI
-// zapis - onaj koji je vlasnik već video u launcheru.
-//
-// Stvarno različit zapis ("Piće" i "Pića", "Toplo" i "Topli napici") se odavde
-// ne može razlikovati od namere, pa se ne dira. Tu pomaže spisak postojećih
-// ispod polja u panelu: lakše je kliknuti na ono što već postoji nego kucati.
+// Kategorija: ista reč napisana sa drugim razmakom, veličinom slova ili bez
+// kvačica ("Piće", "pice") svodi se na postojeći zapis. Stvarno različit
+// zapis se ne dira; panel ispod polja nudi postojeće kategorije.
 const golo = (s) => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")   // kvacice: pisu se kodovima, jer su same po sebi nevidljive u fajlu
   .replace(/[đĐ]/g, "d").toLowerCase().replace(/\s+/g, " ").trim();
 
@@ -704,19 +587,8 @@ export function uskladiKategoriju(novo, postojece) {
   return isto || cisto;
 }
 
-// DVA ARTIKLA ISTOG IMENA SU DVA ARTIKLA, MA KOLIKO LIČILA.
-//
-// Kategorije se same usklađuju (vidi gore), ali imena ne mogu: dva reda u bazi
-// se ne mogu spojiti u jedan, jer svaki nosi svoju cenu, svoju zalihu i svoju
-// istoriju prodaje. Zato se ovde ništa ne menja - samo se javi da isto ime već
-// postoji, a vlasnik odlučuje.
-//
-// Zašto uopšte: dva reda „Coca-Cola 0.5" na kasi su dve iste pločice koje radnik
-// ne ume da razlikuje, zaliha se deli na dve strane (jedna piše „rasprodato" dok
-// druga ima dvadeset komada), a u izveštaju se ista stvar broji dvaput, pa nije
-// ni prva ni druga po prodaji.
-//
-// Poredi se isto kao kod kategorija: razmak, veliko/malo slovo i kvačice.
+// Isto ime artikla (poređenje kao kod kategorija) se ne spaja - svaki red ima
+// svoju cenu, zalihu i istoriju prodaje - nego se javlja vlasniku.
 export function istoImeArtikla(ime, osimId = null) {
   const trazeno = golo(ime);
   if (!trazeno) return null;
@@ -732,42 +604,63 @@ export function kategorije(sta) {
   return [...new Set(red.map((r) => String(r.category || "").trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, "sr-Latn-RS"));
 }
-// samo dostupne igre (za launcher - sakrivene se ne šalju igraču)
+// Samo dostupne igre (sakrivene se launcheru ne šalju).
 export function gamesForClient() {
   return db.prepare("SELECT * FROM games WHERE available = 1 ORDER BY sort, name").all();
 }
 
-// ---- Alati / prečice (Internet sekcija u launcheru) ----
+// ---- Prečice (Internet u launcheru) ----
 export function toolsList() {
   return db.prepare("SELECT * FROM tools ORDER BY sort, name").all();
 }
 export function toolsForClient() {
   return db.prepare("SELECT id, name, kind, target, args, image, color FROM tools WHERE available = 1 ORDER BY sort, name").all();
 }
+// Boja prečice se prima samo kao heks zapis, jer je launcher upisuje u stil
+// kartice. null znači "boja po imenu".
+const BOJA_HEKS = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+function bojaPrecice(c) {
+  if (c == null || c === "") return { boja: null };
+  const s = typeof c === "string" ? c.trim() : "";
+  return BOJA_HEKS.test(s) ? { boja: s } : { error: "Boja mora biti u obliku #RRGGBB" };
+}
+// Objekat ili niz iz zahteva ne sme da stigne do SQLite-a.
+const tekstPolja = (v) => (typeof v === "string" || typeof v === "number" ? String(v) : "");
+
 export function createTool({ name, kind, target, args, color, available }) {
-  name = String(name || "").trim();
+  name = tekstPolja(name).trim();
   kind = kind === "app" ? "app" : "web";
-  target = String(target || "").trim();
+  target = tekstPolja(target).trim();
   if (!name) return { error: "Naziv je obavezan" };
   if (!target) return { error: kind === "app" ? "Putanja do programa je obavezna" : "Adresa (URL) je obavezna" };
   if (kind === "web" && !/^https?:\/\//i.test(target)) return { error: "Adresa mora počinjati sa http:// ili https://" };
+  const b = bojaPrecice(color);
+  if (b.error) return b;
   const maxSort = db.prepare("SELECT COALESCE(MAX(sort),0) s FROM tools").get().s;
   const info = db.prepare("INSERT INTO tools (name, kind, target, args, color, available, sort, created_at) VALUES (?,?,?,?,?,?,?,?)")
-    .run(name, kind, target, args || "", color || null, available === false ? 0 : 1, maxSort + 1, Date.now());
+    .run(name, kind, target, tekstPolja(args), b.boja, available === false ? 0 : 1, maxSort + 1, Date.now());
   return { ok: true, id: info.lastInsertRowid };
 }
 export function updateTool(id, { name, kind, target, args, color, available }) {
   const t = db.prepare("SELECT * FROM tools WHERE id=?").get(id);
   if (!t) return { error: "Alat ne postoji" };
-  name = String(name ?? t.name).trim();
+  name = tekstPolja(name ?? t.name).trim();
   kind = (kind ?? t.kind) === "app" ? "app" : "web";
-  target = String(target ?? t.target).trim();
+  target = tekstPolja(target ?? t.target).trim();
   if (!name) return { error: "Naziv je obavezan" };
   if (!target) return { error: "Cilj (URL ili putanja) je obavezan" };
   if (kind === "web" && !/^https?:\/\//i.test(target)) return { error: "Adresa mora počinjati sa http:// ili https://" };
+  // Nepostojeće ili null polje zadržava staru boju. Nepromenjena vrednost se
+  // ne proverava ponovo.
+  let boja = t.color ?? null;
+  if (color != null && color !== t.color) {
+    const b = bojaPrecice(color);
+    if (b.error) return b;
+    boja = b.boja;
+  }
   db.prepare("UPDATE tools SET name=?, kind=?, target=?, args=?, color=?, available=? WHERE id=?")
-    .run(name, kind, target, args ?? t.args ?? "", color ?? t.color ?? null, available === false ? 0 : available === true ? 1 : t.available, id);
-  // Promenjen cilj briše oznaku o kvaru - vidi isto kod igara u routes.js.
+    .run(name, kind, target, args == null ? (t.args ?? "") : tekstPolja(args), boja, available === false ? 0 : available === true ? 1 : t.available, id);
+  // Promenjen cilj briše oznaku o kvaru (isto kao kod igara u routes.js).
   if (target !== t.target) ocistiKvar("tools", id);
   return { ok: true };
 }
@@ -777,13 +670,8 @@ export function deleteTool(id) {
   return { ok: true };
 }
 
-// Brisanje artikla iz shopa mora da povuce i njegovu fotografiju. Igre i alati
-// su to radili od pocetka, shop nije - pa je svaka obrisana limenka ostavljala
-// sliku na disku zauvek.
-//
-// Prodat artikal ostaje u starim porudžbinama po imenu i ceni (order_items ih
-// čuva), pa se samo veza ka njemu prazni. Bez toga je baza odbijala brisanje
-// (strani ključ) čim je piće bar jednom prodato, a panel je javljao grešku.
+// Brisanje artikla briše i njegovu sliku. Prodat artikal ostaje u starim
+// porudžbinama po imenu i ceni (order_items), a veza ka artiklu se prazni.
 export function deleteShopItem(id) {
   const it = db.prepare("SELECT image FROM shop_items WHERE id=?").get(id);
   if (!it) return { error: "Artikal ne postoji" };
@@ -805,19 +693,12 @@ export function reorderTools(ids) {
 }
 
 // ---- Zalihe pića (stock; NULL = neograničeno) ----
-// Pretvara ono što je stiglo u porudžbini u čist spisak: cena UVEK iz baze,
-// količina ograničena, i - najvažnije - isti artikal spojen u JEDAN red.
-//
-// Ranije je svaka stavka išla zasebno. Klijent koji pošalje isti artikal u pet
-// redova po 20 komada je prošao proveru zaliha pet puta (svaki red se merio
-// zasebno prema istoj zalihi), pa bi se prodalo sto komada iako ih na stanju
-// ima dvadeset - a radnik bi tek kod frižidera video da pića nema.
-// Kroz launcher se to ne može desiti (korpa je Map po artiklu), ali server ne
-// sme da veruje da je klijent onakav kakvim ga mi pravimo.
+// Stavke porudžbine u čist spisak: cena uvek iz baze, količina ograničena, a
+// isti artikal spojen u jedan red, da se zaliha ne proverava više puta za isti
+// artikal. Server ne pretpostavlja da poruka stiže iz launchera.
 export function spojiStavke(items, { najviseVrsta = 40, najviseKomada = 20, samoDostupne = true } = {}) {
   const po = new Map();
-  // Radnik na kasi sme i skriven artikal (npr. nešto što se ne nudi igračima
-  // kroz launcher), igrač ne sme - zato razlika u upitu.
+  // Radnik na kasi sme i skriven artikal, igrač ne.
   const upit = samoDostupne
     ? "SELECT * FROM shop_items WHERE id = ? AND available = 1"
     : "SELECT * FROM shop_items WHERE id = ?";
@@ -840,7 +721,7 @@ export function spojiStavke(items, { najviseVrsta = 40, najviseKomada = 20, samo
 function stockShortage(resolved) {
   return resolved.find((r) => r.item.stock != null && r.item.stock < r.qty) || null;
 }
-// Ispod ovoga se javlja osoblju da je vreme za dopunu magacina.
+// Ispod ovoga se osoblju javlja da je vreme za dopunu.
 export const PRAG_ZALIHE = 5;
 
 function consumeStock(resolved) {
@@ -850,14 +731,12 @@ function consumeStock(resolved) {
     if (r.item.stock == null) continue;
     upd.run(r.qty, r.item.id);
     changed = true;
-    // Pice nestane u spicu i sazna se tek kad gost pita. Javi cim padne
-    // ispod praga, i to jednom - da ne zvoni na svakoj sledecoj porudzbini.
+    // Javlja se jednom, kad zaliha padne ispod praga.
     const posle = db.prepare("SELECT name, stock FROM shop_items WHERE id=?").get(r.item.id);
     if (!posle) continue;
     const pre = r.item.stock;
     const nema = posle.stock === 0;
-    // Dva odvojena povoda: prvi put ispod praga, i trenutak kad se stvarno
-    // isprazni. Drugo mora da prodje i kad je artikal vec bio pri kraju.
+    // Dva povoda: prvi pad ispod praga i trenutak kad se artikal isprazni.
     const preslo = pre > PRAG_ZALIHE && posle.stock <= PRAG_ZALIHE;
     const isprazneno = pre > 0 && nema;
     if (!preslo && !isprazneno) continue;
@@ -869,18 +748,8 @@ function consumeStock(resolved) {
   if (changed) pushCatalog();
 }
 
-// OTKAZANA PORUDŽBINA VRAĆA PIĆE NA STANJE.
-//
-// Zaliha se skidala pri poručivanju, a pri otkazivanju se nije vraćala nikad -
-// kredit jeste, zaliha ne. Svako otkazivanje je time trajno "pojelo" po jedno
-// piće iz evidencije. Kroz mesec dana stanje u panelu je niže od onoga što
-// stvarno stoji u frižideru: launcher piše "Rasprodato" nad punim sanducima, a
-// traka za dopunu doziva radnika na artikle kojih ima.
-//
-// Vraća se samo ono što se DANAS vodi po komadu. Ako je vlasnik u međuvremenu
-// uključio brojanje zalihe na artiklu koji je u trenutku porudžbine bio
-// neograničen, ovde bi se dodao komad koji nikad nije ni skinut - retko i
-// ispravlja se pri prvom brojanju frižidera.
+// Otkazana porudžbina vraća piće na stanje. Vraća se samo za artikle koji se
+// i sada vode po komadu.
 function vratiStock(orderId) {
   const stavke = db.prepare(
     `SELECT oi.item_id, SUM(oi.qty) qty FROM order_items oi
@@ -902,10 +771,8 @@ export function zaliheNaIzmaku() {
   ).all(PRAG_ZALIHE);
 }
 
-// Osoblje je izmenilo shop/igre - pošalji svež katalog svim launcherima,
-// da igrač ne gleda zastareo spisak i ne pokušava da poruči skriven artikal.
-// Internet je promenio stanje - javi svim launcherima odjednom. Šalje se samo
-// na promenu; poruka svakih minut, uvek ista, bila bi saobraćaj bez sadržaja.
+// Izmenjen katalog se šalje svim launcherima.
+// Promena stanja interneta se javlja svim launcherima, samo kad se promeni.
 export function javiInternet(ok) {
   broadcastClients({ t: "internet", ok: !!ok });
 }
@@ -930,29 +797,29 @@ function pushOrders() {
   broadcastPanels({ t: "orders", orders: ordersSnapshot() });
 }
 
-// KLIJENT: konekcija / prijava
+// Klijent: veza i prijava
 const connectedSince = new Map(); // computerId -> ts (od kada je launcher povezan)
 
 export function onClientOpen(comp, ip, verzija, opcije = {}) {
   connectedSince.set(comp.id, Date.now());
+  clearTimeout(bezVezeTajmeri.get(comp.id));
+  bezVezeTajmeri.delete(comp.id);
   if (opcije.offline) cekajOfflineIzvestaj(comp.id);
-  // Verzija se pamti samo kad je launcher posalje. Stariji je ne salju, pa
-  // ostaje ono sto je poslednje bilo poznato - a prazno polje u panelu znaci
-  // "ovaj racunar ima launcher stariji od 2.22".
+  // Verzija se upisuje samo kad je launcher pošalje; prazno polje u panelu
+  // znači stariji launcher.
   db.prepare("UPDATE computers SET last_seen = ?, ip = COALESCE(?, ip), launcher_version = COALESCE(?, launcher_version) WHERE id = ?")
     .run(Date.now(), ip || null, verzija || null, comp.id);
-  // Numeracija se upisuje uz verziju: launcher koji javi verziju bez numeracije
-  // je iz stare (vidi verzije.js).
+  // Launcher koji javi verziju bez numeracije je iz stare (vidi verzije.js).
   const numeracija = Number(opcije.numeracija) || 0;
   if (verzija) db.prepare("UPDATE computers SET launcher_numeracija = ? WHERE id = ?").run(numeracija, comp.id);
-  // Racunar koji se vratio sa novom verzijom je dokaz da je nadogradnja prosla.
+  // Računar koji se vratio sa novom verzijom potvrđuje nadogradnju.
   nadogradnjaPoPovratku(comp, verzija, numeracija);
   sendWelcomeState(comp.id);
   pushComputers();
 }
 
-// Pun "welcome" + trenutno stanje računara. Poziva se na konekciju klijenta,
-// ali i na "hello" - kad se launcher ponovo učita pa mu treba svež katalog.
+// Pun "welcome" i stanje računara. Šalje se pri povezivanju i na "hello"
+// (launcher je ponovo učitao ekran).
 export function sendWelcomeState(computerId) {
   const comp = computerById(computerId);
   if (!comp) return;
@@ -962,19 +829,16 @@ export function sendWelcomeState(computerId) {
     computer: { id: comp.id, name: comp.name },
     settings: { cafeName: settings.cafeName, currency: settings.currency, ratePerHour: settings.ratePerHour },
     brend: brendObj(),
-    // Heš servisnog PIN-a, da ga launcher zapamti i proverava lokalno kad
-    // servera nema. Sam PIN se NE šalje - vidi servisniPinZaKlijenta.
+    // Heš servisnog PIN-a (vidi servisniPinZaKlijenta).
     servisniPin: servisniPinZaKlijenta(),
     shop: shopList(),
     games: gamesForClient(),
     tools: toolsForClient(),
     pozadine: pozadineObj(),
     tekstura: teksturaObj(),
-    // Ima li kuca internet. null znaci "jos nije provereno" i NIJE isto sto i
-    // "nema" - launcher tada pise da ne zna, umesto da izmisli.
+    // Internet u igraonici; null znači da još nije provereno.
     internet: stanjeInterneta(),
-    // Spisak sara ide klijentu da bi igrac mogao da bira svoju na svom nalogu.
-    // Sve sare zajedno su oko 4 KB - salje se jednom, pri povezivanju.
+    // Spisak šara za izbor na nalogu (oko 4 KB, jednom pri povezivanju).
     teksture: {
       spisak: teksturaSpisak(),
       jacine: JACINE, kretanja: KRETANJA, prozirnosti: PROZIRNOSTI,
@@ -982,11 +846,8 @@ export function sendWelcomeState(computerId) {
     promo: promoZaKlijenta(),
   });
 
-  // LAUNCHER KOJI JE RADIO BEZ SERVERA PRVO JAVLJA KOLIKO JE ODIGRANO.
-  //
-  // Do tada mu se sesija ne vraća: "login_ok" bi ga vratio na radnu površinu i
-  // tamo gde se igrač u međuvremenu odjavio ili mu je isteklo vreme, a naplata
-  // bi krenula pre obračuna. Vidi clientOfflineIzvestaj.
+  // Launcher koji je radio bez servera prvo šalje izveštaj; sesija mu se vraća
+  // tek posle obračuna (vidi clientOfflineIzvestaj).
   if (cekaOfflineIzvestaj.has(comp.id)) return;
   posaljiStanjeSesije(comp.id);
 }
@@ -995,7 +856,7 @@ export function sendWelcomeState(computerId) {
 function posaljiStanjeSesije(computerId) {
   const comp = computerById(computerId);
   if (!comp) return;
-  // Ako postoji aktivna sesija (npr. server se restartovao) - nastavi je
+  // Aktivna sesija se nastavlja (npr. posle restarta servera).
   const s = activeSessionForComputer(comp.id);
   if (s) {
     const p = playerById(s.player_id);
@@ -1012,16 +873,10 @@ function posaljiStanjeSesije(computerId) {
 
 // ---------- RAD BEZ SERVERA ----------
 //
-// Kad glavni računar ne radi (ugašen, zatvoren prozor servera, pukao ruter),
-// launcheri vode sesije sami: sat ide dalje, računar se zaključa kad istekne,
-// igrač sme da se odjavi. Kad se veza vrati, launcher javi koliko je sekundi
-// sesija ukupno trajala, a ovde se naplaćuje razlika. Ceo račun je u
-// offline.js; ovde je samo upis.
-//
-// Launcher to najavi u adresi veze (offline=1). Ako izveštaj ne stigne za
-// petnaest sekundi - kvar, ili stariji launcher koji je najavio a ne ume da
-// pošalje - sesija se nastavlja kao i do sada, bez naplate tog vremena, i to
-// ostaje zapisano. Računar ne sme da visi na tom čekanju.
+// Launcher koji je radio bez servera javlja koliko je sekundi sesija ukupno
+// trajala, a ovde se naplaćuje razlika (račun je u offline.js). Najavljuje se
+// u adresi veze (offline=1). Ako izveštaj ne stigne za 15 sekundi, sesija se
+// nastavlja bez naplate tog vremena i to se zapisuje.
 const OFFLINE_CEKA_MS = Number(process.env.OFFLINE_IZVESTAJ_CEKA_MS) || 15000;
 const cekaOfflineIzvestaj = new Map(); // computerId -> tajmer
 
@@ -1066,8 +921,8 @@ function clientOfflineIzvestaj(computerId, msg) {
     return odbij("Izveštaj o radu bez servera je za drugog igrača nego sesija na tom računaru - nije naplaćen.", zapis.sesija);
   }
   if (r.razlog) {
-    // Osoblje je zatvorilo sesiju dok računar nije bio na vezi. Tada je bilo
-    // razloga, a računar to nije mogao da čuje - pa se ne naplaćuje ništa posle.
+    // Osoblje je zatvorilo sesiju dok računar nije bio na vezi; vreme posle toga
+    // se ne naplaćuje.
     return odbij("Sesija na ovom računaru je zatvorena dok računar nije bio na vezi - " +
       "vreme igranja bez veze nije naplaćeno.", zapis.sesija);
   }
@@ -1098,23 +953,47 @@ function clientOfflineIzvestaj(computerId, msg) {
     naplaceno: r.naplaceno, balance: r.noviKredit, remainingSeconds: remainingSeconds(r.noviKredit),
   });
   if (r.kraj) {
-    // Isteklo vreme zaključava - osim kad je osoblje računar već otključalo
-    // servisnim PIN-om dok servera nije bilo. Inače bi se zaključao ponovo čim
-    // se veza vrati, a osoblje ne bi znalo zašto.
+    // Isteklo vreme zaključava računar, osim ako ga je osoblje već otključalo
+    // servisnim PIN-om.
     endSession(computerId, { lock: r.kraj === "vreme" && !zapis.otkljucano, reason: bezServera.RAZLOG_KRAJA[r.kraj] });
     return;
   }
   nastavi();
 }
 
+// Računar koji nestane dok je sesija otvorena (izvučen kabl, ugašen launcher,
+// pad). Naplata za to vreme stoji; ako se ne vrati za minut, panel dobija
+// zvučno upozorenje, a događaj ide u Logove.
+const BEZ_VEZE_MS = Number(process.env.BEZ_VEZE_MS) || 60000;
+const bezVezeTajmeri = new Map(); // computerId -> tajmer
+
+function pratiNestanak(computerId) {
+  clearTimeout(bezVezeTajmeri.get(computerId));
+  bezVezeTajmeri.delete(computerId);
+  const sesija = computerById(computerId)?.current_session_id;
+  if (!sesija) return;
+  const tajmer = setTimeout(() => {
+    bezVezeTajmeri.delete(computerId);
+    if (isClientOnline(computerId)) return;
+    const comp = computerById(computerId);
+    if (!comp || comp.current_session_id !== sesija) return;
+    const p = comp.current_player_id ? playerById(comp.current_player_id) : null;
+    const tekst = `${comp.name} se ne javlja, a ${p?.username || "igrač"} je u sesiji. Proveri kabl i da li launcher radi.`;
+    logEvent({ category: "racunar", action: "bez_veze", actor: "sistem", target: comp.name, detail: tekst });
+    broadcastPanels({ t: "event", kind: "bez-veze", text: tekst });
+  }, BEZ_VEZE_MS);
+  if (tajmer.unref) tajmer.unref();
+  bezVezeTajmeri.set(computerId, tajmer);
+}
+
 export function onClientClose(computerId) {
-  // Čekanje na izveštaj važi dok je taj računar na vezi. Stara veza koja se
-  // zatvori POSLE otvaranja nove ne sme da ga prekine.
+  // Stara veza koja se zatvori posle otvaranja nove ne prekida čekanje na
+  // izveštaj.
   if (!isClientOnline(computerId)) {
     clearTimeout(cekaOfflineIzvestaj.get(computerId));
     cekaOfflineIzvestaj.delete(computerId);
-    // I "povezan od" pripada novoj vezi, ako je ona već otvorena.
     connectedSince.delete(computerId);
+    pratiNestanak(computerId);
   }
   db.prepare("UPDATE computers SET last_seen = ? WHERE id = ?").run(Date.now(), computerId);
   pushComputers();
@@ -1126,29 +1005,26 @@ function loginOkPayload(player, session, { nastavak = false } = {}) {
     player: { id: player.id, username: player.username, displayName: player.display_name },
     balance: round2(player.balance),
     remainingSeconds: remainingSeconds(player.balance),
-    // `sekundi`: koliko je već naplaćeno - launcher od toga broji dalje, i kad
-    // servera nema. Vidi server/src/offline.js.
+    // `sekundi`: koliko je već naplaćeno; launcher broji dalje od toga i bez
+    // servera (vidi offline.js).
     session: { id: session.id, startedAt: session.started_at, sekundi: Number(session.sekundi) || 0 },
-    // Sesija koja se VRAĆA posle prekida veze, a ne nova prijava: launcher tada
-    // ne pušta pozdravnu animaciju usred igre.
+    // Sesija koja se nastavlja posle prekida veze: launcher ne pušta pozdrav.
     nastavak,
     skoroIgrane: skoroIgraneIgre(player.id),
     porudzbine: igracevePorudzbine(player.id),
-    // Igraceva sara ide odmah uz prijavu, da ne bljesne kucna pa se promeni.
+    // Igračeva šara stiže uz prijavu.
     tekstura: teksturaZaRacunar(player.id),
-    // Nivo i iskustvo idu odmah: traka na vrhu pocetne se crta iz njih, a ako
-    // stignu naknadno, igrac vidi "Uskoro!" pa mu se promeni pred ocima.
+    // Nivo i iskustvo idu uz prijavu, za traku na vrhu početne.
     vip: vipOd(player.xp),
     profil: profilIgraca(player.id),
-    // Sta je bas ovaj igrac izabrao; null znaci "kao u igraonici".
+    // Izbor igrača; null znači "kao u igraonici".
     mojaTekstura: (() => { const t = temaIgraca(player.id); return t ? { kljuc: t.kljuc, jacina: t.jacina, kretanje: t.kretanje } : null; })(),
-    // Nagradni tocak: stanje bas za ovog igraca (koliko je potrosio, sme li da vrti).
+    // Nagradni točak za ovog igrača.
     tocak: tocakInfo(player.id),
   };
 }
 
-// Redosled igara koje je bas ovaj igrac poslednje pokretao. Launcher ih stavlja
-// na pocetak police, da stalni gost ne trazi svoju igru kroz ceo spisak.
+// Igre koje je igrač poslednje pokretao; launcher ih stavlja na početak police.
 function skoroIgraneIgre(playerId) {
   return db.prepare(`
     SELECT game_id FROM game_launches
@@ -1160,15 +1036,7 @@ function skoroIgraneIgre(playerId) {
 
 function zabeleziPokretanje(computerId, gameId) {
   const g = db.prepare("SELECT name FROM games WHERE id=?").get(gameId);
-  // NEPOZNATA IGRA SE NE PRECUTKUJE.
-  //
-  // Ranije je ovde stajao go "return". Zbog toga se cela funkcija godinama
-  // nije izvrsila nijednom: klijent je slao gameId: undefined (id nije bio
-  // upisan u plocicu), server ne bi nasao igru i vratio bi se bez traga. Nista
-  // u programu nije prijavljivalo da spisak najigranijih stoji prazan.
-  //
-  // Sada svaki takav slucaj ostavlja zapis. Legitiman je samo jedan - igra
-  // obrisana iz panela dok je plocica jos na ekranu - i tada se bar vidi.
+  // Nepoznata igra (obrisana dok je pločica bila na ekranu) se zapisuje.
   if (!g) {
     const c = computerById(computerId);
     logEvent({ category: "sistem", action: "igra_nepoznata", actor: "sistem", target: c?.name || `#${computerId}`,
@@ -1180,16 +1048,13 @@ function zabeleziPokretanje(computerId, gameId) {
     .run(gameId, comp?.current_player_id || null, computerId, Date.now());
   const p = comp?.current_player_id ? playerById(comp.current_player_id) : null;
   logEvent({ category: "igre", action: "launch", actor: p?.username || "?", target: comp?.name || "?", detail: `Pokrenuta igra: ${g.name}` });
-  // Uspelo pokretanje BRIŠE zapis o kvaru. Oznaka koja stoji i pošto je prečica
-  // popravljena je gora od nikakve: vlasnik je nauči da ignoriše, pa je preskoči
-  // i onog dana kad je istinita.
+  // Uspelo pokretanje briše zapis o kvaru.
   ocistiKvar("games", gameId);
 }
 
-// Poslednji neuspeh stoji uz samu stavku (vidi migraciju u db.js). Ovde su obe
-// strane tog zapisa na jednom mestu, da se ne razilaze.
+// Poslednji neuspeh stoji uz samu stavku kataloga (migracija u db.js).
 const KVAR_TABELE = { igra: "games", alat: "tools" };
-// Ime tabele ulazi u upit, pa se ne prima spolja nego bira iz ovog spiska.
+// Ime tabele se bira iz spiska, ne prima spolja.
 function upisiKvar(tabela, id, razlog, gde) {
   if (tabela !== "games" && tabela !== "tools") return;
   try {
@@ -1202,18 +1067,14 @@ export function ocistiKvar(tabela, id) {
   try { db.prepare(`UPDATE ${tabela} SET kvar_kad=NULL, kvar_razlog=NULL, kvar_gde=NULL WHERE id=?`).run(Number(id)); } catch {}
 }
 
-// Igra koja nece da se pokrene. Do sada je to znao samo igrac koji sedi za tim
-// racunarom: launcher mu javi "nije instalirana", on slegne ramenima i pokrene
-// nesto drugo. Vlasnik sazna tek kad se neko poduzi da se pozali - a najcesci
-// uzrok je precica koja na TOM racunaru fali ili se drugacije zove. Zato se
-// upisuje u logove, uz ime racunara, i odmah javi panelu.
+// Igra koja neće da se pokrene: zapis u logovima uz ime računara i
+// obaveštenje panelu. Najčešći uzrok je prečica koja na tom računaru fali.
 const RAZLOZI = {
   nema: "putanja ne postoji na tom računaru",
   folder: "upisan je folder umesto prečice ili .exe fajla",
   greska: "Windows je odbio da je pokrene",
 };
-// Isti kvar se javlja pri svakom pokusaju. Kad igrac pritisne pet puta, logovi
-// ne treba da dobiju pet istih redova.
+// Isti kvar se javlja pri svakom pokušaju; logovi ga beleže jednom u minuti.
 const skoroJavljeno = new Map(); // "racunarId|igra" -> ts
 function igraNeRadi(computerId, msg) {
   const igra = String(msg?.igra || "").trim().slice(0, 80);
@@ -1223,13 +1084,8 @@ function igraNeRadi(computerId, msg) {
   const sada = Date.now();
   const comp = computerById(computerId);
 
-  // ZAPIS UZ SAMU STAVKU IDE UVEK, I PRE PRIGUŠENJA.
-  //
-  // Prigušenje ispod čuva LOGOVE od pet istih redova kad gost pritisne pet puta.
-  // Ali oznaka na stavci nije zapis događaja nego STANJE - "ova prečica trenutno
-  // ne radi, i to na ovom računaru". Da je i ona išla posle prigušenja, drugi
-  // računar koji u istom minutu naiđe na isti kvar ne bi ništa promenio, pa bi
-  // vlasnik i dalje video samo prvi.
+  // Oznaka uz stavku kataloga je stanje, ne događaj, pa se upisuje pre
+  // prigušenja logova.
   const tabela = KVAR_TABELE[msg?.vrsta] || "games";
   if (msg?.id != null) upisiKvar(tabela, msg.id, msg?.razlog, comp?.name);
 
@@ -1244,11 +1100,9 @@ function igraNeRadi(computerId, msg) {
   broadcastPanels({ t: "event", kind: "igra-ne-radi", text: `${comp?.name || "Računar"}: „${igra}" ne može da se pokrene - ${razlog}` });
 }
 
-// ---- DALJINSKI TASK MANAGER ----
-// Panel pita preko HTTP-a, a racunar odgovara preko WebSocket-a. Ta dva puta
-// se spajaju ovde: svaki zahtev dobija svoj broj, pa se odgovor vrati onom ko
-// je pitao. Ako racunar ne odgovori (ugasen usred pitanja, mreza pukla),
-// cekanje se prekida samo - panel ne sme da visi.
+// ---- Daljinski spisak procesa ----
+// Panel pita preko HTTP-a, računar odgovara preko WebSocket-a. Svaki zahtev
+// ima broj, a čekanje ima rok.
 let brojZahteva = 0;
 const zahteviUToku = new Map(); // broj -> { res, tajmer }
 
@@ -1291,10 +1145,8 @@ export async function ugasiProcesNaRacunaru(computerId, pid, actor) {
   return { ok: true, ime: r.ime };
 }
 
-// Launcher javlja kvar na sebi (pukao ekran, ne reaguje). Igrac to ne
-// prijavljuje - on vidi da racunar "ne radi" i zove radnika. Ovako u panelu
-// stoji zapis sa imenom racunara: ako se ista masina javlja stalno, kvar je na
-// njoj, ne u programu.
+// Kvar koji javlja launcher (pukao ekran, izlaz bez PIN-a...), sa imenom
+// računara.
 function klijentProblem(computerId, msg) {
   const vrsta = String(msg?.vrsta || "").trim().slice(0, 40);
   const opis = String(msg?.opis || "").trim().slice(0, 200);
@@ -1302,7 +1154,7 @@ function klijentProblem(computerId, msg) {
   const comp = computerById(computerId);
   const kljuc = `problem|${computerId}|${vrsta}`;
   const sada = Date.now();
-  // Pad ume da se ponovi u krug; log ne sme da se zatrpa.
+  // Isti kvar se ne ponavlja u logovima češće od jednom u minuti.
   if (sada - (skoroJavljeno.get(kljuc) || 0) < 60000) return;
   skoroJavljeno.set(kljuc, sada);
   logEvent({
@@ -1312,17 +1164,13 @@ function klijentProblem(computerId, msg) {
   broadcastPanels({ t: "event", kind: "klijent-problem", text: `${comp?.name || "Računar"}: ${opis || vrsta}` });
 }
 
-// Launcher javlja ono što osoblje treba da zna: blokirano pokretanje programa
-// skinutog kroz pregledač, očišćeni tragovi prethodnog igrača. Ove poruke server
-// ranije nije ni čitao - blokiran program je postojao samo na ekranu igrača, a
-// vlasnik nije mogao da vidi ko to pokušava i na kom računaru.
-//
-// Tekst stiže sa računara igrača, pa se skraćuje i prigušuje kao i kvarovi.
+// Zapisi launchera za osoblje: blokiran program iz Preuzimanja, očišćeni
+// tragovi igrača. Tekst stiže sa računara igrača, pa se skraćuje i prigušuje.
 function klijentZapis(computerId, msg) {
   const tekst = String(msg?.tekst || "").replace(/\s+/g, " ").trim().slice(0, 200);
   if (!tekst) return;
   const sada = Date.now();
-  // Mapa sa pamćenjem ne sme da raste bez kraja: imena programa su razna.
+  // Mapa se čisti da ne raste bez granice.
   if (skoroJavljeno.size > 500) {
     for (const [k, ts] of skoroJavljeno) if (sada - ts > 10 * 60000) skoroJavljeno.delete(k);
   }
@@ -1335,7 +1183,7 @@ function klijentZapis(computerId, msg) {
     target: comp?.name || "?", detail: tekst });
 }
 
-// Sta se najvise igralo u zadatom periodu.
+// Najigranije igre u periodu.
 export function najigranije(from, to, limit = 10) {
   return db.prepare(`
     SELECT g.name, COUNT(*) puta, COUNT(DISTINCT l.player_id) igraca
@@ -1344,7 +1192,7 @@ export function najigranije(from, to, limit = 10) {
     GROUP BY g.id ORDER BY puta DESC LIMIT ?`).all(from, to, limit);
 }
 
-// glavni ruter za poruke sa klijenta
+// Poruke sa launchera
 export function handleClientMessage(computerId, msg) {
   switch (msg.t) {
     case "login":
@@ -1387,7 +1235,7 @@ export function handleClientMessage(computerId, msg) {
     case "sys_info":
       return clientSysInfo(computerId, msg);
     case "hello":
-      // launcher se (ponovo) učitao - pošalji mu svež katalog i stanje
+      // Launcher je ponovo učitao ekran.
       return sendWelcomeState(computerId);
     case "offline_izvestaj":
       return clientOfflineIzvestaj(computerId, msg);
@@ -1400,8 +1248,7 @@ export function handleClientMessage(computerId, msg) {
   }
 }
 
-// Igrac menja svoju pozadinu sa svog naloga u launcheru. Menja se samo NJEGOV
-// zapis - kucnu sara dira jedino vlasnik kroz panel.
+// Igrač menja svoju šaru; kućnu menja samo vlasnik kroz panel.
 function clientTekstura(computerId, msg) {
   const comp = computerById(computerId);
   if (!comp?.current_player_id) return; // niko nije prijavljen na tom racunaru
@@ -1412,16 +1259,12 @@ function clientTekstura(computerId, msg) {
   sendClient(computerId, { t: "tekstura", tekstura: r.tekstura, moja: r.tema });
 }
 
-// Igrac menja izgled svog profila (boja imena, okvir). Sve provere su na
-// serveru - vidi sacuvajProfilIgraca.
+// Igrač menja izgled profila; provere su u sacuvajProfilIgraca.
 function clientProfil(computerId, msg) {
   const comp = computerById(computerId);
   if (!comp?.current_player_id) return;
-  // Poruka bez ijedne izmene znaci "posalji mi profil". Profil inace stize uz
-  // prijavu; ovo je za slucaj kad je veza pukla bas tada, pa je launcher ostao
-  // sa praznim ekranom i natpisom da se ucitava - a niko nista nije trazio.
-  // Ne upisuje se nista: upis "istih vrednosti" izgleda kao izmena u bazi i u
-  // logovima, a nije.
+  // Poruka bez izmena traži profil (kad nije stigao uz prijavu). Ništa se ne
+  // upisuje.
   if (msg.boja == null && msg.okvir == null) {
     return sendClient(computerId, { t: "profil", profil: profilIgraca(comp.current_player_id) });
   }
@@ -1430,8 +1273,7 @@ function clientProfil(computerId, msg) {
   sendClient(computerId, { t: "profil", profil: profilIgraca(comp.current_player_id) });
 }
 
-// Igrač zavrteo točak sa svog računara. Ishod bira server; klijent dobija indeks
-// pobedničkog polja i nagradu, pa animira do njega.
+// Nagradni točak: ishod bira server, a launcher animira do dobijenog polja.
 function clientTocakSpin(computerId) {
   const comp = computerById(computerId);
   if (!comp?.current_player_id) return;
@@ -1440,9 +1282,7 @@ function clientTocakSpin(computerId) {
   sendClient(computerId, { t: "tocak_rezultat", index: r.index, nagrada: r.nagrada, balance: r.balance, sledeciSpin: r.sledeciSpin });
 }
 
-// Gost kupuje VIP sam, sa svog računara, svojim kreditom. Provera stoji na
-// serveru: launcher stoji na računaru igrača, pa poruka koja stigne mimo njega
-// mora da dobije isti odgovor kao i klik.
+// Kupovina VIP-a sa računara igrača; sve provere su ovde.
 function clientKupiVip(computerId) {
   const comp = computerById(computerId);
   if (!comp?.current_player_id) return;
@@ -1456,15 +1296,14 @@ function clientLogin(computerId, username, password) {
   if (comp.status === "locked") {
     return sendClient(computerId, { t: "login_err", message: "Računar je zaključan. Pozovite osoblje." });
   }
-  // Zaštita od duple prijave (npr. dupli Enter): bez ovoga bi nastale dve
-  // aktivne sesije na istom računaru i naplata bi tekla dvostruko.
+  // Zaštita od duple prijave na istom računaru (dvostruka naplata).
   if (comp.current_player_id || activeSessionForComputer(computerId)) {
     const cur = playerById(comp.current_player_id);
     const s = activeSessionForComputer(computerId);
     if (cur && s) sendClient(computerId, loginOkPayload(cur, s));
     return;
   }
-  // Kocnica se gleda tek ovde: sve iznad su uredna odbijanja koja se ne broje.
+  // Kočnica se gleda tek ovde: odbijanja iznad se ne broje.
   const kljucKocnice = `igrac:${computerId}`;
   const pauza = kocnica.ceka(kljucKocnice);
   if (pauza) {
@@ -1486,7 +1325,7 @@ function clientLogin(computerId, username, password) {
   if (rate() > 0 && p.balance <= 0) {
     return sendClient(computerId, { t: "login_err", message: "Nemate kredita. Dopunite na kasi." });
   }
-  // da li je igrac vec prijavljen negde drugde?
+  // Igrač je već prijavljen na drugom računaru?
   const other = db.prepare("SELECT * FROM computers WHERE current_player_id = ? AND id != ?").get(p.id, computerId);
   if (other) {
     return sendClient(computerId, { t: "login_err", message: `Već ste prijavljeni na ${other.name}.` });
@@ -1511,13 +1350,9 @@ function clientLogin(computerId, username, password) {
   logEvent({ category: "prijava", action: "login", actor: p.username, target: comp.name, detail: "Igrač se prijavio" });
 }
 
-// KOČNICA PROTIV POGAĐANJA
-// Ista za PIN osoblja, prijavu igrača i prijavu na panel: 5 promašaja pa 30 s
-// pauze. Bez ovoga se lozinka pogađa hiljadama pokušaja u sekundi, a igrači sede
-// na istoj mreži kao server.
-// Broji se ISKLJUČIVO pogrešna lozinka ili PIN. Uredna odbijanja (nema kredita,
-// već je prijavljen na drugom računaru, nalog blokiran) se ne broje - inače bi
-// igrač koji svakodnevno ulazi završio zaključan bez razloga.
+// Kočnica protiv pogađanja: 5 promašaja pa 30 s pauze, za PIN osoblja,
+// prijavu igrača i prijavu na panel. Broje se samo pogrešna lozinka ili PIN,
+// ne i uredna odbijanja (nema kredita, blokiran nalog...).
 const KOCNICA_PROMASAJA = 5;
 const KOCNICA_PAUZA = 30000;
 const KOCNICA_ZABORAV = 10 * 60000; // stari ključevi ispadaju, da mapa ne raste
@@ -1541,7 +1376,7 @@ function kocnicaPromasaj(kljuc) {
 }
 function kocnicaPogodak(kljuc) { promasaji.delete(kljuc); }
 
-// Prijava na panel je van ovog fajla (routes.js), pa joj treba pristup.
+// Koristi je i prijava na panel (routes.js).
 export const kocnica = { ceka: kocnicaCeka, promasaj: kocnicaPromasaj, pogodak: kocnicaPogodak };
 
 export function checkPin(computerId, pin) {
@@ -1569,21 +1404,10 @@ function clientUnlockPin(computerId, pin) {
   unlockComputer(computerId, null);
 }
 
-// ISTA PORUDŽBINA SE NE NAPLAĆUJE DVAPUT - I KAD DUGME ZAKAŽE.
-//
-// Dugmad se zaključavaju do odgovora servera, i u launcheru i u panelu. Ali ta
-// brava ima rok: posle osam sekundi bez odgovora dugme se otključava, da radnik
-// ne ostane zarobljen kad server zaćuti. U tom procepu - spor server, mreža koja
-// se zagrcnula, odgovor koji je stigao prekasno - drugi klik prolazi kao nova
-// porudžbina i gost je naplaćen dvaput.
-//
-// Zato se uz svaku porudžbinu šalje njen BROJ POKUŠAJA (`poId`), isti pri svakom
-// ponavljanju. Server pamti šta je sa tim brojem već uradio i drugi put vraća
-// isti odgovor umesto da napravi nov račun.
-//
-// Ovo nije zamena za zaključano dugme nego druga brava: prva sprečava da se
-// klikne, druga da se naplati. Onaj ko poruči isto piće dvaput namerno šalje
-// nov broj, pa mu ništa ne smeta.
+// Ista porudžbina se ne naplaćuje dvaput. Dugme se otključava posle osam
+// sekundi bez odgovora, pa uz porudžbinu ide broj pokušaja (`poId`), isti pri
+// ponavljanju: server pamti šta je sa tim brojem uradio i vraća isti odgovor.
+// Namerno ponovljena porudžbina nosi nov broj.
 const NALOZI_PAMTI = 3 * 60000; // koliko se pamti jedan broj pokušaja
 const obradjeniNalozi = new Map(); // poId -> { odgovor, kad }
 
@@ -1591,7 +1415,7 @@ function ocistiNaloge() {
   const granica = Date.now() - NALOZI_PAMTI;
   for (const [k, v] of obradjeniNalozi) if (v.kad < granica) obradjeniNalozi.delete(k);
 }
-// Vrati raniji odgovor ako je ovaj broj već obrađen.
+// Raniji odgovor za već obrađen broj pokušaja.
 export function ranijiOdgovor(poId) {
   if (!poId) return null;
   ocistiNaloge();
@@ -1605,16 +1429,14 @@ export function zapamtiOdgovor(poId, odgovor) {
 }
 
 function clientOrder(computerId, items, note, payment = "credit", poId = null) {
-  // Isti pokušaj drugi put: vrati raniji odgovor, ne pravi nov račun. Broj važi
-  // za ovaj računar - isti broj sa drugog ne sme da dobije tuđ odgovor, u kom je
-  // stanje tuđeg naloga.
+  // Broj važi po računaru, da isti broj sa drugog računara ne dobije tuđ odgovor.
   const kljucNaloga = poId ? `pc${computerId}:${String(poId).slice(0, 80)}` : null;
   const ranije = ranijiOdgovor(kljucNaloga);
   if (ranije) return sendClient(computerId, ranije);
   const comp = computerById(computerId);
   if (!comp.current_player_id) return sendClient(computerId, { t: "error", message: "Niste prijavljeni." });
   const p = playerById(comp.current_player_id);
-  // Kes placa radnik pri donosenju, pa se kredit ne dira. Sve ostalo je isto.
+  // Keš naplaćuje radnik pri donošenju, pa se kredit ne dira.
   const kes = payment === "cash";
 
   const resolved = spojiStavke(items);
@@ -1632,9 +1454,7 @@ function clientOrder(computerId, items, note, payment = "credit", poId = null) {
   }
 
   const now = Date.now();
-  // Porudžbina, stavke, zaliha i naplata su JEDAN posao. Nestanak struje između
-  // skidanja zalihe i naplate bi ostavio piće skinuto sa stanja, a kredit
-  // nenaplaćen - i to bi se otkrilo tek pri obračunu smene.
+  // Porudžbina, stavke, zaliha i naplata su jedna transakcija.
   let orderId, newBal, prelaz, log;
   try {
     ({ orderId, newBal, prelaz, log } = uJednomPoslu(() => {
@@ -1649,9 +1469,7 @@ function clientOrder(computerId, items, note, payment = "credit", poId = null) {
       let bal = round2(p.balance);
       let prelaz = null;
       if (!kes) {
-        // Pice placeno KREDITOM donosi iskustvo, kes ne. Ne zato sto je kes
-        // manje vredan, nego zato sto se za kes ne zna ciji je - na kasi ga
-        // moze platiti i neko ko nije prijavljen ni na jednom racunaru.
+        // Iskustvo donosi samo piće plaćeno kreditom, jer se za keš ne zna čiji je.
         bal = round2(p.balance - total);
         const noviXp = xpPosleTrosenja(p, total);
         db.prepare("UPDATE players SET balance=?, xp=? WHERE id=?").run(bal, noviXp, p.id);
@@ -1659,7 +1477,7 @@ function clientOrder(computerId, items, note, payment = "credit", poId = null) {
         const a = nivoZa(p.xp), b = nivoZa(noviXp);
         if (b.nivo > a.nivo) prelaz = { nivoPre: a, nivoPosle: b };
       }
-      // Zapis iz kog se računa "Shop" u obračunu smene ide u ISTI posao.
+      // Zapis za "Shop" u obračunu smene ide u istu transakciju.
       const l = upisiLog({ category: "shop", action: "order", actor: p.username, target: comp.name,
         detail: `Porudžbina #${id} (${kes ? "keš" : "kredit"}): ` + resolved.map((r) => `${r.qty}x ${r.item.name}`).join(", "),
         amount: -total });
@@ -1671,8 +1489,7 @@ function clientOrder(computerId, items, note, payment = "credit", poId = null) {
     return sendClient(computerId, { t: "order_err", message: "Porudžbina nije prošla. Pokušaj ponovo ili pozovi osoblje." });
   }
 
-  // Nivo se javlja tek kad je porudzbina stvarno upisana - inace bi igrac dobio
-  // cestitku za nesto sto je u medjuvremenu puklo.
+  // Nivo se javlja tek posle upisa.
   javiNivo(p.id, prelaz);
 
   sendClient(computerId, zapamtiOdgovor(kljucNaloga, {
@@ -1686,22 +1503,11 @@ function clientOrder(computerId, items, note, payment = "credit", poId = null) {
   posaljiPorudzbineIgracu(p.id);
   pushOrders();
   pushComputers();
-  // Radnik mora odmah da vidi da za ovu porudžbinu naplaćuje keš na licu mesta.
+  // Keš porudžbina je u obaveštenju posebno označena.
   broadcastPanels({ t: "event", kind: "order", text: `Nova porudžbina #${orderId} - ${comp.name} (${p.username})${kes ? ", KEŠ" : ""}` });
-  // IZNOS SE UPISUJE I ZA KEŠ.
-  //
-  // Obračun smene računa "Shop ukupno" iz logova (category='shop'), a "od toga
-  // keš" iz tabele porudžbina, pa "Shop sa naloga" izvodi kao razliku. Dok je
-  // keš porudžbina iz launchera išla bez iznosa, u ukupno nije ulazila, a iz
-  // razlike je ispadala kao MINUS: gost plati kolu 130 kešom i radniku u
-  // obračunu piše "Shop ukupno 0, sa naloga −130". Otkazivanje je to gurnulo i
-  // korak dalje (poništenje je iznos imalo), pa je ukupan shop postajao −130.
-  // Kasa je iznos oduvek upisivala; ovde je bio izuzetak bez razloga.
-  //
-  // Pazar je i ranije bio tačan - on keš čita iz porudžbina - pa se greška
-  // videla samo u podeli, tamo gde radnik proverava sebe.
-  //
-  // Sam zapis je upisan u poslu sa porudžbinom (gore); ovde se samo javlja.
+  // Iznos se upisuje i za keš: obračun smene računa "Shop ukupno" iz logova, a
+  // "od toga keš" iz porudžbina, pa se "sa naloga" dobija kao razlika. Zapis je
+  // upisan u transakciji iznad; ovde se samo javlja panelima.
   javiLog(log);
 }
 
@@ -1719,18 +1525,12 @@ function clientChangePassword(computerId, oldPassword, newPassword) {
   sendClient(computerId, { t: "pw_ok" });
 }
 
-// Sesije / naplata
+// Sesije i naplata
 const tickState = new Map(); // sessionId -> { last }
 
-// KRAJ SESIJE - JEDAN POSAO.
-//
-// Zatvaranje sesije, upis njene cene u istoriju naloga, zapis u logovima (iz
-// kog se računa promet smene) i oslobađanje računara moraju da prođu zajedno.
-// Pad između prva i poslednja dva ostavlja najgori mogući trag: sesija je
-// zatvorena, ali računar i dalje nosi `current_player_id`. Panel ga tada
-// pokazuje kao zauzet pa radnik nikoga ne posadi, a igrač koji sedne ne može ni
-// da se prijavi - prijava vidi "neko je već tu" i tiho odustane. Mašina ostaje
-// mrtva dok je neko ručno ne razreši.
+// Kraj sesije je jedna transakcija: zatvaranje sesije, cena u istoriji naloga,
+// zapis u logovima i oslobađanje računara. Inače bi računar ostao "zauzet"
+// sa zatvorenom sesijom, a nova prijava na njemu ne bi prošla.
 export function endSession(computerId, { lock = false, reason = "logout", adminId = null } = {}) {
   const s = activeSessionForComputer(computerId);
   const now = Date.now();
@@ -1751,8 +1551,8 @@ export function endSession(computerId, { lock = false, reason = "logout", adminI
       return l;
     });
   } catch (e) {
-    // Računar ne sme da ostane zaključan u pola posla. Greška se zapisuje, a
-    // stanje ostaje ono pre pokušaja - sesija i dalje teče i naplaćuje se.
+    // Ako upis ne uspe, greška se zapisuje, a sesija ostaje kakva je bila (i
+    // dalje se naplaćuje).
     logEvent({ category: "sistem", action: "greska", actor: "server",
       detail: `Kraj sesije na ${compName(computerId)} nije upisan: ${String(e?.message || e).slice(0, 150)}` });
     return;
@@ -1764,29 +1564,24 @@ export function endSession(computerId, { lock = false, reason = "logout", adminI
   }
   javiLog(log);
 
-  // Igraceva sara odlazi sa njim - sledeci gost zatice kucnu.
+  // Igračeva šara odlazi sa njim.
   sendClient(computerId, { t: "tekstura", tekstura: teksturaObj() });
   if (lock) sendClient(computerId, { t: "locked", reason });
   else sendClient(computerId, { t: "to_login" });
   pushComputers();
 }
 
-// Naplata ide po razlici izmedju dva prolaza, a prolaz je na 5 sekundi.
-// Kad sistemski sat SKOCI UNAPRED - a to na racunarima za igre nije retkost:
-// RTC ode u stranu, pa Windows pri pokretanju sinhronizuje vreme i sat preskoci
-// - ta razlika bi bila naplacena kao odigrano vreme. Na trinaest racunara to je
-// trenutni odliv kredita i svi bi u istoj sekundi ostali bez vremena, a niko ne
-// bi znao zasto. Zato se jedan prolaz ne naplacuje duze od ovoga.
-// Skok UNAZAD daje negativnu razliku i preskace se nize (elapsed <= 0).
+// Jedan prolaz naplate ne naplaćuje više od ovoga. Skok sistemskog sata
+// unapred (sinhronizacija posle pokretanja) bi se inače naplatio kao odigrano
+// vreme. Skok unazad daje negativnu razliku i preskače se.
 export const NAJVISE_PO_PROLAZU = 60; // sekundi
 
-// Koliko sekundi jednog prolaza sme da se naplati.
 export function sekundeZaNaplatu(proteklo) {
   if (!Number.isFinite(proteklo) || proteklo <= 0) return 0;
   return Math.min(proteklo, NAJVISE_PO_PROLAZU);
 }
 
-// Skok sata se javlja jednom u minutu - inace bi jedan pomeren sat napunio log.
+// Skok sata se javlja najviše jednom u minutu.
 let skokJavljen = 0;
 function javiSkokSata(proteklo) {
   const sada = Date.now();
@@ -1798,8 +1593,7 @@ function javiSkokSata(proteklo) {
   });
 }
 
-// Kvar naplate se javlja jednom u minutu po sesiji - inače bi jedna ista greška
-// na svakih pet sekundi napunila logove i pregazila sve ostalo u njima.
+// Kvar naplate se javlja najviše jednom u minutu po sesiji.
 const kvarNaplateJavljen = new Map();
 function javiKvarNaplate(s, e) {
   const sada = Date.now();
@@ -1813,25 +1607,19 @@ function javiKvarNaplate(s, e) {
   } catch {}
 }
 
-// naplata svakih nekoliko sekundi
+// Naplata, na svakih pet sekundi.
 export function billingTick() {
   const r = rate();
   const now = Date.now();
   const active = db.prepare("SELECT * FROM sessions WHERE status='active'").all();
   for (const s of active) {
-    // JEDNA SESIJA KOJA PUKNE NE SME DA ZAUSTAVI OSTALE.
-    //
-    // Ovo je petlja kroz svih trinaest mašina. Pozivalac hvata grešku, pa server
-    // ne pada - ali bi greška na trećoj sesiji preskočila mašine od četvrte do
-    // trinaeste, i to pri SVAKOM prolazu, jer se svaki put puca na istom mestu.
-    // Rezultat: devet računara igra besplatno, a nigde ne piše zašto.
+    // Greška u jednoj sesiji ne sme da preskoči ostale.
     try {
       const st = tickState.get(s.id) || { last: now };
-      // Pauziraj naplatu ako klijent tog računara nije povezan (nestanak struje/mreže) -
-      // resetuj vreme da nema "catch-up" naplate kad se ponovo poveže.
+      // Računar nije na vezi: naplata stoji, a vreme se pomera da ne bude
+      // naknadne naplate kad se vrati.
       if (!isClientOnline(s.computer_id)) { st.last = now; tickState.set(s.id, st); continue; }
-      // Dok se čeka izveštaj o radu bez servera, ne naplaćuje se ništa - prvo
-      // obračun, pa onda sat ide dalje. Čekanje traje najviše 15 sekundi.
+      // Dok se čeka izveštaj o radu bez servera (najviše 15 s), ne naplaćuje se.
       if (cekaOfflineIzvestaj.has(s.computer_id)) { st.last = now; tickState.set(s.id, st); continue; }
       const proteklo = (now - st.last) / 1000;
       st.last = now;
@@ -1842,18 +1630,12 @@ export function billingTick() {
 
       const p = playerById(s.player_id);
       if (!p) continue;
-      // NAPLATA U CELIM PARAMA, SA OSTATKOM.
-      //
-      // Stanje na nalogu se vodi u parama, a jedan prolaz vredi delić pare: pri
-      // 120 din/h to je 0,1667. Dok se svaki prolaz zaokruživao zasebno, skidalo
-      // se 0,17 - igrač je plaćao 122,40 din/h umesto 120, a koliko se promaši
-      // zavisilo je od cene (100 din/h je bilo 100,80, a 80 din/h 79,20).
-      // Sada se skida samo koliko ima celih para, a ostatak ide u sledeći
-      // prolaz - pa se na duže vreme naplaćuje tačno upisana cena.
+      // Naplata u celim parama, sa ostatkom koji prelazi u sledeći prolaz, pa se
+      // na duže vreme naplaćuje tačno upisana cena (zaokruživanje svakog prolaza
+      // bi pri 120 din/h naplatilo 122,40).
       const cost = (elapsed / 3600) * r + (st.ostatak || 0);
       const celih = Math.floor(cost * 100 + 1e-7) / 100;
-      // Ne naplaćuj više nego što igrač ima - inače bi sesija zabeležila veći
-      // trošak nego što je stvarno skinuto i promet bi bio naduvan.
+      // Ne naplaćuje se više nego što igrač ima.
       const charged = Math.min(celih, Math.max(0, round2(p.balance)));
       st.ostatak = charged < celih ? 0 : Math.max(0, cost - celih);
       const newBal = round2(p.balance - charged);
@@ -1861,40 +1643,30 @@ export function billingTick() {
       const noveSekunde = Math.round(((Number(s.sekundi) || 0) + elapsed) * 10) / 10;
 
       if (newBal <= 0) {
-        // Ova dva upisa NISU u istom poslu sa `endSession`, i to namerno.
-        // `endSession` hvata svoju grešku i vraća se normalno; da su u zajedničkom
-        // poslu, njegov rollback bi poništio samo zatvaranje sesije dok bi se
-        // nulovanje kredita svejedno potvrdilo - a to je gore od oba upisa
-        // posebno. Ovako se stanje samo popravlja: kredit je 0, pa sledeći prolaz
-        // za pet sekundi ponovo dođe ovde i pokuša da zatvori sesiju.
+        // Ova dva upisa nisu u transakciji sa endSession: endSession hvata svoju
+        // grešku, pa bi zajednički rollback poništio samo zatvaranje sesije. Ovako
+        // sledeći prolaz ponovo pokušava da zatvori sesiju.
         db.prepare("UPDATE players SET balance=0 WHERE id=?").run(p.id);
         db.prepare("UPDATE sessions SET cost=?, sekundi=? WHERE id=?").run(newCost, noveSekunde, s.id);
         endSession(s.computer_id, { lock: true, reason: "time" });
         broadcastPanels({ t: "event", kind: "timeup", text: `${p.username} - isteklo vreme (${db.prepare("SELECT name FROM computers WHERE id=?").get(s.computer_id)?.name})` });
         continue;
       }
-      // Stanje na nalogu i cena sesije moraju da se pomere zajedno: ako se skine
-      // kredit a cena ne upiše, taj novac nestaje iz izveštaja i iz obračuna.
-      // Iskustvo ide u ISTI upis kao kredit, ne u zaseban.
-      //
-      // Naplata prolazi svakih pet sekundi za svaku sesiju; zaseban upis bi
-      // udvostrucio pisanje po bazi bez razloga. A i tacnije je: dinar koji je
-      // skinut i XP koji je zaradjen su isti dogadjaj i ne smeju da se raziđu.
+      // Kredit, cena sesije i iskustvo se upisuju zajedno.
       const noviXp = xpPosleTrosenja(p, charged);
       uJednomPoslu(() => {
         db.prepare("UPDATE players SET balance=?, xp=? WHERE id=?").run(newBal, noviXp, p.id);
         db.prepare("UPDATE sessions SET cost=?, sekundi=? WHERE id=?").run(newCost, noveSekunde, s.id);
       });
-      // Nivo se javlja tek posle upisa - da igrac ne dobije cestitku za nesto sto
-      // se nije sacuvalo.
+      // Nivo se javlja tek posle upisa.
       const preNivo = nivoZa(p.xp), posleNivo = nivoZa(noviXp);
       if (posleNivo.nivo > preNivo.nivo) javiNivo(p.id, { nivoPre: preNivo, nivoPosle: posleNivo });
       const preostalo = remainingSeconds(newBal);
       sendClient(s.computer_id, { t: "balance", balance: round2(newBal), remainingSeconds: preostalo, vip: vipOd(noviXp), sesija: s.id, sekundi: noveSekunde });
       javiOsobljuPredIstek(s, p, preostalo);
     } catch (e) {
-      // Vreme se pomera i za sesiju koja je pukla: bez toga bi sledeći prolaz
-      // pokušao da naplati sve od početka greške odjednom.
+      // Vreme se pomera i kad naplata pukne, da sledeći prolaz ne naplati sve od
+      // početka greške odjednom.
       tickState.set(s.id, { last: now });
       javiKvarNaplate(s, e);
     }
@@ -1902,10 +1674,8 @@ export function billingTick() {
   if (active.length) pushComputers();
 }
 
-// Igrač koji ustane i zaboravi da se odjavi plaća prazan sto, a računar stoji
-// zauzet dok neko čeka. Launcher javlja koliko dugo nema dodira sa tastaturom
-// i mišem, pa se sesija sama zatvara - uz odbrojavanje da ga ne prekine usred
-// filma ili striminga, gde dugo nema unosa a čovek je tu.
+// Odjava zbog mirovanja: launcher javlja koliko dugo nema unosa, a sesija se
+// zatvara posle odbrojavanja (film ili stream mogu dugo da idu bez unosa).
 const MIROVANJE_ODLOZI = 60; // sekundi odbrojavanja pre zatvaranja
 const mirovanjeJavljeno = new Set(); // sessionId gde odbrojavanje već ide
 
@@ -1931,14 +1701,9 @@ function proveriMirovanje(computerId, sekunde) {
   mirovanjeJavljeno.add(s.id);
 }
 
-// Osoblje mora da sazna PRE nego što vreme istekne - tada može da priđe i
-// ponudi dopunu. Kad se računar već zaključa, igrač po pravilu ustane i ode.
+// Osoblje dobija upozorenje pre isteka vremena, da ponudi dopunu.
 const PRAG_UPOZORENJA = [600, 300, 60]; // 10 min, 5 min, 1 min
 // sessionId -> { pragovi: Set, poslednje: ms }
-//
-// Vreme poslednjeg javljanja stoji kao svoje polje. Ranije je bilo zakačeno kao
-// obično svojstvo na sam Set (`javljeni.poslednje`) - radilo je, ali Set koji
-// nosi skriveno polje je zamka za onog ko sledeći čita ovaj kod.
 const javljenoZaSesiju = new Map();
 
 function javiOsobljuPredIstek(s, p, preostalo) {
@@ -1951,14 +1716,12 @@ function javiOsobljuPredIstek(s, p, preostalo) {
   if (!novi.length) return;
   novi.forEach((x) => javljeni.pragovi.add(x));
 
-  // Igrač koji se prijavi sa 5 min prelazi dva praga skoro istovremeno -
-  // osoblju ne treba isto upozorenje dvaput u par sekundi.
+  // Dva praga u par sekundi daju jedno upozorenje.
   const sada = Date.now();
   if (sada - (javljeni.poslednje || 0) < 45000) return;
   javljeni.poslednje = sada;
 
-  // U poruci ide STVARNO preostalo vreme, ne prag. Igrač koji se prijavi sa 5 min
-  // prelazi prag od 10 min odmah, pa bi "ostalo 10 min" obmanulo osoblje.
+  // U poruci je stvarno preostalo vreme, ne prag.
   const comp = db.prepare("SELECT name FROM computers WHERE id=?").get(s.computer_id);
   const opis = preostalo >= 60 ? `${Math.max(1, Math.round(preostalo / 60))} min` : `${Math.round(preostalo)} s`;
   broadcastPanels({
@@ -1972,7 +1735,7 @@ function javiOsobljuPredIstek(s, p, preostalo) {
   });
 }
 
-// ADMIN AKCIJE (iz HTTP ruta)
+// Akcije osoblja (HTTP rute)
 export function lockComputer(computerId, adminId) {
   const comp = computerById(computerId);
   if (!comp) return { error: "Nepostojeći računar" };
@@ -1989,7 +1752,7 @@ export function lockComputer(computerId, adminId) {
 export function unlockComputer(computerId, adminId) {
   const comp = computerById(computerId);
   if (!comp) return { error: "Nepostojeći računar" };
-  // ako je neko prijavljen, prvo uredno zatvori sesiju (inace bi naplata nastavila u pozadini)
+  // Prijavljen igrač: sesija se prvo zatvara.
   if (comp.current_player_id) {
     endSession(computerId, { lock: false, reason: "staff", adminId });
   } else {
@@ -2010,13 +1773,8 @@ export function sendMessageToComputer(computerId, text) {
   return { ok };
 }
 
-// POČETNI KREDIT JE DOPUNA, I TAKO SE I BROJI.
-//
-// Gost koji otvara nalog plati na kasi isto kao i onaj koji dopunjava. Dok se taj
-// novac upisivao samo uz otvaranje naloga (Logovi > Nalozi), obračun smene ga
-// nije video - on broji samo kategoriju "novac" - pa je radnik uveče imao u kasi
-// višak koji ne ume da objasni. Dnevni izveštaj ga je video, pa se ni ta dva
-// broja nisu slagala. Sada nalog, istorija naloga i zapis o novcu idu zajedno.
+// Početni kredit je dopuna i ulazi u obračun smene (kategorija "novac"),
+// zajedno sa nalogom i istorijom naloga.
 export function createPlayer({ username, password, displayName, balance, note }, { adminId = null, adminUsername = "sistem" } = {}) {
   username = String(username || "").trim();
   if (!username || !password) return { error: "Korisničko ime i lozinka su obavezni" };
@@ -2047,9 +1805,8 @@ export function createPlayer({ username, password, displayName, balance, note },
   return { ok: true, id };
 }
 
-// Grupa od pet ljudi uđe sa ulice i niko nema nalog. Kucanje pet imena i pet
-// lozinki drži red na kasi, pa ih panel otvara odjednom: imena idu redom
-// gost-01, gost-02..., lozinka je četvorocifrena da može da se izdiktira.
+// Brzi gosti: do deset naloga odjednom (gost-01, gost-02...), sa
+// četvorocifrenom lozinkom.
 export function createGuests(count, balance, admin = {}) {
   count = Math.min(10, Math.max(1, Math.floor(Number(count) || 1)));
   balance = Math.max(0, Number(balance) || 0);
@@ -2071,9 +1828,8 @@ export function createGuests(count, balance, admin = {}) {
   return { ok: true, players: napravljeni };
 }
 
-// Gostujući nalozi se gomilaju, pa vlasnik može da počisti one potrošene.
-// Dira samo gost-* naloge bez kredita, koji nisu za računarom i nisu korišćeni
-// danas - sve ostalo ostaje netaknuto, uključujući redovne igrače.
+// Potrošeni gosti za čišćenje: samo gost-* nalozi bez kredita, koji nisu za
+// računarom i nisu korišćeni poslednja 24 sata.
 export function guestsToClean() {
   const granica = Date.now() - 24 * 60 * 60 * 1000;
   return db.prepare(`
@@ -2093,16 +1849,8 @@ export function cleanGuests() {
   return { ok: true, obrisano, imena: spisak.map((g) => g.username) };
 }
 
-// DOPUNA KREDITA - JEDAN POSAO.
-//
-// Ovo je put kojim prolazi svaki dinar koji gost preda preko pulta, pa je i
-// najskuplje mesto da nešto prođe upola. Tri upisa moraju da idu zajedno:
-// novo stanje na nalogu, red u istoriji naloga i zapis u logovima (iz kog se
-// računa pazar smene). Ako bilo koji od njih prođe bez ostalih, kasa se na
-// kraju smene ne poklapa, a razlika nema objašnjenje.
-//
-// Ime radnika ide ovamo umesto da se log piše iz rute: log mora da bude U
-// ISTOM poslu sa novcem, a ruta je van njega.
+// Dopuna kredita je jedna transakcija: stanje naloga, istorija naloga i
+// zapis u logovima (iz kog se računa pazar smene).
 export function topUpPlayer(playerId, amount, adminId, note, adminUsername = "sistem") {
   const p = playerById(playerId);
   if (!p || p.obrisan) return { error: "Nepostojeći igrač" };
@@ -2128,14 +1876,14 @@ export function topUpPlayer(playerId, amount, adminId, note, adminUsername = "si
   }
   javiLog(log);
 
-  // ako je bio bez kredita i zakljucan, obavesti klijent o novom stanju
+  // Igrač za računarom odmah dobija novo stanje.
   const comp = db.prepare("SELECT * FROM computers WHERE current_player_id = ?").get(playerId);
   if (comp) sendClient(comp.id, { t: "balance", balance: newBal, remainingSeconds: remainingSeconds(newBal) });
   pushComputers();
   return { ok: true, balance: newBal };
 }
 
-// VREMENSKI PAKETI
+// Vremenski paketi
 export function paketiLista() {
   return db.prepare("SELECT * FROM paketi ORDER BY sort, id").all();
 }
@@ -2171,18 +1919,9 @@ export function obrisiPaket(id) {
   return { ok: true };
 }
 
-// Prodaja paketa igraču. Igrač plati 'price' (novac koji ulazi = dopuna), a
-// dobije vreme: kredit = sati * cena po satu u tom trenutku. Razlika do pune
-// cene je popust i vodi se kao 'bonus' - da naplata (dopune) ostane tačna, a
-// popust bude vidljiv posebno u istoriji naloga.
-// PRODAJA PAKETA - JEDAN POSAO.
-//
-// Ovde se u jednom potezu naplaćuje najveći iznos u igraonici (fabrički 500) i
-// pravе se ČETIRI upisa: naplaćeni deo u istoriju, poklonjeni popust u
-// istoriju, novo stanje na nalogu i zapis u logovima iz kog se računa pazar.
-// Bez zajedničke zaštite pad između njih ostavlja gosta koji je platio 500 bez
-// kredita, ili sa kreditom koji nigde nije naplaćen. Isto pravilo kao kod
-// porudžbine i točka - ovaj put je ranije bio propušten.
+// Prodaja paketa: igrač plaća `price`, a dobija kredit = sati x cena po satu.
+// Razlika je popust i vodi se kao 'bonus'. Sve (naplata, popust, stanje
+// naloga, zapis u logovima) je jedna transakcija.
 export function prodajPaket(playerId, paketId, adminId, adminUsername = "sistem") {
   const p = playerById(playerId);
   if (!p || p.obrisan) return { error: "Nepostojeći igrač" };
@@ -2220,9 +1959,8 @@ export function prodajPaket(playerId, paketId, adminId, adminUsername = "sistem"
   return { ok: true, balance: bal, kredit, cena, sati: paket.hours };
 }
 
-// NAGRADNI TOČAK
-// Igrač koji je za nedelju dana potrošio dovoljno može jednom da zavrti i osvoji
-// kredit. Ishod BIRA server (težinski nasumično), klijent samo animira do njega.
+// Nagradni točak: igrač koji je za sedam dana potrošio dovoljno vrti jednom.
+// Ishod bira server (težinski nasumično).
 const NEDELJA = 7 * 86400000;
 
 function potrosnjaNedelja(playerId) {
@@ -2236,13 +1974,11 @@ export function tocakNagrade() {
   return db.prepare("SELECT * FROM tocak_nagrade ORDER BY sort, id").all();
 }
 
-// Sve što klijentu treba da prikaže točak za jednog igrača.
+// Stanje točka za jednog igrača.
 export function tocakInfo(playerId) {
   const ukljucen = getSetting("tocak_ukljucen", "0") === "1";
   const p = playerById(playerId);
-  // VIP-u je prag niži. To je JEDINA pogodnost koja kuću stvarno košta, pa je i
-  // jedina koja se podešava iz panela - i nikad ne može da bude viša od običnog
-  // praga (vidi pragZaSpin), jer bi VIP tada postao kazna.
+  // VIP ima niži prag; nikad viši od običnog (vidi pragZaSpin).
   const prag = vip.pragZaSpin({
     jeVip: vip.vaziVip(p?.vip_do),
     prag: Number(getSetting("tocak_prag", "1200")) || 0,
@@ -2261,7 +1997,7 @@ export function tocakInfo(playerId) {
   };
 }
 
-// Izloženo radi testa raspodele - da se proveri da težine stvarno rade.
+// Izvezena radi testa raspodele.
 export function izaberiNagradu(nagrade) {
   const ukupno = nagrade.reduce((a, n) => a + Math.max(0, n.tezina), 0);
   if (ukupno <= 0) return 0;
@@ -2287,23 +2023,19 @@ export function zavrtiTocak(playerId) {
   if (!nagrade.length) return { error: "Nema podešenih nagrada" };
   const idx = izaberiNagradu(nagrade);
   const dobit = nagrade[idx];
-  // Oznaka da je vrteo i isplata nagrade su JEDAN posao. Da nisu, pad između
-  // njih bi ostavio igrača bez spina i bez nagrade - ili, u obrnutom redosledu,
-  // sa nagradom koju može da uzme ponovo.
+  // Oznaka spina i isplata nagrade su jedna transakcija.
   let bal;
   try {
     bal = uJednomPoslu(() => {
-      // Prvo upiši da je vrteo - da dupli klik ili puknuta veza ne daju drugi spin.
-      // Broj spinova i ukupan dobitak idu u ISTOM upisu: značke ih traže, a iz
-      // logova se ne mogu izvući jer održavanje seče stare zapise.
+      // Spin se upisuje prvi, da dupli klik ne da drugi. Broj spinova i ukupan
+      // dobitak idu u isti upis (značke ih koriste, a logovi se seku).
       db.prepare("UPDATE players SET last_spin_at=?, spinova=COALESCE(spinova,0)+1, spin_dobitak=COALESCE(spin_dobitak,0)+? WHERE id=?")
         .run(now, dobit.kredit > 0 ? dobit.kredit : 0, playerId);
       let b = round2(Number(p.balance) || 0);
       if (dobit.kredit > 0) {
         b = round2(b + dobit.kredit);
         db.prepare("UPDATE players SET balance=? WHERE id=?").run(b, playerId);
-        // Kredit sa točka je poklon, ne novac u kasi - zato 'bonus', a log bez
-        // iznosa da ne uđe u pazar smene.
+        // Kredit sa točka je poklon ('bonus'); log je bez iznosa, da ne uđe u pazar.
         addTransaction(playerId, "bonus", dobit.kredit, b, null, `Nagradni točak: ${dobit.naziv}`);
       }
       return b;
@@ -2320,7 +2052,7 @@ export function zavrtiTocak(playerId) {
   return { ok: true, index: idx, nagrada: { naziv: dobit.naziv, kredit: dobit.kredit }, balance: bal, sledeciSpin: now + NEDELJA };
 }
 
-// --- podešavanje točka (vlasnik) ---
+// Podešavanje točka (vlasnik)
 export function tocakConfig() {
   return {
     ukljucen: getSetting("tocak_ukljucen", "0") === "1",
@@ -2370,23 +2102,19 @@ export function obrisiNagradu(id) {
   pushTocak();
   return { ok: true };
 }
-// Kad se točak upali/ugasi ili nagrade promene, prijavljeni igrači dobiju svež
-// prikaz odmah - bez ponovnog učitavanja.
+// Izmena točka stiže prijavljenim igračima odmah.
 export function pushTocak() {
   for (const c of db.prepare("SELECT id, current_player_id FROM computers WHERE current_player_id IS NOT NULL").all()) {
     sendClient(c.id, { t: "tocak", tocak: tocakInfo(c.current_player_id) });
   }
 }
 
-// POS: radnik ručno kuca porudžbinu (kredit sa naloga ili keš)
+// Kasa: radnik kuca porudžbinu (kredit sa naloga ili keš).
 export function createPosOrder({ items, playerId, computerId, payment = "cash", note, actor = "radnik", poId = null }) {
-  // Isti pokusaj drugi put: vrati raniji odgovor, ne pravi nov racun - vidi
-  // objasnjenje uz obradjeniNalozi.
+  // Ponovljen pokušaj vraća raniji odgovor (vidi obradjeniNalozi).
   const ranije = ranijiOdgovor(poId);
   if (ranije) return ranije;
-  // Isti artikal se spaja u jedan red - inace bi se zaliha proveravala vise
-  // puta prema istom stanju i prodalo bi se vise nego sto ima. Radnik sme veci
-  // broj komada i skrivene artikle.
+  // Isti artikal se spaja u jedan red. Radnik sme više komada i skrivene artikle.
   const resolved = spojiStavke(items, { najviseKomada: 50, samoDostupne: false });
   if (!resolved.length) return { error: "Dodajte bar jedan artikal" };
   const total = resolved.reduce((s, r) => s + r.item.price * r.qty, 0);
@@ -2406,7 +2134,7 @@ export function createPosOrder({ items, playerId, computerId, payment = "cash", 
   }
 
   const now = Date.now();
-  // Račun, stavke, zaliha i naplata su JEDAN posao - vidi clientOrder.
+  // Jedna transakcija, kao u clientOrder.
   let orderId, javiIgracu = null, log = null;
   try {
     ({ orderId, javiIgracu, log } = uJednomPoslu(() => {
@@ -2420,7 +2148,7 @@ export function createPosOrder({ items, playerId, computerId, payment = "cash", 
 
       let javi = null;
       if (payment === "credit" && player) {
-        // Isto pravilo kao za porudzbinu sa racunara: kredit donosi iskustvo.
+        // Kredit donosi iskustvo, kao i porudžbina sa računara.
         const newBal = round2(player.balance - total);
         const noviXp = xpPosleTrosenja(player, total);
         db.prepare("UPDATE players SET balance=?, xp=? WHERE id=?").run(newBal, noviXp, player.id);
@@ -2438,8 +2166,7 @@ export function createPosOrder({ items, playerId, computerId, payment = "cash", 
       detail: `POS račun nije upisan: ${String(e?.message || e).slice(0, 150)}` });
     return { error: "Račun nije upisan. Pokušaj ponovo." };
   }
-  // Javljanje igraču ide POSLE potvrde upisa - inače bi mu pisalo novo stanje
-  // kredita za račun koji na kraju nije prošao.
+  // Igraču se javlja posle upisa.
   if (javiIgracu && player) {
     const comp = db.prepare("SELECT id FROM computers WHERE current_player_id = ?").get(player.id);
     if (comp) sendClient(comp.id, { t: "balance", balance: javiIgracu.newBal, remainingSeconds: remainingSeconds(javiIgracu.newBal) });
@@ -2462,26 +2189,19 @@ export function setOrderStatus(orderId, status, actor = "osoblje") {
   const o = db.prepare("SELECT * FROM orders WHERE id=?").get(orderId);
   if (!o) return { error: "Nepostojeća porudžbina" };
   if (o.status === status) return { ok: true }; // ništa se nije promenilo
-  // OTKAZANO JE KONAČNO. Pri otkazivanju su vraćeni kredit i piće, a iznos je
-  // izašao iz pazara. "Vraćena" porudžbina ništa od toga ne bi ponovila, pa bi
-  // gost dobio piće besplatno. Ko se predomisli, pravi novu.
+  // Otkazano je konačno: kredit i piće su vraćeni, iznos je izašao iz pazara.
   if (o.status === "cancelled") return { error: "Otkazana porudžbina ne može da se vrati - napravi novu." };
 
   const cancelling = status === "cancelled" && o.status !== "cancelled";
 
-  // OTKAZIVANJE JE JEDAN POSAO: vraćen kredit, nov status i poništenje u
-  // obračunu moraju da prođu zajedno. Da nisu, pad između njih ostavlja
-  // porudžbinu koja je i naplaćena i otkazana (ili obrnuto: kredit vraćen, a
-  // porudžbina i dalje stoji u pazaru).
+  // Otkazivanje je jedna transakcija: vraćen kredit, piće na stanju, status i
+  // poništenje u obračunu.
   let vracen = null, log, vracenoNaStanje = [];
   try {
     ({ vracen, log, vracenoNaStanje } = uJednomPoslu(() => {
-      // Piće se vraća na stanje u ISTOM poslu sa kreditom - inače bi pad između
-      // njih ostavio gosta sa vraćenim novcem i pićem koje i dalje fali u
-      // evidenciji (ili obrnuto).
       const naStanje = cancelling ? vratiStock(orderId) : [];
       let v = null;
-      // otkazivanje vraca kredit (samo ako je plaćeno kreditom sa naloga)
+      // Kredit se vraća samo za porudžbinu plaćenu kreditom.
       if (cancelling && o.payment === "credit" && o.player_id) {
         const p = playerById(o.player_id);
         if (p) {
@@ -2492,8 +2212,7 @@ export function setOrderStatus(orderId, status, actor = "osoblje") {
         }
       }
       db.prepare("UPDATE orders SET status=? WHERE id=?").run(status, orderId);
-      // Pozitivan iznos poništava original u obračunu smene - bez ovoga bi
-      // otkazana porudžbina i dalje stajala u pazaru.
+      // Pozitivan iznos poništava original u obračunu smene.
       return { vracen: v, log: cancelling
         ? upisiLog({ category: "shop", action: "order_cancel", actor, target: `#${orderId}`,
             detail: `Otkazana porudžbina #${orderId}${o.payment === "credit" ? " - kredit vraćen" : ""}`,
@@ -2515,8 +2234,7 @@ export function setOrderStatus(orderId, status, actor = "osoblje") {
 
   if (o.computer_id) sendClient(o.computer_id, { t: "order_status", orderId, status });
   posaljiPorudzbineIgracu(o.player_id);
-  // Vraceno pice mora odmah da se vidi i u launcheru ("Rasprodato" nestaje) i u
-  // traci za dopunu na kontrolnoj tabli.
+  // Vraćeno piće se odmah vidi u launcheru i u traci za dopunu.
   if (vracenoNaStanje.length) pushCatalog();
   pushOrders();
   pushComputers();
@@ -2560,15 +2278,9 @@ export function updatePlayer(id, { username, displayName, note }) {
   return { ok: true };
 }
 
-// BRISANJE NALOGA NE BRIŠE ISTORIJU NOVCA.
-//
-// Ranije su uz nalog odlazile i njegove transakcije i sesije. Izveštaji se
-// računaju baš iz njih, pa je "Očisti potrošene goste" menjao prošlost: dopune i
-// odigrano vreme tih gostiju nestajali su iz jučerašnjeg i prošlonedeljnog
-// prometa. Zatvoren period ne sme da se menja.
-//
-// Zato se nalog samo gasi: ime se oslobađa (dobija oznaku ispred), lozinka se
-// briše, a nalog nestaje iz spiskova, rang liste i prijave. Istorija ostaje cela.
+// Brisanje naloga ne briše istoriju novca: izveštaji se računaju iz
+// transakcija i sesija. Nalog se gasi - ime dobija oznaku, lozinka se briše,
+// nalog nestaje iz spiskova - a istorija ostaje.
 export const OZNAKA_OBRISANOG = /^obrisan-\d+-/;
 export const imeIgraca = (ime) => String(ime ?? "").replace(OZNAKA_OBRISANOG, "");
 export function deletePlayer(id) {
@@ -2585,10 +2297,9 @@ export function deletePlayer(id) {
   return { ok: true, username: p.username };
 }
 
-// SERVER INFO (podešavanja)
+// Podaci o serveru (Podešavanja)
 export function serverInfo() {
-  // Mora da ide preko DATA_DIR, ne preko pretpostavljene putanje - inace bi
-  // izolovana instanca prijavljivala velicinu i kopije tudje baze.
+  // Preko DATA_DIR, da izolovana instanca prijavljuje svoju bazu.
   const dataDir = DATA_DIR;
   const sz = (f) => { try { return fs.statSync(path.join(dataDir, f)).size; } catch { return 0; } };
   let backups = [];
@@ -2599,8 +2310,6 @@ export function serverInfo() {
       .map((f) => { try { return fs.statSync(path.join(dir, f)).mtimeMs; } catch { return 0; } })
       .sort((a, b) => b - a);
   } catch {}
-  // Ako se package.json ne procita, bolje da pise "nepoznata" nego izmisljen
-  // broj - inace bi panel javljao verziju koja nikad nije postojala.
   let version = "nepoznata";
   try { version = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")).version || version; } catch {}
   const ips = [];
@@ -2623,13 +2332,11 @@ export function serverInfo() {
 
 export function round2(n) {
   const x = Math.round(Number(n) * 100) / 100;
-  // Infinity i NaN se u SQLite upisu kao NULL i trajno pokvare nalog, pa se
-  // ovde zaustavljaju - bolje nula nego neupotrebljiv zapis.
+  // Infinity i NaN se u SQLite upisuju kao NULL, pa postaju 0.
   return Number.isFinite(x) ? x : 0;
 }
 
-// Gornja granica za sve iznose koje osoblje kuca. Nijedan realan promet u
-// igraonici nije blizu ovoga, a greska u kucanju se zaustavlja pre baze.
+// Gornja granica za iznose koje osoblje kuca.
 const MAX_IZNOS = 1000000;
 export function ispravanIznos(n) {
   const x = Number(n);
@@ -2637,30 +2344,36 @@ export function ispravanIznos(n) {
 }
 
 // Daljinske komande
-// "taskmgr" je izbacen: otvarao je Task Manager NA racunaru igraca, pa je
-// radnik morao da ustane i ode do te masine - a igrac bi u medjuvremenu imao
-// Task Manager pred sobom. Zamenjen je daljinskim prikazom (procesiRacunara).
 const POWER_CMDS = ["shutdown", "restart", "logoff", "reboot_launcher"];
 
-export function sendCommand(computerId, cmd) {
+// Gašenje i odjava sa Windows-a prvo zatvaraju sesiju: ugašen računar se
+// vraća tek sledećeg dana, a otvorena sesija bi se tada nastavila i
+// naplaćivala. Restart i restart launchera zadržavaju sesiju.
+const KOMANDE_KOJE_ZATVARAJU = ["shutdown", "logoff"];
+
+export function sendCommand(computerId, cmd, adminId = null) {
   if (!POWER_CMDS.includes(cmd)) return { error: "Nepoznata komanda" };
+  if (!isClientOnline(computerId)) return { error: "Računar nije povezan" };
+  if (KOMANDE_KOJE_ZATVARAJU.includes(cmd) && computerById(computerId)?.current_player_id) {
+    endSession(computerId, { lock: false, reason: "staff", adminId });
+  }
   const ok = sendClient(computerId, { t: "command", cmd });
   if (ok) broadcastPanels({ t: "event", kind: "cmd", text: `Komanda "${cmdLabel(cmd)}" poslata na ${compName(computerId)}` });
   return ok ? { ok: true } : { error: "Računar nije povezan" };
 }
 
-export function bulkAction(ids, action) {
+export function bulkAction(ids, action, adminId = null) {
   const targets = ids && ids.length ? ids : db.prepare("SELECT id FROM computers WHERE obrisan IS NULL").all().map((r) => r.id);
   let sent = 0;
   for (const id of targets) {
     if (action === "lock") { lockComputer(id, null); sent++; }
     else if (action === "unlock") {
-      // grupno otključavanje dira samo zaključane - ne prekida aktivne sesije
+      // Grupno otključavanje dira samo zaključane računare.
       const c = computerById(id);
       if (c && c.status === "locked") { unlockComputer(id, null); sent++; }
     }
     else if (action === "logout") { forceLogout(id, null); sent++; }
-    else { const r = sendCommand(id, action); if (r.ok) sent++; }
+    else { const r = sendCommand(id, action, adminId); if (r.ok) sent++; }
   }
   return { ok: true, sent, total: targets.length };
 }
@@ -2668,14 +2381,9 @@ export function bulkAction(ids, action) {
 function compName(id) { return db.prepare("SELECT name FROM computers WHERE id=?").get(id)?.name || "?"; }
 function cmdLabel(c) { return { shutdown: "Ugasi", restart: "Restartuj", logoff: "Odjava Windows", reboot_launcher: "Restart launchera" }[c] || c; }
 
-// UKLANJANJE RAČUNARA.
-//
-// Brisanje reda je pucalo čim je računar jednom korišćen: sesije i porudžbine
-// pokazuju na njega, pa baza odbija (strani ključ), a panel je dobijao "Greška
-// na serveru". Računar sa istorijom se zato GASI: ime se oslobađa, token
-// prestaje da važi (launcher više ne može da se predstavi kao on), otvorena veza
-// se zatvara, a računar nestaje iz spiskova. Istorija ostaje. Računar bez
-// ijednog traga se briše skroz.
+// Uklanjanje računara: računar sa istorijom (sesije, porudžbine) se gasi -
+// ime se oslobađa, token prestaje da važi, otvorena veza se zatvara - a
+// istorija ostaje. Računar bez istorije se briše.
 export function obrisiRacunar(id) {
   const c = computerById(id);
   if (!c || c.obrisan) return { error: "Računar ne postoji", nema: true };
@@ -2700,23 +2408,15 @@ export function obrisiRacunar(id) {
 }
 export const imeRacunara = (ime) => String(ime ?? "").replace(/^obrisan-\d+-/, "");
 
-// Radnici / admini
+// Radnici
 export function listAdmins() {
-  // Ugaseni nalozi idu na dno, ali se VIDE: vlasnik mora da zna ko je sve imao
-  // pristup, i da moze da vrati radnika koji se vratio na posao.
-  // Redosled: serviser, pa vlasnici, pa radnici - isto kako se i moc granа.
+  // Ugašeni nalozi idu na dno spiska, ali se vide. Redosled: serviser,
+  // vlasnici, radnici.
   return db.prepare("SELECT id, username, role, active, created_at FROM admins ORDER BY active DESC, CASE role WHEN 'serviser' THEN 0 WHEN 'owner' THEN 1 ELSE 2 END, username")
     .all().map((a) => ({ id: a.id, username: a.username, role: a.role, aktivan: a.active !== 0, createdAt: a.created_at }));
 }
-// KO KOGA SME DA DIRA.
-//
-// Jedno pravilo, na jednom mestu, i važi za sve: promenu lozinke, oduzimanje
-// pristupa, vraćanje naloga, pravljenje novog. Ranije je bilo dovoljno biti
-// vlasnik, pa bi vlasnik mogao da ukloni serviserski nalog - a onda podrška
-// nema kako da uđe kad se on sam zaključa.
-//
-// Pravilo: **možeš da diraš samo naloge NIŽE od sebe.** Vlasnik dira radnike,
-// serviser dira i vlasnike. Niko ne dira sebi ravnog ni višeg.
+// Ko koga sme da menja: samo naloge niže uloge. Važi za promenu lozinke,
+// oduzimanje i vraćanje pristupa.
 export function smePreko(kojiRadi, ciljnaUloga) {
   return rang(kojiRadi?.role) > rang(ciljnaUloga);
 }
@@ -2734,15 +2434,9 @@ export function createAdmin({ username, password, role }, kojiRadi) {
   username = String(username || "").trim();
   if (!username || !password) return { error: "Korisničko ime i lozinka su obavezni" };
   if (!["owner", "staff", "serviser"].includes(role)) role = "staff";
-  // PRAVLJENJE ide do SVOJE uloge, menjanje samo ISPOD nje.
-  //
-  // Razlika je namerna. Vlasnik sme da doda drugog vlasnika (igraonica sa dva
-  // gazde je normalna stvar), a serviser drugog servisera - ali nijedan od njih
-  // posle ne sme da tog sebi ravnog ukloni ili mu promeni lozinku. Tako se dva
-  // vlasnika ne mogu međusobno iskључiti iz sopstvene igraonice.
-  //
-  // Naviše se ne ide ni u jednom slučaju: vlasnik ne može sebi da napravi
-  // nadređenog, ni slučajno ni namerno.
+  // Pravljenje ide do sopstvene uloge (vlasnik sme drugog vlasnika), a menjanje
+  // samo ispod nje, pa se dva vlasnika ne mogu međusobno isključiti. Naviše se
+  // ne ide.
   if (rang(kojiRadi?.role) < rang(role)) {
     return { error: role === "serviser"
       ? "Serviserski nalog može da napravi samo serviser."
@@ -2760,7 +2454,7 @@ export function updateAdminPassword(id, newPassword, kojiRadi) {
   if (!newPassword || String(newPassword).length < 3) return { error: "Lozinka mora imati bar 3 znaka" };
   db.prepare("UPDATE admins SET password_hash=? WHERE id=?").run(hashPassword(newPassword), id);
   zaboraviProveruLozinke(); // upozorenje o fabrickoj lozinki mora odmah da nestane
-  // reset lozinke odjavljuje taj nalog sa svih panela
+  // Promena lozinke odjavljuje taj nalog sa svih panela.
   db.prepare("DELETE FROM admin_tokens WHERE admin_id=?").run(id);
   return { ok: true };
 }
@@ -2773,16 +2467,8 @@ export function deleteAdmin(id, currentAdminId, kojiRadi) {
   const owners = db.prepare("SELECT COUNT(*) c FROM admins WHERE role='owner' AND active=1").get().c;
   if (a.role === "owner" && owners <= 1) return { error: "Mora postojati bar jedan vlasnik" };
 
-  // OTPUSTEN RADNIK: nalog se GASI, ne brise.
-  //
-  // Smene i promet pokazuju ko je otvorio kasu i ko je upisao dopunu. Kad bi se
-  // nalog obrisao, ti redovi bi ostali bez imena i obracun smene vise ne bi
-  // imao smisla - a upravo zbog obracuna sve to i postoji. Ranije je brisanje
-  // pucalo na stranom kljucu cim je radnik jednom otvorio smenu: vlasnik nije
-  // mogao da mu oduzme pristup, a nalog i token su nastavljali da rade.
-  //
-  // Nalog bez ijednog traga (napravljen greskom, nikad korišćen) se brise skroz,
-  // da spisak ne skuplja prazne redove.
+  // Radniku kome se oduzima pristup nalog se gasi, ne briše: smene i dopune
+  // ostaju potpisane njegovim imenom. Nalog bez ijednog traga se briše.
   const trag = db.prepare(
     "SELECT (SELECT COUNT(*) FROM shifts WHERE admin_id=?) + (SELECT COUNT(*) FROM transactions WHERE admin_id=?) c"
   ).get(id, id).c;
@@ -2800,7 +2486,7 @@ export function deleteAdmin(id, currentAdminId, kojiRadi) {
   return r;
 }
 
-// Vracanje ugasenog naloga (radnik se vratio na posao).
+// Vraćanje ugašenog naloga.
 export function vratiAdmin(id, kojiRadi) {
   const a = db.prepare("SELECT * FROM admins WHERE id=?").get(id);
   const zabrana = proveriPravo(kojiRadi, a);
@@ -2817,7 +2503,7 @@ export function changeOwnPassword(adminId, oldPassword, newPassword) {
   return { ok: true };
 }
 
-// SLIKE (shop artikli, cover igre, baner igre)
+// Slike (artikli, omoti i baneri igara)
 function saveImage(table, prefix, id, dataUrl, col = "image", maxBytes = 3 * 1024 * 1024) {
   const item = db.prepare(`SELECT * FROM ${table} WHERE id=?`).get(id);
   if (!item) return { error: "Stavka ne postoji" };
@@ -2828,7 +2514,6 @@ function saveImage(table, prefix, id, dataUrl, col = "image", maxBytes = 3 * 102
   if (buf.length > maxBytes) return { error: `Slika je prevelika (maksimum ${Math.round(maxBytes / 1048576)} MB)` };
   const dir = UPLOADS;
   fs.mkdirSync(dir, { recursive: true });
-  // obriši staru sliku ako postoji
   if (item[col]) { obrisiSliku(item[col]); }
   const fname = `${prefix}-${id}-${Date.now()}.${ext}`;
   fs.writeFileSync(path.join(dir, fname), buf);
@@ -2842,9 +2527,7 @@ function removeImage(table, id, col = "image") {
   db.prepare(`UPDATE ${table} SET ${col}=NULL WHERE id=?`).run(id);
   return { ok: true };
 }
-// POZADINE EKRANA U LAUNCHERU
-// Slike se kace kroz panel, ne u folder launchera - inace bi se menjale rucno
-// na svakom racunaru. Ovako vlasnik okaci jednom i svih 13 dobije odmah.
+// Pozadine ekrana u launcheru, iz panela, za sve računare odjednom.
 export const POZADINE = {
   prijava: { naziv: "Prijava", opis: "Ekran za prijavu igrača, stoji ceo dan kad je računar slobodan" },
   pocetna: { naziv: "Početna", opis: "Iza hero banera, police igara i alata" },
@@ -2859,35 +2542,14 @@ export function pozadineObj() {
   return out;
 }
 
-// BREND: LOGO I BOJA, PO IGRAONICI
-//
-// Svaka igraonica ima svoje ime, svoj znak i svoju boju. Dok su logo i crvena
-// stajali ušiveni u fajlove, druga igraonica je morala da dobije prepravljenu
-// kopiju programa - a to znači da svaka nadogradnja mora da se pravi posebno za
-// svakoga. Ovako se program izdaje jedan, a izgled se podešava iz panela.
-//
-// Naziv se već podešavao (`cafe_name`); ovde se dodaju znak i boja. Pozadine
-// ekrana i promo baneri su i ranije bili podesivi, pa je ovo poslednje što je
-// bilo ušiveno.
+// Brend: znak i boja igraonice, iz panela. Program je isti za svaku
+// igraonicu, a izgled se podešava.
 export const AKCENAT_PODRAZUMEVANI = "#2f6ae8";
 
-// GOTOVE BOJE KUĆE
-//
-// Do sada je izbor boje bio polje za heks i sistemski birač. To radi, ali traži
-// da vlasnik ZNA koja boja valja - a ne zna, i nema kako da zna: boja mora da
-// se čita na tamnoj podlozi, da nosi belo slovo na dugmetu, i da se ne pomeša
-// sa bojama koje u ovom programu NEŠTO ZNAČE.
-//
-// Zato ide spisak gotovih, svaka proverena za sve troje. Polje za heks ostaje
-// za onoga ko ima tačnu boju iz svog znaka - ali kao izuzetak, ne kao jedini put.
-//
-// U spisku NEMA crvene, narandžaste ni zelene, i to nije previd. Te tri porodice
-// su zauzete značenjima ("ističe vreme", "nagrada", "ima kredita"), pa bi kuća
-// koja uzme neku od njih igraču pomešala boju kuće sa stanjem naloga. Ko baš
-// hoće takvu boju može je upisati ručno - ali će mu program reći šta to znači.
-//
-// Nijedna iz ovog spiska ne sme sama da nosi zamerku: spisak gotovih koji nudi
-// ono na šta isti program upozorava sam sebi protivreči. To čuva provera.
+// Gotove boje kuće, proverene za čitljivost na tamnoj podlozi i belo slovo na
+// dugmetu. Crvene, narandžaste i zelene nema: te boje nose značenja (ističe
+// vreme, nagrada, ima kredita). Heks se može upisati i ručno, uz upozorenje.
+// Nijedna gotova boja ne sme da nosi zamerku (čuva test).
 export const BOJE_KUCE = [
   { kljuc: "plava",       naziv: "Plava",       heks: "#2f6ae8" },
   { kljuc: "indigo",      naziv: "Indigo",      heks: "#5145d8" },
@@ -2901,8 +2563,7 @@ export const BOJE_KUCE = [
   { kljuc: "srebro",      naziv: "Srebro",      heks: "#c3c9dc" },
 ];
 
-// Boje koje u programu NEŠTO ZNAČE. Ne biraju se - one su tu da bi igrač na
-// prvi pogled znao šta gleda, pa boja kuće ne sme da bude previše blizu njima.
+// Boje koje nose značenje; boja kuće ne sme da bude preblizu njima.
 const ZNACENJA = [
   { heks: "#3dc97e", sta: "„ima kredita“" },
   { heks: "#ffb527", sta: "„nagrada“" },
@@ -2914,8 +2575,7 @@ const uRgb = (h) => {
   return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : null;
 };
 
-// Ton (hue) u stepenima. Poredi se TON, ne cela boja: svetlija ili tamnija
-// zelena je i dalje zelena, a igrač je vidi kao istu stvar.
+// Ton u stepenima. Poredi se ton, ne cela boja.
 function ton(heks) {
   const rgb = uRgb(heks);
   if (!rgb) return null;
@@ -2929,8 +2589,7 @@ function ton(heks) {
   return (h * 60 + 360) % 360;
 }
 
-// Koliko je boja svetla. Pretamna na tamnoj podlozi se ne vidi, a presvetla ne
-// nosi belo slovo na dugmetu.
+// Svetlina: pretamna se ne vidi na tamnoj podlozi, presvetla ne nosi belo slovo.
 function svetlina(heks) {
   const rgb = uRgb(heks);
   if (!rgb) return null;
@@ -2941,17 +2600,15 @@ function svetlina(heks) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-// Šta ne valja sa izabranom bojom. Prazan spisak = sve je u redu.
-//
-// Ovo UPOZORAVA, ne zabranjuje. Vlasnik je taj koji odlučuje kako mu izgleda
-// igraonica; program samo mora da kaže šta ga to košta pre nego što potvrdi.
+// Zamerke na izabranu boju; prazan spisak znači da je u redu. Upozorava, ne
+// zabranjuje.
 export function zamerkeNaBoju(heks) {
   const t = ton(heks), s = svetlina(heks);
   const lista = [];
   if (s == null) return lista;
 
-  // 0.03 je otprilike tamnoća na kojoj se dugme gubi u podlozi (#070c1c),
-  // 0.62 je granica preko koje belo slovo na dugmetu prestaje da se čita.
+  // Donja granica: dugme se gubi u podlozi (#070c1c). Gornja: belo slovo se
+  // slabo čita.
   if (s < 0.045) lista.push({ vrsta: "tamna", tekst: "Ova boja je pretamna - dugmad se gube u podlozi." });
   if (s > 0.62) lista.push({ vrsta: "svetla", tekst: "Ova boja je presvetla - belo slovo na dugmetu se slabo čita." });
 
@@ -2970,8 +2627,7 @@ export function zamerkeNaBoju(heks) {
 
 const HEKS = /^#[0-9a-f]{6}$/i;
 
-// Iz jedne boje se izvode sve nijanse koje panel i launcher koriste. Vlasnik
-// bira JEDNU boju - traziti od njega pet je isto što i ne dati mu izbor.
+// Sve nijanse za panel i launcher izvode se iz jedne boje.
 export function nijanse(heks) {
   const osnovna = HEKS.test(String(heks || "")) ? String(heks).toLowerCase() : AKCENAT_PODRAZUMEVANI;
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(osnovna.slice(i, i + 2), 16));
@@ -2992,9 +2648,7 @@ export function brendObj() {
     naziv: getSetting("cafe_name", "Crit"),
     logo: getSetting("brend_logo", "") || null,
     ...nijanse(getSetting("brend_akcenat", AKCENAT_PODRAZUMEVANI)),
-    // Fabricku boju i spisak gotovih salje SERVER. Dok je panel drzao svoju
-    // kopiju, dugme "Fabricka" je vracalo staru crvenu i posle promene fabricke
-    // - pa se ista vrednost drzala na dva mesta i razisla se.
+    // Fabričku boju i gotove boje šalje server; panel ih ne drži posebno.
     fabricki: AKCENAT_PODRAZUMEVANI,
     gotove: BOJE_KUCE,
   };
@@ -3034,9 +2688,7 @@ export function sacuvajAkcenat(heks) {
   return { ok: true, ...brendObj() };
 }
 
-// Izgled se menja na SVIM ekranima odmah - i u panelu i na svih trinaest
-// launchera. Bez ovoga bi vlasnik menjao boju pa obilazio mašine da vidi šta je
-// dobio.
+// Izgled se menja odmah u panelu i na svim launcherima.
 export function pushBrend() {
   const b = brendObj();
   broadcastClients({ t: "brend", brend: b });
@@ -3071,59 +2723,35 @@ export function removePozadinu(kljuc) {
   return { ok: true };
 }
 
-// Launcheri odmah dobijaju novu pozadinu, bez restarta.
 export function pushPozadine() {
   broadcastClients({ t: "pozadine", pozadine: pozadineObj() });
 }
 
-// TEKSTURA POZADINE
-// Sitna sara koja se ponavlja preko cele pozadine. Ne cuva se kao slika nego
-// kao izbor - launcher je crta sam, pa je ostra na svakoj rezoluciji, ne tezi
-// nista i ne mora da se salje kroz mrezu.
-// Sara se pise SAMO ovde. I launcher i panel je dobijaju odavde, pa pregled u
-// panelu ne moze da se razidje od onoga sto igrac vidi.
-// Prozirnost je po sari razlicita namerno: tackice pokrivaju malo povrsine pa
-// im treba vise, kose linije pokrivaju mnogo pa im treba manje - da sve sare
-// deluju podjednako prisutno kad se prebacuje sa jedne na drugu.
-// Šara koja se crta od naziva igraonice se pravi u hodu; ostale su upisane.
-// Bez ovoga bi `o.sara` za nju bilo `undefined` i pozadina bi nestala.
+// Šara pozadine. Čuva se kao izbor, a launcher je crta sam (oštra na svakoj
+// rezoluciji). Definicija postoji samo ovde, pa panel i launcher prikazuju
+// isto. Prozirnost je po šari različita, da sve deluju podjednako prisutno.
+// Šara sa imenom igraonice se pravi u hodu (saraOd).
 const saraTeksture = (o) => (o.saraOd ? o.saraOd(getSetting("cafe_name", "Igraonica")) : o.sara);
 
-// Spisak šara spreman za slanje - i launcheru i panelu.
-//
-// Stoji na jednom mestu jer je već jednom razišlo: launcher je dobijao razrešenu
-// šaru, a panel sirov objekat sa funkcijom u sebi. `JSON.stringify` funkciju
-// izbaci, pa je vlasnik u Podešavanjima gledao prazan kvadrat umesto šare -
-// bez ijedne greške, i to samo za onu jednu koja se crta u hodu.
+// Spisak šara za slanje launcheru i panelu, sa već izračunatom šarom od imena
+// (funkcija se ne može poslati kao JSON).
 export function teksturaSpisak() {
   return Object.fromEntries(Object.entries(TEKSTURE)
     .map(([k, o]) => [k, { naziv: o.naziv, opis: o.opis, korak: o.korak, sara: saraTeksture(o) }]));
 }
-// Razmaci i prelomi reda se sklanjaju pre nego sto sara postane adresa.
-// CSS `url("...")` ne sme da sadrzi prelom reda - pravilo tada tiho otpadne i
-// pozadina ostane prazna, bez ijedne greske. Bez ovoga bi svaka sara morala
-// da se pise u jednom redu, a takve se ne mogu ni citati ni ispravljati.
+// Razmaci i prelomi reda se sklanjaju: CSS `url("...")` sa prelomom reda se
+// tiho odbacuje.
 const svg = (s) => `url("data:image/svg+xml,${s.replace(/\s+/g, " ").trim().replace(/</g, "%3C").replace(/>/g, "%3E").replace(/#/g, "%23")}")`;
-// Naziv igraonice upisuje vlasnik i završava USRED SVG-a. Ime sa `&` ili `<`
-// pokvarilo bi celu sliku, a šara je pozadina svakog ekrana u launcheru - jedan
-// ampersand u nazivu i trinaest mašina ostane bez pozadine.
+// Naziv igraonice ulazi u SVG, pa se eskejpuje (`&` ili `<` bi pokvarili sliku).
 const escXml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-// ISKRE: ista sara, ali u boji kuce i punom jacinom.
-// Sluzi za kretanje "Iskre" - preko nasumicne plocice u mrezi legne ista figura
-// u crvenom, zasvetli i ugasi se. Zato mora da bude ISTI obris: da bi se crvena
-// figura poklopila sa belom ispod nje, ne sme da se crta posebno.
-// Iskra nosi BOJU KUCE, a ne upisanu crvenu.
-//
-// Ovde je stajalo `#ff2b2b`. Dok je boja kuce i bila crvena, to se nije videlo -
-// a onda bi igraonica koja u panelu izabere svoju boju dobila saru koja iskri
-// tudjom. Boja se cita u trenutku crtanja, pa promena u panelu vazi odmah.
+// Iskre: ista šara u boji kuće i punom jačinom, za kretanje "Iskre". Obris
+// je isti, da se figure poklope; boja kuće se čita pri crtanju.
 const uIskru = (obris) => obris
   .replace(/#fff\b/g, getSetting("brend_akcenat", AKCENAT_PODRAZUMEVANI))
   .replace(/(fill|stroke)-opacity='[\d.]+'/g, "$1-opacity='0.95'");
 
-// Varijanta u boji kuce se izvlaci iz vec napisane bele - sara se ne pise
-// dvaput, pa ne mogu da se raziđu.
+// Varijanta u boji kuće se izvodi iz bele, da se šara ne piše dvaput.
 const dekodiraj = (u) => String(u)
   .replace(/^url\("data:image\/svg\+xml,/, "").replace(/"\)$/, "")
   .replace(/%3C/g, "<").replace(/%3E/g, ">").replace(/%23/g, "#");
@@ -3132,15 +2760,8 @@ const iskraOd = (sara) => (sara ? svg(uIskru(dekodiraj(sara))) : "");
 export const TEKSTURE = {
   nema: { naziv: "Bez teksture", opis: "Čista pozadina, samo gradijent", sara: "", korak: 0 },
 
-  // PRAVI RASTER IZ STAMPE, NE DVE TACKE U POLJU.
-  //
-  // Ovde su stajala dva jednaka kruga u polju od 14px. To nije sara nego
-  // popuna: oko odmah uhvati resetku i vise ne vidi nista drugo.
-  //
-  // Raster se u stampi radi pod 45 stepeni i sa razlicitim precnikom tacke -
-  // odatle mu ton. Ovde su tri velicine: krupne nose sliku, srednje je vezuju,
-  // sitne popunjavaju medjuprostor. Tacke na ivici stoje i sa suprotne strane,
-  // pa se sav plocice ne vidi.
+  // Raster pod 45 stepeni sa tri veličine tačke; tačke na ivici se ponavljaju
+  // sa suprotne strane, pa se spoj pločica ne vidi.
   tacke: {
     naziv: "Raster", opis: "Rasterske tačke iz štampe stripa, tri veličine", korak: 48,
     sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48'><g fill='#fff'>
@@ -3150,9 +2771,7 @@ export const TEKSTURE = {
       <circle cx='0' cy='24' r='0.75' fill-opacity='0.10'/><circle cx='48' cy='24' r='0.75' fill-opacity='0.10'/>
       <circle cx='24' cy='24' r='0.75' fill-opacity='0.10'/></g></svg>`),
   },
-  // Iskre sa znaka: cetiri kraka, stranice UVUCENE. Prava zvezdica iz stripa
-  // nije mnogougao nego oblik koji se suzava ka sredini - zato krive, ne linije.
-  // Pet velicina, van resetke, da grupa deluje raspoređeno a ne poređano.
+  // Četvorokrake iskre sa uvučenim stranicama, pet veličina, van rešetke.
   zvezde: {
     naziv: "Iskre", opis: "Četvorokrake iskre sa znaka, pet veličina", korak: 88,
     sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='88' height='88'><g fill='#fff'>
@@ -3163,10 +2782,8 @@ export const TEKSTURE = {
       <path d='M44 41.4C44.7 43.3 44.7 43.3 46.6 44C44.7 44.7 44.7 44.7 44 46.6C43.3 44.7 43.3 44.7 41.4 44C43.3 43.3 43.3 43.3 44 41.4z' fill-opacity='0.07'/>
     </g></svg>`),
   },
-  // Prasak iz znaka. Krupan oblik u sredini polja se u ponavljanju cita kao red
-  // jednakih zvezda, pa je polje uvecano, glavni oblik pomeren iz sredine i
-  // prigusen, a oko njega idu sitniji pod razlicitim uglovima - oko tada vidi
-  // grupu, ne resetku. Zraci su naizmenicno duzi i kraci, kao u stripu.
+  // Prasak: glavni oblik pomeren iz sredine i prigušen, oko njega sitniji pod
+  // različitim uglovima, pa se u ponavljanju ne vidi rešetka.
   prasak: {
     naziv: "Praskovi", opis: "Strip prasak iz znaka, raspoređen bez reda", korak: 150,
     sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150'><g fill='none' stroke='#fff' stroke-linejoin='round'>
@@ -3176,12 +2793,7 @@ export const TEKSTURE = {
       <path d='M23.4 117.9L20.6 119.3L21 122.4L18.8 120.2L16.1 121.8L17.2 118.9L14.6 117.3L17.7 117.2L18.2 114.1L19.7 116.8L22.6 115.6z' stroke-opacity='0.075' stroke-width='0.9'/>
     </g></svg>`),
   },
-  // Linije brzine, ZASILJENE. Prva verzija su bile tri prave crte jednake
-  // debljine - to nije brzina nego resetka. U stripu je linija brzine klin:
-  // debela odakle krece, u nulu gde se gubi.
-  //
-  // Nagib je tacno 45 stepeni, i to nije estetika nego uslov: samo pri tom nagibu
-  // ono sto izadje na desnu ivicu ulazi na levu u istoj visini, pa se sav ne vidi.
+  // Zašiljene linije brzine pod tačno 45 stepeni, da se pločice spajaju bez šava.
   kose: {
     naziv: "Brzina", opis: "Zašiljene linije brzine, kao iza figure u stripu", korak: 96,
     sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><g fill='#fff'>
@@ -3196,8 +2808,8 @@ export const TEKSTURE = {
     naziv: "Kockice d20", opis: "Znak kritičnog pogotka iz stonih igara", korak: 64,
     sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><g fill='none' stroke='#fff' stroke-opacity='0.15' stroke-width='1.4' stroke-linejoin='round'><path d='M16 3L27.3 9.5L27.3 22.5L16 29L4.7 22.5L4.7 9.5Z'/><path d='M16 9.5L21.6 19.3L10.3 19.3Z'/><path d='M16 3L16 9.5M27.3 22.5L21.6 19.3M4.7 22.5L10.3 19.3'/></g><g transform='translate(32 32) scale(0.62)' fill='none' stroke='#fff' stroke-opacity='0.1' stroke-width='2.2' stroke-linejoin='round'><path d='M16 3L27.3 9.5L27.3 22.5L16 29L4.7 22.5L4.7 9.5Z'/><path d='M16 9.5L21.6 19.3L10.3 19.3Z'/></g></svg>`),
   },
-  // Sestougaona mreza - najmirnija od svih, dobra ispod okacene fotografije.
-  // Kljuc je namerno bez nasih slova - ide kroz API i CSS.
+  // Šestougaona mreža; najmirnija, dobra ispod fotografije. Ključ je bez naših
+  // slova (API i CSS).
   sace: {
     naziv: "Saće", opis: "Šestougaona mreža, krupna i sitna u njoj", korak: 84,
     sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='84' height='48'><g fill='none' stroke='#fff'>
@@ -3205,29 +2817,17 @@ export const TEKSTURE = {
       <g stroke-opacity='0.055' stroke-width='0.9'><path d='M21 13L31 19v12l-10 6-10-6V19z'/><path d='M63 13L73 19v12l-10 6-10-6V19z'/></g>
     </g></svg>`),
   },
-  // Munje: energija, uz shop sa energetskim picima i uz gaming.
+  // Munje.
   munje: {
     naziv: "Munje", opis: "Sitne munje, najživlja od svih šara", korak: 48,
     sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48'><path d='M14 4L7 21h6l-3 13 12-19h-7l4-11z' fill='#fff' fill-opacity='0.14'/><path d='M37 27L32.5 38h3.8l-1.9 8.4L42 34h-4.5l2.5-7z' fill='#fff' fill-opacity='0.1'/></svg>`),
   },
-  // ŠARA SA IMENOM KUĆE - PIŠE SE U HODU, NE STOJI UPISANA.
-  //
-  // Ovde je stajalo slovo po slovo "CRIT". Dok je igraonica jedna, to je bila
-  // najbrendiranija šara u spisku. Drugoj igraonici bi to bila šara sa TUĐIM
-  // imenom - jedina stvar u launcheru koju vlasnik ne bi mogao da promeni iz
-  // panela, a igrač je gleda ceo dan iza svake police.
-  //
-  // Zato se crta od naziva iz Podešavanja. Promeni ime igraonice u panelu i
-  // pozadina se promeni sa njim, bez nove verzije launchera.
-  // Ključ ostaje `crit` iako se šara više ne zove tako: postojeće baze u
-  // igraonici ga imaju upisanog u podešavanjima. Preimenovanje ključa bi im
-  // tiho ugasilo pozadinu - `TEKSTURE["crit"]` više ne bi postojalo, pa bi
-  // pala na "nema" i niko ne bi znao zašto je pozadina nestala.
+  // Šara sa imenom igraonice se crta od naziva iz Podešavanja. Ključ ostaje
+  // `crit` jer ga postojeće baze imaju upisanog.
   crit: {
     naziv: "Ime kuće", opis: "Naziv igraonice kao šara, najbrendiranije", korak: 96,
     saraOd: (ime) => {
-      // Duga imena se ne skraćuju nego se smanjuju - presečeno ime izgleda kao
-      // kvar, a sitno ime je i dalje ime.
+      // Duga imena se smanjuju, ne skraćuju.
       const t = String(ime || "").toUpperCase().trim().slice(0, 14) || "?";
       const v = Math.max(9, Math.min(21, Math.round(126 / Math.max(t.length, 4))));
       return svg(`<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><text x='6' y='30' font-family='Segoe UI, Arial, sans-serif' font-size='${v}' font-weight='900' letter-spacing='2' fill='#fff' fill-opacity='0.11'>${escXml(t)}</text><text x='54' y='78' font-family='Segoe UI, Arial, sans-serif' font-size='${Math.round(v * 0.72)}' font-weight='900' letter-spacing='2' fill='#fff' fill-opacity='0.075' transform='rotate(-14 54 78)'>${escXml(t)}</text></svg>`);
@@ -3237,9 +2837,7 @@ export const TEKSTURE = {
     naziv: "Rombovi", opis: "Mirna dijagonalna šara, najdiskretnija", korak: 34,
     sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='34' height='34'><path d='M17 2l15 15-15 15L2 17z' fill='none' stroke='#fff' stroke-opacity='0.11' stroke-width='1.1'/></svg>`),
   },
-  // Ugljenicno tkanje - klasika na gaming opremi. Nije sahovnica: niti se
-  // SMENJUJU po pravcu (dva polja lezu vodoravno, dva uspravno), a svako nosi
-  // svetlu ivicu na strani odakle pada svetlo. Bez te ivice ostaje samo tabla.
+  // Karbonsko tkanje: polja se smenjuju po pravcu i imaju svetlu ivicu.
   ugljenik: {
     naziv: "Ugljenik", opis: "Tkanje kao na gaming opremi, sitno i mirno", korak: 18,
     sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><g fill='#fff'>
@@ -3249,9 +2847,8 @@ export const TEKSTURE = {
       <rect x='9' y='0' width='1.5' height='9' fill-opacity='0.06'/><rect x='0' y='9' width='1.5' height='9' fill-opacity='0.06'/>
     </g></svg>`),
   },
-  // Veze sa stampane ploce. Glavne linije prelaze CELU plocicu (vodoravna na
-  // y=34, uspravna na x=96), pa se sa susednom spajaju u istoj tacki - inace se
-  // u ponavljanju vide razbacani stapici umesto mreze.
+  // Veze sa štampane ploče; glavne linije prelaze celu pločicu, da se spajaju sa
+  // susednim.
   kolo: {
     naziv: "Kolo", opis: "Veze sa štampane ploče, tehnička i mirna", korak: 128,
     sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='128' height='128'>
@@ -3264,58 +2861,39 @@ export const TEKSTURE = {
   },
 };
 export const JACINE = { slabo: "Slabo", srednje: "Srednje", jako: "Jako" };
-// KOLIKO SE ŠARA VIDI.
-//
-// Lestvica je bila 0.45 / 0.75 / 1: i najtiša postavka se čitala kao vodeni žig
-// preko celog ekrana, pa vlasnik nije imao izbor između "šara" i "bez šare".
-// Naslovi police ("IGRE", "INTERNET I ALATI") stoje na goloj šari, a reč koja
-// se ponavlja ispod naslova tuče se sa samim naslovom. Sada "jako" nosi ono
-// što je ranije bilo "srednje", a ispod toga postoje dve stvarno tiše.
+// Koliko se šara vidi.
 export const PROZIRNOSTI = { slabo: 0.22, srednje: 0.42, jako: 0.7 };
 
-// KRETANJE SARE
-// Sara moze polako da klizi. Namerno je SPORO: ovo stoji ceo dan iza igara i
-// ne sme da vuce pogled dok neko igra. Brzina je u sekundama po jednom koraku
-// (jedna plocica), pa je kretanje besavno bez obzira na velicinu sare.
-// "mirno" je podrazumevano - ko ne zeli kretanje, ne mora da ga ima.
-// Svako kretanje ima JEDNU dobro podesenu brzinu. Ranije su postojali "lagano"
-// i "zivo" kao dve brzine istog klizanja - to je bio jedan efekat sa klizacem,
-// a ne izbor. Sad je svaki nacin svoja stvar.
+// Kretanje šare, sporo jer stoji iza igara ceo dan. Brzina je u sekundama po
+// jednoj pločici, pa je kretanje bez šava. Podrazumevano je "mirno".
 export const KRETANJA = {
   mirno: { naziv: "Mirno", opis: "Šara stoji", sekundi: 0 },
   klizanje: { naziv: "Klizanje", opis: "Šara polako putuje po dijagonali", sekundi: 30 },
   talas: { naziv: "Talas", opis: "Svetlo prelazi preko šare, kao odsjaj", sekundi: 15 },
   dubina: { naziv: "Dubina", opis: "Dva sloja, bliži prati pokret miša", sekundi: 44 },
-  // Nasumicne figure u mrezi na trenutak zasvetle u boji kuce pa se ugase.
-  // Sara stoji - pomera se samo svetlo, i to na malo mesta odjednom.
+  // Nasumične figure zasvetle u boji kuće; šara stoji.
   iskre: { naziv: "Iskre", opis: "Pojedine figure zasvetle crveno pa se ugase", sekundi: 0 },
 };
-// Stara imena iz ranijih verzija - da vec sacuvan izbor ne ispadne "nepoznat"
-// i tiho se ugasi kad se server nadogradi.
+// Imena iz ranijih verzija, da sačuvan izbor ostane važeći.
 const STARA_KRETANJA = { lagano: "klizanje", zivo: "klizanje" };
 
-// Pretvara izbor u gotove vrednosti za CSS. Radi i za kucnu teksturu i za
-// igracevu, pa je pravilo na jednom mestu.
+// Izbor u vrednosti za CSS, za kućnu i za igračevu šaru.
 export function spremiTeksturu({ kljuc, jacina, kretanje } = {}) {
   const k = TEKSTURE[kljuc] ? kljuc : "nema";
   const j = JACINE[jacina] ? jacina : "srednje";
   const staro = STARA_KRETANJA[kretanje];
   const kr = KRETANJA[kretanje] ? kretanje : (staro || "mirno");
-  // Bez sare nema sta da se pomera, pa se kretanje gasi umesto da CSS vrti
-  // praznu animaciju u krug.
+  // Bez šare se kretanje gasi.
   const radi = k !== "nema" && kr !== "mirno";
   const vazi = radi ? kr : "mirno";
   return {
     kljuc: k, jacina: j, kretanje: vazi,
     sara: saraTeksture(TEKSTURE[k]),
     prozirnost: k === "nema" ? 0 : PROZIRNOSTI[j],
-    // Korak je velicina plocice: kretanje pomera saru za tacno jednu plocicu,
-    // pa se petlja zatvara bez vidljivog skoka. Iskre ga koriste da se crvena
-    // figura poklopi tacno sa belom ispod nje.
+    // Korak je veličina pločice: kretanje pomera šaru za tačno jednu pločicu.
     korak: TEKSTURE[k].korak || 0,
     sekundi: radi ? KRETANJA[vazi].sekundi : 0,
-    // Ista sara u boji kuce - salje se samo kad zatreba, da welcome ne nosi
-    // dvostruko vise podataka bez potrebe.
+    // Šara u boji kuće, samo kad je kretanje "iskre".
     iskra: vazi === "iskre" ? iskraOd(saraTeksture(TEKSTURE[k])) : "",
   };
 }
@@ -3342,17 +2920,14 @@ export function saveTeksturu(kljuc, jacina, kretanje) {
 
 export function pushTeksturu() {
   broadcastClients({ t: "tekstura", tekstura: teksturaObj() });
-  // Prijavljeni igraci koji imaju SVOJU pozadinu ne smeju da je izgube kad
-  // vlasnik promeni kucnu - njima se ponovo salje njihova.
+  // Igrači sa svojom šarom je zadržavaju kad vlasnik promeni kućnu.
   for (const c of db.prepare("SELECT id, current_player_id FROM computers WHERE current_player_id IS NOT NULL").all()) {
     const t = temaIgraca(c.current_player_id);
     if (t) sendClient(c.id, { t: "tekstura", tekstura: t });
   }
 }
 
-// TEKSTURA IGRACA
-// Igrac bira svoju saru na svom nalogu, u launcheru. Vazi samo dok je on
-// prijavljen; kad se odjavi, racunar se vraca na kucnu.
+// Šara igrača: važi dok je prijavljen.
 export function temaIgraca(playerId) {
   const red = db.prepare("SELECT tema FROM players WHERE id=?").get(playerId);
   if (!red || !red.tema) return null;
@@ -3363,16 +2938,12 @@ export function temaIgraca(playerId) {
 }
 
 export function sacuvajTemuIgraca(playerId, { kljuc, jacina, kretanje } = {}) {
-  // "kuca" znaci: vrati me na ono sto je vlasnik podesio.
+  // "kuca" vraća na šaru igraonice.
   if (kljuc === "kuca") {
     db.prepare("UPDATE players SET tema=NULL WHERE id=?").run(playerId);
     return { ok: true, tema: null, tekstura: teksturaObj() };
   }
-  // Svoja sara je NAGRADA za drugi nivo, i to se proverava OVDE.
-  //
-  // Launcher zakljucane stvari prikazuje sivo i ne da da se kliknu - ali
-  // launcher stoji na racunaru igraca. Ko posalje poruku mimo njega dobija isti
-  // odgovor kao da je kliknuo.
+  // Svoja šara se otključava na drugom nivou; provera je na serveru.
   if (!smeDa(db.prepare("SELECT xp FROM players WHERE id=?").get(playerId)?.xp, "sara")) {
     return { error: `Svoja šara se otključava na ${OTKLJUCAVANJA.sara.nivo}. nivou` };
   }
@@ -3385,16 +2956,16 @@ export function sacuvajTemuIgraca(playerId, { kljuc, jacina, kretanje } = {}) {
   return { ok: true, tema: { kljuc: t.kljuc, jacina: t.jacina, kretanje: t.kretanje }, tekstura: t };
 }
 
-// Sta racunar treba da prikaze: igraceva sara ako je ima, inace kucna.
+// Igračeva šara ako je ima, inače kućna.
 export function teksturaZaRacunar(playerId) {
   return (playerId && temaIgraca(playerId)) || teksturaObj();
 }
 
-// PROMO BANERI (vrh pocetne u launcheru)
+// Promo baneri (vrh početne u launcheru)
 export function promoLista() {
   return db.prepare("SELECT * FROM promo ORDER BY sort, id").all();
 }
-// samo ono sto igrac treba da vidi
+// Samo ono što igrač vidi.
 export function promoZaKlijenta() {
   return db.prepare("SELECT id, image, naziv FROM promo WHERE available = 1 ORDER BY sort, id").all();
 }
@@ -3434,7 +3005,7 @@ export function promoVidljivost(id, vidljiv) {
   return { ok: true };
 }
 
-// Pomeranje gore/dole menja mesto sa susedom - redosled je vidljiv igracu.
+// Pomeranje gore/dole menja mesto sa susedom.
 export function pomeriPromo(id, smer) {
   const svi = promoLista();
   const i = svi.findIndex((p) => p.id === id);
@@ -3462,14 +3033,12 @@ export function removeAllGameImages(id) { removeImage("games", id, "image"); rem
 export const saveToolImage = (id, dataUrl) => saveImage("tools", "tool", id, dataUrl);
 export const removeToolImage = (id) => removeImage("tools", id);
 
-// PRIVREMENI BANERI (dok pravi dizajn ne stigne)
-// Crtaju se kao SVG i pisu pravo u uploads - ne idu kroz proveru za otpremljene
-// slike (koja prima samo raster), jer ih pravi sam server, ne korisnik.
+// Privremeni baneri: server ih crta kao SVG i upisuje direktno u uploads
+// (provera otpremljenih slika prima samo raster).
 function upisiSvg(prefix, svgTekst, staraPutanja) {
   const dir = UPLOADS;
   fs.mkdirSync(dir, { recursive: true });
-  // Obrisi prethodni SAMO ako je i on bio generisan baner (ne diramo sliku koju
-  // je vlasnik sam okacio - ako je banner prava slika, ostavljamo je na miru).
+  // Briše se samo prethodni generisan baner, ne slika koju je okačio vlasnik.
   if (staraPutanja && /\/uploads\/baner-/.test(staraPutanja)) {
     obrisiSliku(staraPutanja);
   }
@@ -3487,8 +3056,7 @@ export function napraviBanerIgre(id) {
   return { ok: true, banner: url };
 }
 
-// Napravi baner svakoj igri koja ga nema. Igre sa vec okacenim banerom se ne
-// diraju - privremeni baner je za prazna mesta, ne da pregazi tudji rad.
+// Baner za svaku igru koja ga nema; okačeni baneri se ne diraju.
 export function napraviBaneriSvimIgrama() {
   const igre = db.prepare("SELECT * FROM games WHERE banner IS NULL OR banner=''").all();
   for (const g of igre) {
@@ -3513,7 +3081,7 @@ export function napraviPromoCrit() {
   return { ok: true, id: info.lastInsertRowid, image: url };
 }
 
-// Programi / daljinska instalacija
+// Daljinska instalacija programa
 export function programsList() {
   return db.prepare("SELECT * FROM programs ORDER BY name").all();
 }
@@ -3529,7 +3097,7 @@ export function updateProgram(id, { name, url, args, note }) {
   const p = db.prepare("SELECT * FROM programs WHERE id=?").get(id);
   if (!p) return { error: "Program ne postoji" };
   name = String(name ?? p.name).trim(); url = String(url ?? p.url).trim();
-  // Iste provere kao pri dodavanju - izmena je ranije mogla da isprazni link.
+  // Iste provere kao pri dodavanju.
   if (!name || !url) return { error: "Naziv i link su obavezni" };
   if (!/^https?:\/\//i.test(url)) return { error: "Link mora počinjati sa http:// ili https://" };
   db.prepare("UPDATE programs SET name=?, url=?, args=?, note=? WHERE id=?")
@@ -3541,7 +3109,7 @@ export function deleteProgram(id) {
   return { ok: true };
 }
 
-// status instalacije po računaru (u memoriji)
+// Stanje instalacije po računaru (u memoriji).
 const installStatus = new Map(); // computerId -> { program, state, message, ts }
 
 export function getInstallStatus() {
@@ -3580,37 +3148,26 @@ function clientInstallStatus(computerId, msg) {
 
 // ---------- ISKUSTVO I PROFIL IGRAČA ----------
 //
-// Pravila nivoa su u nivoi.js - to je čist račun. Ovde je ono što se tiče
-// igraonice: KADA se iskustvo dodaje, KOME, i šta se time otključava.
+// Pravila nivoa su u nivoi.js; ovde je kada se iskustvo dodaje i šta se time
+// otključava.
 
-// Boje imena i okviri koje igrač bira. Namerno kratak spisak: petnaest nijansi
-// znači da niko ne bira, a i svaka mora da bude čitljiva na tamnoj podlozi.
-// Boje imena i okviri žive uz nivoe (nivoi.js) - to su nagrade, ne podaci o
-// igraču. Odavde se samo prosleđuju dalje, da ostatak programa ne mora da zna
-// odakle dolaze.
+// Boje imena i okviri su u nivoi.js (nagrade po nivou); ovde se samo
+// prosleđuju.
 export { BOJE_IMENA, OKVIRI };
 
 const profilIzBaze = (red) => {
   let p = {};
   try { p = JSON.parse(red?.profil || "{}") || {}; } catch { p = {}; }
   return {
-    // VIP boje se čitaju ravnopravno: kad članarina istekne, izbor OSTAJE
-    // zapisan i vrati se sam od sebe čim gost ponovo kupi. Brisanje izbora pri
-    // isteku bi značilo da posle obnove mora sve iznova da bira.
+    // VIP izbor ostaje zapisan i kad članarina istekne, i važi ponovo posle obnove.
     boja: BOJE_IMENA[p.boja] || vip.VIP_BOJE[p.boja] ? p.boja : "bela",
     okvir: OKVIRI[p.okvir] || vip.VIP_OKVIRI[p.okvir] ? p.okvir : "nema",
   };
 };
 
-// ISKUSTVO SE DODAJE KAD SE NEŠTO POTROŠI, NE KAD SE DOPUNI.
-//
-// Dopuna je obećanje, potrošnja je ono što se stvarno desilo. Ko dopuni 5000 i
-// ode kući nije igrao. Zato ovo zove naplata vremena i plaćanje pića kreditom -
-// a NE dopuna, poklonjen kredit ni nagrada sa točka: to je kuća dala, i inače
-// bi točak bio prečica do nivoa.
-//
-// Vraća { nivoPre, nivoPosle } kad se pređe nivo, inače null - da pozivalac zna
-// da li ima šta da javi igraču.
+// Iskustvo se dodaje pri potrošnji (vreme, piće sa kredita), ne pri dopuni,
+// poklonjenom kreditu ni nagradi sa točka. Vraća { nivoPre, nivoPosle } kad se
+// pređe nivo, inače null.
 export function dodajXp(playerId, iznos) {
   const dodatak = Number(iznos);
   if (!playerId || !Number.isFinite(dodatak) || dodatak <= 0) return null;
@@ -3623,15 +3180,9 @@ export function dodajXp(playerId, iznos) {
   return posle.nivo > pre.nivo ? { nivoPre: pre, nivoPosle: posle } : null;
 }
 
-// ISKUSTVO POSLE POTROŠNJE, SA VIP MNOŽIOCEM.
-//
-// Čist račun, bez upisa: poslovi sa novcem iskustvo upisuju u ISTOM upisu sa
-// kreditom, pa im treba samo broj. Kroz ovo prolazi svaki XP - naplata vremena,
-// piće sa računara, kasa, obračun rada bez servera.
-//
-// Množilac je ranije stajao samo u dodajXp, a nju nijedna prava potrošnja nije
-// zvala: sve četiri putanje su iskustvo računale same, bez njega. VIP gost je
-// plaćao "dvostruko iskustvo" i dobijao obično.
+// Iskustvo posle potrošnje, sa VIP množiocem. Samo račun: poslovi sa novcem
+// iskustvo upisuju zajedno sa kreditom. Kroz ovo prolazi svaka potrošnja
+// (vreme, piće, kasa, rad bez servera).
 function xpPosleTrosenja(p, iznos) {
   const staro = Number(p?.xp) || 0;
   const dodatak = Number(iznos);
@@ -3640,11 +3191,7 @@ function xpPosleTrosenja(p, iznos) {
   return round2(staro + dodatak * mnozilac);
 }
 
-// Novi nivo se javlja igraču ODMAH, na ekranu na kom sedi.
-//
-// Bez toga bi napredak postojao samo u bazi: igrač bi jednom u dve nedelje
-// slučajno primetio da mu je traka drugačija, a otključana stvar bi stajala
-// neiskorišćena jer niko nije rekao da postoji.
+// Nov nivo se odmah javlja igraču na ekranu.
 function javiNivo(playerId, prelaz) {
   if (!prelaz) return;
   const comp = db.prepare("SELECT id FROM computers WHERE current_player_id=?").get(playerId);
@@ -3662,40 +3209,37 @@ function javiNivo(playerId, prelaz) {
     detail: `Nivo ${prelaz.nivoPosle.nivo} - ${prelaz.nivoPosle.naziv}` });
 }
 
-// Sve na jednom mestu: doda iskustvo i, ako je prešao nivo, javi mu.
+// Dodaje iskustvo i javlja nov nivo.
 export function zaradiXp(playerId, iznos) {
   javiNivo(playerId, dodajXp(playerId, iznos));
 }
 
-// Ono što launcher prikazuje u traci na vrhu početne.
+// Podaci za traku na vrhu početne.
 export function vipZaIgraca(playerId) {
   const red = playerId ? db.prepare("SELECT xp, vip_do FROM players WHERE id=?").get(playerId) : null;
   return red ? vipOd(red.xp, red.vip_do) : null;
 }
 
-// Isto, ali bez citanja iz baze - naplata prolazi svakih pet sekundi i vec drzi
-// xp u ruci; jos jedno citanje po sesiji po prolazu je uzalud.
+// Isto, bez čitanja iz baze (naplata već ima xp).
 export function vipOd(xp, vipDo) {
   const n = nivoZa(xp);
   const jeVip = vip.vaziVip(vipDo);
   return {
     nivo: n.nivo, naziv: n.naziv,
-    // Traka meri napredak U NIVOU. Da meri od nule, igrač na devetom nivou bi
-    // gledao traku skoro punu koju nikad ne napuni - to je zid, ne napredak.
+    // Napredak unutar nivoa, ne od nule.
     xp: n.uNivou, xpDo: n.poslednji ? null : n.zaSledeci,
     poslednji: n.poslednji, sledeci: n.sledeciNaziv,
-    // VIP se KUPUJE, ne zarađuje - zato ovde stoji rok, a ne nivo.
+    // VIP se kupuje; važi do roka.
     vip: jeVip,
     vipDana: vip.danaOstalo(vipDo),
     mnozilac: vip.xpMnozilac(jeVip, Number(getSetting("vip_xp", vip.PODRAZUMEVANO.xpMnozilac))),
   };
 }
 
-// ---- VIP: ČLANARINA KOJA SE KUPUJE ----
+// ---- VIP članarina ----
 //
-// Zašto se plaća kreditom: kredit je gost već platio kešom na kasi, pa je taj
-// novac već u kasi. Ovo ne uzima kući ništa - pretvara stajaći kredit u prihod,
-// i to samouslužno, bez radnika, u bilo koje doba.
+// Plaća se kreditom koji je gost već uplatio na kasi, samouslužno iz
+// launchera.
 export function vipObj() {
   return {
     ukljucen: getSetting("vip_ukljucen", "0") === "1",
@@ -3707,17 +3251,12 @@ export function vipObj() {
   };
 }
 
-// Isto, ali sa odgovorom na pitanje zbog kog vlasnik i otvara ovu karticu:
-// ISPLATI LI SE. Bez toga podešavanje VIP-a je pet polja za kucanje i nijedan
-// podatak - pa se cena nikad ne menja, jer se ne zna prema čemu bi se menjala.
-//
-// Odvojeno od vipObj() namerno: vipObj se poziva pri svakoj kupovini, a ovo su
-// dva prebrojavanja koja tamo nemaju šta da traže.
+// Podešavanje VIP-a uz brojke prodaje za poslednjih 30 dana. Odvojeno od
+// vipObj, koji se zove pri svakoj kupovini.
 export function vipPregled() {
   const sada = Date.now();
   const aktivnih = db.prepare("SELECT COUNT(*) c FROM players WHERE vip_do > ? AND obrisan IS NULL").get(sada).c;
-  // Trideset dana unazad, jer se i članarina prodaje po mesecu - brojevi se
-  // tako porede sa cenom bez računanja u glavi.
+  // Trideset dana, kao i trajanje članarine.
   const od = sada - 30 * 86400000;
   const r = db.prepare("SELECT COUNT(*) c, COALESCE(SUM(-amount),0) s FROM transactions WHERE type='vip' AND created_at > ?").get(od);
   return { ...vipObj(), aktivnih, prodato30: r.c, prihod30: round2(r.s) };
@@ -3736,8 +3275,7 @@ export function postaviVip({ ukljucen, cena, dana, xpMnozilac, tocakPrag }) {
   }
   if (xpMnozilac != null) {
     const m = Number(xpMnozilac);
-    // Ispod 1 bi značilo KAZNU za one koji nisu kupili, a to nije isto što i
-    // nagrada za one koji jesu. Iznad 5 nivoi prestaju da nešto znače.
+    // Množilac između 1 i 5.
     if (!Number.isFinite(m) || m < 1 || m > 5) return { error: "Množilac iskustva mora biti između 1 i 5" };
     setSetting("vip_xp", String(m));
   }
@@ -3748,7 +3286,7 @@ export function postaviVip({ ukljucen, cena, dana, xpMnozilac, tocakPrag }) {
   return { ok: true, ...vipObj() };
 }
 
-// Igrač kupuje sam, iz launchera, svojim kreditom.
+// Kupovina iz launchera, kreditom igrača.
 export function kupiVip(playerId) {
   const o = vipObj();
   if (!o.ukljucen) return { error: "VIP trenutno nije u ponudi." };
@@ -3756,14 +3294,13 @@ export function kupiVip(playerId) {
   if (!p || p.obrisan) return { error: "Nepostojeći nalog." };
   if (o.cena <= 0) return { error: "Cena VIP-a nije podešena. Pozovi osoblje." };
   if (round2(Number(p.balance) || 0) < o.cena) {
-    // Iznos, ne "nemas dovoljno": gost tako zna TACNO koliko da dopuni na kasi.
+    // Poruka kaže tačno koliko fali.
     const fali = Math.ceil(o.cena - (Number(p.balance) || 0));
     return { error: `Fali ti još ${fali} ${getSetting("currency", "RSD")}. Dopuni na kasi pa probaj ponovo.` };
   }
   let stanje, rok;
   try {
-    // Naplata i rok su JEDAN posao. Da nisu, pad između njih bi ostavio gosta
-    // bez kredita i bez VIP-a - ili sa VIP-om koji niko nije platio.
+    // Naplata i rok su jedna transakcija.
     ({ stanje, rok } = uJednomPoslu(() => {
       const b = round2((Number(p.balance) || 0) - o.cena);
       const r = vip.novRok(p.vip_do, o.dana);
@@ -3776,15 +3313,9 @@ export function kupiVip(playerId) {
       detail: `VIP nije upisan: ${String(e?.message || e).slice(0, 150)}` });
     return { error: "Kupovina nije prošla. Pokušaj ponovo." };
   }
-  // BEZ `amount` - I TO NAMERNO.
-  //
-  // `logs.amount` u kategoriji "novac" znaci KES KOJI SE POMERIO U KASI: iz
-  // njega se racuna koliko para radnik mora da ima pri zatvaranju smene. VIP se
-  // placa kreditom, a taj je novac usao ranije, pri dopuni. Dok je ovde stajao
-  // iznos, obracun je od radnika trazio 1500 dinara viska za svaku prodatu
-  // clanarinu - i to bi isplivalo tek uvece, kao manjak koji niko ne ume da
-  // objasni. Kretanje kredita stoji u `transactions` (tip "vip"), odakle ga i
-  // citaju izvestaji. Isto radi i nagradni tocak, iz istog razloga.
+  // Bez `amount`: u kategoriji "novac" amount je keš u kasi (obračun smene), a
+  // VIP se plaća kreditom. Kretanje kredita je u `transactions` (tip "vip"),
+  // odakle ga čitaju izveštaji.
   logEvent({ category: "novac", action: "vip", actor: p.username, target: p.username,
     detail: `Kupio VIP na ${o.dana} dana (${o.cena} sa kredita)` });
   const comp = db.prepare("SELECT id FROM computers WHERE current_player_id=?").get(playerId);
@@ -3797,30 +3328,18 @@ export function kupiVip(playerId) {
   return { ok: true, vipDo: rok, dana: vip.danaOstalo(rok), balance: stanje };
 }
 
-// "1 dan", "2 dana", "21 dan". Stoji ovde jer se ispisuje u log koji čita
-// radnik, a "1 dana" u evidenciji izgleda kao da program ne zna šta radi.
+// "1 dan", "2 dana", "21 dan".
 const oblikDana = (n) => (Math.abs(n) % 10 === 1 && Math.abs(n) % 100 !== 11 ? "dan" : "dana");
 
-// Osoblje daje ili oduzima VIP iz panela - za goste koji plate kešom na kasi.
-//
-// KEŠ MORA DA SE UPIŠE, INAČE SE KASA NE POKLAPA.
-//
-// Gost preda 1500 dinara preko pulta i radnik mu klikne VIP. Dok se taj novac
-// nigde nije zapisivao, uveče je u fioci stajalo 1500 viška koje obračun ne
-// pominje - a neobjašnjen višak se gleda isto kao i manjak.
-//
-// Zato se keš vodi kao ono što jeste: dopuna pa odmah naplata članarine. Stanje
-// na nalogu ostaje isto (ne dobija gost i kredit i VIP), ali oba koraka postoje:
-//   - dopuna ide u pazar smene, pa kasa očekuje tih 1500
-//   - naplata ide u promet, pa se u izveštaju vidi koliko VIP donosi
-// Ni jedan izveštaj za ovo nije morao da dobije izuzetak.
+// VIP iz panela, za goste koji plaćaju kešom na kasi. Keš se vodi kao dopuna
+// pa naplata članarine: stanje naloga se ne menja, dopuna ulazi u pazar
+// smene, a naplata u promet VIP-a.
 export function postaviVipIgracu(playerId, dana, ko, { naplati = 0, adminId = null } = {}) {
   const p = playerById(playerId);
   if (!p || p.obrisan) return { error: "Nepostojeći nalog." };
   const d = Math.floor(Number(dana));
   if (!Number.isFinite(d)) return { error: "Broj dana nije ispravan." };
-  // Nula znači ODUZMI odmah. Negativan broj bi bio rok u prošlosti, što je isto
-  // - ali se ne pušta, jer je to skoro uvek greška u kucanju.
+  // 0 oduzima VIP odmah; negativan broj se ne prima.
   if (d < 0 || d > 400) return { error: "Broj dana mora biti između 0 i 400." };
   const kes = round2(Number(naplati) || 0);
   if (kes < 0) return { error: "Naplaćen iznos ne može biti negativan." };
@@ -3829,8 +3348,7 @@ export function postaviVipIgracu(playerId, dana, ko, { naplati = 0, adminId = nu
   const rok = d === 0 ? null : vip.novRok(p.vip_do, d);
   let log = null;
   try {
-    // Rok i novac su JEDAN posao, iz istog razloga kao i kod kupovine iz
-    // launchera: pad između njih ostavlja naplaćenog gosta bez VIP-a.
+    // Rok i novac su jedna transakcija.
     log = uJednomPoslu(() => {
       db.prepare("UPDATE players SET vip_do=? WHERE id=?").run(rok, playerId);
       if (kes <= 0) return null;
@@ -3857,31 +3375,17 @@ export function postaviVipIgracu(playerId, dana, ko, { naplati = 0, adminId = nu
   return { ok: true, vipDo: rok, dana: vip.danaOstalo(rok), naplaceno: kes };
 }
 
-// ---- RANG LISTA IGRAONICE ----
+// ---- Rang lista ----
 //
-// NIJE SPISAK NAJBOLJIH NEGO TVOJE MESTO U NJEMU.
-//
-// Gola tabela prvih deset radi samo za tih deset. Jedanaesti je pogleda jednom,
-// vidi da mu do vrha fali pola godine, i više je ne otvori - a on je onaj koga
-// je trebalo pokrenuti. Zato uz vrh ide i KOMŠILUK: dvojica iznad i dvojica
-// ispod tebe, i koliko ti tačno fali do sledećeg mesta.
-//
-// "Sedmi si u kući, do šestog ti fali 400" je rečenica zbog koje neko dođe u
-// utorak. "Prvo mesto: Marko, 34.200" nije.
-//
-// Rangira se po ISKUSTVU, ne po potrošnji. Iznos koji je ko ostavio u kasi nije
-// za javni ekran, a iskustvo je već ono čime se gost i inače hvali - i VIP ga
-// množi, pa se brojke ne prevode nazad u dinare.
-//
-// Brzi gosti (gost-01, gost-02...) se ne broje: to su privremeni nalozi koji se
-// prave po nekoliko dnevno i posle brišu. Blokirani takođe ne.
+// Uz vrh ide i mesto igrača, dvojica iznad i ispod njega i koliko mu fali do
+// sledećeg mesta. Rangira se po iskustvu, ne po potrošnji. Brzi gosti
+// (gost-*) i blokirani se ne rangiraju.
 const RANG_USLOV = "banned = 0 AND obrisan IS NULL AND username NOT LIKE 'gost-%'";
 
 export function rangLista(playerId = null, koliko = 10) {
   const n = Math.min(50, Math.max(3, Math.floor(Number(koliko) || 10)));
-  // Isti redosled u oba upita, do poslednjeg kriterijuma - inače se mesto
-  // izračunato prebrojavanjem ne bi poklopilo sa mestom u spisku. Kod jednakog
-  // iskustva prvi je stariji nalog: ko je tu duže, taj je i stigao pre.
+  // Isti redosled u oba upita, do poslednjeg kriterijuma; kod jednakog
+  // iskustva prvi je stariji nalog.
   const redosled = "ORDER BY xp DESC, created_at ASC, id ASC";
   const kolone = "id, username, display_name, xp, profil, vip_do, created_at";
   const red = (r, mesto) => ({
@@ -3902,28 +3406,25 @@ export function rangLista(playerId = null, koliko = 10) {
   const ja = playerId != null
     ? db.prepare(`SELECT ${kolone}, banned FROM players WHERE id=?`).get(playerId)
     : null;
-  // Nalog koji se ne rangira (brzi gost, blokiran) vidi listu, ali sebe na njoj
-  // nema - i tako mu i piše, umesto da mu se izmisli mesto.
+  // Nalog koji se ne rangira vidi listu bez sopstvenog mesta.
   const rangira = !!ja && !ja.banned && !/^gost-/.test(ja.username);
   if (!rangira) return { vrh, ukupno, ja: null, komsiluk: [] };
 
-  // Mesto se dobija prebrojavanjem onih ispred, jednim upitom - bez učitavanja
-  // cele tabele. Uslov mora da prati redosled znak za znak.
+  // Mesto se dobija prebrojavanjem onih ispred; uslov prati redosled.
   const ispred = db.prepare(
     `SELECT COUNT(*) c FROM players WHERE ${RANG_USLOV}
      AND (xp > ? OR (xp = ? AND (created_at < ? OR (created_at = ? AND id < ?))))`
   ).get(ja.xp, ja.xp, ja.created_at, ja.created_at, ja.id).c;
   const mesto = ispred + 1;
 
-  // Prvi ispred mene - "do šestog ti fali 400". Bez toga je mesto samo broj.
+  // Prvi ispred igrača (koliko mu fali do sledećeg mesta).
   const goreRed = db.prepare(
     `SELECT ${kolone} FROM players WHERE ${RANG_USLOV}
      AND (xp > ? OR (xp = ? AND (created_at < ? OR (created_at = ? AND id < ?))))
      ORDER BY xp ASC, created_at DESC, id DESC LIMIT 1`
   ).get(ja.xp, ja.xp, ja.created_at, ja.created_at, ja.id);
 
-  // Komšiluk se preskače kad sam ionako u vrhu - isti ljudi dvaput jedan ispod
-  // drugog izgledaju kao greška.
+  // Susedi se preskaču kad je igrač u vrhu.
   let komsiluk = [];
   if (mesto > n) {
     const od = Math.max(0, mesto - 3);
@@ -3938,16 +3439,15 @@ export function rangLista(playerId = null, koliko = 10) {
   };
 }
 
-// Profil: ko je, dokle je stigao i šta je za sobom ostavio.
+// Profil igrača.
 export function profilIgraca(playerId) {
   const p = db.prepare("SELECT id, username, display_name, xp, profil, created_at, spinova, spin_dobitak, vip_do FROM players WHERE id=?").get(playerId);
   if (!p) return null;
   const n = nivoZa(p.xp);
   const jedan = (sql, ...a) => db.prepare(sql).get(...a) || {};
 
-  // Sati se računaju iz TROŠKA sesija podeljenog cenom po satu, a ne iz
-  // vremena: cena se u međuvremenu mogla promeniti, a i sesija koja je stala
-  // zbog nestanka struje nije naplaćena. Trošak je ono što se stvarno desilo.
+  // Sati se računaju iz troška sesija i cene, ne iz trajanja: cena se menjala,
+  // a vreme bez naplate ne ulazi.
   const ukupno = jedan("SELECT COALESCE(SUM(cost),0) c, COUNT(*) n FROM sessions WHERE player_id=?", playerId);
   const cena = rate();
   const porudzbina = jedan("SELECT COUNT(*) n FROM orders WHERE player_id=? AND status<>'cancelled'", playerId);
@@ -3972,11 +3472,9 @@ export function profilIgraca(playerId) {
     omiljenaPuta: omiljena.n || 0,
     izgled: profilIzBaze(p),
     otkljucano: otkljucanoZa(p.xp),
-    // Spisak nosi i VIP izgled, sa oznakom - gost mora da VIDI šta dobija ako
-    // kupi. Sakrivena pogodnost ne prodaje ništa.
+    // Spisak nosi i VIP izgled, označen, da se vidi šta članarina donosi.
     boje: { ...BOJE_IMENA, ...vip.VIP_BOJE }, okviri: { ...OKVIRI, ...vip.VIP_OKVIRI },
-    // Stanje članarine ide uz profil: po njemu launcher zna da li da prikaže
-    // ponudu ili preostale dane.
+    // Stanje članarine: ponuda ili preostali dani.
     clanarina: (() => {
       const o = vipObj();
       const jeVip = vip.vaziVip(p.vip_do);
@@ -3984,11 +3482,9 @@ export function profilIgraca(playerId) {
         cena: o.cena, trajanje: o.dana, mnozilac: o.xpMnozilac,
         tocakPrag: o.tocakPrag, pogodnosti: o.pogodnosti };
     })(),
-    // Rang lista stiže uz profil, a ne posebnom porukom: obe strane Naloga se
-    // otvaraju istim klikom, a profil se ionako traži svaki put - pa je lista
-    // sveža kad se pogleda, bez ijedne dodatne poruke.
+    // Rang lista stiže uz profil.
     rang: rangLista(playerId),
-    // Značke i lični rekordi - vidi znacke.js i statistikaIgraca.
+    // Značke i lični rekordi (znacke.js, statistikaIgraca).
     znacke: znackeZa(stat),
     grupeZnacaka: GRUPE,
     rekordi: {
@@ -4005,19 +3501,13 @@ export function profilIgraca(playerId) {
   };
 }
 
-// STATISTIKA ZA ZNAČKE - jedan prolaz, ne upit po znački.
-//
-// Značke se računaju pri svakom otvaranju profila (vidi znacke.js zašto se ne
-// pamte). Da svaka od dvadeset pet radi svoj upit, otvaranje profila bi bilo
-// dvadeset pet upita - a profil se otvara i pri svakoj prijavi. Zato sve što
-// značkama treba stiže odavde, iz nekoliko upita nad indeksiranim kolonama.
+// Statistika za značke u nekoliko upita, ne po upit za svaku značku (profil
+// se traži pri svakoj prijavi).
 function statistikaIgraca(p, vec) {
   const jedan = (sql, ...a) => db.prepare(sql).get(...a) || {};
   const id = p.id;
 
-  // Najduža sesija i doba dana. `started_at` je milisekunda, pa se sat vadi
-  // preko SQLite-ovog datetime - i to u LOKALNOM vremenu, jer "posle 23h" znači
-  // po satu na zidu igraonice, ne po UTC.
+  // Sat se vadi u lokalnom vremenu igraonice.
   const sesije = jedan(`
     SELECT
       MAX(COALESCE(ended_at, started_at) - started_at) najduza,
@@ -4025,12 +3515,12 @@ function statistikaIgraca(p, vec) {
       SUM(CASE WHEN CAST(strftime('%H', started_at/1000, 'unixepoch', 'localtime') AS INTEGER) >= 23 THEN 1 ELSE 0 END) kasno
     FROM sessions WHERE player_id=?`, id);
 
-  // Dan u nedelji sa najviše poseta. 0 = nedelja, kao u strftime('%w').
+  // Dan u nedelji sa najviše poseta; 0 = nedelja, kao strftime('%w').
   const dan = jedan(`
     SELECT strftime('%w', started_at/1000, 'unixepoch', 'localtime') d, COUNT(*) n
     FROM sessions WHERE player_id=? GROUP BY d ORDER BY n DESC LIMIT 1`, id);
 
-  // Najveća potrošnja u jednom danu - lični rekord koji gost sam ispriča.
+  // Najveća potrošnja u jednom danu.
   const najboljiDan = jedan(`
     SELECT strftime('%Y-%m-%d', created_at/1000, 'unixepoch', 'localtime') d, SUM(-amount) iznos
     FROM transactions WHERE player_id=? AND amount < 0
@@ -4046,8 +3536,7 @@ function statistikaIgraca(p, vec) {
     SELECT oi.name ime, SUM(oi.qty) n FROM order_items oi JOIN orders o ON o.id=oi.order_id
     WHERE o.player_id=? AND o.status<>'cancelled' GROUP BY oi.name ORDER BY n DESC LIMIT 1`, id);
 
-  // NEDELJA ZAREDOM: koliko je uzastopnih nedelja gost bio bar jednom.
-  // Broji se unazad od tekuće nedelje - prekid od jedne nedelje prekida niz.
+  // Uzastopne nedelje sa bar jednom posetom, unazad od tekuće.
   const nedelje = db.prepare(`
     SELECT DISTINCT strftime('%Y-%W', started_at/1000, 'unixepoch', 'localtime') w
     FROM sessions WHERE player_id=? ORDER BY w DESC`).all(id).map((r) => r.w);
@@ -4080,16 +3569,9 @@ function statistikaIgraca(p, vec) {
   };
 }
 
-// KLJUČ NEDELJE - ISTI KAO SQLite-ov %W.
-//
-// Posete se u bazi grupišu po `strftime('%Y-%W')`: nedelja počinje ponedeljkom,
-// a dani pre prvog ponedeljka su nedelja 00. Niz "nedelja zaredom" se broji
-// poređenjem sa ovim ključem, pa on mora da bude isti do dana. Ranija formula je
-// brojala drugačije i razilazila se svake nedelje (dan) i oko Nove godine - niz
-// se prekidao baš vikendom, kad igraonica radi najviše.
-//
-// Dan u godini se računa od ponoći do ponoći, zaokruživanjem: dan prelaska na
-// letnje vreme traje 23 sata, pa bi deljenje sa odsecanjem pomerilo sve iza njega.
+// Ključ nedelje, isti kao SQLite-ov %W (nedelja počinje ponedeljkom, dani pre
+// prvog ponedeljka su nedelja 00). Dan u godini se računa zaokruživanjem, jer
+// dan prelaska na letnje vreme traje 23 sata.
 export function kljucNedelje(ms) {
   const t = new Date(ms);
   const ponoc = new Date(t.getFullYear(), t.getMonth(), t.getDate());
@@ -4098,11 +3580,7 @@ export function kljucNedelje(ms) {
   return `${t.getFullYear()}-${String(w).padStart(2, "0")}`;
 }
 
-// Izbor izgleda se PROVERAVA NA SERVERU, ne samo skriva u launcheru.
-//
-// Launcher zaključane stvari prikazuje sivo i ne da da se kliknu - ali launcher
-// je na računaru igrača. Ko pošalje poruku mimo njega, dobija isti odgovor kao
-// da je kliknuo: ne može dok ne stigne do nivoa.
+// Izgled profila se proverava na serveru (nivo, VIP).
 export function sacuvajProfilIgraca(playerId, { boja, okvir } = {}) {
   const p = db.prepare("SELECT xp, profil, vip_do FROM players WHERE id=?").get(playerId);
   if (!p) return { error: "Nalog ne postoji" };
@@ -4113,8 +3591,7 @@ export function sacuvajProfilIgraca(playerId, { boja, okvir } = {}) {
   if (boja != null) {
     const vipBoja = !!vip.VIP_BOJE[boja];
     if (!BOJE_IMENA[boja] && !vipBoja) return { error: "Nepoznata boja" };
-    // VIP boje se NE mogu zaraditi nijednim nivoom. Kad bi mogle, VIP bi bio
-    // samo prečica - a prečica se ne kupuje.
+    // VIP boje se ne zarađuju nivoom.
     if (vipBoja && !jeVip) return { error: "Ova boja ide uz VIP." };
     if (!vipBoja && boja !== "bela" && !smeDa(p.xp, "boja")) {
       return { error: `Boja imena se otključava na ${OTKLJUCAVANJA.boja.nivo}. nivou` };
@@ -4136,28 +3613,21 @@ export function sacuvajProfilIgraca(playerId, { boja, okvir } = {}) {
 
 // ---------- NADOGRADNJA LAUNCHERA ----------
 //
-// Pravila i zasto su takva stoje u nadogradnja.js. Ovde je odluka KOME se i
-// KADA salje.
+// Pravila su u nadogradnja.js; ovde je kome se i kada šalje.
 
-// Racunar na kom neko sedi se ne dira.
-//
-// Nadogradnja gasi launcher i vraca ga tek posle instalacije. Usred placenog
-// sata to je oduzeto vreme gostu i posao radniku koji mora da objasni sta se
-// desilo. Zato mora sve troje: da je povezan, da nije zauzet i da nema sesiju
-// u toku. "locked" (zakljucan od osoblja) i "idle" (prijavni ekran) su jedina
-// dva stanja u kojima za tim racunarom sigurno niko ne igra.
+// Nadograđuje se samo računar koji je na vezi, nije zauzet i nema sesiju:
+// stanje "idle" (ekran prijave) ili "locked".
 function smeNadogradnju(c) {
   if (!isClientOnline(c.id)) return false;
   if (c.current_session_id) return false;
   return c.status === "idle" || c.status === "locked";
 }
 
-// Posle slanja se ceka - druga najava ne bi ubrzala nista, a mogla bi da
-// pokrene drugo preuzimanje preko prvog koje jos traje.
+// Posle najave se čeka, da se ne pokrene drugo preuzimanje preko prvog.
 const nadogradnjaPoslato = new Map(); // computerId -> { verzija, ts }
 const NADOGRADNJA_PAUZA = 10 * 60 * 1000;
 
-// Stanje po racunaru vidi vlasnik u panelu, isto kao za instalacije.
+// Stanje nadogradnje po računaru, za panel.
 const nadogradnjaStatus = new Map(); // computerId -> { verzija, state, message, ts }
 
 export function nadogradnjaStanje() {
@@ -4171,8 +3641,7 @@ export function nadogradnjaStanje() {
       verzija: v,
       online: isClientOnline(c.id),
       slobodan: smeNadogradnju(c),
-      // Launcher iz stare numeracije, ili koji se nikad nije javio, ne
-      // nadograđuje se sam (odbija "manji" broj). Zaostaje, ali ide ručno.
+      // Launcher iz stare numeracije (ili koji se nije javio) ide ručno.
       staraNumeracija: stara,
       zaostaje: st.ima ? (stara || !v || nad.uporediVerzije(v, st.verzija) < 0) : false,
       status: nadogradnjaStatus.get(c.id) || null,
@@ -4188,8 +3657,7 @@ export function nadogradnjaStanje() {
   };
 }
 
-// Sta se salje racunaru. Adresu za preuzimanje launcher sklapa SAM, od servera
-// na koji je vec vezan - ovde ide samo sta i koliko. Vidi main.js.
+// Najava za računar. Adresu preuzimanja launcher sklapa sam (vidi main.js).
 function najava(st) {
   return { t: "nadogradnja", verzija: st.verzija, numeracija: nad.NUMERACIJA, sha256: st.sha256, velicina: st.velicina };
 }
@@ -4204,7 +3672,7 @@ export function posaljiNadogradnju(ids, actor = "vlasnik", automatski = false) {
   let poslato = 0, zauzeto = 0, vecImaju = 0, rucno = 0;
   for (const c of trazeni) {
     const v = c.launcher_version || null;
-    // Stara numeracija odbija "manji" broj - takav računar ide ručno.
+    // Stara numeracija ide ručno.
     if ((c.launcher_numeracija || 0) < nad.NUMERACIJA) { rucno++; continue; }
     if (v && nad.uporediVerzije(v, st.verzija) >= 0) { vecImaju++; continue; }
     if (!smeNadogradnju(c)) { zauzeto++; continue; }
@@ -4224,12 +3692,8 @@ export function posaljiNadogradnju(ids, actor = "vlasnik", automatski = false) {
   return { ok: true, poslato, zauzeto, vecImaju, rucno };
 }
 
-// Racunari se nadograde SAMI, cim se oslobode.
-//
-// Jedna provera u razmaku pokriva sve puteve kojima masina postaje slobodna -
-// kraj sesije, zakljucavanje od osoblja, ponovno povezivanje posle restarta.
-// Da se kacilo na svaki od tih dogadjaja posebno, prvi zaboravljen bi ostavio
-// racunar zauvek na staroj verziji, a to se ne bi ni primetilo.
+// Računari se nadograđuju čim se oslobode. Jedna periodična provera pokriva
+// sve puteve (kraj sesije, zaključavanje, povratak posle restarta).
 export function nadogradnjaTick() {
   const st = nad.stanje();
   if (!st.ima || !st.pusteno) return;
@@ -4242,8 +3706,7 @@ function clientNadogradnjaStatus(computerId, msg) {
   nadogradnjaStatus.set(computerId, st);
   broadcastPanels({ t: "nadogradnja" });
   if (stanje === "greska") {
-    // Racunar koji je pukao mora da sme da proba ponovo, bez cekanja pauze -
-    // inace bi jedno prekinuto preuzimanje zakljucalo masinu na deset minuta.
+    // Posle greške računar sme odmah ponovo, bez pauze.
     nadogradnjaPoslato.delete(computerId);
     logEvent({ category: "racunar", action: "nadogradnja_greska", actor: "sistem", target: compName(computerId),
       detail: `Nadogradnja nije uspela: ${st.message}` });
@@ -4254,15 +3717,10 @@ function clientNadogradnjaStatus(computerId, msg) {
   }
 }
 
-// Uspeh se ne prijavljuje - dokazuje se.
-//
-// Racunar koji instalira gasi svoj launcher, pa ne moze da javi "gotovo je".
-// Jedini pouzdan dokaz je da se vratio i predstavio NOVOM verzijom; tek tada
-// se u panelu upisuje da je nadogradnja uspela.
+// Uspeh se potvrđuje kad se računar vrati i javi novom verzijom.
 function nadogradnjaPoPovratku(comp, verzija, numeracija) {
   const cekao = nadogradnjaStatus.get(comp.id);
   if (!cekao || !verzija) return;
-  // Isti broj iz druge numeracije nije dokaz ničega.
   if (numeracija !== nad.NUMERACIJA) return;
   if (nad.uporediVerzije(verzija, cekao.verzija) < 0) return;
   nadogradnjaStatus.set(comp.id, { verzija, state: "gotovo", message: "Nadogradnja uspela", ts: Date.now() });
@@ -4271,28 +3729,18 @@ function nadogradnjaPoPovratku(comp, verzija, numeracija) {
     detail: `Launcher nadograđen na ${verzija}` });
 }
 
-// Wake-on-lan
-// Klijent javi svoje mrežne kartice; biramo MAC one čija se IP poklapa sa
-// adresom koju server vidi (LAN kartica, ne VPN/VirtualBox), pa čuvamo za paljenje.
+// Wake-on-LAN
+// Launcher javlja mrežne kartice; bira se MAC kartice čija IP adresa odgovara
+// onoj koju server vidi (LAN, ne VPN).
 function normalizeMac(mac) {
   const hex = String(mac || "").replace(/[^0-9a-fA-F]/g, "");
   if (hex.length !== 12 || /^0+$/.test(hex)) return null;
   return hex.toUpperCase().match(/.{2}/g).join(":");
 }
 function clientSysInfo(computerId, msg) {
-  // FABRICKI SERVISNI PIN SE PRIJAVLJUJE, NE PRECUTKUJE.
-  //
-  // Launcher javlja da li mu je servisni PIN jos uvek 1234. Taj PIN cuva ulaz u
-  // podesavanja i izlaz iz kioska kad server ne radi - dok je fabricki, igrac
-  // koji iscupa mrezni kabl moze da preusmeri masinu na svoj server i tako sebi
-  // otvori besplatnu igru. Menja se rucno po masini, pa se na trinaestoj
-  // zaboravi, a zaboravljeno se nikad ne primeti samo od sebe.
-  //
-  // Isti pristup kao za fabricku lozinku vlasnika: sistem to ne moze da popravi
-  // umesto coveka, ali moze da stoji crveno dok se ne popravi.
-  //
-  // Stariji launcheri ovo ne salju. Tada se NE dira ono sto vec znamo - prazno
-  // polje znaci "ne javlja", ne "sve je u redu".
+  // Launcher javlja da li mu je servisni PIN još fabrički; panel to prikazuje
+  // po računaru. Stariji launcher ovo ne šalje, i tada se poznato stanje ne
+  // menja.
   if (typeof msg.fabrickiPin === "boolean") {
     const staro = db.prepare("SELECT pin_fabricki FROM computers WHERE id=?").get(computerId)?.pin_fabricki;
     const novo = msg.fabrickiPin ? 1 : 0;
@@ -4309,14 +3757,14 @@ function clientSysInfo(computerId, msg) {
   const nics = Array.isArray(msg.nics) ? msg.nics : (msg.mac ? [{ ip: null, mac: msg.mac }] : []);
   if (!nics.length) return;
   const c = db.prepare("SELECT ip, mac FROM computers WHERE id=?").get(computerId);
-  // kartica čija IP odgovara onoj koju server vidi = prava LAN kartica
+  // Kartica čija IP adresa odgovara onoj koju server vidi.
   let chosen = (c && c.ip && nics.find((n) => n.ip === c.ip)) || nics[0];
   const mac = normalizeMac(chosen && chosen.mac);
   if (!mac || (c && c.mac === mac)) return;
   db.prepare("UPDATE computers SET mac=? WHERE id=?").run(mac, computerId);
   pushComputers();
 }
-// magic packet: 6x 0xFF pa 16x ponovljen MAC (102 bajta)
+// Magic packet: 6 x 0xFF, pa 16 puta MAC (102 bajta).
 function magicPacket(mac) {
   const bytes = mac.split(":").map((h) => parseInt(h, 16));
   const packet = Buffer.alloc(102, 0xff);
@@ -4333,7 +3781,7 @@ function sendWol(mac) {
       try { sock.setBroadcast(true); } catch {}
       let pending = 2, ok = false;
       const done = (err) => { if (!err) ok = true; if (--pending === 0) { try { sock.close(); } catch {} resolve(ok); } };
-      // klasični WoL portovi 9 i 7, na broadcast adresu
+      // WoL portovi 9 i 7, na broadcast adresu.
       sock.send(packet, 0, packet.length, 9, "255.255.255.255", done);
       sock.send(packet, 0, packet.length, 7, "255.255.255.255", done);
     });
@@ -4355,5 +3803,5 @@ export async function wakeAll(actor) {
   return { ok: true, sent, total: rows.length };
 }
 
-// Inicijalizuj keš aktivne smene iz baze (npr. posle restarta servera)
+// Keš otvorene smene iz baze (posle restarta servera).
 activeShiftId = getActiveShift()?.id ?? null;

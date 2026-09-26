@@ -2,21 +2,11 @@ import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
 import { KOREN, radniFolder, ugasiLaunchere, putanjaElektrona } from "./_okruzenje.mjs";
-// KLIK NA IGRU MORA DA STIGNE DO BAZE
+// Klik na igru mora da stigne do baze.
 //
-// Kad igrac pokrene igru, launcher javi serveru { t: "game_start", gameId }.
-// Taj jedan podatak nosi tri stvari:
-//
-//   - igracu se skoro igrane igre vracaju na pocetak police
-//   - vlasnik u izvestaju vidi sta se stvarno igra
-//   - u Logovima stoji ko je sta pokrenuo i kada
-//
-// Sve troje je bilo mrtvo, i to tiho: plocica igre je u sebe upisivala samo
-// putanju, argumente i naziv - BEZ id-a. Slalo se gameId: undefined, server ne
-// bi nasao igru i vratio bi se bez ijedne greske. Tabela pokretanja je ostajala
-// prazna zauvek, a nista u programu to nije prijavljivalo.
-//
-// Ovo se ne vidi iz koda: trazi pravi klik na pravu plocicu i pogled u bazu.
+// Launcher pri pokretanju salje { t: "game_start", gameId }. Od toga zavise
+// redosled police (skoro igrane prve), izvestaj vlasnika i zapis u Logovima.
+// Proverava se da plocica nosi id igre i da pravi klik upise pokretanje u bazu.
 //
 //   node proba-pokretanje-igre.mjs
 const PORT = 8201;

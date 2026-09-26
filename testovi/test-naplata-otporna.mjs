@@ -1,23 +1,11 @@
 import { radniFolder, podigniServer, ucitajWebSocket, citajIzvor, brojac } from "./_okruzenje.mjs";
 const WebSocket = await ucitajWebSocket();
-// NAPLATA IDE KROZ SVE MASINE, I JEDNA NE SME DA ZAUSTAVI OSTALE
+// Naplata ide kroz sve masine, i greska na jednoj ne zaustavlja ostale.
 //
-// `billingTick` je jedna petlja kroz SVE aktivne sesije - u igraonici kroz svih
-// trinaest masina. Pozivalac (index.js) hvata gresku, pa server ne pada. Ali to
-// nije dovoljno: greska na trecoj sesiji prekida petlju, pa se masine od cetvrte
-// do trinaeste tog prolaza ne naplate. A posto se puca na istom mestu pri svakom
-// prolazu, one se ne naplate NIKAD.
-//
-// Rezultat bi bio najgori moguci: devet racunara igra besplatno, server izgleda
-// zdravo, i nigde ne pise zasto - otkrilo bi se tek pri obracunu smene.
-//
-// STA SE OVDE MERI, A STA NE
-//
-// Meri se ono sto se posteno moze izmeriti: da jedan prolaz naplati SVE masine
-// koje igraju, i to jednako. Sam pad jedne sesije se ne glumi - baza ga ne da
-// (strani kljucevi drze `sessions` vezanu za postojeceg igraca i racunar), pa bi
-// svaka simulacija bila laz. Da je telo petlje zasticeno i da se kvar zapisuje
-// proverava se nad izvorom.
+// `billingTick` je jedna petlja kroz sve aktivne sesije. Meri se da jedan prolaz
+// naplati sve masine koje igraju, jednako. Pad jedne sesije se ne glumi (strani
+// kljucevi ga ne dozvoljavaju); da je telo petlje zasticeno i da se kvar
+// zapisuje proverava se nad izvorom.
 const BASE = "http://127.0.0.1:8201";
 const DATA = radniFolder("naplata-otporna");
 await podigniServer(DATA, 8201);

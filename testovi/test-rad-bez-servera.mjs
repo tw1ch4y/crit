@@ -1,10 +1,7 @@
 import { citajIzvor, brojac } from "./_okruzenje.mjs";
-// RAD BEZ SERVERA - DA JE LAUNCHER STVARNO POVEZAN SA RAČUNOM
-//
-// Račun je proveren na dva mesta: test-lokalna-sesija (brojke, bez mreže) i
-// test-offline-naplata (pravi server). Ali oba proveravaju delove za sebe. Ovde
-// se čuva ono što ih spaja u launcheru - svaka od ovih veza, kad pukne, izgleda
-// isto kao da rad bez servera ne postoji: sat stoji, igra radi besplatno.
+// Rad bez servera: veze u launcheru između računa (test-lokalna-sesija) i
+// servera (test-offline-naplata). Kad bilo koja pukne, sat stoji i igra radi
+// besplatno.
 //
 // Ponašanje u pravom Electronu, sa serverom koji se stvarno ugasi, meri
 // proba-bez-servera.mjs.

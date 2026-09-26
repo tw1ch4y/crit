@@ -6,21 +6,10 @@ import { NUMERACIJA, uporediVerzije, verzijaIzImena, izStareNumeracije, brojIzIm
 
 // ---------- NADOGRADNJA LAUNCHERA ----------
 //
-// Do sada je svaka izmena launchera znacila obilazak svih trinaest masina:
-// USB, instalacija, cekanje, sledeca. Pola sata posla za ispravku od jednog
-// reda, pa se ispravke i odlazu dok se "ne skupi nekoliko" - a to znaci da
-// poznata greska nedeljama radi u igraonici.
-//
-// Ovde server drzi JEDAN instalater, a racunari ga sami preuzimaju. Tri
-// pravila drze to bezbednim:
-//
-//  1. Fajl sam po sebi ne znaci nista. Dok ga covek ne PUSTI U RAD, niko ga
-//     ne skida. Losa verzija tako ne moze da se razlije na sve masine samo
-//     zato sto je neko prekopirao fajl.
-//  2. Racunar na kom neko sedi se ne dira. Nadogradnja gasi launcher; usred
-//     placenog sata to je ukradeno vreme.
-//  3. Sta se skinulo mora da bude tacno ono sto server ima. Uz najavu ide
-//     otisak (sha256), a racunar odbija da pokrene fajl koji se ne poklapa.
+// Server drži jedan instalater, a računari ga preuzimaju sami:
+//   1. instalater se ne preuzima dok ga serviser ne pusti u rad;
+//   2. računar na kom neko igra se ne nadograđuje;
+//   3. uz najavu ide sha256, a računar ne pokreće fajl koji se ne poklapa.
 
 export const FOLDER = path.join(DATA_DIR, "nadogradnja");
 
@@ -28,10 +17,8 @@ export const FOLDER = path.join(DATA_DIR, "nadogradnja");
 // alati za pakovanje). Ovde se samo prosleđuju dalje.
 export { NUMERACIJA, uporediVerzije, verzijaIzImena, izStareNumeracije };
 
-// Racunanje otiska je citanje celog instalatera - oko sto megabajta. Panel
-// stanje trazi pri svakom osvezavanju, pa bi bez pamcenja server na svakih
-// nekoliko sekundi prezvakao ceo fajl. Pamti se po imenu, velicini i vremenu
-// izmene: promeni li se bilo sta od toga, racuna se ponovo.
+// Otisak se pamti po imenu, veličini i vremenu izmene, da se instalater od
+// 100 MB ne čita pri svakom osvežavanju panela.
 const otisci = new Map(); // putanja -> { velicina, mtime, sha256 }
 function otisak(put, st) {
   const stari = otisci.get(put);
@@ -67,14 +54,8 @@ export function nadjiInstalater() {
   return nadjeno;
 }
 
-// Puštena verzija se pamti kao TEKST verzije, ne kao "da/ne".
-//
-// Da stoji samo "pusteno: da", prekopiran nov fajl bi nasledio odobrenje
-// prethodnog i odmah krenuo na sve masine - bas ono sto pravilo 1 sprecava.
-// Ovako svaka nova verzija trazi svoju odluku.
-//
-// Uz broj ide i oznaka numeracije (vidi verzije.js): odluka zapisana u staroj
-// numeraciji ne važi, jer je ista brojka u novoj drugi program.
+// Puštena verzija se pamti kao broj verzije, ne kao "da/ne", pa svaki nov
+// instalater traži svoju odluku. Uz broj ide oznaka numeracije (verzije.js).
 const OZNAKA_PUSTENE = `n${NUMERACIJA}:`;
 export const pustenaVerzija = () => {
   const v = String(getSetting("nadogradnja_pustena") || "");
@@ -117,10 +98,8 @@ export function spremiFolder() {
   return FOLDER;
 }
 
-// Fajl koji stize preko panela se prvo pise pod privremenim imenom, pa se tek
-// na kraju preimenuje. Prekinut prenos tako ostavlja ".deo" fajl koji nijedna
-// masina nece uzeti, umesto pola instalatera sa ispravnim imenom - a taj bi
-// se skidao na racunare i tamo pucao bez razumljivog razloga.
+// Fajl iz panela se piše kao ".deo" i preimenuje na kraju, pa prekinut
+// prenos ne ostavlja pola instalatera sa ispravnim imenom.
 export function putanjaZaUpis(ime) {
   const cisto = path.basename(String(ime || "")).replace(/[^\w .()\-]/g, "");
   if (!/\.exe$/i.test(cisto)) return { error: "Instalater mora biti .exe fajl" };
@@ -151,9 +130,8 @@ export function obrisi(ime) {
 export function listaFajlova() {
   let fajlovi = [];
   try { fajlovi = fs.readdirSync(FOLDER); } catch { return []; }
-  // Stari instaleri se prikazuju (da bi mogli da se obrišu), ali posle novih.
-  // Fajl koji nestane između čitanja foldera i čitanja veličine se preskače -
-  // inače bi jedno brisanje oborilo celu stranu.
+  // Stari instaleri se prikazuju posle novih (da mogu da se obrišu). Fajl koji
+  // nestane u međuvremenu se preskače.
   return fajlovi
     .filter((i) => /\.exe$/i.test(i) && (verzijaIzImena(i) || izStareNumeracije(i)))
     .map((ime) => {

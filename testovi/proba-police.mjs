@@ -1,27 +1,14 @@
-// POLICA IGARA SE STVARNO POMERA, NE SAMO STO JE CSS NAPISAN
+// Polica igara se stvarno pomera dok se skroluje (ozivipolicu u launcher.js):
+// nagib u smeru kretanja, paralaksa omota i dubina na ivicama. Meri se u pravom
+// Electronu:
 //
-// Polica dobija tri stvari dok se skroluje (vidi ozivipolicu u launcher.js):
-// nagib u smeru kretanja, paralaksu omota unutar okvira i dubinu - utisavanje
-// plocica koje polica sece na ivici. Sve troje radi JavaScript kroz CSS
-// promenljive, pa se iz koda ne vidi da li se stvarno mice - jedini dokaz je da
-// se vrednosti promene dok polica klizi.
-//
-// Ovde se meri bas to, u pravom Electronu:
-//
-//   1. u miru je nagib nula, a dubina vec postavljena (zavisi od polozaja)
-//   2. usred naglog skrolovanja nagib i paralaksa NISU nula
+//   1. u miru je nagib nula, a dubina postavljena (zavisi od polozaja)
+//   2. usred naglog skrolovanja nagib i paralaksa nisu nula
 //   3. kad se stane, oboje se vrate na nulu
 //   4. kad igrac ugasi animacije, nista se ne postavlja
-//   5. RED OSTAJE PRAV - ni u miru ni usred kretanja
+//   5. naslovi igara ostaju u istoj liniji, u miru i u kretanju
 //
-// Peta stvar je tu zbog greske koju prve cetiri nisu videle. Dubina je prvo
-// SKUPLJALA okvir (scale), a ime igre stoji UNUTAR tog okvira (.tile-scrim je
-// dete .tile-media). Naslovi na polici zato nisu stajali u istoj liniji: razlika
-// je bila oko 13px i izgledala je kao pokvaren red, ne kao dubina. Svaka
-// provera je i dalje prolazila, jer su sve merile da li se vrednost promenila -
-// nijedna da li polica posle toga lepo izgleda.
-//
-// Ne treba mu server: katalog se salje rucno, kao i u probi klikova.
+// Server nije potreban: katalog se salje rucno, kao u probi klikova.
 //
 //   node proba-police.mjs
 import fs from "node:fs";

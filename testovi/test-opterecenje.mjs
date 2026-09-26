@@ -1,15 +1,8 @@
 import { radniFolder, podigniServer, ucitajWebSocket } from "./_okruzenje.mjs";
 const WebSocket = await ucitajWebSocket();
-// SVIH TRINAEST RACUNARA ODJEDNOM
-//
-// Dosad je svaka provera radila sa jednim ili dva racunara. Igraonica puna u
-// subotu uvece izgleda drugacije: trinaest launchera na istoj vezi, svi salju
-// prijave, porudzbine i pokretanja igara u isto vreme, a panel sve to prima
-// uzivo. Greske koje se tu vide ne postoje kad se radi u miru - dve porudzbine
-// u istom trenutku nad istom zalihom, sesija naplacena dvaput, poruka koja se
-// izgubi jer je red pun.
-//
-// Zato se ovde pusta prava stvar: pravi WebSocket, pravi server, pravi upisi.
+// Svih trinaest racunara odjednom: pravi WebSocket, pravi server i pravi upisi.
+// Porudzbine nad istom zalihom, prijave i pokretanja u isto vreme, panel koji sve
+// prima uzivo.
 const PORT = 8185;
 const BASE = `http://127.0.0.1:${PORT}`;
 const WSB = `ws://127.0.0.1:${PORT}`;
@@ -87,17 +80,12 @@ proveri("svaki racunar ima svog igraca",
 
 // ---- 13 PORUDZBINA ODJEDNOM NAD ISTOM ZALIHOM ----
 //
-// Zaliha je 20, a trinaest racunara trazi po 2 komada = 26. Sest komada mora da
-// bude odbijeno, a stanje ne sme da ode u minus.
+// Zaliha je 20, a trinaest racunara trazi po 2 komada = 26. Sest mora da bude
+// odbijeno, a stanje ne sme u minus.
 //
-// STA OVO ZAPRAVO DOKAZUJE (provereno gasenjem transakcija):
-// zalihu ovde ne cuva transakcija nego to sto je server jednonitan a upis u
-// bazu sinhron - dva zahteva se nikad ne preklope nasred posla. Test prolazi i
-// bez transakcija. One cuvaju od DRUGE stvari: prekida nasred posla (nestanak
-// struje izmedju skidanja zalihe i naplate), a to proverava test-jedan-posao,
-// koji bez njih pada sa 14/14 na 9/14.
-//
-// Zapisano da neko ne bi zakljucio da je jedno dokaz za drugo.
+// Ovo cuva jednonitni server sa sinhronim upisom, ne transakcija (test prolazi
+// i bez nje). Transakcije cuvaju od prekida nasred posla; to proverava
+// test-jedan-posao.
 veze.forEach((ws) => ws.send(JSON.stringify({ t: "order", items: [{ id: artikal.id, qty: 2 }], payment: "credit" })));
 await cekaj(3000);
 

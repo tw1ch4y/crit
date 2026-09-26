@@ -1,21 +1,10 @@
-// PAKET SE PROVERAVA TAKO ŠTO SE POKRENE, NE TAKO ŠTO SE POGLEDA
+// Proverava paket za USB pokretanjem.
 //
 //   node alati/proveri-paket.mjs
 //
-// ZAŠTO POSTOJI
-//
-// `napravi-paket.mjs` sklapa folder za USB, a `test-paket.mjs` čita njegov kod i
-// proverava da su pravila na mestu. Nijedno od toga ne pušta ono što će stvarno
-// otići u igraonicu.
-//
-// A tu se lomilo: paket je jednom otišao sa bazom koja nije nosila poslednje
-// izmene (SQLite ih je držao u WAL-u, a kopiranje je uzimalo samo `crit.db`), pa
-// je čišćenje „orphana" odmah zatim obrisalo i omote igara kojih u toj bazi
-// nema. Sve je izgledalo uredno dok se ne stigne na lice mesta.
-//
-// Ovaj alat diže server IZ SAME KUTIJE i prolazi kroz ono što igraonica radi
-// prvog dana: otvara panel, traži katalog i povlači svaku sliku koju baza
-// pominje. Traje dvadesetak sekundi i pušta se pre nego što USB krene.
+// Diže server iz samog paketa i radi ono što igraonica radi prvog dana:
+// otvara panel, traži katalog i preuzima svaku sliku koju baza pominje.
+// Traje dvadesetak sekundi.
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -24,8 +13,7 @@ const KOREN = path.join(import.meta.dirname, "..");
 const BREND = JSON.parse(fs.readFileSync(path.join(KOREN, "igraonica.json"), "utf8"));
 const PAKET = path.join(path.dirname(KOREN), `${BREND.ime.toUpperCase().replace(/\s+/g, "-")}-ZA-IGRAONICU`);
 const SRV = path.join(PAKET, "1 - SERVER (glavni racunar)");
-// Namerno nije 8095: server igraonice ume da radi na ovom istom računaru dok se
-// paket proverava, a dva servera na istom portu se ne dižu.
+// Drugi port, jer server igraonice može da radi na istom računaru.
 const PORT = process.env.PORT || "8211";
 
 const cekaj = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -40,8 +28,8 @@ if (!fs.existsSync(SRV)) {
 
 console.log(`\nPROVERA PAKETA\n  ${PAKET}\n`);
 
-// Server se diže iz kutije, sa podacima iz kutije - ništa se ne uzima iz
-// projekta. To je cela poenta.
+// Server se diže iz paketa, sa podacima iz paketa; ništa se ne uzima iz
+// projekta.
 const server = spawn(process.execPath, [path.join(SRV, "src", "index.js")], {
   env: { ...process.env, PORT, CRIT_DATA_DIR: path.join(SRV, "data") },
   stdio: ["ignore", "pipe", "pipe"], cwd: SRV,
@@ -84,10 +72,7 @@ proveri(`prečice u paketu (${alati.length})`, alati.length > 0);
 proveri(`artikli u paketu (${shop.length})`, shop.length > 0);
 proveri(`računari u paketu (${comps.length})`, comps.length > 0);
 
-// ---- SVAKA SLIKA KOJU BAZA POMINJE SE STVARNO OTVARA ----
-//
-// Ovo je provera zbog koje alat i postoji: baza i fajlovi su dve stvari, i
-// razilaze se tiho.
+// ---- Svaka slika koju baza pominje se stvarno preuzima ----
 const fali = [];
 for (const g of igre) {
   if (!g.image) { fali.push(`omot: ${g.name}`); continue; }

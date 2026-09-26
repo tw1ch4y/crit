@@ -6,34 +6,21 @@ import { NUMERACIJA } from "./verzije.js";
 
 // ---------- PAKET ZA NADOGRADNJU SERVERA ----------
 //
-// Server se do sada nadograđivao rukom: ugasi, prekopiraj src\ i public\,
-// pokreni. Na jednom računaru to nije mnogo posla - ali se radi pored šanka,
-// za vreme rada, i jedan pogrešan folder (data\ umesto src\) briše igraonicu.
+// Ovde su oblik i provera paketa; zamenu radi nadzornik (zamena-servera.js).
 //
-// Paket je jedan fajl koji se otpremi u panelu. Ovde je samo njegov oblik i
-// provera; zamenu radi nadzornik (vidi zamena-servera.js), jer server ne može
-// da zameni sam sebe dok radi.
-//
-// OBLIK (ceo sadržaj je gzip):
+// Oblik (ceo sadržaj je gzip):
 //   8 bajtova   OZNAKA
 //   4 bajta     dužina opisa (big-endian)
 //   opis        JSON: { v, numeracija, verzija, napravljen, fajlovi: [{ put, velicina, sha256 }] }
-//   fajlovi     sadržaji, jedan za drugim, redom iz opisa
+//   fajlovi     sadržaji redom iz opisa
 //
-// Bez tar-a i bez zavisnosti: server ima dve biblioteke i ne treba mu treća da
-// bi pročitao sopstveni paket.
-//
-// ŠTA SE PROVERAVA PRE NEGO ŠTO SE IŠTA RASPAKUJE:
-//   - svaki fajl ima otisak (sha256) - pokvaren prenos ne prolazi
-//   - putanja sme samo u src\, public\ (bez uploads), node_modules\ i u
-//     nekoliko fajlova na vrhu. Nikad data\, nikad "..", nikad apsolutna.
-//     Paket koji bi pisao po bazi ili van foldera servera se ne otvara.
-//   - veličina posle raspakivanja je ograničena - fajl od par megabajta koji
-//     se raspakuje u desetine gigabajta ne sme da napuni disk servera
-//   - paket nosi package.json i src/index.js, i verzija u opisu je ista kao u
-//     package.json - inače bi panel pokazivao jednu verziju a radila bi druga
-//   - paket je iz tekuće numeracije (vidi verzije.js) - stari 2.58.0 je po
-//     broju "noviji" od v1.0.0, a nije
+// Pre raspakivanja se proverava:
+//   - otisak (sha256) svakog fajla;
+//   - putanje: samo src\, public\ (bez uploads), node_modules\ i nekoliko
+//     fajlova na vrhu; nikad data\, ".." ni apsolutna putanja;
+//   - veličina posle raspakivanja je ograničena;
+//   - paket nosi package.json i src/index.js, sa istom verzijom kao u opisu;
+//   - paket je iz tekuće numeracije (verzije.js).
 
 export const OZNAKA = Buffer.from("SRVPAK01", "ascii");
 export const NAJVECI_RASPAKOVAN = 300 * 1024 * 1024;

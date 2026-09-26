@@ -13,17 +13,11 @@ export const db = new DatabaseSync(path.join(DATA_DIR, "crit.db"));
 db.exec("PRAGMA journal_mode = WAL;");
 db.exec("PRAGMA foreign_keys = ON;");
 
-// ---- JEDAN POSAO, JEDAN UPIS ----
+// ---- Jedna transakcija ----
 //
-// Porudžbina nije jedan upis nego pet: red u orders, stavke, skidanje zalihe,
-// novo stanje kredita i zapis u transactions. Bez ovoga svaki od njih sam sebe
-// potvrđuje, pa nestanak struje između trećeg i četvrtog ostavlja igraonicu u
-// stanju u kom je piće skinuto sa stanja, a kredit nije naplaćen. Nestanak
-// struje je ovde najizvesniji događaj, pa to nije teorija.
-//
-// SAVEPOINT umesto BEGIN: SQLite ne dozvoljava BEGIN unutar BEGIN-a, a poslovi
-// se pozivaju jedan iz drugog (prodaja paketa zove dopunu kredita). Sa
-// savepoint-ima se ugnežđivanje ponaša ispravno.
+// Poslovi sa novcem imaju više upisa (porudžbina: red, stavke, zaliha, kredit,
+// istorija) i moraju da prođu zajedno. SAVEPOINT umesto BEGIN, jer se poslovi
+// pozivaju jedan iz drugog (prodaja paketa zove dopunu).
 let dubinaPosla = 0;
 export function uJednomPoslu(fn) {
   const ime = `p${dubinaPosla}`;
@@ -256,8 +250,7 @@ function columnExists(table, col) {
   return db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
 }
 function migrate() {
-  // Ugasen nalog (otpusten radnik). Ne brise se, jer smene i promet moraju da
-  // znaju KO je sta uradio - bez toga obracun smene nema smisla.
+  // Ugašen nalog radnika; ne briše se, smene i promet nose njegovo ime.
   if (!columnExists("admins", "active")) db.exec("ALTER TABLE admins ADD COLUMN active INTEGER NOT NULL DEFAULT 1");
   if (!columnExists("shop_items", "image")) db.exec("ALTER TABLE shop_items ADD COLUMN image TEXT");
   if (!columnExists("orders", "payment")) db.exec("ALTER TABLE orders ADD COLUMN payment TEXT NOT NULL DEFAULT 'credit'");
@@ -269,76 +262,41 @@ function migrate() {
   if (!columnExists("games", "banner")) db.exec("ALTER TABLE games ADD COLUMN banner TEXT");
   if (!columnExists("games", "available")) db.exec("ALTER TABLE games ADD COLUMN available INTEGER NOT NULL DEFAULT 1");
   if (!columnExists("shop_items", "stock")) db.exec("ALTER TABLE shop_items ADD COLUMN stock INTEGER"); // NULL = neograničeno
-  // Igračeva pozadina: šara koju je sam izabrao u launcheru, na svom nalogu.
-  // Čuva se kao tekst (JSON) jer su to tri sitna izbora koja se ne pretražuju.
+  // Igračeva šara, kao JSON.
   if (!columnExists("players", "tema")) db.exec("ALTER TABLE players ADD COLUMN tema TEXT");
-  // Verzija launchera na tom računaru. Bez nje se u igraonici sa 13 mašina ne
-  // može znati koja je gde instalirana - jedan računar se ponaša drugačije, a
-  // nigde ne piše zašto. Upisuje se pri svakom povezivanju.
+  // Verzija launchera, upisuje se pri svakom povezivanju.
   if (!columnExists("computers", "launcher_version")) db.exec("ALTER TABLE computers ADD COLUMN launcher_version TEXT");
-  // Numeracija verzija koju launcher javlja uz verziju (vidi verzije.js).
-  // 0 = stara numeracija, ili launcher koji se nikad nije javio.
+  // Numeracija verzija (verzije.js); 0 = stara ili se nije javio.
   if (!columnExists("computers", "launcher_numeracija")) {
     db.exec("ALTER TABLE computers ADD COLUMN launcher_numeracija INTEGER NOT NULL DEFAULT 0");
   }
-  // Da li je servisni PIN launchera na toj masini jos fabricki (1234). NULL =
-  // launcher to ne javlja (starija verzija), sto NIJE isto sto i "u redu je".
+  // Da li je servisni PIN na računaru još fabrički. NULL = launcher to ne javlja.
   if (!columnExists("computers", "pin_fabricki")) db.exec("ALTER TABLE computers ADD COLUMN pin_fabricki INTEGER");
   // konačne brojke smene se čuvaju pri zatvaranju (da se ne preračunavaju iz logova)
   if (!columnExists("shifts", "total_shop_cash")) db.exec("ALTER TABLE shifts ADD COLUMN total_shop_cash REAL");
   if (!columnExists("shifts", "total_sessions")) db.exec("ALTER TABLE shifts ADD COLUMN total_sessions REAL");
   // Kad je igrač poslednji put zavrteo nagradni točak - da ne može više puta nedeljno.
   if (!columnExists("players", "last_spin_at")) db.exec("ALTER TABLE players ADD COLUMN last_spin_at INTEGER");
-  // ISKUSTVO: jedan potrosen dinar = jedan XP. Stoji na igracu, ne racuna se iz
-  // prometa - promet se sece pri odrzavanju (stari logovi se brisu), pa bi se
-  // nivo igraca tiho vratio unazad onog dana kad odrzavanje prodje.
+  // Iskustvo stoji na igraču, ne računa se iz prometa (stari logovi se seku).
   if (!columnExists("players", "xp")) db.exec("ALTER TABLE players ADD COLUMN xp REAL NOT NULL DEFAULT 0");
-  // Izgled profila: boja imena i okvir oko znaka. Kao tekst (JSON), jer su to
-  // dva sitna izbora koja se ne pretrazuju. Odvojeno od `tema` (sara) da se
-  // citanje sare ne kvari kad se doda jos nesto na profil.
+  // Izgled profila (boja imena, okvir), kao JSON; odvojeno od `tema`.
   if (!columnExists("players", "profil")) db.exec("ALTER TABLE players ADD COLUMN profil TEXT");
-  // TOČAK: koliko puta je vrteo i koliko je ukupno dobio.
-  //
-  // `last_spin_at` pamti samo POSLEDNJI spin, a značke traže broj. Broj se ne
-  // može izvući ni iz `transactions` (spin bez dobitka ne upisuje ništa) ni iz
-  // logova (održavanje ih seče po starosti, pa bi značka "10 spinova" jednog
-  // dana tiho nestala sa profila gosta koji je stvarno vrteo trideset puta).
-  // Zato stoji na igraču, kao i XP, i iz istog razloga.
+  // Broj spinova i ukupan dobitak sa točka, za značke (`last_spin_at` pamti
+  // samo poslednji, a logovi se seku).
   if (!columnExists("players", "spinova")) db.exec("ALTER TABLE players ADD COLUMN spinova INTEGER NOT NULL DEFAULT 0");
   if (!columnExists("players", "spin_dobitak")) db.exec("ALTER TABLE players ADD COLUMN spin_dobitak REAL NOT NULL DEFAULT 0");
-  // VIP: DOKLE vazi clanarina, ne da li je aktivna.
-  //
-  // Zastavica "jeste/nije" bi trazila da neko svakog dana prolazi kroz sve
-  // naloge i gasi istekle - a taj posao se preskoci onog dana kad server ne radi,
-  // pa gost ostane VIP zauvek. Rok se ne kvari: prosao je ili nije.
+  // VIP važi do roka; zastavicu bi neko morao svakog dana da gasi.
   if (!columnExists("players", "vip_do")) db.exec("ALTER TABLE players ADD COLUMN vip_do INTEGER");
-  // OBRISAN NALOG (vreme brisanja). Nalog se ne briše fizički: uz njega idu
-  // transakcije i sesije iz kojih se računaju izveštaji. Vidi deletePlayer.
+  // Vreme brisanja naloga; nalog ostaje zbog izveštaja (deletePlayer).
   if (!columnExists("players", "obrisan")) db.exec("ALTER TABLE players ADD COLUMN obrisan INTEGER");
   // Isto za računar: uz njega idu sesije i porudžbine. Vidi obrisiRacunar.
   if (!columnExists("computers", "obrisan")) db.exec("ALTER TABLE computers ADD COLUMN obrisan INTEGER");
-  // KOLIKO JE SEKUNDI SESIJE NAPLAĆENO.
-  //
-  // Launcher broji sekunde i dok servera nema, pa kad se vrati javi koliko je
-  // sesija ukupno trajala. Naplaćuje se razlika između toga i ovoga - bez
-  // poređenja satova dva računara, i bez duple naplate kad isti izveštaj stigne
-  // dvaput. Iz `cost` se ovo ne može izvući: cena po satu se menja, a naplata
-  // staje na nuli kredita. Vidi server/src/offline.js.
+  // Koliko je sekundi sesije naplaćeno; server naplaćuje razliku prema
+  // izveštaju launchera (offline.js). Iz `cost` se to ne može izvući.
   if (!columnExists("sessions", "sekundi")) db.exec("ALTER TABLE sessions ADD COLUMN sekundi REAL NOT NULL DEFAULT 0");
 
-  // KVAR OSTAJE ZAPISAN UZ SAMU IGRU, NE SAMO U LOGOVIMA.
-  //
-  // Kad igra neće da se pokrene, launcher to javi serveru - ali se do sada
-  // završavalo kao jedan red u Logovima i kratka poruka koja prođe preko ekrana.
-  // Vlasnik je to video samo ako je baš u tom trenutku gledao u panel.
-  //
-  // A najčešći uzrok je prečica koja fali na JEDNOJ mašini od trinaest: gost
-  // slegne ramenima i pokrene nešto drugo, niko ne prijavi, i tako mesecima.
-  // Zato poslednji neuspeh stoji na samom redu - vlasnik otvori Igre i vidi
-  // koja, gde i zašto.
-  //
-  // Pamti se samo POSLEDNJI: spisak svih neuspeha je posao logova, a ovde treba
-  // odgovor na jedno pitanje - radi li ova stavka sada.
+  // Poslednji neuspeh pokretanja stoji uz samu igru ili prečicu (kada, gde,
+  // zašto), da vlasnik na strani Igre vidi šta ne radi i na kom računaru.
   for (const tabela of ["games", "tools"]) {
     if (!columnExists(tabela, "kvar_kad")) db.exec(`ALTER TABLE ${tabela} ADD COLUMN kvar_kad INTEGER`);
     if (!columnExists(tabela, "kvar_razlog")) db.exec(`ALTER TABLE ${tabela} ADD COLUMN kvar_razlog TEXT`);
@@ -365,10 +323,8 @@ function seed() {
     currency: "RSD",
     rate_per_hour: "120", // dinara na sat
     unlock_pin: "1234", // PIN koji osoblje kuca da otkljuca racunar
-    // Šara i animacija su uključene od početka - inače sveža igraonica izgleda
-    // ravno i niko ne zna da to postoji dok ne pretraži podešavanja. Postavlja
-    // se SAMO ako ključ nikad nije upisan: ko je namerno izabrao "bez šare",
-    // njegov izbor ostaje (getSetting vrati "nema", nije null, pa se preskoči).
+    // Šara je uključena od početka; postavlja se samo ako ključ nikad nije
+    // upisan, pa izbor "bez šare" ostaje.
     tekstura: "crit",
     tekstura_jacina: "srednje",
     tekstura_kretanje: "talas",
@@ -417,15 +373,8 @@ function seed() {
     console.log("Ubacen primer shop artikala");
   }
 
-  // BIBLIOTEKA INSTALACIJA
-  // Strana "Instalacije" je bila prazna, pa je vlasnik morao sam da trazi
-  // linkove i tihe argumente za svaki program. Ovo su programi koji trebaju
-  // svakoj igraonici. Svaki link je proveren da stvarno vraca instalaciju, ne
-  // HTML stranicu - mrtav link je gori od prazne strane, jer radnik klikne
-  // "Instaliraj" i dobije gresku nasred smene.
-  //
-  // Tihi argumenti se razlikuju po tome cime je instalacija pravljena:
-  //   NSIS -> /S     Inno -> /silent     MSI -> /qn
+  // Biblioteka instalacija: programi potrebni svakoj igraonici, sa proverenim
+  // linkovima. Tihi argumenti: NSIS /S, Inno /silent, MSI /qn.
   const progCount = db.prepare("SELECT COUNT(*) c FROM programs").get().c;
   if (progCount === 0) {
     const ins = db.prepare("INSERT INTO programs (name, url, args, note, created_at) VALUES (?,?,?,?,?)");
@@ -473,8 +422,7 @@ function seed() {
     console.log("Ubacen primer vremenskog paketa (5h za 500)");
   }
 
-  // Nagradni točak: podrazumevani prag i nagrade. Isključen dok ga vlasnik ne
-  // upali - da ne deli kredit pre nego što odluči šta i koliko.
+  // Nagradni točak je isključen dok ga vlasnik ne uključi.
   if (getSetting("tocak_ukljucen") === null) setSetting("tocak_ukljucen", "0");
   if (getSetting("tocak_prag") === null) setSetting("tocak_prag", "1200");
   const nagCount = db.prepare("SELECT COUNT(*) c FROM tocak_nagrade").get().c;

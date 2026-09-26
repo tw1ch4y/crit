@@ -2,21 +2,11 @@ import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
 import { KOREN, radniFolder, ugasiLaunchere, putanjaElektrona } from "./_okruzenje.mjs";
-// POKRECE SE SAMO ONO STO JE SERVER POSLAO
+// Pokrece se samo ono sto je server poslao.
 //
-// Ekran launchera trazi pokretanje preko mosta (`launch-game`), a most do sada
-// nije proveravao STA se trazi - prosledjivao je svaku putanju. Dok je ekran
-// ispravan, tu nema problema: on nudi samo ono sto je stiglo sa servera, a sve
-// sto ulazi u stranu prolazi kroz bekstvo teksta.
-//
-// Ali to znaci da izmedju igraca i "pokreni bilo sta na ovom racunaru" stoji
-// JEDNA JEDINA pretpostavka - da se u ekran nikad nista ne ubaci. Ovo je kiosk
-// na masini za kojom sedi tinejdzer koji ima vremena; takva pretpostavka ne sme
-// da bude jedina brava.
-//
-// Ovde se most gadja direktno, bas kao sto bi ga gadjao ubacen kod: trazi se
-// pokretanje programa koji NIJE u katalogu. Mora da bude odbijen, i mora da
-// ostane zapis - pokusaj pokretanja necega van spiska nije greska u kucanju.
+// Most `launch-game` odbija putanju koja nije u katalogu i ostavlja zapis o
+// pokusaju. To je druga brava pored `esc()` u ekranu: vazi i ako se u stranu
+// ubaci kod. Ovde se most gadja direktno programom van kataloga.
 //
 //   node proba-pokretanje-van-kataloga.mjs
 const PORT = 8207;

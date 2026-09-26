@@ -97,11 +97,7 @@ proveri("porudzbina igraca takodje javlja zalihu",
 
 // ---- OTKAZANA PORUDZBINA VRACA PICE NA STANJE ----
 //
-// Zaliha se skidala pri porucivanju, a pri otkazivanju se nije vracala nikad -
-// kredit jeste, zaliha ne. Svako otkazivanje je time trajno "pojelo" po jedno
-// pice iz evidencije. Kroz mesec dana stanje u panelu je nize od onoga sto
-// stvarno stoji u frizideru: launcher pise "Rasprodato" nad punim sanducima, a
-// traka za dopunu doziva radnika na artikle kojih ima.
+// Otkazivanje vraca i kredit i zalihu.
 const stanje = async (id) => (await api("/api/shop")).find((x) => x.id === id)?.stock;
 
 await api("/api/shop", "POST", { name: "Test Povratak", category: "Test", price: 100, stock: 10 });

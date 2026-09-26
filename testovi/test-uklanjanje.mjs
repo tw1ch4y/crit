@@ -1,13 +1,9 @@
 import { radniFolder, podigniServer, ucitajWebSocket, brojac } from "./_okruzenje.mjs";
 const WebSocket = await ucitajWebSocket();
-// UKLANJANJE STVARI KOJE IMAJU ISTORIJU, I PROVERA ONOGA ŠTO SE KUCA
+// Uklanjanje stvari koje imaju istoriju, i provera onoga što se kuca.
 //
-// Računar i artikal se ne mogu obrisati kao prazan red: na njih pokazuju sesije
-// i porudžbine, a baza ima uključene strane ključeve. Dok se to nije gledalo,
-// brisanje korišćenog računara i prodatog pića vraćalo je "Greška na serveru".
-//
-// Uz to: iznosi smene i PIN-ovi se proveravaju pre upisa. Tekst umesto broja je
-// zatvarao smenu "bez razlike", a prazan PIN je otključavao računar praznim unosom.
+// Računar i artikal na koje pokazuju sesije i porudžbine ne brišu se kao prazan
+// red (strani ključevi). Iznosi smene i PIN-ovi se proveravaju pre upisa.
 const PORT = 8233;
 const BASE = `http://127.0.0.1:${PORT}`, WSB = `ws://127.0.0.1:${PORT}`;
 await podigniServer(radniFolder("uklanjanje-data"), PORT);

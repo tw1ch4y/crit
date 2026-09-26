@@ -1,15 +1,11 @@
-// Pregled PANELA (strana za osoblje).
-// Launcher ima svoj alat; panel do sada nije imao nijedan, a osoblje ga gleda
-// po ceo dan. Slika svaku stranu i meri isto sto i kod launchera: sta ispada iz
-// ekrana, koji je tekst odsecen, i koliko je strana stvarno popunjena.
+// Pregled panela: slika svaku stranu i meri sta ispada iz ekrana, koji je tekst
+// odsecen i koliko je strana popunjena.
 //
 //   node pregled-panela.mjs                 sve strane, 1920x1080 i 1366x768
 //   node pregled-panela.mjs --rez 1366x768  samo jedna rezolucija
 //   node pregled-panela.mjs --strana igraci samo jedna strana
 //
-// Kod koji se izvrsava U STRANI stoji u zasebnim fajlovima (u-strani/*.js), ne
-// kao tekst unutar teksta. Ranije je bio ugnjezden i escape se lomio na svakoj
-// izmeni - fajl se generisao sa greskom i alat je tiho visio.
+// Kod koji se izvrsava u strani je u zasebnim fajlovima (u-strani/*.js).
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -20,15 +16,8 @@ const OVDE = path.dirname(fileURLToPath(import.meta.url));
 const KOREN = path.join(OVDE, "..");
 const arg = (ime, p) => { const i = process.argv.indexOf("--" + ime); return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : p; };
 const PORT = arg("port", "8096");
-// TELEFON JE TREĆA REZOLUCIJA, I NIJE DODATAK.
-//
-// Radnik panel drži na telefonu, kraj kase: tu prima porudžbine, dopunjava
-// kredit i zatvara smenu. Panel za to ima ceo svoj raspored (donja traka umesto
-// bočnog menija, profil u vrhu, upozorenja pomerena dole) - a nijedan alat ga
-// nikad nije pogledao na toj širini. Merile su se samo dve veličine ekrana koje
-// kraj kase niko ne koristi.
-//
-// 412x915 je tipičan Android; uže od toga je danas retko.
+// Treća rezolucija je telefon (412x915, tipičan Android): panel na uskom
+// ekranu ima svoj raspored (donja traka, profil u vrhu, upozorenja dole).
 const REZOLUCIJE = arg("rez", "1920x1080,1366x768,412x915").split(",").map((r) => { const [w, h] = r.split("x").map(Number); return { w, h, ime: `${w}x${h}` }; });
 const SAMO = arg("strana", "");
 const RADNO = path.join(OVDE, ".radno", "pregled-panela");
@@ -83,14 +72,9 @@ fs.writeFileSync(path.join(RADNO, "u-strani", "mere.js"), `(() => {
   // Koliko je strana stvarno popunjena: dokle dopire sadrzaj u odnosu na
   // raspolozivu visinu. Skoro prazna strana je znak da nesto fali.
   const dno = [...(main ? main.children : [])].map((e) => e.getBoundingClientRect().bottom).sort((a, b) => b - a)[0] || 0;
-  // TRI STANJA NA SVEMU STO SE KLIKCE: prelazak, pritisak, fokus.
-  //
-  // Panel se koristi i sa TELEFONA, jednom rukom, dok neko ceka za kasom - tamo
-  // se pritisak vidi umesto kursora i jedini je znak da je dodir primljen. A
-  // radnik za kasom radi tastaturom: Tab kroz spisak, Enter na naplatu. Do sada
-  // je pritisak imalo pet elemenata, a fokus samo dugmad i kvacice.
-  //
-  // Pravila se citaju iz STVARNIH stilova strane, ne iz izvora.
+  // Tri stanja na svemu sto se klikce: prelazak, pritisak, fokus. Panel se koristi
+  // i sa telefona (pritisak je jedina potvrda dodira) i tastaturom na kasi (fokus).
+  // Pravila se citaju iz stvarnih stilova strane, ne iz izvora.
   const bezStanja = (() => {
     const pravila = { hover: [], pritisak: [], fokus: [] };
     // Uzima se deo selektora DO stanja: ".switch:active .slider" znaci da

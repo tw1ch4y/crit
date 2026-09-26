@@ -2,17 +2,11 @@ import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
 import { KOREN, radniFolder, putanjaElektrona } from "./_okruzenje.mjs";
-// PRAVI LAUNCHER I OTKUCAJ SERVERA
+// Pravi launcher i ping servera.
 //
-// Server od sada pinguje svaku vezu i GASI onu koja ne odgovori do sledeceg
-// ping-a. To resava racunar kome je iscupan kabl (vidi test-mrtva-veza), ali
-// nosi i rizik: ako pravi launcher iz bilo kog razloga ne odgovori na ping,
-// svih trinaest racunara bi ispadalo sa mreze svakih trideset sekundi. To bi
-// bilo gore od greske koja se popravlja.
-//
-// Zato se ovde pusta PRAVI launcher i gleda se dva puna kruga ping-a. Nista od
-// ovoga se ne vidi iz koda: odgovor na ping salje sama biblioteka, duboko ispod
-// nase logike.
+// Server gasi vezu koja ne odgovori na ping do sledeceg (vidi test-mrtva-veza).
+// Ovde se proverava da pravi launcher odgovara i da veza izdrzi dva puna kruga
+// ping-a.
 //
 //   node proba-veza.mjs
 const PORT = 8189;

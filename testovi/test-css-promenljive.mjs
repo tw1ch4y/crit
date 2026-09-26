@@ -1,19 +1,7 @@
 import { citajIzvor, brojac } from "./_okruzenje.mjs";
-// PROMENLJIVA KOJE NEMA OBARA CELO PRAVILO, I TO BEZ IJEDNE GRESKE
-//
-// `transition: background var(--t-brzo)` izgleda ispravno. Ako `--t-brzo` nigde
-// nije definisano, CSS ne prijavi nista - samo odbaci celo pravilo. Prelaz onda
-// ne radi. Ni konzola, ni pregledac, ni test nista ne kazu; covek koji gleda
-// ekran vidi da je "nekako suvo" i ne zna zasto.
-//
-// Tako je u launcheru bilo DESET animacija i PET prelaza koji nisu radili
-// (`--ease-out`, `--t-brzo`), naslov nagradnog tocka nije bio u gaming fontu
-// (`--font-naslov`), a u panelu izabrana sara nije imala vidljiv okvir jer je
-// pisalo `var(--brand)` umesto `var(--accent)`.
-//
-// Ovde se proverava samo ono sto je STVARNO opasno: upotreba BEZ rezerve.
-// `var(--mono, monospace)` je u redu i kad `--mono` ne postoji - rezerva je tu
-// bas za to.
+// CSS promenljiva koja nije definisana obara celo pravilo bez ikakve greske
+// (npr. `transition: background var(--t-brzo)`). Proverava se svaka upotreba
+// bez rezerve; `var(--mono, monospace)` je u redu i kad `--mono` ne postoji.
 const { proveri, kraj } = brojac();
 
 // Komentari objasnjavaju sta je bilo, pa smeju da pominju imena kojih vise nema.

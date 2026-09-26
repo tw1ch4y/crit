@@ -1,15 +1,12 @@
 import { radniFolder, podigniServer, ucitajWebSocket, brojac } from "./_okruzenje.mjs";
 const WebSocket = await ucitajWebSocket();
-// ISKUSTVO SE ZARADJUJE, NE POKLANJA
+// Iskustvo se zaradjuje: jedan potrosen dinar = jedan XP. Racun nivoa proverava
+// test-nivoi.mjs; ovde:
 //
-// Jedan potrosen dinar = jedan XP. Ovde se ne proverava racun nivoa (to radi
-// test-nivoi.mjs, bez servera) nego ono sto se moze pokvariti tek u igraonici:
-//
-//   - da POTROSNJA donosi iskustvo, a DOPUNA ne
-//   - da poklonjen kredit i nagrada sa tocka NE donose - inace je tocak precica
-//     do nivoa, a nivo prestaje da znaci da je neko igrao
-//   - da se zakljucane stvari ne mogu uzeti mimo launchera
-//   - da igrac odmah vidi da je presao nivo
+//   - potrosnja donosi iskustvo, dopuna ne
+//   - poklonjen kredit i nagrada sa tocka ne donose
+//   - zakljucane stvari se ne mogu uzeti mimo launchera
+//   - igrac odmah vidi da je presao nivo
 const BASE = "http://127.0.0.1:8187", WSB = "ws://127.0.0.1:8187";
 await podigniServer(radniFolder("xp-data"), 8187);
 const { proveri, kraj } = brojac();

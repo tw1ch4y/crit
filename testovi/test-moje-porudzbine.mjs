@@ -104,10 +104,8 @@ proveri("posle ponovne prijave spisak je tu", ponovo.porudzbine.length === 2, JS
 
 // --- klijentski deo: koje se prikazuju i GDE ---
 //
-// Isti spisak je ranije stajao i u Shop-u i na nalogu, sa dva razlicita
-// markupa. Igrac je istu stvar vidjao dvaput, a svaka izmena je morala na dva
-// mesta. Sada spisak zivi samo na nalogu, a Shop nosi jednu liniju dok se
-// porudzbina sprema.
+// Spisak porudzbina je samo na nalogu; Shop nosi jednu liniju dok se porudzbina
+// sprema.
 const izvor = citajIzvor("client/renderer/js/launcher.js");
 proveri("spisak porudzbina postoji na nalogu", /function sekcijaPorudzbine\(\)/.test(izvor));
 proveri("aktivne se izdvajaju od ranijih", /const aktivne = aktivnePorudzbine\(\)/.test(izvor));

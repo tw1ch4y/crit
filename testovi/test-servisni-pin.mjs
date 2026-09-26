@@ -1,17 +1,10 @@
 import { radniFolder, podigniServer, ucitajWebSocket, citajIzvor } from "./_okruzenje.mjs";
 const WebSocket = await ucitajWebSocket();
-// FABRICKI SERVISNI PIN SE PRIJAVLJUJE, NE PRECUTKUJE.
+// Fabricki servisni PIN se prijavljuje u panelu.
 //
-// Servisni PIN launchera cuva dve stvari koje server ne moze da pokrije:
-// ulaz u podesavanja launchera i izlaz iz kioska KAD SERVER NE RADI. Dok stoji
-// na fabrickom 1234, igrac koji iscupa mrezni kabl sacekaj par sekundi da se
-// pojavi "Promeni adresu servera", ukuca 1234 i preusmeri masinu na svoj
-// server - i time sebi otvori besplatnu igru.
-//
-// Menja se rucno, po masini, u podesavanja.json. Rucni korak se zaboravi bas na
-// onoj trinaestoj masini, a zaboravljeno se nikad ne primeti samo od sebe.
-// Launcher to ne moze da popravi umesto coveka, ali moze da PRIJAVI - pa panel
-// stoji crveno dok se ne popravi. Isti pristup kao za fabricku lozinku vlasnika.
+// PIN cuva ulaz u podesavanja launchera i izlaz iz kioska kad server ne radi.
+// Dok je 1234, launcher to javlja i panel stoji crveno, isto kao za fabricku
+// lozinku vlasnika.
 const BASE = "http://127.0.0.1:8174", WSB = "ws://127.0.0.1:8174";
 await podigniServer(radniFolder("servisni-pin-data"), 8174);
 

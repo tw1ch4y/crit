@@ -1,14 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { KOREN, citajIzvor } from "./_okruzenje.mjs";
-// Font launchera. Chakra Petch je UGRADJEN u paket - ne skida se sa interneta i
-// ne zavisi od toga sta je instalirano na racunaru igraca.
-//
-// Najveca opasnost ovde nije da nesto pukne, nego da se tiho pokvari: ako font
-// nema nasa slova ili ako fajlovi ne udju u instaler, pregledac bez ijedne
-// greske uzme sistemski font. Onda u istoj reci stoje dva pisma i sve izgleda
-// jeftino - a primeti se tek na ekranu u igraonici.
-// Da li font STVARNO ima slova proverava:  node proba-fonta.mjs
+// Font launchera (Chakra Petch) je ugradjen u paket. Proverava se da fajlovi
+// postoje, da idu u instaler i da latin-ext pokriva nasa slova; bez toga
+// pregledac tiho uzme sistemski font.
+// Da li font stvarno ima slova proverava:  node proba-fonta.mjs
 
 let pao = 0, prosao = 0;
 const proveri = (n, u, d = "") => { if (u) { prosao++; console.log("  OK   " + n); } else { pao++; console.log("  PAO  " + n + (d ? "  -> " + d : "")); } };

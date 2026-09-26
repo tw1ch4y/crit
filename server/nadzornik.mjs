@@ -1,18 +1,15 @@
-// NADZORNIK SERVERA - šta radi i zašto piše u src/nadzor.js.
+// Nadzornik servera (odluke su u src/nadzor.js).
 //
 //   node nadzornik.mjs             pokreće server i drži ga
-//   node nadzornik.mjs --provera   isto, ali samo iza nadzornika koji je nestao
-//                                  bez urednog gašenja (vidi PROVERA niže)
+//   node nadzornik.mjs --provera   isto, ali samo ako je prethodni nadzornik
+//                                  nestao bez urednog gašenja
 //
-// Pokreće ga zakazani zadatak pri paljenju računara ("Podesi autostart.bat"),
-// ili ručno "Pokreni server.bat". Uredno se gasi:
-//   - kad se u data\ pojavi fajl "nadzor-stani" (tako ga gasi VRATI-KOPIJU.bat,
-//     i to bez administratora, iako zadatak radi kao SYSTEM)
-//   - na Ctrl+C i kad se zatvori prozor u kom radi
+// Pokreće ga zakazani zadatak pri paljenju računara ("Podesi autostart.bat")
+// ili ručno "Pokreni server.bat". Uredno se gasi kad se u data\ pojavi fajl
+// "nadzor-stani", na Ctrl+C i pri zatvaranju prozora.
 //
-// Uz to izvodi nadogradnju servera sa panela: server javi da je paket spreman
-// i ugasi se, a nadzornik zameni kod i podigne novu verziju - ili vrati staru,
-// ako se nova ne javi (vidi src/zamena-servera.js).
+// Izvodi i nadogradnju servera sa panela: zamenjuje kod i diže novu verziju,
+// ili vraća staru ako se nova ne javi (src/zamena-servera.js).
 import { spawn, execFile } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
@@ -45,9 +42,8 @@ const OPIS = {
   nadogradnja: "nova verzija", vracena: "vraćena prethodna verzija", nadzornik: "posle nestanka nadzornika",
 };
 
-// Zapis nadzornika ide u fajl, jer kad radi kao zakazani zadatak nema prozora
-// u koji bi išao. Seče se na četvrt megabajta kad pređe megabajt: server koji
-// pada u krug ne sme da napuni disk.
+// Zapis ide u fajl (zadatak radi bez prozora); seče se na četvrt megabajta
+// kad pređe megabajt.
 function log(tekst) {
   const red = `[${new Date().toISOString()}] ${tekst}`;
   console.log(red);
@@ -81,9 +77,8 @@ let proveraNove = null;       // nova verzija je pokrenuta i čeka se da se javi
 // Pre svakog pokretanja: nedovršena zamena se vraća, a zatražena se izvodi.
 async function prePokretanja(razlog) {
   if (nedovrsena(MARKER)) {
-    // Zapis stoji: prethodna zamena nije potvrđena. Ili je nova verzija pala pri
-    // pokretanju, ili se nije javila na vreme, ili je računar ostao bez struje
-    // usred zamene. U svakom od tih slučajeva staro se vraća.
+    // Nepotvrđena prethodna zamena (nova verzija pala, nije se javila, ili je
+    // nestalo struje): vraća se stara.
     const z = nedovrsena(MARKER);
     const r = vrati({ folderServera: OVDE, marker: MARKER });
     const nova = proveraNove?.verzija || "nova verzija";
@@ -121,7 +116,7 @@ async function prePokretanja(razlog) {
   return razlog;
 }
 
-// Nova verzija se potvrđuje tek kad se javi sa SVOJIM brojem. Server koji radi,
+// Nova verzija se potvrđuje tek kad se javi sa svojim brojem. Server koji radi,
 // a javlja stari broj, znači da zamena nije uzela.
 setInterval(async () => {
   if (!proveraNove) return;
@@ -224,19 +219,11 @@ async function ugasi(zasto) {
   process.exit(0);
 }
 
-// PROVERA NA 5 MINUTA ("--provera", drugi zakazani zadatak).
-//
-// Nadzornik ugašen silom - iz Task Manager-a, ili ga Windows ubije kad ostane
-// bez memorije - povuče i server: Windows gasi Node dete zajedno sa roditeljem.
-// A "ponovo pri grešci" zakazanog zadatka važi za zadatak koji ne uspe da
-// KRENE, ne za program koji je posle ugašen. Server bi ostao ugašen do sledećeg
-// paljenja računara.
-//
-// Zato drugi zadatak na svakih 5 minuta pokreće nadzornika sa --provera, a on
-// diže server samo kad je prethodni nadzornik NESTAO: nadzor.json ostaje iza
-// nadzornika koji je ubijen, a briše ga svako uredno gašenje. Namerno ugašen
-// server (VRATI-KOPIJU, uklanjanje autostarta) tako ostaje ugašen - osim kad je
-// ostavljen fajl nadzor-pokreni. Dok nadzornik radi, ovog drugog odbije brava.
+// Provera na 5 minuta (--provera, drugi zakazani zadatak). Nadzornik ugašen
+// silom povlači i server, a "ponovo pri grešci" zakazanog zadatka to ne
+// pokriva. Server se diže samo ako je nadzor.json ostao (briše ga svako
+// uredno gašenje) ili ako postoji fajl nadzor-pokreni. Dok nadzornik radi,
+// drugog odbija brava.
 let razlogStarta = "start";
 let opisStarta = "";
 if (PROVERA) {
@@ -247,16 +234,9 @@ if (PROVERA) {
   if (nestao && os.uptime() > 10 * 60) razlogStarta = "nadzornik";
 }
 
-// JEDAN NADZORNIK PO PORTU.
-//
-// Brava je port na lokalnoj adresi, a ne fajl: fajl sa PID-om ostane i kad
-// nadzornik umre bez pozdrava (nestanak struje), a Windows posle restarta isti
-// broj da nekom drugom procesu - pa bi server zauvek "već radio". Port oslobodi
-// sam Windows, u trenutku kad proces nestane.
-//
-// Drugi nadzornik (dupli klik na "Pokreni server.bat" dok zadatak već radi)
-// ovde sazna da nije sam i izađe uredno, sa kodom 0 - da ga zakazani zadatak ne
-// bi ponovo pokretao.
+// Jedan nadzornik po portu. Brava je port na lokalnoj adresi, ne fajl sa
+// PID-om, jer port oslobađa Windows čim proces nestane. Drugi nadzornik izlazi
+// sa kodom 0, da ga zakazani zadatak ne pokreće ponovo.
 const brava = net.createServer();
 brava.on("error", (e) => {
   if (e.code === "EADDRINUSE") {

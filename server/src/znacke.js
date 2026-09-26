@@ -1,24 +1,10 @@
-// ZNAČKE
+// Značke.
 //
-// Nivo kaže KOLIKO je neko trošio. Značka kaže ŠTA je radio - i to je ono što
-// se pamti i prepričava: "ja imam Maratonca", "meni fali još jedna za Sve po
-// redu". Nivo je jedan broj koji svi imaju; značke su ono po čemu se profil
-// jednog gosta razlikuje od profila drugog.
-//
-// SVE SE RAČUNA IZ ONOGA ŠTO VEĆ POSTOJI U BAZI.
-//
-// Ništa se ne broji unapred i ništa se ne upisuje kad se značka zaradi. To je
-// namerno i to je najvažnija odluka ovde: gost koji dolazi šest meseci otvori
-// profil prvog dana kad ovo stigne i zatekne dvadeset zarađenih značaka, a ne
-// prazan ekran uz "kreni da skupljaš". Sistem koji počinje od nule kažnjava baš
-// one goste koji su najduže tu.
-//
-// Cena tog izbora je da se značke računaju pri svakom otvaranju profila. Zato
-// sve stoji na jednom prolazu kroz statistiku (vidi statistikaIgraca u
-// service.js), a ne na upitu po znački.
-//
-// Prag se bira tako da PRVA značka u nizu padne brzo (da se vidi da sistem
-// postoji), a poslednja da bude stvarno teška.
+// Sve se računa iz podataka koji već postoje u bazi, bez upisa kad se značka
+// zaradi, pa gost koji dolazi mesecima odmah vidi zarađene značke. Računaju se
+// pri svakom otvaranju profila, iz jednog prolaza kroz statistiku
+// (statistikaIgraca u service.js). Prva značka u nizu dolazi brzo, poslednja
+// je teška.
 
 // Grupe postoje da spisak od tridesetak značaka ne bude zid. Redosled je
 // redosled prikaza.
@@ -30,11 +16,8 @@ export const GRUPE = {
   odanost: { naziv: "Odanost", opis: "Koliko dugo i koliko redovno" },
 };
 
-// `uslov` dobija statistiku igrača i vraća:
-//   broj  - dokle je stigao (za traku napretka)
-// `cilj` je koliko treba. Značka je zarađena kad broj >= cilj.
-//
-// Značka bez cilja (cilj: 1) je "desilo se ili nije".
+// `uslov(statistika)` vraća dokle je igrač stigao, `cilj` koliko treba.
+// cilj: 1 znači "desilo se ili nije".
 export const ZNACKE = [
   // ---- VREME ----
   { kljuc: "prvi-put", grupa: "vreme", naziv: "Prvi put", opis: "Prva sesija u igraonici",
@@ -94,7 +77,7 @@ export const ZNACKE = [
   { kljuc: "poseta-100", grupa: "odanost", naziv: "Naš čovek", opis: "100 poseta",
     cilj: 100, uslov: (s) => s.poseta },
   // Nedelja se broji od ponedeljka. Cetiri zaredom znaci da je gost usao u
-  // naviku - to je jedina znacka koja meri REDOVNOST, ne zbir.
+  // naviku - to je jedina znacka koja meri redovnost, ne zbir.
   { kljuc: "redovan", grupa: "odanost", naziv: "Redovan", opis: "4 nedelje zaredom bar jednom",
     cilj: 4, uslov: (s) => s.nedeljaZaredom },
   { kljuc: "clan-godinu", grupa: "odanost", naziv: "Godinu dana", opis: "Godinu dana od upisa",
@@ -103,10 +86,7 @@ export const ZNACKE = [
 
 const broj = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
-// Spisak za launcher: sta je zaradjeno, dokle je stiglo i koliko treba.
-//
-// Vraca SVE znacke, i zaradjene i ne - jer nagrada koja se ne vidi unapred nije
-// nagrada nego iznenadjenje, a iznenadjenje ne tera nikoga da dodje ponovo.
+// Spisak za launcher: sve značke, zarađene i ne, sa napretkom.
 export function znackeZa(statistika) {
   const s = statistika || {};
   return ZNACKE.map((z) => {

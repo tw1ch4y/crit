@@ -1,8 +1,5 @@
-# Menja podesavanja.json instaliranog launchera.
-#
-# Zove se iz dva .bat fajla u istom folderu. Kod stoji OVDE, a ne kao tekst
-# unutar .bat fajla: tamo se nastavak reda (^) i navodnici lome jedno o drugo,
-# pa je PowerShell dobijao samo prvi red komande i pucao.
+# Menja podesavanja.json instaliranog launchera. Zove se iz dva .bat fajla u
+# istom folderu (u .bat fajlu se nastavak reda ^ i navodnici ne slazu).
 #
 #   podesi.ps1 -Rezim proba
 #   podesi.ps1 -Rezim igraonica -Ip 192.168.1.100
@@ -35,27 +32,21 @@ catch { Write-Host "  NE MOGU DA PROCITAM FAJL."; exit 1 }
 
 if ($Rezim -eq "proba") {
   $adresa = "http://127.0.0.1:8095"
-  # Ciscenje i blokada se gase - na racunaru za probu bi obrisali tudje prijave.
+  # Ciscenje i blokada se gase, da proba ne brise prijave na tom racunaru.
   $t = $t -replace '("ciscenjeSesije"\s*:\s*)true', '${1}false'
   $t = $t -replace '("ciscenjeLicnihFascikli"\s*:\s*)true', '${1}false'
   $t = $t -replace '("blokirajPreuzeteProgram"\s*:\s*)true', '${1}false'
-  # Uputstvo obecava da proba NE DIRA zastitu kioska - a launcher je inace sam
-  # primenjuje pri pokretanju: gasi Task Manager i Win tastere, i menja plan
-  # napajanja. Na racunaru na kome se samo proba to je neprijatno iznenadjenje,
-  # a ako launcher bude nasilno ugasen, ostane tako.
-  # Ovaj fajl je prekidac koji launcher trazi (NO_LOCK) - dok postoji, Windows
-  # se ne dira uopste.
+  # bez-zakljucavanja.txt (NO_LOCK u launcheru): dok postoji, launcher ne
+  # menja Windows podesavanja (Task Manager, Win tasteri, plan napajanja).
   $zastava = Join-Path (Split-Path -Parent (Split-Path -Parent $put)) "bez-zakljucavanja.txt"
   try {
     Set-Content -LiteralPath $zastava -Value "Proba na jednom racunaru - launcher ne dira Windows podesavanja. Obrisi ovaj fajl za rad u igraonici." -Encoding UTF8
     Write-Host "  Zastita kioska iskljucena (bez-zakljucavanja.txt)"
   } catch { Write-Host "  PAZNJA: nisam mogao da upisem bez-zakljucavanja.txt - pokreni kao administrator" }
 } else {
-  # Provera adrese stoji OVDE, a ne u .bat fajlu: tamo "set /p" na prazan unos
-  # ume da ostavi razmak umesto nicega, pa je provera prolazila i u fajl je
-  # upisivano "http://:8095" - launcher se posle toga nikad ne bi povezao.
-  # Prima i celu adresu (http://192.168.1.100:8095), jer se ona bas tako prepise
-  # iz prozora servera.
+  # Adresa se proverava ovde jer "set /p" u .bat fajlu na prazan unos ume da
+  # ostavi razmak. Prima i celu adresu (http://192.168.1.100:8095) iz prozora
+  # servera.
   $cist = $Ip.Trim() -replace '^\s*https?://', '' -replace '[:/].*$', ''
   $jeIp = $cist -match '^\d{1,3}(\.\d{1,3}){3}$'
   $jeIme = $cist -match '^[A-Za-z0-9][A-Za-z0-9.-]*$'
@@ -67,16 +58,14 @@ if ($Rezim -eq "proba") {
     Write-Host ""
     exit 1
   }
-  # Zagrade oko promenljive su obavezne: "$cist:8095" PowerShell cita kao ime
-  # opsega (kao $env:PUT) i vrati prazno - adresa je ispadala kao "http://".
+  # "$cist:8095" bi PowerShell procitao kao promenljivu iz opsega (kao $env:X).
   $adresa = "http://$($cist):8095"
-  # Ciscenje licnih fascikli ostaje iskljuceno namerno - na racunarima sa
-  # OneDrive-om bi se brisanje Desktopa i Preuzimanja prenelo u oblak.
+  # Ciscenje licnih fascikli ostaje iskljuceno: sa OneDrive-om bi se brisanje
+  # Desktopa i Preuzimanja prenelo u oblak.
   $t = $t -replace '("ciscenjeSesije"\s*:\s*)false', '${1}true'
   $t = $t -replace '("blokirajPreuzeteProgram"\s*:\s*)false', '${1}true'
-  # Vracanje na igraonicu mora da SKINE prekidac iz probe - inace bi racunar
-  # ostao bez zastite kioska, a niko to ne bi primetio dok igrac ne otvori Task
-  # Manager.
+  # Vracanje na igraonicu skida prekidac iz probe, inace zastita kioska ostaje
+  # iskljucena.
   $zastava = Join-Path (Split-Path -Parent (Split-Path -Parent $put)) "bez-zakljucavanja.txt"
   if (Test-Path -LiteralPath $zastava) {
     try { Remove-Item -LiteralPath $zastava -Force; Write-Host "  Zastita kioska vracena" }

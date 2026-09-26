@@ -3,26 +3,16 @@ import fs from "node:fs";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { KOREN, radniFolder, ugasiLaunchere, putanjaElektrona } from "./_okruzenje.mjs";
-// MIS I ZVUK: DA SE STVARNO PROMENI I DA SE STVARNO VRATI
+// Mis i zvuk: promena mora da stigne do Windows-a, a pri odjavi se vraca
+// zateceno stanje.
 //
-// Igrac sme da namesti mis i zvuk sa svog naloga, jer su Windows podesavanja u
-// kiosku zakljucana. Dve stvari moraju da rade, i obe se vide samo na pravom
-// Windows-u:
-//
-//   1. promena mora da stigne do sistema, ne samo do ekrana launchera
-//   2. pri odjavi se mora vratiti ZATECENO - inace sledeci gost sedne za
-//      racunar sa tudjim mis podesavanjima, i tako kroz ceo dan
-//
-// PAZNJA: ova proba MENJA PODESAVANJA MASINE na kojoj se pusta - brzinu misa,
-// ubrzanje pokazivaca i jacinu zvuka. Na pocetku snima zatecno stanje i vraca ga
-// na kraju, bez obzira na ishod, pa i kad se prekine sa Ctrl+C.
-//
-// Na racunaru na kom se program PISE se ne pusta: tamo covek radi, a prekinuta
-// proba bi mu ostavila promenjenog misa usred posla. Zato se odbija na masini
-// koja nosi CRIT-NE-DIRAJ.txt (isti fajl koji cuva i od ciscenja sesije).
+// PAZNJA: proba menja podesavanja masine na kojoj se pusta (brzina misa,
+// ubrzanje pokazivaca, jacina zvuka). Zateceno stanje se snima na pocetku i
+// vraca na kraju, i kad se proba prekine (Ctrl+C). Na masini sa
+// CRIT-NE-DIRAJ.txt se ne pusta.
 //
 //   node proba-podesavanja.mjs          na masini u igraonici
-//   node proba-podesavanja.mjs --ipak   i na zasticenoj, ako bas mora
+//   node proba-podesavanja.mjs --ipak   i na zasticenoj
 import os from "node:os";
 if (fs.existsSync(path.join(os.homedir(), "CRIT-NE-DIRAJ.txt")) && !process.argv.includes("--ipak")) {
   console.log("  PRESKOCENO  ovaj racunar je zasticen (CRIT-NE-DIRAJ.txt u korisnickom folderu).");
@@ -55,14 +45,9 @@ const vratiSve = async () => {
   try { if (zateceno.zvuk.jacina != null) await winPod.primeniZvuk({ jacina: zateceno.zvuk.jacina }); } catch {}
 };
 
-// VRACANJE I KAD SE PROBA PREKINE.
-//
-// `finally` na kraju hvata gresku u samoj probi, ali ne i Ctrl+C ni neuhvacenu
-// gresku - a bas tada proba stane NA POLA, sa vec promenjenim misem. Covek za
-// tim racunarom bi ostao sa tudjim podesavanjima i ne bi znao odakle mu.
-//
-// Vracanje ide kroz `execFileSync` jer se pri gasenju procesa ne ceka na
-// obecanja: asinhroni poziv bi bio zakazan i nikad izvrsen.
+// Vracanje i kad se proba prekine (Ctrl+C, neuhvacena greska), ne samo u
+// `finally`. Ide kroz `execFileSync` jer se pri gasenju procesa ne ceka na
+// obecanja.
 const vratiSinhrono = () => {
   if (vraceno) return;
   vraceno = true;

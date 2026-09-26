@@ -199,8 +199,8 @@ proveri("ime precice se ne lomi nasred reci", blok(".site-name {").includes("wor
 const saIskrama = await api("/api/tekstura", "POST", { kljuc: "kockice", jacina: "srednje", kretanje: "iskre" });
 proveri("iskre saljemo kao svoje kretanje", saIskrama.body.kretanje === "iskre", JSON.stringify(saIskrama.body.kretanje));
 proveri("uz iskre stize varijanta sare u boji kuce", /^url\("data:image/.test(saIskrama.body.iskra || ""), String(saIskrama.body.iskra).slice(0, 50));
-// Iskra nosi BOJU KUCE - koja god da je. Ranije je ovde stajala upisana crvena,
-// pa bi provera prolazila i da iskra ignorise izbor vlasnika.
+// Iskra nosi boju kuce, koja god da je; proverava se sa bojom iz /api/brend,
+// ne sa upisanom.
 const bojaKuce = (await api("/api/brend")).body.akcenat;
 const uAdresi = "%23" + bojaKuce.slice(1);
 proveri("iskra nosi boju kuce", (saIskrama.body.iskra || "").includes(uAdresi),

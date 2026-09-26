@@ -1,10 +1,6 @@
 import { radniFolder, podigniServer, citajIzvor } from "./_okruzenje.mjs";
-// DALJINSKI TASK MANAGER I BIBLIOTEKA INSTALACIJA
-//
-// "Task Manager" iz panela je otvarao Task Manager NA racunaru igraca: radnik
-// bi morao da ustane i ode do te masine, a igrac bi u medjuvremenu imao Task
-// Manager pred sobom. Sada radnik sa glavnog racunara vidi sta radi na
-// izabranoj masini i gasi zaglavljen program odatle.
+// Daljinski Task Manager i biblioteka instalacija: radnik sa glavnog racunara
+// vidi procese na izabranoj masini i gasi zaglavljen program.
 //
 // Ceo tok kroz pravi launcher (PowerShell popis, taskkill, WebSocket) proverava
 // zaseban alat, jer trazi Electron:

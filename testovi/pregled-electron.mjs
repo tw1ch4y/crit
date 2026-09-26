@@ -294,9 +294,7 @@ const EKRANI = [
   { ime: "9-igra-nece", opis: "Igra ne moze da se pokrene", ocekivan: "desktopScreen",
     do: async (win, p) => {
       posalji(win, p.login); await sacekajPozdrav(win);
-      // Isti tekst koji main.js stvarno posalje (objasniGresku). Ranije je ovde
-      // stajala lepsa poruka nego u stvarnosti, pa je slika krila da igrac
-      // dobija sirovu Windows gresku.
+      // Isti tekst koji main.js stvarno posalje (objasniGresku).
       win.webContents.send("game-error", { name: "Counter-Strike 2", message: "Igra nije pronađena na ovom računaru. Pozovite osoblje." });
       await cekaj(700);
     } },
@@ -378,15 +376,8 @@ const MERE = \`(() => {
     const plocica = document.querySelector(".tile")?.getBoundingClientRect();
     return {
       hero: Math.round(hb.height),
-      // KOLIKO JE GORNJE TRAKE PRAZNO.
-      //
-      // Merilo se preko ".hero-title" i ".hero-poster" - elemenata kojih u ovoj
-      // verziji nema otkad je gore VIP traka. Rezultat je bio prazan, a prazan
-      // se u izvestaju ispisivao kao "(null)": merenje koje CUTI izgleda isto
-      // kao merenje koje kaze "sve je u redu", i tako je ostalo neprimeceno.
-      //
-      // Sada se mere STVARNA deca trake: levi blok (VIP ili promo baner) i
-      // tocak desno. Prazno je ono sto nije nijedno od to dvoje.
+      // Prazan deo gornje trake: mere se stvarna deca trake, levi blok (VIP ili promo
+      // baner) i tocak desno. Prazno je ono sto nije nijedno od to dvoje.
       heroPrazno: (() => {
         const deca = [...h.children].map((e) => e.getBoundingClientRect()).filter((b) => b.width > 0);
         if (!deca.length) return "traka je prazna";
@@ -405,13 +396,8 @@ const MERE = \`(() => {
     naslov: fontOd(".hero-title, .acc-name, .ev-t, .brand-tag"), traka: fontOd(".statusbar"),
   };
 
-  // SHOP: DVA REDA MORAJU DA STANU.
-  //
-  // Kartica nosi cenu i dugme "+" na dnu. Ako drugi red zavrsi ispod ivice,
-  // igrac mora da skroluje da bi uopste video sta kosta - a i da bi kupio.
-  // Ranije se racunalo na prazan Shop; cim igrac ima porudzbinu u toku, traka
-  // "Porudzbina se sprema" pojede pedesetak piksela i drugi red se preseca.
-  // Bas tada igrac i gleda Shop: porucio je i ceka.
+  // Shop: oba reda kartica (cena i dugme "+") moraju da stanu na ekran, i kad
+  // traka "Porudzbina se sprema" zauzme svoje mesto.
   const shop = (() => {
     const g = document.querySelector(".shop-grid");
     const k = g && g.querySelector(".pice");

@@ -2,22 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { KOREN, citajIzvor, brojac } from "./_okruzenje.mjs";
 import { mesta, zamene, oznaka, FAJLOVI_SA_IMENOM } from "../igraonica.mjs";
-// SVAKA IGRAONICA DOBIJA INSTALER SA SVOJIM IMENOM
-//
-// Ime `Crit` je stajalo u instaleru, u precici na desktopu, u imenu foldera u
-// koji se launcher instalira i u alatima za oporavak. Dok je igraonica jedna,
-// to nikome ne smeta. Cim program dobije drugu igraonicu, ona dobija instaler
-// koji se zove tudjim imenom - a njeni alati za oporavak gase proces koji na toj
-// masini ne postoji, i pri tom uredno jave da je sve proslo.
-//
-// OVA PROVERA JE VEC NASLA DVA PROMASAJA pri prvom preimenovanju. Jedan
-// bezazlen (folder sa podesavanjima se ne obrise), drugi opasan: u
-// POPRAVI-RACUNAR.bat je `find` bio zamenjen a `tasklist /FI "IMAGENAME eq ..."`
-// nije - pa bi alat za oporavak zauvek mislio da launcher jos radi. Alat koji se
-// pokrece kad je vec sve otislo naopako mora da radi.
-//
-// Zato se ovde preimenovanje STVARNO IZVRSI (u memoriji, fajlovi se ne diraju) i
-// gleda sta je prezivelo.
+// Svaka igraonica dobija instaler sa svojim imenom: instaler, precica, folder
+// instalacije i alati za oporavak (koji traze proces po imenu). Preimenovanje se
+// izvrsi u memoriji (fajlovi se ne diraju) i proverava se da staro ime nije
+// ostalo nigde.
 const { proveri, kraj } = brojac();
 
 const brend = JSON.parse(citajIzvor("igraonica.json"));
@@ -62,11 +50,8 @@ proveri("precica u autostartu se trazi po imenu igraonice",
 
 // ---- 4) PREIMENOVANJE PROLAZI KROZ SVE ----
 //
-// Ovo je provera koja je nasla prave greske. Preimenuje se u memoriji, pa se
-// gleda da li je igde ostalo staro ime.
-// Probno ime NE SME da lici na pravo. Prvi put je ovde stajalo bas ono ime na
-// koje je igraonica u medjuvremenu preimenovana - pa je provera trazila staro
-// ime, nalazila novo (isto), i prijavila devet gresaka kojih nema.
+// Preimenuje se u memoriji, pa se gleda da li je igde ostalo staro ime. Probno
+// ime ne sme da lici na pravo.
 const PROBNO = "Vrbaska Kockica";
 const NOVO = { ime: PROBNO, launcher: `${PROBNO} Launcher`, oznaka: oznaka(PROBNO), appId: `rs.${oznaka(PROBNO)}.launcher` };
 proveri("probno ime se ne preklapa sa pravim",

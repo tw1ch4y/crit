@@ -1,18 +1,8 @@
 import { citajIzvor, brojac } from "./_okruzenje.mjs";
-// VIP TRAKA NA VRHU POCETNE
+// VIP traka na vrhu pocetne: znak, nivo i traka koja se puni.
 //
-// Zamisljena je kao napredak iz igara: znak, nivo, traka koja se puni, nagrada
-// na kraju. Sam XP sistem jos ne postoji - pravila (sta daje iskustvo, koliko,
-// sta se otkljucava) tek treba da se osmisle.
-//
-// Zato ovde stoji ZAKLJUCANO stanje sa pecatom "Uskoro!". Ono sto se ovde cuva
-// je da traka NIKAD ne izmisli napredak: prazna traka bez objasnjenja je
-// obecanje koje program ne ispunjava, a lazno popunjena je gore od toga.
-//
-// Druga stvar koja se cuva je UGOVOR sa serverom. Kad XP sistem stigne, server
-// salje `vip: { nivo, naziv, xp, xpDo }` i traka se sama popuni - izgled se ne
-// prepravlja. Da ugovor nije zapisan ovde, prvi ko bude pravio XP ne bi znao
-// kako da ga ukljuci.
+// Traka nikad ne izmislja napredak. Ugovor sa serverom je
+// `vip: { nivo, naziv, xp, xpDo }`; sa njim se traka popuni bez izmene izgleda.
 const { proveri, kraj } = brojac();
 const rend = citajIzvor("client/renderer/js/launcher.js");
 const css = citajIzvor("client/renderer/css/launcher.css");
@@ -67,13 +57,7 @@ proveri("promo baneri imaju prednost nad VIP trakom",
 
 // ---- REC "VIP" NE STOJI ONOME KO JE NIJE PLATIO ----
 //
-// Dok je VIP bio nagrada za peti nivo, na traci je pisalo "VIP" i to je imalo
-// smisla. Cim je VIP poceo da se KUPUJE, isti natpis je postao greska na
-// najvidljivijem mestu u programu: gost koji nije platio nista gledao je
-// ogromno zlatno VIP iznad svoje trake. Citalo se kao da ga vec ima - a stvar
-// koju vec imas se ne kupuje.
-//
-// Naslov trake je zato IME RANGA, a rec VIP se pojavljuje samo clanu.
+// Naslov trake je ime ranga; rec VIP se pojavljuje samo clanu.
 proveri("naslov trake je ime ranga, ne rec VIP",
   /class="rang-ime">\$\{ima \? esc\(\(v\.naziv \|\| ""\)\.toUpperCase\(\)\)/.test(rend),
   "upisan natpis VIP je reklamirao clanarinu bas onome ko je nije kupio");

@@ -1,23 +1,12 @@
-// IME IGRAONICE - MENJA SE NA JEDNOM MESTU, UPISUJE SE NA SVA
+// Ime igraonice na svim mestima gde ga vidi korisnik ili Windows.
 //
-//   node igraonica.mjs                 pokaže gde koje ime stoji i da li se slaže
+//   node igraonica.mjs                   pokaže gde koje ime stoji i da li se slaže
 //   node igraonica.mjs "Nova Igraonica"  upiše svuda
 //
-// ZAŠTO POSTOJI
-//
-// Ime `Crit` je stajalo u instaleru, u prečici na desktopu, u imenu foldera u
-// koji se launcher instalira i u alatima za oporavak (`POPRAVI-RACUNAR.bat` i
-// ostali ga zovu po imenu procesa). Dok je igraonica jedna, to nikome ne smeta.
-// Čim program dobije drugu igraonicu, ona dobija instaler koji se zove tuđim
-// imenom - a njeni alati za oporavak gase proces koji na toj mašini ne postoji,
-// i pri tom uredno jave da je sve prošlo.
-//
-// ŠTA SE NE MENJA
-//
-// Unutrašnja imena ostaju: `crit.db`, `CRIT_DATA_DIR`, imena funkcija u kodu.
-// To ne vidi nijedan korisnik, a preimenovanje baze bi ostavilo sve postojeće
-// podatke sa strane. Menja se samo ono što se VIDI - na instaleru, u Windows-u i
-// u alatima koji zovu launcher po imenu.
+// Menja ime paketa, appId, ime instalera i foldera instalacije, prečicu i
+// alate za oporavak (`POPRAVI-RACUNAR.bat` i ostali traže proces po imenu).
+// Unutrašnja imena (`crit.db`, `CRIT_DATA_DIR`, imena funkcija) ostaju, da
+// postojeći podaci ostanu na mestu.
 import fs from "node:fs";
 import path from "node:path";
 
@@ -41,9 +30,8 @@ export function procitajBrend() {
   return procitajJson(IZVOR);
 }
 
-// Gde koje ime mora da stoji. Jedno mesto za tvrdnju "ovo nosi ime igraonice" -
-// odavde je čita i alat i provera (testovi/test-ime-igraonice.mjs), pa se ne
-// može desiti da se doda mesto koje alat menja a provera ne gleda.
+// Mesta koja nose ime; isti spisak koriste alat i provera
+// (testovi/test-ime-igraonice.mjs).
 export function mesta(b) {
   return [
     { fajl: "client/package.json", polje: "name", vrednost: `${b.oznaka}-launcher`, opis: "ime paketa launchera" },
@@ -64,21 +52,11 @@ const stavi = (o, put, v) => {
   k.reduce((x, i) => (x[i] ??= {}), o)[zadnji] = v;
 };
 
-// Tekstualne zamene: ovde ime stoji usred rečenice ili putanje, pa se ne može
-// upisati po polju.
+// Tekstualne zamene, za ime usred rečenice ili putanje.
 //
-// PUNO IME LAUNCHERA ("Crit Launcher") menja se SVUDA gde se nađe. Prvo su ovde
-// stajali pojedinačni obrasci - "onaj u taskkill-u", "onaj u putanji" - i to je
-// odmah promašilo dva mesta. Jedno bezazleno (folder koji se ne obriše), drugo
-// opasno: u `POPRAVI-RACUNAR.bat` je `find` bio zamenjen a `tasklist /FI
-// "IMAGENAME eq ..."` nije, pa bi alat za oporavak zauvek mislio da launcher
-// još radi. Alat koji se pokreće kad je već sve otišlo naopako mora da radi.
-//
-// BARE IME ("Crit") se NE menja svuda, i to je namerno: pojavljuje se u
-// `crit.db`, `CRIT_DATA_DIR`, `promoCrit`, `tekstura: "crit"` i u zaglavljima
-// `X-Crit-*`. To su unutrašnja imena - ne vidi ih nijedan korisnik, a
-// preimenovanje baze bi ostavilo sve postojeće podatke sa strane. Zato za njega
-// ide izričit spisak mesta.
+// Puno ime launchera ("Crit Launcher") menja se svuda. Samo ime ("Crit")
+// samo na navedenim mestima, jer se javlja i u unutrašnjim imenima (`crit.db`,
+// `CRIT_DATA_DIR`, `promoCrit`, `tekstura: "crit"`, zaglavlja `X-Crit-*`).
 export function zamene(staro, novo) {
   const z = [];
   const par = (a, b) => { if (a !== b && a) z.push([a, b]); };
@@ -99,8 +77,7 @@ export function zamene(staro, novo) {
   return z;
 }
 
-// napravi-paket.mjs NIJE ovde: on ime ČITA iz igraonica.json, pa nema šta da
-// mu se menja. Tako je i bolje - uputstvo koje pravi ide u samu igraonicu.
+// napravi-paket.mjs nije na spisku jer ime čita iz igraonica.json.
 export const FAJLOVI_SA_IMENOM = [
   "client/DEINSTALIRAJ-LAUNCHER.bat",
   "client/POPRAVI-RACUNAR.bat",
@@ -173,12 +150,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(im
   console.log(`  folder:    %LOCALAPPDATA%\\Programs\\${novo.launcher}`);
   console.log(`  appId:     ${novo.appId}\n`);
 
-  // OVO SE MORA PROČITATI, NE PRESKOČITI.
-  //
-  // Windows program prepoznaje po appId-u, a launcher svoja podešavanja drži u
-  // folderu nazvanom po imenu programa. Oboje se upravo promenilo, pa na mašini
-  // na kojoj već stoji stara verzija nova nastaje PORED nje, a launcher ne nađe
-  // svoja podešavanja i traži adresu servera i token kao prvi put.
+  // Posle promene imena Windows vidi drugi program (appId), a launcher traži
+  // podešavanja u folderu sa novim imenom.
   console.log("PAŽNJA - na mašinama gde je stara verzija već instalirana:");
   console.log("  1. prvo DEINSTALIRAJ-LAUNCHER.bat (stara se ne prepisuje sama - drugo je ime)");
   console.log("  2. posle instalacije se ponovo unose adresa servera i token");

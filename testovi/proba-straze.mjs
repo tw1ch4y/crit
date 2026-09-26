@@ -4,21 +4,16 @@ import path from "node:path";
 import { spawn, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { KOREN, brojac } from "./_okruzenje.mjs";
-// STRAŽA NAD SKINUTIM PROGRAMIMA, SA PRAVIM POWERSHELL-OM
+// Straža nad skinutim programima, sa pravim PowerShell-om (odluke straže sa
+// lažnim procesom proverava test-bez-zamrzavanja.mjs):
 //
-// test-bez-zamrzavanja.mjs proverava odluke straže sa lažnim pomoćnim
-// procesom. Ovde se pušta pravi, jer tri stvari mogu da se vide samo na
-// Windows-u:
+//   1. skripta radi kao argument za -Command (navodnici, prelomi)
+//   2. za sve vreme radi jedan PowerShell, ne novi na svakih nekoliko sekundi
+//   3. pomoćni proces se sam gasi kad launcher nestane
 //
-//   1. da skripta uopšte radi kao argument za -Command (navodnici, prelomi)
-//   2. da za sve vreme radi JEDAN PowerShell - ranije je na svake četiri sekunde
-//      kretao novi, i to je bio trzaj u igri i put do zamrznutog računara
-//   3. da pomoćni proces sam nestane kad launcher umre bez pozdrava - inače bi
-//      ostajao da radi do gašenja računara, po jedan za svaki pad launchera
-//
-// "Skinut program" je kopija ping.exe u lažnoj fascikli Preuzimanja, u
-// privremenoj fascikli ove probe. Straža dobija lažan korisnički folder, pa na
-// ovom računaru ne može da prepozna - ni da ugasi - ništa osim te kopije.
+// "Skinut program" je kopija ping.exe u lažnim Preuzimanjima u privremenoj
+// fascikli probe; straža dobija lažan korisnički folder, pa ne može da dirne
+// ništa drugo na ovom računaru.
 //
 //   node proba-straze.mjs
 if (process.platform !== "win32") { console.log("proba radi samo na Windows-u"); process.exit(0); }
@@ -111,17 +106,12 @@ try {
   proveri("kad launcher umre, straža nestane sama", siroceNestalo, `PID ${siroce} i dalje radi posle 10 s`);
   if (siroceNestalo) console.log(`       (nestala ${Date.now() - t2} ms posle launchera)`);
 
-  // ---- 4) ...i to NE SAMO zato što je Node ubije ----
+  // ---- 4) ...i ne samo zato što je Node ubije ----
   //
-  // Gornja provera prolazi i bez ijedne linije u skripti: Node na Windows-u
-  // gasi svoje procese kad sam izađe. Ta zaštita postoji, ali se ne vidi iz
-  // našeg koda i ne zavisi od nas. Provera roditelja u skripti je druga,
-  // nezavisna brava - i ovde se meri baš ona.
-  //
-  // Straža je dete OVE probe, ali joj se za roditelja daje DRUGI proces - lažan,
-  // koji proba ubije. Proba i dalje živi, pa Node nema razloga da gasi išta; ako
-  // straža nestane, ugasila se sama. (Pokretanje sa `detached` ovde ne vredi: na
-  // Windows-u je to proces bez ikakve konzole i PowerShell tada ni ne krene.)
+  // Node na Windows-u gasi svoje procese kad izađe, pa gornja provera prolazi i
+  // bez provere roditelja u skripti. Ovde straža dobija lažnog roditelja koga
+  // proba ubije, a proba živi dalje; ako straža nestane, ugasila se sama.
+  // (`detached` na Windows-u pokreće proces bez konzole, pa PowerShell ni ne krene.)
   const lazanRoditelj = spawn(process.execPath, ["-e", "setTimeout(() => {}, 120000)"], { windowsHide: true, stdio: "ignore" });
   await cekaj(300);
   odvojena = spawn("powershell",

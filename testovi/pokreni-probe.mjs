@@ -1,13 +1,6 @@
-// Pušta SVE alate koji rade sa pravim launcherom u pravom Electronu.
-//
-// Zašto postoji: suite (`pokreni-sve.mjs`) su brze i rade bez ičega spolja, ali
-// se dobar deo njihovih tvrdnji svodi na čitanje izvornog koda - hvataju da je
-// neko obrisao liniju, ne da funkcija radi. Pravi dokaz daju alati u ovom
-// spisku: oni otvaraju prozor, kliknu dugme i mere šta se stvarno desilo.
-//
-// Dok se pokretali samo ručno, bili su zaboravljivi - a baš su oni našli da se
-// nagradni točak ne može ni zavrteti ni zatvoriti, i da animacije stoje mrtve na
-// računaru sa isključenim Windows animacijama.
+// Pušta sve alate koji rade sa pravim launcherom u pravom Electronu. Suite iz
+// `pokreni-sve.mjs` su brze, ali deo provera čita izvorni kod; ovi alati otvaraju
+// prozor, klikću i mere rezultat.
 //
 //   node pokreni-probe.mjs          sve
 //   node pokreni-probe.mjs klikova  samo one čije ime sadrži "klikova"
@@ -30,8 +23,7 @@ const DATA = path.join(OVDE, ".radno", "probe-data");
 // Alati kojima treba server na PORT-u. proba-procesa sam diže svoj, pa ide bez.
 const ALATI = [
   { ime: "pregled-electron", args: ["--port", String(PORT)], opis: "svi ekrani na dve rezolucije, mere šta ispada iz ekrana" },
-  // Panel je do sada imao svoj alat, ali ga niko nije pustao - stajao je van
-  // ovog spiska, pa se osoblje po ceo dan gledalo u strane koje niko ne meri.
+  // Pregled panela: sve strane, na tri rezolucije.
   { ime: "pregled-panela", args: ["--port", String(PORT)], opis: "svih 15 strana panela, na tri rezolucije (i na telefonu)" },
   { ime: "proba-klikova", args: [String(PORT)], opis: "svako dugme stvarno stiže do koda" },
   { ime: "proba-kretanja", args: [String(PORT)], opis: "animacije šare se stvarno pomeraju" },
@@ -106,17 +98,9 @@ if (izabrani.some((a) => !a.sam)) {
   const igraci = JSON.parse(await api("/api/players").catch(() => "[]") || "[]");
   if (igraci[0]) await api(`/api/players/${igraci[0].id}/vip`, "POST", { dana: 30, naplati: 1500 });
 
-  // PORUDŽBINE SE MERE PUNE, NE PRAZNE.
-  //
-  // Strana Porudžbine je ono u šta radnik gleda ceo dan, i to sa telefona kraj
-  // kase. Dok je baza za probe bila bez ijednog artikla, ta strana se merila u
-  // praznom stanju: alat je javljao "sve u redu" nad porukom „Nema aktivnih
-  // porudžbina", a raspored kartica - koji se jedini i gleda - nije video niko.
-  //
-  // Jedna je od VIP gosta, da se izmeri i zlatna oznaka i to što stoji prva.
-  // Artikli se dodaju SAMO ako ih nema. Nova baza već nosi svoj sank, pa je
-  // slepo dodavanje pravilo dva reda „Coca-Cola 0.5" i dve kategorije koje se
-  // razlikuju u jednom slovu - a onda alat meri nered koji je sam napravio.
+  // Porudžbine se mere sa sadržajem, ne u praznom stanju; jedna je od VIP gosta
+  // (zlatna oznaka, prva u spisku). Artikli se dodaju samo ako ih nema, jer nova
+  // baza već nosi fabrički sank.
   let artikli = JSON.parse(await api("/api/shop").catch(() => "[]") || "[]");
   if (!artikli.length) {
     for (const [ime, cena, kat] of [["Coca-Cola 0.5", 130, "Sokovi"], ["Red Bull", 300, "Energetsko"],
@@ -172,17 +156,8 @@ if (server) { try { server.kill(); } catch {} await cekaj(400); }
 // ostavi Electron da radi, a on onda kvari sledece pokretanje.
 ugasiLaunchere();
 
-// ALATI KOJI MERE ISPISUJU I KAD PROĐU.
-//
-// `pregled-*` nisu testovi nego merenja: koliko je hero traka visoka, koliko je
-// u polici viška, koliko praznine ostaje do alata. Dok se ispis pokazivao samo
-// kad nešto PADNE, ti brojevi se nisu videli nikad - a baš po njima se odlučuje
-// kako ekran izgleda. Vraćali su se tako što se alat ručno pušta iznova.
-//
-// `proba-klikova` ide uz njih iz istog razloga: ona ispisuje KOJE je ekrane
-// obisla i koliko je elemenata pregledala. Dok se to nije videlo, ekran koji
-// ispadne iz obilaska (Nalog je godinu dana stajao na "Ucitavam profil", pa se
-// nijedan njegov odeljak nije ni iscrtao) prolazio je kao uredan.
+// Alati koji mere (`pregled-*`) i `proba-klikova` ispisuju rezultat i kad
+// prođu: izmerene visine i praznine, obiđene ekrane i broj pregledanih elemenata.
 for (const n of nalazi.filter((x) => x.ok && (x.naziv.startsWith("pregled-") || x.naziv.startsWith("proba-klikova")))) {
   const redovi = n.izlaz.split("\n").filter((l) => l.trim());
   if (redovi.length) console.log(`\n--- ${n.naziv} ---\n${redovi.join("\n")}`);
@@ -191,9 +166,8 @@ for (const n of nalazi.filter((x) => x.ok && (x.naziv.startsWith("pregled-") || 
 const pali = nalazi.filter((n) => !n.ok);
 for (const n of pali) {
   console.log(`\n--- ${n.naziv} ---`);
-  // Uz svaki PAO ide i ono što je ispisano ODMAH POSLE njega: tu stoje izmerene
-  // vrednosti zbog kojih je i pao. Ranije je filter propuštao samo red sa "PAO"
-  // pa se iz izveštaja nije videlo zašto, i moralo se ručno puštati iznova.
+  // Uz svaki PAO ide i ono što je ispisano odmah posle njega (izmerene vrednosti
+  // zbog kojih je pao).
   const redovi = n.izlaz.split("\n");
   const bitno = [];
   redovi.forEach((l, i) => {

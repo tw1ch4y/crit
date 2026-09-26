@@ -8,8 +8,7 @@ const state = {
   players: [],
   shop: [],
   logs: [],
-  // Pocetna vrednost dok podesavanja ne stignu sa servera. Namerno bez imena
-  // igraonice: druga igraonica bi na trenutak videla tudje ime na svom panelu.
+  // Početna vrednost dok podešavanja ne stignu; bez imena igraonice.
   settings: { cafeName: "Igraonica", currency: "RSD", ratePerHour: 120 },
   ws: null,
   wsOk: false,
@@ -37,18 +36,8 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 // inicijali kad artikal/igra nema sliku
 const monogram = (name) => esc(String(name || "?").trim().slice(0, 2).toUpperCase());
 
-// POSLEDNJI NEUSPEO POKUŠAJ STOJI UZ SAMU STAVKU.
-//
-// Kad igra ili prečica neće da se pokrene, launcher to javi serveru - ali se do
-// sada završavalo kao red u Logovima i poruka koja prođe preko ekrana. Vlasnik
-// je to video samo ako je baš tada gledao u panel.
-//
-// A najčešći uzrok je prečica koja fali na JEDNOJ mašini od trinaest: gost
-// slegne ramenima i pokrene nešto drugo, niko ne prijavi, i tako mesecima.
-//
-// Zato ovde piše sve troje: šta je bilo, NA KOM računaru i kada. Bez imena
-// računara vlasnik ne zna gde da ode, a bez vremena ne zna da li je to staro i
-// odavno popravljeno.
+// Poslednji neuspeh pokretanja stoji uz samu igru ili prečicu: šta, na kom
+// računaru i kada.
 const KVAR_TEKST = {
   nema: "putanja ne postoji na tom računaru",
   folder: "upisan je folder, a treba prečica ili .exe",
@@ -61,13 +50,12 @@ function kvarHtml(r) {
   return `<div class="kvar-red" title="Nestaje kad se stavka jednom uspešno pokrene ili kad promeniš putanju">
     ${icon("alert")}<span>Nije se pokrenulo${gde} - ${sta}</span><i>${timeAgo(r.kvar_kad)}</i></div>`;
 }
-// Uloge idu odozdo nagore: radnik < vlasnik < serviser. Visa uvek sme sve sto
-// sme niza, pa se svuda pita "da li je BAR vlasnik", ne "da li je tacno vlasnik".
+// Uloge: radnik < vlasnik < serviser; proverava se "bar vlasnik".
 const RANG = { staff: 1, owner: 2, serviser: 3 };
 const rang = (u) => RANG[u] || 0;
 const isOwner = () => rang(state.admin?.role) >= RANG.owner;
 const isServiser = () => rang(state.admin?.role) >= RANG.serviser;
-// Nad tudjim nalogom se sme samo ako je NIZI od mog - isto pravilo kao na serveru.
+// Nad tudjim nalogom se sme samo ako je nizi od mog - isto pravilo kao na serveru.
 const smemNad = (uloga) => rang(state.admin?.role) > rang(uloga);
 const ULOGA_NAZIV = { serviser: "Serviser", owner: "Vlasnik", staff: "Radnik" };
 
@@ -81,9 +69,8 @@ async function api(path, method = "GET", body) {
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
-    // Server ugašen, kabl ispao, telefon izgubio WiFi. Bez ovoga je pregledač
-    // bacao svoje "Failed to fetch" i radnik je na ekranu dobijao englesku
-    // poruku koja mu ne kaže ni šta se desilo ni šta da radi.
+    // Server ne odgovara: umesto "Failed to fetch" prikazuje se traka o prekidu
+    // veze.
     state.vezaPukla = true;
     setConn(false, true);
     const e = new Error("Nema veze sa serverom. Proveri da li je glavni računar upaljen i da li server radi.");
@@ -92,19 +79,14 @@ async function api(path, method = "GET", body) {
   }
   state.vezaPukla = false;
   const data = await res.json().catch(() => ({}));
-  // Sama odjava se radi SAMO kad je postojeca prijava istekla usred rada.
-  // Na ekranu za prijavu 401 znaci pogresna lozinka - ranije je i to zvalo
-  // doLogout(), a doLogout zove /logout, koji bez tokena opet vraca 401 i opet
-  // zove doLogout. Jedna pogresna lozinka je tako pokretala petlju od nekoliko
-  // hiljada zahteva u sekundi, koja se nije zaustavljala do osvezavanja strane,
-  // i uz to je gutala pravu poruku o gresci.
+  // Odjava samo kad je postojeća prijava istekla usred rada. Na ekranu za
+  // prijavu 401 znači pogrešnu lozinku (a /logout bez tokena bi opet vratio 401).
   if (res.status === 401 && state.token && path !== "/login" && path !== "/logout") {
     doLogout();
     throw new Error("Sesija je istekla");
   }
-  // Uz poruku ide i SAV odgovor servera. Neke greške nisu kraj posla nego
-  // pitanje ("ovo ime već postoji - svejedno?"), a da bi se to pitalo, pozivalac
-  // mora da vidi šta je tačno stiglo, ne samo rečenicu.
+  // Uz poruku ide ceo odgovor servera: neke greške su pitanje ("ovo ime već
+  // postoji - svejedno?").
   if (!res.ok) {
     const e = new Error(data.error || "Došlo je do greške");
     e.status = res.status;
@@ -118,8 +100,7 @@ async function api(path, method = "GET", body) {
 const cur = () => state.settings.currency || "RSD";
 const ratePerHour = () => Number(state.settings.ratePerHour) || 0;
 
-// Srpski broji na tri načina: 1 nalog, 2-4 naloga, 5+ naloga. Brojevi 11-14 idu
-// uz mnoštvo iako se završavaju na 1-4.
+// Srpska množina: 1 nalog, 2-4 naloga, 5+ naloga (11-14 idu na "mnogo").
 function oblik(n, jedan, dva, mnogo) {
   n = Math.abs(Math.round(n));
   const desetice = n % 100, jedinice = n % 10;
@@ -139,17 +120,14 @@ function porediVerzije(a, b) {
   return 0;
 }
 
-// Prazna tabela. Ranije je svaka pisala samo jedan sivi red teksta usred belog
-// polja - izgledalo je kao da se strana nije učitala. Sada svuda isto: ikona,
-// šta fali i šta se radi da bi se pojavilo.
+// Prazna tabela: ikona, šta nedostaje i kako se dodaje.
 function praznaTabela(kolona, ikona, naslov, opis = "") {
   return `<tr><td colspan="${kolona}" class="empty">${icon(ikona)}
     <div class="e-t">${naslov}</div>
     ${opis ? `<div class="e-s">${opis}</div>` : ""}</td></tr>`;
 }
 
-// Prečice po satima uz iznose u dinarima. Kad je naplata isključena (cena 0)
-// sati nemaju smisla, pa se red ni ne prikazuje.
+// Prečice po satima uz iznose; bez naplate (cena 0) se ne prikazuju.
 function satiChips() {
   const r = ratePerHour();
   if (r <= 0) return "";
@@ -175,7 +153,8 @@ function timeAgo(ts) {
   return Math.floor(d / 86400) + " d";
 }
 function statusInfo(c) {
-  if (!c.online) return { key: "offline", label: "Offline", cls: "offline" };
+  // Sesija je otvorena, a računar se ne javlja: nije isto što i ugašen računar.
+  if (!c.online) return { key: "offline", label: c.player ? "Bez veze" : "Offline", cls: "offline" };
   if (c.status === "in_use") return { key: "online", label: "Online", cls: "online" };
   if (c.status === "locked") return { key: "locked", label: "Zaključan", cls: "locked" };
   return { key: "standby", label: "Standby", cls: "standby" };
@@ -220,12 +199,7 @@ function toast(msg, type = "info") {
   setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 280); }, 3200);
 }
 
-// BREND: LOGO I BOJA IGRAONICE
-//
-// Dok su logo i crvena stajali ušiveni u fajlove, druga igraonica je morala da
-// dobije prepravljenu kopiju programa - pa bi svaka nadogradnja morala da se
-// pravi posebno za svakoga. Ovako se program izdaje jedan, a izgled se podešava
-// iz panela i menja se svuda odjednom, bez osvežavanja strane.
+// Brend: znak i boja igraonice iz Podešavanja, primenjuju se odmah.
 function primeniBrend(b) {
   if (!b) return;
   state.brend = b;
@@ -235,25 +209,13 @@ function primeniBrend(b) {
   s.setProperty("--accent-down", b.down);
   s.setProperty("--accent-soft", b.soft);
   s.setProperty("--accent-line", b.line);
-  // Logo na sva tri mesta: prijava, bočna traka, mobilna traka. Kad ga nema,
-  // ostaje ugrađeni - nova igraonica ne sme da gleda prazan pravougaonik dok ne
-  // okači svoj.
+  // Znak na prijavi i u bočnoj traci; bez okačenog ostaje ugrađeni.
   if (b.logo) $$(".login-logo-img, .side-logo-img").forEach((i) => { i.src = b.logo; i.alt = b.naziv || ""; });
   if (b.naziv) document.title = `${b.naziv} - Panel`;
 }
 
-// DUGME KOJE MENJA NOVAC SE ZAKLJUČAVA DOK SERVER NE ODGOVORI.
-//
-// Radnik na kasi radi u žurbi i pred gostom. Dupli klik na "Naplati" je slao
-// DVA računa i naplaćivao dvaput; dupli klik na "Dodaj" je kredit dopunjavao
-// dvaput. Oba puta se otkrije tek na kraju smene, kao razlika u kasi koju niko
-// ne ume da objasni - a razlika u kasi mora da ima ime.
-//
-// U launcheru je ta zaštita postojala od ranije ("Poruči" se zaključava do
-// odgovora servera); u panelu je nije bilo, a baš se on koristi u gužvi.
-//
-// Dugme se vraća u prvobitno stanje BEZ OBZIRA na ishod, pa neuspeo zahtev ne
-// ostavlja radnika sa zaključanim dugmetom.
+// Dugme koje menja novac je zaključano dok server ne odgovori, da dupli klik
+// ne naplati dvaput. Vraća se u prvobitno stanje bez obzira na ishod.
 async function jednomKlik(btn, posao, tekstDok = "Šaljem...") {
   if (!btn || btn.disabled) return;
   const stari = btn.textContent;
@@ -262,8 +224,7 @@ async function jednomKlik(btn, posao, tekstDok = "Šaljem...") {
   try {
     return await posao();
   } finally {
-    // Posao je mogao da zatvori modal, pa je dugme već van strane - tada ovo
-    // ništa ne menja i to je u redu.
+    // Ako je posao zatvorio modal, dugme više nije na strani.
     btn.disabled = false;
     btn.textContent = stari;
   }
@@ -447,9 +408,7 @@ function openShiftModal(mandatory) {
       $("#osOpen", root).addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
         try {
           const r = await api("/shift/open", "POST", { openingCash: $("#osCash", root).value });
-          // Kontrolna tabla mora odmah iznova: na njoj stoji upozorenje "smena
-          // nije otvorena", i ako ostane posle otvaranja, izgleda kao da dugme
-          // nije uradilo ništa.
+          // Tabla se crta iznova, da nestane upozorenje "smena nije otvorena".
           state.shift = r.shift; updateShiftBar(); refreshView(["dashboard"]);
           toast("Smena je otvorena", "success"); close();
         } catch (e) { $("#osErr", root).textContent = e.message; }
@@ -501,9 +460,7 @@ function shiftBreakdownHtml(s) {
     <div class="faint" style="font-size:12px;margin-top:8px;line-height:1.5">Potrošnja se plaća iz kredita koji je već uplaćen ranije, zato ne ulazi u pazar smene.</div>`;
 }
 function showShiftSummary(s) {
-  // Kad se kasa ne poklopi, objašnjenje se traži ODMAH - u tom trenutku čovek
-  // zna zašto. Sutra više ne zna, a razlika ostaje gola brojka koja liči na
-  // krađu. Ako se poklapa, ne pita se ništa.
+  // Kad se kasa ne poklopi, objašnjenje se traži odmah.
   const razlika = s.difference != null && Math.abs(s.difference) >= 0.5;
   modal(`Obračun smene #${s.id}`, `${shiftBreakdownHtml(s)}
     ${razlika ? `<div class="field" style="margin-top:12px"><label>Zašto se kasa ne poklapa? (može i kasnije)</label>
@@ -565,16 +522,11 @@ async function renderReports() {
   const ex = $("#repExport");
   if (ex) ex.addEventListener("click", () => izveziIzvestaj(period, d));
 }
-// Izvoz u CSV - vlasnik otvori u Excelu ili pošalje knjigovođi. Excel na našim
-// računarima očekuje tačku-zarez i BOM da bi čitao ćirilicu/latinicu iz UTF-8.
+// Izvoz u CSV za Excel: tačka-zarez i BOM (UTF-8).
 function izveziIzvestaj(period, d) {
   const r = d.revenue || {}, s = d.sessions || {};
-  // NAZIV IGRE SE PRIPREMA ZA CSV, NE LEPI SIROV.
-  //
-  // Kolone deli tačka-zarez, a naziv igre kuca čovek. Jedan „Half-Life; Alyx"
-  // razdvaja jedan red u dve kolone i tabela se pomeri od tog mesta naniže -
-  // knjigovođa dobije fajl koji izgleda ispravno, a nije. Isto važi za navodnike
-  // i za prelom reda.
+  // Polja se pripremaju za CSV: tačka-zarez, navodnici i prelom reda u nazivu
+  // pomerili bi kolone.
   const polje = (v) => {
     const t = String(v ?? "");
     return /[;"\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
@@ -592,9 +544,7 @@ function izveziIzvestaj(period, d) {
     red("  - kredit", r.shopCredit || 0),
     red("VIP članarine", r.vip || 0),
     red("Dopune kredita", r.topups || 0),
-    // Poklonjen kredit (nagradni točak i popust na paket) stoji na ekranu kao
-    // trošak, pa mora i ovde: bez njega izveštaj koji ide knjigovođi kaže manje
-    // nego što piše u panelu, a to je razlika koju treba objašnjavati.
+    // Poklonjen kredit (točak, popust na paket) i u izvozu.
     red("Poklonjen kredit (točak, paketi)", r.poklonjeno || 0),
     red("Broj sesija", s.count || 0),
     red("Odigrano minuta", s.minutes || 0),
@@ -637,9 +587,7 @@ function fmtMinutes(m) {
 async function renderShifts() {
   let list = [];
   try { list = await api("/shifts"); } catch {}
-  // Razlika ide u sam spisak: zbog nje se ova strana i otvara. Dok je stajala
-  // samo u detalju, trebalo je kliknuti na svaku smenu da bi se videlo gde se
-  // kasa nije poklopila, a njih je šezdesetak mesečno.
+  // Razlika u kasi je u samom spisku smena.
   const razlikaHtml = (s) => {
     if (s.difference == null) return '<span class="faint">-</span>';
     if (Math.abs(s.difference) < 0.5) return '<span class="pill green">poklapa se</span>';
@@ -670,9 +618,7 @@ async function renderShifts() {
 async function shiftDetailModal(id) {
   try {
     const s = await api(`/shifts/${id}`);
-    // Razlika u kasi uvek ima razlog: vraćen novac gostu, kusur uzet za sitno,
-    // radnik se prebrojao. Bez mesta da se to zapiše, posle mesec dana ostaje
-    // gola brojka koju niko ne ume da objasni, a izgleda kao krađa.
+    // Napomena uz smenu (razlog razlike u kasi).
     modal(`Smena #${s.id}`, `${shiftBreakdownHtml(s)}
       <div class="field" style="margin-top:12px"><label>Napomena uz smenu</label>
         <textarea id="sdNote" rows="2" placeholder="npr. 500 vraćeno gostu, kusur uzet iz kase">${esc(s.note || "")}</textarea></div>
@@ -713,10 +659,8 @@ async function loadSnapshot() {
 }
 
 // Websocket
-// Traka o prekidu veze. Kad prekid javi WebSocket, ceka se 1.5 s - kratki
-// prekidi se sami zakrpe i traka bi bespotrebno treperila. Kad prekid javi
-// neuspeo zahtev (odmah = true), radnik je bas tada nesto kliknuo i mora
-// istog trena da vidi zasto se nista nije desilo.
+// Traka o prekidu veze: za prekid WebSocket-a posle 1,5 s (kratki prekidi se
+// sami zakrpe), za neuspeo zahtev odmah.
 function setConn(ok, odmah = false) {
   const b = $("#connBanner");
   if (!b) return;
@@ -746,10 +690,12 @@ function connectWs() {
     else if (m.t === "event") {
       if (m.kind === "order") { toast(m.text, "info"); ding(); }
       else if (m.kind === "timeup") { toast(m.text, "error"); ding(); }
-      // Igrac je pokusao da pokrene igru koje na tom racunaru nema. Ranije je to
-      // znao samo on, pa je vlasnik saznavao tek kad se neko poduzi da se pozali.
+      // Igra koja ne može da se pokrene na nekom računaru.
       else if (m.kind === "igra-ne-radi") { toast(m.text, "error"); ding(); }
       else if (m.kind === "mirovanje") { toast(m.text, "info"); ding(); }
+      // Računar sa igračem koji je nestao sa mreže, i kvar koji javlja sam
+      // launcher (pukao ekran, pokušan izlaz bez PIN-a, program van kataloga).
+      else if (m.kind === "bez-veze" || m.kind === "klijent-problem") { toast(m.text, "error"); ding(); }
       else if (m.kind === "zaliha") {
         toast(m.text, m.nema ? "error" : "info");
         ding();
@@ -822,15 +768,9 @@ function togglePfMenu(open) {
     togglePfMenu._t = setTimeout(() => { m.classList.add("hidden"); m.classList.remove("closing"); }, 150);
   }
 }
-// NA TELEFONU PROFIL IDE U GORNJU TRAKU.
-//
-// Bocni meni se na uskom ekranu pretvara u traku sa ikonama na dnu, a njegovo
-// podnozje - smena, "Promeni lozinku" i "Odjavi se" - tu nema gde da stane.
-// Ranije se prosto sakrivalo, pa se sa telefona nije mogla otvoriti smena ni
-// promeniti lozinka; a bas to radnik radi sa telefona. Zato se isti taj deo
-// premesta u gornju traku, gde zdesna ionako stoji prazan prostor.
-//
-// Premesta se cvor, ne kopija: kopija bi udvostrucila id-jeve i osluskivace.
+// Na uskom ekranu podnožje bočnog menija (smena, lozinka, odjava) prelazi u
+// gornju traku. Premešta se čvor, ne kopija, da se ne udvostruče id-jevi i
+// slušaoci.
 const USKO = window.matchMedia("(max-width: 860px)");
 function smestiProfil() {
   const foot = $(".side-foot");
@@ -860,25 +800,15 @@ function promenaLozinkeModal() {
   });
 }
 $("#pmPassword").addEventListener("click", promenaLozinkeModal);
-// Upozorenje na kontrolnoj tabli se iscrtava iznova pri svakom osvezavanju, pa
-// mu dugme ne moze da nosi svoj osluskivac - hvata se ovde.
+// Dugme u upozorenju se crta iznova, pa se klik hvata ovde.
 document.addEventListener("click", (e) => {
   if (e.target.closest("#upzLozinka")) promenaLozinkeModal();
   if (e.target.closest("#upzSmena")) openShiftModal(false);
 });
 
 // Kontrolna tabla
-// Panel je dostupan sa svakog telefona na mreži, a preko njega se dopunjuje
-// kredit. Ko uđe sa admin/admin može sebi da upiše koliko hoće. Dosad je o tome
-// pisalo samo u konzoli servera, koju niko ne čita - zato upozorenje stoji na
-// kontrolnoj tabli, koju vlasnik gleda svaki dan, dok se lozinka ne promeni.
-// Radnik je već naplaćivao, a smena nije otvorena.
-//
-// Obračun smene broji samo ono što je naplaćeno DOK je smena otvorena. Novac
-// naplaćen pre toga je uredno zapisan i vidi se u Izveštajima, ali na kraju
-// dana stoji u kasi kao višak koji obračun ne pominje - a radnik ne zna zašto.
-// Upozorenje se pojavljuje tek kad se to stvarno desi, da ne dosađuje ujutru
-// dok igraonica još nije ni počela da radi.
+// Upozorenje: naplaćeno je dok smena nije bila otvorena. Taj novac nije ni u
+// jednom obračunu smene, pa se pokazuje, i to tek kad se desi.
 function upozorenjeSmena() {
   if (state.shift || !(state.vanSmene > 0)) return "";
   return `<div class="upozorenje-fabricko" id="upozSmena">
@@ -903,16 +833,8 @@ function upozorenjeLozinka() {
   </div>`;
 }
 
-// SERVISNI PIN LAUNCHERA JOŠ FABRIČKI.
-//
-// Taj PIN čuva ulaz u podešavanja launchera i izlaz iz kioska kad server ne
-// radi. Dok stoji na 1234, igrač koji iščupa mrežni kabl može da preusmeri
-// računar na svoj server i tako sebi otvori besplatnu igru.
-//
-// Menja se ručno, po mašini - a ručni korak se zaboravi baš na onoj trinaestoj.
-// Zato ovde stoje IMENA računara: bez njih vlasnik zna da negde nešto fali, ali
-// mora da obiđe sve mašine da nađe koju. Isti razlog zbog kog je i fabrička
-// lozinka vlasnika dobila svoje upozorenje.
+// Računari na kojima servisni PIN još važi kao fabrički (1234), po imenu.
+// PIN se upisuje u Podešavanjima i stiže na sve računare.
 function upozorenjePin() {
   if (!isOwner()) return "";
   const masine = state.computers.filter((c) => c.pinFabricki === true).map((c) => c.name);
@@ -1003,8 +925,7 @@ async function renderDashboard() {
 function filteredComputers() {
   return state.computers.filter((c) => state.filter === "all" ? true : statusInfo(c).key === state.filter);
 }
-// "Označi sve" prati stvarno stanje: čekiran kad su svi vidljivi označeni,
-// crtica (indeterminate) kad je označen samo deo
+// "Označi sve": čekirano kad su svi vidljivi označeni, crtica kad je deo.
 function syncSelAll() {
   const el = $("#selAll");
   if (!el) return;
@@ -1014,10 +935,7 @@ function syncSelAll() {
   el.indeterminate = sel > 0 && sel < vis.length;
 }
 
-// Kad uđe grupa, radnik mora u sekundi da vidi KOJI su računari slobodni,
-// ne samo koliko ih ima. Ugašeni se posebno označavaju jer traže paljenje.
-// Piće nestane u špicu i sazna se tek kad gost pita. Traka stoji na kontrolnoj
-// tabli dok se magacin ne dopuni, a klik vodi pravo na dopunu zalihe.
+// Traka zaliha: artikli za dopunu; klik otvara dopunu.
 function trakaZaliha() {
   const z = state.zalihe || [];
   if (!z.length) return "";
@@ -1060,13 +978,12 @@ document.addEventListener("click", async (e) => {
 
 function trakaSlobodnih() {
   const spremni = state.computers.filter((c) => c.online && !c.player && c.status !== "locked");
-  const ugaseni = state.computers.filter((c) => !c.online);
+  // Računar sa otvorenom sesijom nije ni slobodan ni ugašen, i kad je bez veze.
+  const ugaseni = state.computers.filter((c) => !c.online && !c.player);
   if (!spremni.length && !ugaseni.length) {
     return `<div class="slobodni-traka puna">${icon("info")}<span>Svi računari su zauzeti</span></div>`;
   }
-  // Daljinsko paljenje radi samo za racunar kome je upisana MAC adresa. Ranije
-  // su svi ugaseni stajali kao dugme "klikni da upalis", pa je klik na dvanaest
-  // od trinaest davao samo poruku o gresci - traka je obecavala sto ne moze.
+  // Daljinsko paljenje radi samo za računar sa poznatom MAC adresom.
   const znacka = (c, ugasen) => {
     const moze = !ugasen || !!c.mac;
     const naslov = !ugasen ? "Slobodan"
@@ -1074,10 +991,7 @@ function trakaSlobodnih() {
       : "Ugašen - nema zabeleženu MAC adresu, pa ne može daljinsko paljenje. Računar mora bar jednom da se poveže dok je uključen.";
     return `<button class="slobodan-pc${ugasen ? " ugasen" : ""}${moze ? "" : " bez-mac"}" data-slobodan="${c.id}" title="${naslov}">${esc(c.name)}</button>`;
   };
-  // Naslov mora da odgovara onome sto u traci stvarno stoji. Ranije je uvek
-  // pisalo "SLOBODNO", pa je pri zatvorenoj igraonici traka nabrajala svih 13
-  // racunara ispod brojaca na kom pise "SLOBODNO 0" - dva podatka jedan ispod
-  // drugog koji protivrece jedan drugom.
+  // Naslov prati sadržaj trake.
   const delovi = [];
   if (spremni.length) delovi.push(`<span class="slobodni-naslov">Slobodno</span>${spremni.map((c) => znacka(c, false)).join("")}`);
   // Naslov obećava paljenje samo ako bar jedan ugašen ima MAC adresu.
@@ -1109,8 +1023,7 @@ function stationCard(c) {
     if (c.mac) acts.push(`<button class="btn btn-sm btn-primary" data-act="wake" data-id="${c.id}">${icon("power")} Upali</button>`);
     acts.push(`<button class="btn btn-sm btn-ghost" data-act="detail" data-id="${c.id}" style="flex:1">Detalji</button>`);
   } else if (c.player) {
-    // Igrač je za računarom - dopuna je ono što radnik ovde najčešće radi,
-    // pa ide na karticu da ne mora da traži nalog po spisku igrača.
+    // Dopuna je najčešća radnja na zauzetom računaru, pa je na kartici.
     acts.push(`<button class="btn btn-sm" data-act="dopuni" data-id="${c.id}">${icon("wallet")} Dopuni</button>`);
     acts.push(`<button class="btn btn-sm icon" data-act="lock" data-id="${c.id}" title="Zaključaj računar">${icon("lock")}</button>`);
     acts.push(`<button class="btn btn-sm icon" data-act="detail" data-id="${c.id}" title="Više opcija">${icon("more")}</button>`);
@@ -1171,13 +1084,8 @@ async function bulkClick(action) {
     });
     return;
   }
-  // KOLIKO IH TRENUTNO IGRA - to je jedini broj koji ovde nešto znači.
-  //
-  // "Zaključaj" i "Odjavi" na računaru sa igračem zatvaraju sesiju i GASE MU
-  // IGRU. Do sada su išli bez ijednog pitanja, dok su "Ugasi" i "Restart" imali
-  // potvrdu - a posledica je ista: čovek usred meča ostaje bez igre. U igraonici
-  // je to najskuplja greška koja se pravi jednim promašenim klikom, jer gost
-  // koji tako izgubi partiju sledeći put ide preko puta.
+  // Potvrda kaže koliko računara ima igrača: zaključavanje i odjava im zatvaraju
+  // sesiju i gase igru.
   const igraju = ids.filter((id) => state.computers.find((c) => c.id === id)?.player).length;
   const uzIgrace = igraju
     ? `Od toga ${igraju === 1 ? "1 računar ima igrača koji trenutno igra" : `${igraju} ${oblik(igraju, "računar ima igrača koji", "računara imaju igrače koji", "računara ima igrače koji")} trenutno ${igraju === 1 ? "igra" : "igraju"}`} - igra će im biti ugašena.`
@@ -1189,8 +1097,7 @@ async function bulkClick(action) {
     lock: igraju ? { text: `Zaključaće se ${ids.length} označenih računara.`, istaknuto: uzIgrace, title: "Zaključavanje računara", ok: "Zaključaj", danger: true } : null,
     logout: igraju ? { text: `Odjaviće se igrači sa ${ids.length} označenih računara.`, istaknuto: uzIgrace, title: "Odjava igrača", ok: "Odjavi", danger: true } : null,
   }[action];
-  // Zaključavanje i odjava PRAZNIH računara ne pitaju ništa - nema šta da se
-  // prekine, a pitanje bez sadržaja se nauči da se preskače.
+  // Prazni računari se ne pitaju.
   if (potvrde && !(await confirmDialog(potvrde.text, potvrde))) return;
   try {
     const r = await api("/computers-action", "POST", { ids, action });
@@ -1201,9 +1108,7 @@ async function bulkClick(action) {
 }
 
 async function shiftAction(action) {
-  // Isto kao kod grupnih akcija: broj onih koji TRENUTNO IGRAJU je jedino što
-  // ovde nešto znači. "Zaključaj sve" na punoj igraonici gasi igru svima
-  // odjednom, a stara poruka to nije ni pominjala.
+  // Isto za grupne akcije iz trake smene.
   const igraju = state.computers.filter((c) => c.player).length;
   const uzIgrace = igraju
     ? `Trenutno ${igraju === 1 ? "igra 1 igrač" : `igraju ${igraju} igrača`} - igra će im biti ugašena.`
@@ -1258,8 +1163,7 @@ document.addEventListener("click", async (e) => {
   document.querySelector(`.station[data-id="${id}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
 });
 
-// Tabla se osvežava svake sekunde i pravi kartice iznova, pa oznaka mora da
-// živi u stanju - inače je prvo osvežavanje obriše pre nego što je radnik vidi.
+// Tabla se crta svake sekunde, pa oznaka istaknutog računara živi u stanju.
 let istaknutRacunar = null;
 let istaknutTajmer = null;
 function istakniRacunar(id) {
@@ -1336,15 +1240,8 @@ function pcDetail(id) {
   });
 }
 
-// ŠTA RADI NA RAČUNARU (daljinski task manager)
-//
-// Radnik sa glavnog računara vidi šta radi na izabranoj mašini i gasi
-// zaglavljenu igru. Ranije je "Task Manager" iz panela otvarao Task Manager NA
-// računaru igrača - radnik bi morao da ustane i ode do te mašine, a igrač bi u
-// međuvremenu imao Task Manager pred sobom.
-//
-// Sistemski programi se prikazuju, ali se NE mogu ugasiti odavde - inače bi
-// jedan pogrešan klik oborio Windows nasred smene.
+// Spisak procesa na računaru igrača. Sistemski procesi se prikazuju, ali
+// ne mogu da se ugase odavde.
 const mem = (b) => {
   const n = Number(b) || 0;
   if (n >= 1024 * 1024 * 1024) return (n / 1024 / 1024 / 1024).toFixed(1) + " GB";
@@ -1354,9 +1251,7 @@ const mem = (b) => {
 function procesiModal(c) {
   let spisak = [];
   let filter = "";
-  // Sistemskih procesa je oko dve trecine spiska i nijedan se ne gasi odavde.
-  // Radnik ovde trazi zaglavljenu igru, pa mu oni samo smetaju - prikazuju se
-  // tek na zahtev.
+  // Sistemski procesi se prikazuju tek na zahtev.
   let sviProcesi = false;
   modal(`Šta radi na ${c.name}`, `
     <div class="toolbar" style="margin-bottom:12px">
@@ -1477,12 +1372,10 @@ async function refreshPlayers() {
   let pukla = false;
   try { d = await api(`/players?page=${state.plPage}&per=25&search=${encodeURIComponent(state.plSearch)}`); }
   catch (e) { toast(e.message, "error"); pukla = !!e.veza; }
-  // Kad podaci NISU stigli, spisak ne sme da kaze "jos nema naloga" - radnik bi
-  // pomislio da nalog ne postoji i napravio isti jos jednom.
+  // Kad podaci nisu stigli, ne piše "još nema naloga".
   if (pukla) {
     $("#plCount").textContent = "podaci nisu učitani";
-    // Poruka ide UMESTO tabele, ne u njenu celiju: u celiji je sirina vezana za
-    // kolone, pa se na telefonu tekst lomio po jednu rec u redu.
+    // Poruka ide umesto tabele, ne u ćeliju (na telefonu bi se lomila).
     const kartica = $("#playerRows").closest(".card");
     if (kartica) kartica.innerHTML = `<div class="ucitavanje-palo">${icon("alert")}
       <b>Spisak nije mogao da se učita</b>
@@ -1551,8 +1444,8 @@ function playerModal() {
     }, "Pravim nalog..."));
   });
 }
-// Nalozi za goste koji nemaju svoj. Rezultat ostaje otvoren dok ga radnik ne
-// zatvori - lozinke se posle ne mogu videti nigde, mora da ih izdiktira sad.
+// Brzi gosti. Lozinke se vide samo ovde, pa prozor ostaje dok ga radnik ne
+// zatvori.
 function guestsModal() {
   modal("Brzi gost", `
     <div class="muted">Otvara naloge <b>gost-01</b>, <b>gost-02</b>... sa četvorocifrenom lozinkom koju izdiktiraš gostima.</div>
@@ -1566,9 +1459,7 @@ function guestsModal() {
     <button class="btn btn-primary btn-block" id="gbSave">Otvori naloge</button>`, (root, close) => {
     $$("[data-gq]", root).forEach((b) => b.addEventListener("click", () => { $("#gbBal", root).value = Number(b.dataset.gq); }));
     $$("[data-sati]", root).forEach((b) => b.addEventListener("click", () => { $("#gbBal", root).value = Math.round(Number(b.dataset.sati) * ratePerHour()); }));
-    // Dupli klik je ovde skuplji nego drugde: napravio bi DVA seta naloga, oba
-    // sa kreditom, a lozinke prvog seta se posle ne mogu videti nigde - one se
-    // pokazuju samo jednom, u prozoru koji drugi set prepiše.
+    // Dupli klik bi napravio dva seta naloga sa kreditom.
     $("#gbSave", root).addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
       const count = Number($("#gbCount", root).value);
       if (!count || count < 1) { $("#gbErr", root).textContent = "Unesi bar jedan nalog"; return; }
@@ -1582,8 +1473,7 @@ function guestsModal() {
   });
 }
 
-// Dugme za čišćenje se pokazuje samo kad stvarno ima šta da se obriše, da ne
-// stoji prazno na strani kod igraonice koja goste ne koristi.
+// Dugme za čišćenje samo kad ima šta da se obriše.
 async function osveziCiscenjeGostiju() {
   const b = $("#cleanGuests");
   if (!b || !isOwner()) return;
@@ -1629,9 +1519,8 @@ function prikaziGoste(igraci) {
   });
 }
 
-// Upozorenje da igraču ističe vreme. Namerno OSTAJE na ekranu dok ga radnik ne
-// skloni - kratki toast bi promakao dok se radnik bavi kasom ili pićem.
-// Klik na "Dopuni" odmah otvara dopunu tog igrača, da ne mora da ga traži.
+// Upozorenje da igraču ističe vreme ostaje dok ga radnik ne skloni; "Dopuni"
+// otvara dopunu tog igrača.
 const isticeAktivna = new Map(); // computerId -> element
 function upozoriIstice(m) {
   const lista = $("#isticeLista");
@@ -1676,8 +1565,7 @@ function osveziIstice() {
   }
 }
 
-// Kontrolna tabla drži samo sažetak igrača uz računar, pun zapis je na strani
-// Igrači koja se učitava po stranicama - ako nije u memoriji, dovuci ga.
+// Tabla ima samo sažetak igrača; pun zapis se po potrebi učitava.
 async function nadjiIgraca(id, username) {
   const p = state.players.find((x) => x.id === id) || (state.playersPage?.items || []).find((x) => x.id === id);
   if (p) return p;
@@ -1717,11 +1605,7 @@ async function topupModal(p) {
     <div class="tu-racun" id="tuRacun"></div>
     <div class="err-msg" id="tuErr"></div>
     <button class="btn btn-primary btn-block" id="tuSave">Dodaj</button>`, (root, close) => {
-    // KOLIKO JE TO VREMENA.
-    //
-    // Gost pruži 700 dinara i pita koliko dobija. Dugmad za sate rade u jednom
-    // smeru (sati -> iznos), a radnik najčešće ide obrnuto: ukuca iznos koji je
-    // dobio. Bez ovoga mora da računa u glavi, pred gostom i u gužvi.
+    // Koliko vremena donosi upisan iznos, i koliko će gost imati posle dopune.
     const racun = () => {
       const el = $("#tuRacun", root);
       if (!el) return;
@@ -1799,12 +1683,7 @@ async function editPlayerModal(p) {
     });
     $("#epPassBtn", root).addEventListener("click", async () => { try { await api(`/players/${p.id}/password`, "POST", { password: $("#epPass", root).value }); toast("Lozinka je resetovana", "success"); } catch (e) { toast(e.message, "error"); } });
     $("#epVip", root).addEventListener("click", () => { close(); vipIgracuModal(p); });
-    // BLOKIRANJE PREKIDA SESIJU I GASI IGRU.
-    //
-    // Nije samo oznaka na nalogu: ako gost trenutno igra, blokiranje mu zatvara
-    // sesiju i gasi igru na licu mesta. Do sada je išlo bez ijednog pitanja, a i
-    // bez hvatanja greške - kad zahtev padne, radnik ne vidi ništa i misli da je
-    // nalog blokiran.
+    // Blokiranje zatvara sesiju i gasi igru ako gost igra, pa se prvo pita.
     $("#epBan", root).addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
       const zaRacunarom = !p.banned && state.computers.find((c) => c.player?.id === p.id);
       if (zaRacunarom && !(await confirmDialog(
@@ -1826,15 +1705,8 @@ async function editPlayerModal(p) {
     });
   });
 }
-// VIP ZA GOSTA KOJI PLATI KEŠOM NA KASI.
-//
-// Gost koji ima kredit kupuje VIP sam, iz launchera, i osoblje o tome ne zna
-// ništa. Ovaj prozor je za onog koji preda pare preko pulta.
-//
-// KEŠ SE UPISUJE, I TO JE POLA POSLA OVOG PROZORA. Dok se novac nigde nije
-// zapisivao, uveče je u fioci stajao neobjašnjen višak - a višak se u obračunu
-// gleda isto kao i manjak. Zato je iznos ovde polje, a ne pretpostavka, i zato
-// poklonjen VIP mora da se izabere svesno.
+// VIP za gosta koji plaća kešom na kasi. Iznos se upisuje (ide u pazar
+// smene); poklonjen VIP se bira posebno.
 async function vipIgracuModal(p) {
   let cfg = null;
   try { cfg = await api("/vip"); } catch {}
@@ -1857,8 +1729,7 @@ async function vipIgracuModal(p) {
     ${p.vip ? `<button class="btn btn-danger btn-block" id="vgOff" style="margin-top:8px">${icon("x")} Oduzmi VIP odmah</button>` : ""}`,
   (root, close) => {
     const poklon = $("#vgPoklon", root), kes = $("#vgKes", root);
-    // Polje za iznos se zaključava, a ne skriva: radnik vidi da se ne naplaćuje
-    // umesto da se pita gde je nestalo.
+    // Kod poklona se polje za iznos zaključava, ne skriva.
     poklon.addEventListener("change", () => { kes.disabled = poklon.checked; if (poklon.checked) kes.value = 0; else kes.value = cena; });
     $("#vgSave", root).addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
       const d = Number($("#vgDana", root).value);
@@ -1968,12 +1839,8 @@ async function renderOrders() {
 document.addEventListener("click", async (e) => {
   const btn = e.target.closest("[data-o]");
   if (!btn) return;
-  // OTKAZIVANJE PITA, OSTALO NE.
-  //
-  // Dugme "×" stoji tik uz "Dostavljeno", a radi nešto sasvim drugo: vraća
-  // gostu novac na nalog, izbacuje račun iz pazara i vraća piće na stanje. Jedan
-  // promašen klik na porudžbini koja je uredno doneta znači da je gost dobio i
-  // piće i novac nazad, a da manjak ispliva tek pri obračunu smene.
+  // Otkazivanje vraća novac, izbacuje račun iz pazara i vraća piće na stanje,
+  // pa se prvo pita.
   if (btn.dataset.o === "cancelled") {
     const o = (state.orders || []).find((x) => String(x.id) === String(btn.dataset.id));
     const novac = o
@@ -2018,9 +1885,7 @@ function mountPlayerCombo(root, players, onPick) {
 async function renderPos() {
   try { state.shop = await api("/shop"); if (!state.players.length) state.players = await api("/players"); } catch {}
   const avail = state.shop.filter((i) => i.available);
-  // Jedan spisak i traka kategorija iznad njega. Ranije je svaka kategorija
-  // imala svoj red plocica, pa su se "Energetsko" i "Vode" delile istu traku i
-  // radnik je pred gostom trazio po ekranu ono sto staje u jedan red.
+  // Jedan spisak i traka kategorija iznad njega.
   const kategorije = [...new Set(avail.map((i) => i.category).filter(Boolean))];
   const izabrana = kategorije.includes(state.posFilter) ? state.posFilter : null;
   const vidljivi = izabrana ? avail.filter((i) => i.category === izabrana) : avail;
@@ -2052,9 +1917,8 @@ async function renderPos() {
   renderCart();
 }
 
-// Radnik kuca račun dok gost stoji pred njim. Slika se prepoznaje brže od
-// imena, a "Coca-Cola" i "Coca-Cola Zero" se po tekstu lako promaše.
-// korpa/atribut se razlikuju izmedju strane Kasa i pop-up porudžbine, sve ostalo je isto
+// Kartice sa slikom (brže se prepoznaju od imena). Korpa i atribut se
+// razlikuju za Kasu i pop-up porudžbine.
 function posItemHtml(i, korpa = state.posCart, atribut = "pos") {
   const uRacunu = korpa.get(i.id) || 0;
   const nema = i.stock === 0;
@@ -2133,12 +1997,8 @@ function renderCart() {
     const items = [...state.posCart].map(([id, qty]) => ({ id, qty }));
     if (!items.length) return;
     if (state.posPayment === "credit" && !state.posPlayerId) { toast("Ukucaj i izaberi nalog igrača", "error"); return; }
-    // BROJ POKUŠAJA - isti dok se račun ne promeni.
-    //
-    // Zaključano dugme sprečava da se klikne dvaput. Ali ono ima rok: posle
-    // osam sekundi bez odgovora se otključava, da radnik ne ostane zarobljen kad
-    // server zaćuti. U tom procepu drugi klik bi prošao kao NOV račun i naplatio
-    // dvaput. Server po ovom broju prepozna isti pokušaj i vrati stari odgovor.
+    // Broj pokušaja ostaje isti dok se račun ne promeni; server po njemu
+    // prepoznaje ponovljen zahtev (dugme se otključava posle osam sekundi).
     if (!state.posId) state.posId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     try {
       const r = await api("/pos", "POST", { items, playerId: state.posPayment === "credit" ? state.posPlayerId : null, payment: state.posPayment, poId: state.posId });
@@ -2195,8 +2055,8 @@ async function openOrderModal() {
         catch (e) { toast(e.message, "error"); }
       }, "Naplaćujem..."));
     }
-    // Pločice u modalu pokazuju koliko je čega već na računu, pa se preiscrtavaju
-    // zajedno sa desnom stranom.
+    // Pločice u modalu pokazuju količinu na računu i crtaju se zajedno sa desnom
+    // stranom.
     function osveziPlocicu(id) {
       const stara = $(`[data-add="${id}"]`, root);
       const it = state.shop.find((x) => x.id === id);
@@ -2237,9 +2097,7 @@ async function renderShop() {
       <button class="btn btn-sm btn-ghost del" data-shop="del" data-id="${i.id}">${icon("trash")}</button>
     </div></div>`;
   };
-  // Jedan spisak i traka kategorija iznad njega. Ranije je svaka kategorija
-  // imala svoj red kartica, pa su se dve kategorije delile istu traku a treca
-  // padala ispod - izgledalo je kao da su kartice nabacane gde je bilo mesta.
+  // Jedan spisak i traka kategorija iznad njega.
   const kategorije = Object.keys(cats).filter(Boolean);
   const izabrana = kategorije.includes(state.shopFilter) ? state.shopFilter : null;
   const vidljivi = izabrana ? items.filter((i) => i.category === izabrana) : items;
@@ -2324,13 +2182,8 @@ function shopModal(item) {
     if (rem) rem.addEventListener("click", () => { removeImg = true; picked = null; $("#imgPrev", root).innerHTML = monogram(it.name); });
     $("#siSave", root).addEventListener("click", async () => {
       const body = { name: $("#siName", root).value, category: $("#siCat", root).value, price: $("#siPrice", root).value, emoji: it.emoji || "", available: $("#siAvail", root).checked, stock: $("#siStock", root).value };
-      // ISTO IME NIJE GREŠKA NEGO PITANJE.
-      //
-      // Dva reda „Coca-Cola 0.5" su dve iste pločice na kasi koje radnik ne ume
-      // da razlikuje, zaliha podeljena na dve strane (jedna piše „rasprodato"
-      // dok druga ima dvadeset komada) i ista stvar brojana dvaput u izveštaju.
-      // Ali ponekad se baš to hoće, pa se ne zabranjuje - samo se kaže šta već
-      // postoji, pa vlasnik bira.
+      // Isto ime artikla: server pita, a vlasnik bira (ponovljen zahtev sa
+      // `svejedno`).
       const sacuvaj = async (svejedno) => {
         let id = item?.id;
         if (item) await api(`/shop/${item.id}`, "PUT", { ...body, svejedno });
@@ -2357,12 +2210,8 @@ function shopModal(item) {
 }
 
 // Igre
-// Podsetnik sa dimenzijama, i koliko igara jos ceka sliku. Stoji samo dok
-// stvarno nesto fali - kad je sve okaceno, traka nestaje.
-// Traka javlja SAMO ono što stvarno fali. Omot je obavezan - bez njega je
-// kartica u polici prazna. Baner je izborni: on je rezervna pozadina ekrana
-// prijave, a prijava već ima svoju pozadinu, pa igra bez banera nije problem i
-// ne sme da stoji kao upozorenje.
+// Traka sa dimenzijama i brojem igara bez omota; stoji samo dok nešto fali.
+// Baner je izborni (rezervna pozadina prijave), pa se ne traži.
 function trakaSlika(games) {
   const bezOmota = games.filter((g) => !g.image).length;
   const bezBanera = games.filter((g) => !g.banner).length;
@@ -2385,8 +2234,7 @@ async function renderGames() {
   window._games = games;
   const cats = {};
   games.forEach((g) => (cats[g.category || "Igre"] ||= []).push(g));
-  // Vlasnik mora na jedan pogled da vidi kojoj igri fali slika, inace bi morao
-  // da otvara svaku posebno da bi proverio.
+  // Kartica pokazuje kojoj igri fali slika.
   const card = (g) => `<div class="game-card ${g.available === 0 ? "off" : ""}">
     <div class="game-emoji omot">${g.image ? `<img src="${esc(g.image)}" alt="" />` : monogram(g.name)}</div>
     <div class="game-info">
@@ -2407,9 +2255,7 @@ async function renderGames() {
           title="${g.banner ? "Klikni da napraviš novi privremeni baner" : "Široka slika (2800x400) - izborna, rezervna pozadina ekrana prijave. Klikni da napraviš privremenu."}">${g.banner ? icon("check") : icon("image")} baner</button>
       </div>
     </div></div>`;
-  // Naslov kategorije se pise samo kad ih ima vise od jedne. Kad su sve igre u
-  // podrazumevanoj kategoriji, iznad spiska je stajalo "IGRE" - a strana se vec
-  // zove "Igre", pa je isti podatak pisao dva puta jedan ispod drugog.
+  // Naslov kategorije samo kad ih ima više od jedne.
   const viseKategorija = Object.keys(cats).length > 1;
   const groups = Object.entries(cats).map(([cat, list]) =>
     `${viseKategorija ? `<div class="kat-naslov">${esc(cat)}</div>` : ""}<div class="game-grid">${list.map(card).join("")}</div>`
@@ -2458,16 +2304,9 @@ document.addEventListener("click", async (e) => {
     }
   }
 });
-// KATEGORIJA SE NUDI, NE PAMTI SE NAPAMET
-//
-// Polje ostaje polje za kucanje - niko ne zna unapred šta će igraonica prodavati.
-// Ali čovek koji u utorak upiše "Piće" u četvrtak upiše "Pića", pa u launcheru
-// stoje dve police za istu stvar, obe sa po tri artikla. Ispod polja stoji ono
-// što već postoji, pa je lakše kliknuti nego se setiti kako je bilo napisano.
-//
-// Server uz to sam poklapa iste reči koje se razlikuju samo po velikom slovu,
-// razmaku ili kvačici (vidi `uskladiKategoriju` u service.js) - to je ono što
-// se sa sigurnošću zna da je ista stvar.
+// Ispod polja za kategoriju stoje postojeće kategorije. Server uz to sam
+// izjednačava reči koje se razlikuju samo po veličini slova, razmaku ili
+// kvačicama (uskladiKategoriju u service.js).
 function ponudaKategorija(spisak, id) {
   const kat = [...new Set((spisak || []).map((x) => String(x.category || "").trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, "sr-Latn-RS"));
@@ -2550,8 +2389,7 @@ function gameModal(game) {
 }
 
 // INTERNET ALATI (prečice u launcheru)
-// Pozadine ekrana u launcheru. Slike se kace ovde, ne u folder launchera -
-// jednom okacena slika odmah ide na sve računare, bez reinstalacije.
+// Pozadine ekrana u launcheru: okačena slika odmah ide na sve računare.
 const POZADINE_OPIS = {
   prijava: {
     naslov: "Ekran za prijavu",
@@ -2580,8 +2418,7 @@ const POZADINE_OPIS = {
   },
 };
 
-// Spisak promo banera se osvežava sam, bez ponovnog crtanja cele strane -
-// inače bi se pri svakom kliku gubio položaj skrola.
+// Spisak banera se osvežava bez crtanja cele strane (čuva se položaj skrola).
 async function ucitajPromo() {
   const box = $("#promoSpisak");
   if (!box) return;
@@ -2626,17 +2463,8 @@ document.addEventListener("click", async (e) => {
   } catch (err) { toast(err.message, "error"); }
 });
 
-// ZNAK I BOJA IGRAONICE
-//
-// Program se izdaje jedan, a svaka igraonica ima svoje ime, znak i boju. Dok su
-// logo i boja stajali ušiveni u fajlove, druga igraonica je morala da dobije
-// prepravljenu kopiju - pa bi i svaka nadogradnja morala da se pravi posebno.
-//
-// Izbor boje je bio polje za heks i sistemski birač. To radi, ali traži da
-// vlasnik ZNA koja boja valja, a nema kako da zna: boja mora da se čita na
-// tamnoj podlozi, da nosi belo slovo na dugmetu i da se ne pomeša sa bojama
-// koje ovde nešto znače. Zato sada ide spisak gotovih, proba pre primene i
-// upozorenje kad izabrana boja upadne u tuđe značenje.
+// Znak i boja igraonice. Boja se bira sa spiska gotovih ili upisuje, proba
+// se u okviru pre primene, a upozorenje stiže kad boja upadne u tuđe značenje.
 let bkBrend = null;      // poslednje što je server rekao
 let bkIzbor = null;      // boja koja se PROBA (još nije primenjena)
 let bkSvoja = false;     // je li otvoreno polje za svoju boju
@@ -2649,8 +2477,7 @@ async function ucitajBrend() {
   let b;
   try { b = await api("/brend"); } catch { telo.innerHTML = '<div class="faint">Nije učitano</div>'; return; }
   if (!$("#brendTelo")) return;
-  // Proba se resetuje na ono što je stvarno primenjeno. Da ostane od prošlog
-  // puta, vlasnik bi se vratio na stranicu i video boju koju nikad nije potvrdio.
+  // Proba kreće od boje koja je stvarno primenjena.
   bkBrend = b;
   bkIzbor = b.akcenat;
   bkZamerke = [];
@@ -2678,8 +2505,7 @@ async function ucitajBrend() {
   vezeZnak();
 }
 
-// Crta se samo deo sa bojom, ne cela kartica - da izbor boje ne prerisava i
-// znak iznad njega (pa da polje za fajl izgubi vezu).
+// Crta se samo deo sa bojom, da polje za fajl znaka ne izgubi vezu.
 function crtajBoju() {
   const cilj = $("#bkTelo");
   if (!cilj || !bkBrend) return;
@@ -2690,8 +2516,6 @@ function crtajBoju() {
 function zamerkeHtml(z) {
   if (!z || !z.length) return "";
   return z.map((x) => `<div class="bk-zamerka">${icon("alert")}<span>${esc(x.tekst)}</span></div>`).join("") +
-    // Poslednja rečenica je namerna: vlasnik odlučuje kako mu izgleda igraonica.
-    // Bez nje upozorenje liči na kvar, pa se ljudi vrte u krug tražeći "ispravnu" boju.
     `<div class="bk-zamerka-pod">Boja se ipak može primeniti - ovo je upozorenje, ne zabrana.</div>`;
 }
 
@@ -2758,12 +2582,10 @@ function vezeBoju() {
     postaviProbu(biras.value, true);
   });
   if (heks) heks.addEventListener("input", () => {
-    // Dok vlasnik kuca, vrednost je pola gotova ("#2f6"). Proba se ne pomera dok
-    // ne postane cela boja - inače bi treperila na svaki otkucaj.
+    // Proba se menja tek kad je upisana cela boja.
     const v = heks.value.trim();
     if (!/^#[0-9a-f]{6}$/i.test(v)) return;
-    // Birač mora da prati upisano. Dok nije, pokazivao je staru boju pored nove
-    // - pa je izgledalo kao da polje i birač govore o dve različite stvari.
+    // Birač prati upisanu vrednost.
     if (biras) biras.value = v;
     postaviProbu(v, true);
   });
@@ -2780,21 +2602,18 @@ function vezeBoju() {
   }, "Primenjujem..."));
 
   const fab = $("#bkFabricka");
-  // Fabrička boja stiže sa servera. Dok ju je panel držao kao svoju kopiju, ovo
-  // dugme je vraćalo staru boju i pošto je fabrička promenjena.
+  // Fabrička boja stiže sa servera.
   if (fab) fab.addEventListener("click", () => postaviProbu(bkBrend.fabricki));
 }
 
-// Proba se menja ODMAH, ali se ne čuva. Primena ide na svih trinaest mašina
-// odjednom, pa vlasnik prvo mora da vidi šta bira.
+// Proba se menja odmah, ali se ne čuva dok vlasnik ne potvrdi.
 function postaviProbu(heks, uzivo) {
   const v = String(heks || "").trim().toLowerCase();
   if (!/^#[0-9a-f]{6}$/.test(v)) return;
   bkIzbor = v;
   if (uzivo) {
-    // Vučenje po biraču boje poziva ovo na svaki pomeraj miša. Prerisati celo
-    // polje značilo bi da birač u tom trenutku izgubi fokus, pa se menjaju samo
-    // proba, dugme i oznaka izabranog uzorka.
+    // Tokom vučenja birača menjaju se samo proba, dugme i oznaka uzorka, da birač
+    // ne izgubi fokus.
     obeleziProbu();
   } else {
     crtajBoju();
@@ -2814,9 +2633,8 @@ function obeleziProbu() {
   $$("#bkTelo [data-bk]").forEach((el) => el.classList.toggle("aktivna", el.dataset.bk.toLowerCase() === bkIzbor));
 }
 
-// Zamerke i izvedene nijanse računa SERVER - isto ono što će dobiti launcher.
-// Da panel računa svoje, proba bi pokazivala jednu boju a mašine drugu.
-// Pitanje se odlaže da vučenje po biraču ne pošalje stotinu zahteva.
+// Zamerke i nijanse računa server (iste dobija launcher). Pitanje se odlaže
+// dok se birač vuče.
 function osveziProveru(odmah) {
   clearTimeout(bkTajmer);
   const trazi = async () => {
@@ -2861,8 +2679,7 @@ function vezeZnak() {
 async function renderIzgled() {
   let podaci = { spisak: {}, slike: {} };
   try { podaci = await api("/pozadine"); } catch (e) { toast(e.message, "error"); }
-  // Sare i prozirnosti stizu sa servera, iste one koje dobija launcher - pregled
-  // ovde zato ne moze da pokaze nesto drugo od onoga sto igrac vidi.
+  // Šare i prozirnosti stižu sa servera, iste one koje dobija launcher.
   let tex = { spisak: {}, jacine: {}, prozirnosti: {}, izbor: { kljuc: "nema", jacina: "srednje" } };
   try { tex = await api("/tekstura"); } catch (e) { toast(e.message, "error"); }
   const vid = tex.prozirnosti[tex.izbor.jacina] ?? 0.75;
@@ -2958,8 +2775,7 @@ async function renderIzgled() {
 
     <div class="poz-mreza">${Object.keys(POZADINE_OPIS).map(kartica).join("")}</div>`;
 
-  // Sara sadrzi navodnike, pa ne sme kroz style="..." atribut - tu bi se string
-  // prekinuo na prvom navodniku i uzorak bi ostao prazan.
+  // Šara sadrži navodnike, pa ne ide kroz style="..." atribut.
   $$("[data-sara]").forEach((el) => {
     const o = tex.spisak[el.dataset.sara];
     if (!o || !o.sara) return;
@@ -3023,26 +2839,21 @@ async function renderIzgled() {
   }));
 }
 
-// Ovi alati imaju ugradjen logo u launcheru, njima cover slika nije potrebna.
-// Spisak mora da prati BRANDS u client/renderer/js/launcher.js.
+// Alati sa ugrađenim logom u launcheru ne traže sliku. Spisak prati BRANDS u
+// client/renderer/js/launcher.js.
 const ALATI_SA_LOGOM = ["steam", "epic games", "battle.net", "youtube", "discord", "teamspeak", "google", "spotify", "twitch", "faceit"];
-// Isto pravilo kao u launcheru: razmaci, tacke i crtice se ne broje, pa
-// "Team Speak" i "Battlenet" pogadjaju "teamspeak" i "battle.net".
+// Isto poređenje kao u launcheru (bez razmaka, tačaka i crtica).
 const kljucBrenda = (ime) => String(ime || "").toLowerCase().replace(/[\s._-]/g, "");
 const SET_LOGOA = new Set(ALATI_SA_LOGOM.map(kljucBrenda));
-// Isto pravilo kao u launcheru: prvo tacno ime, pa pocetak imena - da "Faceit AC"
-// i "Discord PTB" pogode svoj brend. Duzi kljucevi idu prvi.
+// Tačno ime, pa početak imena; duži ključevi prvi.
 const KLJUCEVI_LOGOA = [...SET_LOGOA].sort((a, b) => b.length - a.length);
 const imaUgradjenLogo = (ime) => {
   const k = kljucBrenda(ime);
   return !!k && (SET_LOGOA.has(k) || KLJUCEVI_LOGOA.some((b) => k.startsWith(b)));
 };
 
-// Prečica na program vadi PRAVU ikonu iz .exe fajla, pa joj slika ne treba -
-// launcher pokaže isti logo koji Windows pokazuje za taj program. Bez ovoga bi
-// panel javljao da fali slika i za alate koji je već imaju.
-// Isto pravilo kao u launcheru: prečica bez nastavka ("C:\games\cs2" a na
-// disku "cs2.lnk") i dalje daje ikonu, jer je launcher sam pronađe.
+// Prečica na program ne traži sliku: launcher uzima ikonu iz .exe fajla (i
+// za putanju bez nastavka).
 const samSeSnalazi = (t) => t.kind === "app" && !!String(t.target || "").trim()
   && !/^[a-z][a-z0-9+.-]*:\/\//i.test(String(t.target || "").trim());
 const trebaSlika = (t) => !t.image && !imaUgradjenLogo(t.name) && !samSeSnalazi(t);
@@ -3181,12 +2992,8 @@ function toolModal(tool) {
 async function renderComputers() {
   const comps = await api("/computers");
   const onlineCount = comps.filter((c) => c.online).length;
-  // Verzija launchera po racunaru. Kad se jedan racunar ponasa drugacije od
-  // ostalih, prvo se gleda da li je zaostao za ostalima - a to se ranije nije
-  // videlo nigde.
-  //
-  // "Najnovija" se trazi poredjenjem BROJEVA, i samo u novoj numeraciji: kao
-  // tekst je 2.9.0 novije od 2.44.0, a stari 2.57.0 je po broju veci od v1.0.0.
+  // Verzija launchera po računaru. "Najnovija" se traži poređenjem brojeva i
+  // samo u novoj numeraciji.
   const najnovija = comps.filter((c) => c.verzija && c.numeracija >= 1).map((c) => c.verzija).sort(porediVerzije).pop();
   const verzijaCel = (c) => {
     if (!c.verzija) return '<span class="faint" title="Launcher se nije javio ili ne javlja verziju">-</span>';
@@ -3233,10 +3040,7 @@ document.addEventListener("click", async (e) => {
 
 // Instalacije
 const INSTALL_STATE = { queued: ["Na čekanju", "gray"], downloading: ["Preuzimanje...", "blue"], installing: ["Instalacija...", "amber"], done: ["Završeno", "green"], error: ["Greška", "red"] };
-// Linkovi instalacija su predugacki za red u tabeli. Kad se seku s desna, ostane
-// "https://www.battle.net/downloa" - vidi se odakle je, ali ne i sta skida.
-// Zato se secka SREDINA: ostaju sajt i ime fajla, a to su bas dve stvari koje
-// vlasnik proverava pre nego sto posalje instalaciju na trinaest masina.
+// Dug link se skraćuje u sredini: ostaju sajt i ime fajla.
 function skratiLink(url) {
   try {
     const u = new URL(url);
@@ -3250,13 +3054,8 @@ function skratiLink(url) {
 
 // ---------- Nadogradnja launchera ----------
 //
-// Do sada je svaka izmena launchera znacila obilazak svih trinaest masina.
-// Odavde se instalater postavi jednom, pusti u rad, i racunari ga uzimaju sami
-// cim se oslobode.
-//
-// Podela posla nije slucajna: instalater postavlja i pusta SERVISER (on ga je i
-// napravio, pa jedini moze da zna da li valja), a vlasnik vidi stanje i sme da
-// pogura one koji su slobodni.
+// Instalater postavlja i pušta serviser; vlasnik vidi stanje i sme da pošalje
+// nadogradnju slobodnim računarima.
 const NAD_STANJE = {
   poslato: ["Poslato", "gray"],
   preuzimam: ["Preuzima...", "blue"],
@@ -3265,9 +3064,7 @@ const NAD_STANJE = {
   greska: ["Greška", "red"],
   preskoceno: ["Čeka", "gray"],
 };
-// Prima BAJTOVE. Ime je puno namerno: nize u fajlu postoji lokalni `mb` koji
-// prima megabajte, a dve funkcije istog imena sa razlicitim jedinicama su
-// greska koja ceka da se desi.
+// Prima bajtove (nije isto što i lokalni `mb` niže, koji prima megabajte).
 const velicinaFajla = (b) => (b >= 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.round(b / 1024) + " KB");
 
 function nadogradnjaHtml(n) {
@@ -3327,9 +3124,8 @@ function nadogradnjaHtml(n) {
   </div>`;
 }
 
-// ---- NADOGRADNJA SERVERA ----
-// Tok je u server/src/nadogradnja-servera.js. Ovde samo: koja verzija radi, šta
-// čeka, i dugme - uz rečenicu šta se dešava sa igračima dok server ne radi.
+// ---- Nadogradnja servera ----
+// Tok je u server/src/nadogradnja-servera.js.
 function nadogradnjaServeraHtml(n) {
   if (!n) return "";
   const p = n.paket;
@@ -3377,8 +3173,7 @@ async function posaljiPaketServera(file) {
   return d;
 }
 
-// Posle klika na "Nadogradi" server se gasi i vraća. Panel čeka da se javi -
-// i to sa NOVOM verzijom - umesto da korisnik osvežava stranu i nagađa.
+// Posle "Nadogradi" panel čeka da se server javi novom verzijom.
 async function sacekajNoviServer(verzija, stara) {
   const doKad = Date.now() + 150000;
   await new Promise((r) => setTimeout(r, 3000));
@@ -3494,8 +3289,7 @@ function nadogradnjaKlik(e) {
   if (sta === "pusti") {
     const n = state.nadogradnja;
     jednomKlik(btn, async () => {
-      // Ovo je jedina radnja u panelu koja pokrece instalaciju na svim
-      // masinama. Broj masina stoji u pitanju da bi se videlo koliko je siroko.
+      // Pitanje navodi broj računara.
       const ok = await confirmDialog(
         `Računari će je preuzeti i instalirati sami, čim se oslobode. ` +
         `Računar na kom neko igra se ne dira - on dolazi na red kasnije.`,
@@ -3674,9 +3468,7 @@ function installTargets(prog) {
     <div style="max-height:300px;overflow-y:auto">${rows}</div>
     <div class="err-msg" id="itErr"></div>
     <button class="btn btn-primary btn-block" id="itSend">Pošalji instalaciju</button>`, (root, close) => {
-    // Dupli klik bi poslao istu instalaciju dvaput na iste mašine: dva
-    // preuzimanja i dva instalatera istog programa u isto vreme, koji onda
-    // smetaju jedan drugom i oba padnu.
+    // Dupli klik bi poslao istu instalaciju dvaput.
     $("#itSend", root).addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
       const ids = $$(".inst-t:checked", root).map((c) => Number(c.dataset.id));
       if (!ids.length) { $("#itErr", root).textContent = "Izaberi bar jedan online računar"; return; }
@@ -3689,17 +3481,8 @@ function installTargets(prog) {
 // Radnici
 async function renderStaff() {
   const admins = await api("/admins");
-  // Ugašen nalog (otpušten radnik) ostaje na spisku: vlasnik mora da vidi ko je
-  // sve imao pristup, a smene i promet i dalje nose njegovo ime.
-  // SERVISERSKI NALOG SE VIDI, ALI SE NE DIRA.
-  //
-  // Vlasnik je gazda svoje igraonice, ali ne i programa: serviserski nalog ne
-  // pravi i ne uklanja. Zato dugmad stoje samo nad nalozima NIŽIM od mog.
-  //
-  // Vidi se namerno. Nalog koji ima pristup tuđim podacima ne sme da bude
-  // sakriven od onoga čiji su podaci - vlasnik u svakom trenutku zna ko još
-  // može da uđe. Ne može da ga ukloni (to je cena podrške), ali ne može ni da
-  // bude obmanut da ga nema.
+  // Ugašeni nalozi ostaju na spisku. Serviserski nalog se vidi, ali dugmad
+  // stoje samo nad nalozima niže uloge.
   const PILULA = { serviser: "pill red", owner: "pill amber", staff: "pill blue" };
   const rows = admins.map((a) => {
     const smem = smemNad(a.role);
@@ -3729,8 +3512,7 @@ async function renderStaff() {
     <div class="field"><label>Korisničko ime</label><input id="saUser" autofocus /></div>
     <div class="field"><label>Lozinka</label><input id="saPass" /></div>
     <div class="field"><label>Uloga</label><select id="saRole"><option value="staff">Radnik</option><option value="owner">Vlasnik</option>${
-      // Serviserski nalog nudi samo serviseru. Vlasnik ne sme sebi da napravi
-      // nadređenog - ni slučajno ni namerno; server to i odbija.
+      // Serviserski nalog nudi samo serviseru (server to i proverava).
       isServiser() ? '<option value="serviser">Serviser</option>' : ""}</select></div>
     <div class="err-msg" id="saErr"></div><button class="btn btn-primary btn-block" id="saSave">Kreiraj</button>`, (root, close) => {
     $("#saSave", root).addEventListener("click", async () => { try { await api("/admins", "POST", { username: $("#saUser", root).value, password: $("#saPass", root).value, role: $("#saRole", root).value }); toast("Nalog je kreiran", "success"); close(); renderStaff(); } catch (e) { $("#saErr", root).textContent = e.message; } });
@@ -3741,8 +3523,7 @@ document.addEventListener("click", async (e) => {
   if (!btn) return;
   const id = Number(btn.dataset.id);
   if (btn.dataset.staff === "del") {
-    // Ako mu je smena jos otvorena, kasa ostaje na njegovo ime a on vise ne
-    // moze da udje da je zatvori - vlasnik mora da zna da to pada na njega.
+    // Otvorena smena radnika kome se oduzima pristup ostaje vlasniku da je zatvori.
     const uSmeni = state.shift && state.shift.admin === btn.dataset.name;
     if (await confirmDialog("Radniku se oduzima pristup panelu i prijava mu više neće raditi. Smene i dopune koje je upisao ostaju zapisane na njegovo ime, jer bez toga obračun smene nema smisla. Nalog se kasnije može vratiti."
       + (uSmeni ? "\n\nPAŽNJA: njegova smena je trenutno otvorena. Pošto više neće moći da uđe, smenu ćete morati sami da zatvorite i prebrojite kasu." : ""),
@@ -3813,13 +3594,10 @@ async function refreshLogs() {
 }
 const LOG_ICON = { prijava: "key", sesija: "clock", novac: "cash", shop: "bag", igre: "igre", racunar: "monitor", nalozi: "user", podesavanja: "sliders", sistem: "info" };
 function logRow(l) {
-  // Kategorija se pise samo dok se gleda "Sve". Kad je filter vec na "Prijave",
-  // oznaka "Prijave" uz svaki red ne kaze nista novo.
+  // Kategorija se ispisuje samo u prikazu "Sve".
   const kat = (state.logFilter || "sve") === "sve"
     ? `<span class="log-kat">${LOG_CATS[l.category] || l.category}</span>` : "";
-  // Kvar mora da se razlikuje od obicnog zapisa. Bez toga red "igra nije htela
-  // da se pokrene" izgleda isto kao "pokrenuta igra", pa se u spisku izgubi -
-  // a to je bas red zbog kog se logovi i otvaraju.
+  // Neuspeh (`*_fail`) se razlikuje od običnog zapisa.
   const kvar = /_fail$/.test(l.action || "");
   return `<div class="log-row${kvar ? " kvar" : ""}">
     <span class="log-ic ${l.category}">${icon(LOG_ICON[l.category] || "info")}</span>
@@ -3836,11 +3614,8 @@ function prependLog(l) {
   prependLog._t = setTimeout(() => { if (state.view === "logs") refreshLogs(); }, 350);
 }
 
-// Red u podešavanjima: naslov i objašnjenje levo, polje desno.
-// Stoji IZVAN renderSettings jer ga koristi i kartica nagradnog točka, koja se
-// učitava zasebno. Dok je bio lokalna promenljiva, ta kartica je pucala na
-// "setRow is not defined" i zauvek ostajala na "učitavam..." - osoblje nije
-// moglo ni da upali točak ni da promeni nagrade.
+// Red u podešavanjima: naslov i objašnjenje levo, polje desno. Van
+// renderSettings, jer ga koristi i kartica točka koja se učitava posebno.
 const setRow = (t, d, c, stanje = "") => `<div class="set-row"><div class="sr-l"><div class="sr-t">${t}</div>${d ? `<div class="sr-d ${stanje}">${d}</div>` : ""}</div><div class="sr-c">${c}</div></div>`;
 
 // Podešavanja
@@ -3926,12 +3701,8 @@ async function renderSettings() {
       </div>` : ""}
     </div>`;
   $("#setSave").addEventListener("click", async () => {
-    // PROMENA CENE PO SATU MENJA VREME SVIMA KOJI IGRAJU.
-    //
-    // Vreme nije zapamćeno uz nalog nego se računa iz kredita: kredit podeljen
-    // cenom. Ko je uplatio 600 pri ceni 120 ima pet sati; čim cena skoči na
-    // 150, isti taj kredit vredi četiri. Igrači to vide odmah, na svom tajmeru,
-    // usred sesije - a vlasnik koji menja cenu obično misli samo na nove goste.
+    // Promena cene po satu menja preostalo vreme svima koji igraju (vreme se
+    // računa iz kredita), pa se pre čuvanja prikazuje primer.
     const staraCena = Number(state.settings.ratePerHour) || 0;
     const novaCena = Number($("#setRate").value) || 0;
     const uIgri = (state.computers || []).filter((c) => c.session && c.player).length;
@@ -3977,9 +3748,7 @@ async function renderSettings() {
   ucitajSkladiste();
 }
 
-// Prostor na disku. Glavni računar niko neće održavati, a kad disk stane server
-// ne može da piše i cela igraonica staje - zato vlasnik ovo vidi na istom mestu
-// gde su i rezervne kopije, a ne tek kad bude kasno.
+// Prostor na disku, uz rezervne kopije.
 async function ucitajSkladiste() {
   const telo = $("#skladisteTelo");
   if (!telo) return;
@@ -3987,8 +3756,7 @@ async function ucitajSkladiste() {
   try { s = await api("/skladiste"); }
   catch (e) { telo.innerHTML = `<div class="faint" style="padding:4px 0">${esc(e.message)}</div>`; return; }
 
-  // Nova igraonica ima bazu manju od megabajta. Zaokruženo na cele, to je
-  // "0 MB" i izgleda kao da nešto ne radi - zato sitno ide u kilobajtima.
+  // Mala baza se prikazuje u kilobajtima.
   const mb = (n) => {
     if (n >= 1024) return (n / 1024).toFixed(1) + " GB";
     if (n >= 10) return Math.round(n) + " MB";
@@ -3998,9 +3766,7 @@ async function ucitajSkladiste() {
   const disk = s.slobodnoMB === null ? '<span class="faint">nepoznato</span>'
     : `<span${s.maloMesta ? ' style="color:var(--danger)"' : ""}>${mb(s.slobodnoMB)} slobodno</span>`;
   const komada = `${s.kopijaKomada} ${oblik(s.kopijaKomada, "kopija", "kopije", "kopija")}`;
-  // Slike su obično višestruko veće od same baze - devet omota je sedam
-  // megabajta, a baza manja od jednog. Dok se nisu brojale, ovde je pisalo da
-  // program zauzima pola megabajta, pa se prostor na disku nije ni gledao.
+  // Slike se prikazuju posebno; obično zauzimaju više od baze.
   telo.innerHTML =
     kv("Baza", fmtBytes(s.bazaBajta)) +
     kv("Otpremljene slike", `${fmtBytes(s.slikeBajta || 0)} <span class="faint">${s.slikaKomada || 0} ${oblik(s.slikaKomada || 0, "slika", "slike", "slika")}</span>`) +
@@ -4048,28 +3814,16 @@ async function ucitajSkladiste() {
   };
 }
 
-// VIP ČLANARINA - podešavanje (vlasnik).
-//
-// RANG SE ZARAĐUJE, VIP SE KUPUJE. Rang dolazi od igranja, besplatan je i on je
-// status; VIP se plaća, nosi pogodnosti i on je prihod. Dok je VIP bio nagrada
-// za peti nivo, bio je trošak - i to baš na najboljim gostima, kojima je kuća
-// pravila popust iako bi ionako došli.
-//
-// Kartica odgovara na dva pitanja, i to tim redom: ISPLATI LI SE (koliko ih ima
-// i koliko je ušlo) i ŠTA GOST DOBIJA. Bez prvog, podešavanje je pet polja za
-// kucanje bez ijednog podatka - pa se cena nikad ne menja, jer se ne zna prema
-// čemu bi se menjala.
+// VIP članarina (vlasnik): koliko članova ima i koliko je ušlo, pa šta gost
+// dobija.
 async function ucitajVip() {
   const box = $("#vipKartica");
   if (!box) return;
   let cfg, tocak = null;
-  // Točak se čita i ovde, a ne iz window._tocak: dve kartice se učitavaju
-  // paralelno, pa se na koju će prva stići ne može računati. Dok se računalo,
-  // VIP kartica je pri prvom otvaranju tvrdila da je točak isključen.
+  // Točak se čita i ovde; dve kartice se učitavaju paralelno.
   try { [cfg, tocak] = await Promise.all([api("/vip"), api("/tocak").catch(() => null)]); }
   catch (e) {
-    // Kartica koja zauvek piše "učitavam..." je ista greška kao i prazna strana:
-    // vlasnik ne zna da li VIP ne postoji ili nešto ne radi.
+    // Neuspelo učitavanje se prikazuje kao greška.
     box.innerHTML = `<div class="ucitavanje-palo">${icon("alert")}
       <b>VIP podešavanja nisu učitana</b><span>${esc(e.message)}</span>
       <button class="btn btn-sm" id="vipPonovo">Pokušaj ponovo</button></div>`;
@@ -4081,8 +3835,7 @@ async function ucitajVip() {
 
   const tocakUkljucen = !!tocak?.ukljucen;
   const obicanPrag = Number(tocak?.prag ?? 1200);
-  // Brojke se pokazuju tek kad ih ima. "0 članova, 0 dinara" u igraonici koja
-  // VIP još nije ni uključila nije podatak nego ukras.
+  // Brojke samo kad ih ima.
   const imaBrojki = cfg.aktivnih > 0 || cfg.prodato30 > 0;
   const brojke = imaBrojki ? `
     <div class="vip-brojke">
@@ -4129,8 +3882,7 @@ async function ucitajVip() {
       ucitajVip();
     } catch (e) { toast(e.message, "error"); sw.checked = !sw.checked; }
   });
-  // Svako polje se čuva kad ga radnik napusti, kao i kod točka. Poruka o grešci
-  // vraća staru vrednost u polje - inače na ekranu ostane broj koji nije upisan.
+  // Polje se čuva kad ga radnik napusti; greška vraća staru vrednost.
   for (const [polje, kljuc] of [["#vipCena", "cena"], ["#vipDana", "dana"], ["#vipXp", "xpMnozilac"], ["#vipTocakPrag", "tocakPrag"]]) {
     const el = $(polje);
     if (!el) continue;
@@ -4171,8 +3923,7 @@ async function ucitajTocak() {
       <button class="btn btn-sm" id="nagNova">${icon("plus")} Nagrada</button></div>
     <div class="paketi-lista">${nagRedovi}</div>`;
   const sw = $("#tocakUkljucen");
-  // VIP kartica se osvežava zajedno sa točkom: na njoj piše koliki je prag
-  // ostalima i da li točak uopšte radi, pa bi inače ostajala da tvrdi staro.
+  // VIP kartica se osvežava zajedno sa točkom (prikazuje prag i stanje točka).
   if (sw) sw.addEventListener("change", async () => {
     try { await api("/tocak", "POST", { ukljucen: sw.checked }); toast(sw.checked ? "Točak je uključen" : "Točak je isključen", "success"); ucitajVip(); }
     catch (e) { toast(e.message, "error"); sw.checked = !sw.checked; }
@@ -4279,15 +4030,7 @@ document.addEventListener("click", async (e) => {
   }
 });
 
-// KOPIJA VAN RAČUNARA.
-//
-// Baza i sve rezervne kopije stoje na istom disku. Sve gore na ovoj strani
-// pazi da disk ne PUKNE od punoće - ništa od toga ne pomaže kad disk OTKAŽE.
-// Tog dana nestaje sve odjednom: nalozi, kredit koji su gosti uplatili, promet.
-//
-// Zato ova kartica ne ćuti dok nije podešena. Prazno odredište stoji žuto,
-// zastarela kopija crveno - da se stanje vidi na strani koju vlasnik ionako
-// otvara, umesto da se otkrije onog dana kad zatreba.
+// Kopija van računara: nepodešena stoji žuto, zastarela ili neuspela crveno.
 async function ucitajKopijuVan() {
   const telo = $("#kopijaVanTelo");
   if (!telo) return;
@@ -4338,8 +4081,7 @@ async function ucitajKopijuVan() {
   };
   $("#kvSada").onclick = async () => {
     const b = $("#kvSada"); b.disabled = true;
-    // Koliko je slika otišlo se KAŽE. Baza bez slika je pola kopije, a razliku
-    // vlasnik inače vidi tek kad mu zatreba vraćanje.
+    // Poruka kaže i koliko je slika preneto.
     try {
       const r = await api("/kopija-van/sada", "POST");
       const sl = (r.slike?.novih || 0) + (r.slike?.preskoceno || 0);
@@ -4350,8 +4092,7 @@ async function ucitajKopijuVan() {
   };
 }
 
-// Kopije se preuzimaju direktno, sa tokenom u zaglavlju - zato ide preko
-// blob-a, a ne kao obican link koji bi vratio 401.
+// Kopija se preuzima sa tokenom u zaglavlju, preko blob-a.
 async function ucitajKopije() {
   const tb = $("#kopijeRedovi");
   if (!tb) return;
@@ -4362,8 +4103,7 @@ async function ucitajKopije() {
     tb.innerHTML = '<tr><td class="empty" style="padding:18px">Još nema kopija</td></tr>';
     return;
   }
-  // Pet poslednjih je dovoljno da se vidi da kopije rade; red iznad kaze koliko
-  // ih se ukupno cuva, a osam redova je samo produzavalo stranu.
+  // Pet poslednjih; iznad piše koliko se ukupno čuva.
   tb.innerHTML = spisak.slice(0, 5).map((k) => `<tr>
     <td class="mono faint" style="font-size:13px;white-space:nowrap">${dt(k.vreme)}</td>
     <td class="faint">${fmtBytes(k.velicina)}</td>

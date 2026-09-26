@@ -14,15 +14,11 @@ function sirovi(putanja, zaglavlja = {}) {
     r.on("error", rej); r.end();
   });
 }
-// Dva razloga zbog kojih nadogradnja "ne uhvati": stara sara i kesiran panel.
+// Dva razloga zbog kojih se nadogradnja ne vidi:
 //
-// 1. Igracu fale animacije. Sara i kretanje se cuvaju u bazi. Postojeca baza,
-//    napravljena pre nego sto smo dodali sare, nema taj podatak - pa server
-//    podrazumeva "nema" i launcher ne crta nista. Vlasnik zameni fajlove i i
-//    dalje je ravno.
-// 2. Panelu fale sve izmene. style.css i app.js se ucitavaju bez oznake verzije,
-//    pa pregledac posle nadogradnje servira staru, kesiranu stranu. Vlasnik se
-//    zakune da se "nista nije promenilo".
+// 1. Stara baza nema podatak o sari i kretanju; bez njega launcher ne crta nista.
+// 2. style.css i app.js bez oznake verzije pregledac posle nadogradnje servira
+//    iz kesa.
 const BASE = "http://127.0.0.1:8129";
 const DATA = radniFolder("nadogradnja-data");
 

@@ -1,8 +1,7 @@
 import { radniFolder, podigniServer, citajIzvor } from "./_okruzenje.mjs";
-// Panel se otvara sa SVAKOG telefona na mrezi, a preko njega se dopunjuje
-// kredit. Ko udje sa admin/admin moze sebi da upise koliko hoce.
-// Dosad je o fabrickoj lozinki pisalo samo u konzoli servera pri prvom
-// pokretanju - a taj prozor niko ne cita i najcesce je minimizovan.
+// Panel se otvara sa svakog telefona na mrezi, a preko njega se dopunjuje
+// kredit. Fabricka lozinka (admin/admin) mora da se vidi u panelu, ne samo u
+// konzoli servera.
 const BASE = "http://127.0.0.1:8145";
 const DATA = radniFolder("lozinka-data");
 await podigniServer(DATA, 8145);
@@ -42,9 +41,8 @@ const panel = citajIzvor("server/public/js/app.js");
 proveri("upozorenje je na kontrolnoj tabli", /\$\{upozorenjeLozinka\(\)\}/.test(panel),
   "u Podesavanjima ga vlasnik ne bi video - tu ulazi jednom");
 proveri("upozorenje kaze zasto je vazno", panel.includes("dopunjuje kredit"));
-// Ranije je tu pisalo "klikni na svoje ime dole levo". Na telefonu profil stoji
-// GORE DESNO, pa je uputstvo vodilo na pogresnu stranu ekrana. Sad upozorenje
-// nosi svoje dugme, pa nema sta da promasi.
+// Upozorenje nosi svoje dugme za promenu lozinke (profil na telefonu stoji
+// gore desno, na racunaru dole levo).
 proveri("upozorenje ima dugme za promenu lozinke", /id="upzLozinka"/.test(panel));
 proveri("dugme stvarno otvara promenu lozinke", /#upzLozinka.*\)\) promenaLozinkeModal\(\)/s.test(panel));
 proveri("upozorenje ne upucuje na stranu ekrana", !panel.includes("dole levo"),

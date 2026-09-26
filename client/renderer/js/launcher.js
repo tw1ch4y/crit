@@ -1,7 +1,6 @@
-// CRIT LAUNCHER (renderer)
+// Launcher - ekran (renderer)
 const S = {
-  // Pocetna vrednost dok "welcome" ne stigne. Bez imena igraonice - inace bi
-  // druga igraonica na trenutak videla tudje ime na svom ekranu za prijavu.
+  // Početna vrednost dok "welcome" ne stigne; bez imena igraonice.
   settings: { cafeName: "Igraonica", currency: "RSD", ratePerHour: 120 },
   host: "",
   computer: null,
@@ -16,8 +15,7 @@ const S = {
   teksture: null,   // spisak sara za biranje, stize uz welcome
   mojaTekstura: null, // izbor ovog igraca; null znaci "kao u igraonici"
   promo: [],
-  // Ima li kuća internet. Proverava server i javlja svima; `null` znači "ne zna
-  // se" (server jos nije javio ili veza ne radi) i NIJE isto što i "nema".
+  // Internet u igraonici, kako ga javlja server. `null` znači da se ne zna.
   internet: null,
   balance: 0,
   remaining: null,
@@ -40,9 +38,9 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const money = (n) => `${Math.round(Number(n) || 0).toLocaleString("sr-Latn-RS")} ${S.settings.currency}`;
-// inicijali kad stavka nema sliku
+// Inicijali kad stavka nema sliku.
 const mono = (name) => esc(String(name || "?").trim().slice(0, 2).toUpperCase());
-// srpska množina: 1 artikal, 2-4 artikla, 5+ artikala (11-14 idu na "mnogo")
+// Srpska množina: 1 artikal, 2-4 artikla, 5+ artikala (11-14 idu na "mnogo").
 function oblik(n, jedan, dva, mnogo) {
   const a = Math.abs(Math.round(n)), d = a % 10, s = a % 100;
   if (d === 1 && s !== 11) return jedan;
@@ -57,7 +55,7 @@ function dur(sec) {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
-// male SVG ikone (stroke, currentColor)
+// Male SVG ikone (stroke, currentColor).
 const ICONS = {
   check: '<path d="M20 6 9 17l-5-5"/>',
   alert: '<path d="m10.29 3.86-8.18 14.14a2 2 0 0 0 1.71 3h16.36a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4M12 17h.01"/>',
@@ -73,23 +71,18 @@ const ICONS = {
   cash: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
   gift: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v9h14v-9"/><path d="M12 8S10.5 3 8 3a2.5 2.5 0 0 0 0 5ZM12 8s1.5-5 4-5a2.5 2.5 0 0 1 0 5Z"/>',
   key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.5 12.5 8-8M18 4l3 3M15 7l3 3"/>',
-  // Znak profila. Dodat uz stranu Profil - ranije ga nije bilo, a bez ikone bi
-  // stavka u meniju stajala prazna dok ostale imaju svoju.
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>',
-  // "image" se koristio za Moju pozadinu, ali ga u ovom spisku nije bilo - pa
-  // se crtao prazan SVG i stavka je stajala bez ikone.
   image: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="m3 15 5-5 4 4 3-3 6 6"/><circle cx="8.5" cy="8.5" r="1.5"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
   mis: '<rect x="6" y="2" width="12" height="20" rx="6"/><path d="M12 6v4"/>',
   zvuk: '<path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/>',
-  // Rang lista. Postolje sa tri mesta, a ne pehar: pehar je nagrada koja se
-  // dobije jednom, a ovde je mesto koje se svakog dana brani.
+  // Rang lista.
   postolje: '<rect x="9" y="4" width="6" height="17" rx="1"/><rect x="2.5" y="10" width="6" height="11" rx="1"/><rect x="15.5" y="13" width="6" height="8" rx="1"/>',
 };
 const icon = (name, size = 16) =>
   `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ""}</svg>`;
 
-// ZVUK (WebAudio sintetizovan, bez fajlova)
+// Zvuk (WebAudio, bez fajlova).
 const sfx = (() => {
   let ac = null;
   const ctx = () => {
@@ -98,8 +91,7 @@ const sfx = (() => {
     return ac;
   };
   function tone(freq, dur, type = "sine", vol = 0.05, sweep = null, delay = 0) {
-    // Igrač koji je ugasio zvuke launchera (Nalog > Miš i zvuk) ne čuje ni jedan
-    // od njih. Provera stoji ovde, na jednom mestu, umesto na svakom pozivu.
+    // Igrač koji je ugasio zvuke launchera ne čuje nijedan.
     if (S.sfxUkljucen === false) return;
     const a = ctx(); if (!a) return;
     const t = a.currentTime + delay;
@@ -119,15 +111,11 @@ const sfx = (() => {
     error: () => tone(180, 0.24, "sawtooth", 0.05, 110),
     alert: () => { tone(880, 0.14, "square", 0.05); tone(620, 0.22, "square", 0.05, null, 0.16); },
     boot: () => { tone(150, 0.5, "sawtooth", 0.05, 700); tone(920, 0.2, "sine", 0.05, 1500, 0.26); },
-    // Kucanje kazaljke po poljima tocka - kratko i suvo, da se ne stopi u zujanje.
+    // Kazaljka točka: kratko i suvo, da se ne stopi u zujanje.
     tik: () => tone(1750, 0.028, "square", 0.022),
-    // VREME ISTIČE - JEDINI ZVUK KOJI SE NE MOŽE UTIŠATI.
-    //
-    // Igrač je u punom ekranu i ne vidi launcher; obaveštenje preko igre je u
-    // ekskluzivnom punom ekranu nepouzdano, a zvuk se čuje uvek. Ovo nije zvuk
-    // dugmeta nego jedino upozorenje koje stigne do čoveka pre nego što mu se
-    // računar zaključa, pa namerno zaobilazi prekidač za zvuke launchera:
-    // izgubljena sesija je skuplja od jednog neželjenog tona.
+    // Upozorenje o isteku vremena se čuje i kad su zvuci launchera isključeni:
+    // igrač je u igri preko celog ekrana, a zvuk je jedino što sigurno stigne do
+    // njega.
     vreme: (hitno) => {
       const a = (() => { try { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === "suspended") ac.resume(); return ac; } catch { return null; } })();
       if (!a) return;
@@ -146,12 +134,12 @@ const sfx = (() => {
   };
 })();
 
-// Animirano odbrojavanje brojeva
+// Animirano odbrojavanje brojeva.
 function countTo(el, to, fmt) {
   const from = Number(el.dataset.val || 0);
   el.dataset.val = to;
-  // Kad je prozor sakriven/minimizovan (npr. dok traje igra), requestAnimationFrame
-  // je pauziran - postavi konačnu vrednost odmah da broj ne ostane zastareo.
+  // Sakriven prozor (dok traje igra) pauzira requestAnimationFrame, pa se
+  // konačna vrednost upisuje odmah.
   if (from === to || document.hidden) { el.textContent = fmt(to); return; }
   const start = performance.now(), dur = 520;
   function step(now) {
@@ -164,10 +152,7 @@ function countTo(el, to, fmt) {
 }
 function bump(el) { if (!el) return; el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); }
 
-// eksplozija "žetona" (nagradni efekat na uspešnu porudžbinu)
-// Osvojen iznos odleti sa točka na kredit u HUD-u i tamo se "zalepi".
-// Bez ovoga igrač vidi dve nepovezane stvari: poruku da je nešto osvojio, i
-// brojku koja se u međuvremenu promenila. Ovako je to jedan pokret.
+// Osvojen iznos odleti sa točka na kredit u gornjoj traci.
 function letiNaKredit(iznos) {
   const layer = $("#fxLayer");
   const cilj = $("#hudBal")?.closest(".hud-chip");
@@ -191,9 +176,7 @@ function burstCoins(x, y, n = 16) {
   if (!layer) return;
   for (let i = 0; i < n; i++) {
     const p = document.createElement("i");
-    // Deo novcica ide u boji kuce, ostali su zlatni. Klasa se zvala "red"
-    // jos od stare palete - ime je govorilo crveno, vrednost je bila plava, pa
-    // je svako citanje vodilo na pogresan trag.
+    // Deo novčića je u boji kuće, ostali su zlatni.
     p.className = "coin" + (Math.random() < 0.4 ? " kuca" : "");
     const ang = (Math.PI * 2 * i) / n + Math.random() * 0.6;
     const dist = 60 + Math.random() * 130;
@@ -206,7 +189,7 @@ function burstCoins(x, y, n = 16) {
   }
 }
 
-// idle "attract" na login ekranu (mami igrače kad računar stoji prazan)
+// Mamac na ekranu prijave kad računar dugo stoji prazan.
 let _idleT = null;
 function resetIdle() {
   document.body.classList.remove("attract");
@@ -216,8 +199,7 @@ function resetIdle() {
   }, 40000);
 }
 
-// Ako se server ne javi u par sekundi, ponudi ponovno podesavanje -
-// da osoblje ne ostane zarobljeno na ekranu "Povezivanje".
+// Ako se server ne javi za par sekundi, nudi se novo podešavanje.
 let connFailTicks = 0;
 setInterval(() => {
   const onConn = $("#connScreen") && $("#connScreen").classList.contains("active");
@@ -230,9 +212,8 @@ function show(id) {
   $$(".screen").forEach((s) => s.classList.toggle("active", s.id === id));
   primeniPozadinu();
 }
-// Trajanje je podesivo jer nova poruka nije kao nova poruka: "nalog dopunjen"
-// se procita za sekund, a "nov nivo, otkljucano ti je ovo i ono" trazi duze -
-// inace nestane pre nego sto igrac stigne da vidi sta je dobio.
+// Trajanje zavisi od poruke: nov nivo sa otključanim stvarima traži duže od
+// "nalog dopunjen".
 function toast(msg, type = "info", trajanje = 3000) {
   const el = document.createElement("div");
   el.className = "toast " + type;
@@ -240,7 +221,7 @@ function toast(msg, type = "info", trajanje = 3000) {
   el.innerHTML = `<span class="t-ic">${icon(ic)}</span><span class="t-msg"></span>`;
   el.querySelector(".t-msg").textContent = msg;
   $("#toasts").appendChild(el);
-  // Obicno obavestenje ostaje tiho - zvuk je za ono sto se desilo igracu.
+  // Obično obaveštenje je tiho; zvuk ide uz ono što se desilo igraču.
   if (type === "error") sfx.error(); else if (type === "success" || type === "nivo") sfx.success();
   setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 280); }, trajanje);
 }
@@ -253,7 +234,7 @@ function toast(msg, type = "info", trajanje = 3000) {
   if (!cfg.configured) {
     $("#cfgHost").value = cfg.host || "";
     show("setupScreen");
-    // adresa je vec popunjena iz podesavanja.json -> kursor odmah na token
+    // Adresa je popunjena iz podesavanja.json, pa kursor ide na token.
     setTimeout(() => $(cfg.host ? "#cfgToken" : "#cfgHost").focus(), 120);
   } else show("connScreen");
 
@@ -267,27 +248,19 @@ function toast(msg, type = "info", trajanje = 3000) {
   });
   window.crit.onWsStatus(({ connected }) => {
     S.wsOk = connected;
-    // Stanje veze igrac vidi u donjoj traci dok radi, i na ekranu "Povezivanje"
-    // kad veza pukne. Plutajuca oznaka preko ekrana prijave je bila visak.
+    // Stanje veze se vidi u donjoj traci i na ekranu "Povezivanje".
     updateServerStatus(connected);
-    // Kad veza padne, launcher vise ne moze da zna kakav je internet - traka to
-    // i kaze umesto da zadrzi poslednji odgovor kao da jos vazi.
+    // Bez veze launcher ne zna stanje interneta i to i piše.
     updateInternet();
     if (!connected && !$("#setupScreen").classList.contains("active")) {
-      // Točak koji čeka odgovor se otpušta odmah: preko puknute veze ishod
-      // ionako više ne može da stigne, a dok "vrtnja traje" launcher odbacuje
-      // svako novo stanje kredita - pa bi HUD ostao zamrznut i posle povratka
-      // veze, dok naplata teče dalje.
-      otpustiTocak("Veza je pukla usred vrtnje. Spin nije potrošen.");
+      // Točak koji čeka odgovor se otpušta: ishod preko puknute veze ne stiže, a
+      // dok vrtnja traje ekran ne prima nova stanja kredita. Server je možda već
+      // upisao spin, pa poruka ne obećava ništa; pravo stanje stiže sa vezom.
+      otpustiTocak("Veza je pukla usred vrtnje. Ako je spin prošao, nagrada ostaje na nalogu.");
       if (S.player) {
-        // RAD BEZ SERVERA: IGRAČ OSTAJE U SVOJOJ SESIJI.
-        //
-        // Do sada je ovde padao ceo ekran na "Povezivanje", sat je stajao, a
-        // igra iza toga je radila besplatno - a to se dobijalo i čupanjem
-        // sopstvenog kabla. Sada sesiju vodi launcher (vidi lokalna-sesija.js):
-        // sat ide dalje, stanje stiže svake sekunde kao "lokalno_stanje", a
-        // server obračuna kad se vrati. Shop, točak i promene na nalogu čekaju
-        // server - to igrač sazna kad ih pritisne.
+        // Bez servera igrač ostaje u sesiji: launcher je vodi sam (lokalna-sesija.js),
+        // stanje stiže svake sekunde kao "lokalno_stanje", a server obračuna kad se
+        // vrati. Shop, točak i izmene naloga čekaju server.
         if (!S.bezServera) {
           S.bezServera = true;
           toast("Server trenutno nije dostupan. Igraš dalje, a vreme se računa na ovom računaru.", "info", 9000);
@@ -306,7 +279,7 @@ function toast(msg, type = "info", trajanje = 3000) {
   window.crit.onHotkey(({ action }) => {
     if (action === "unlock") { if ($("#lockedScreen").classList.contains("active")) otkrijPinOsoblja(); }
     else if (action === "exit") openPin("Admin izlaz iz launchera", true);
-    // Prečica za novo podešavanje ide kroz isti PIN kao dugme - vidi main.js.
+    // Prečica za novo podešavanje traži isti servisni PIN kao dugme.
     else if (action === "setup") openPin("Servisni PIN - promena adrese servera", false, "setup");
   });
   window.crit.onServerMsg(handleMsg);
@@ -317,8 +290,7 @@ function toast(msg, type = "info", trajanje = 3000) {
   if (window.crit.onGameError) {
     window.crit.onGameError(({ name, message }) => toast(`Ne mogu da pokrenem ${name}: ${message}`, "error"));
   }
-  // Vreme istice. Zvuk je jedini kanal koji stigne do igraca u punom ekranu -
-  // vidi sfx.vreme. Poruka stoji i u launcheru, za slucaj da se vrati na njega.
+  // Vreme ističe: zvuk (vidi sfx.vreme) i poruka u launcheru.
   if (window.crit.onVremeIstice) {
     window.crit.onVremeIstice(({ minuta, hitno }) => {
       sfx.vreme(!!hitno);
@@ -326,45 +298,26 @@ function toast(msg, type = "info", trajanje = 3000) {
         : `Ostalo ti je još ${minuta} min - javi se osoblju za dopunu`, hitno ? "error" : "info", hitno ? 12000 : 7000);
     });
   }
-  // tek sada je sve zakačeno - javi main procesu da može da pusti poruke
+  // Slušaoci su zakačeni; glavni proces sme da pusti poruke.
   if (window.crit.ready) window.crit.ready();
   resetIdle();
 })();
 
-// POZADINE EKRANA
-// Osoblje ih kaci kroz panel, launcher ih samo primenjuje. Menjaju se u letu,
-// bez restarta, jer server posalje novo stanje svim racunarima odjednom.
-// Saru crta server (service.js), ovde se samo prosledi u CSS. Stariji server
-// ovo polje ne salje uopste - tada tekstura ostaje ugasena, umesto da ekran
-// zavrsi u polovicnom stanju.
-// BREND: ZNAK I BOJA IGRAONICE
+// Pozadine ekrana i šara stižu sa servera i primenjuju se odmah, bez
+// restarta. Stariji server šaru ne šalje, pa ona tada ostaje ugašena.
 //
-// Znak i boja su nekad stajali ušiveni u fajlove - ali sledeća igraonica nije
-// ista. Dok je tako bilo,
-// znak i boja stajali ušiveni u fajlove, svaka bi morala da dobije prepravljenu
-// kopiju programa, pa bi i svaka nadogradnja morala da se pravi posebno za
-// svakoga.
-//
-// Ovde se menja SAMO boja kuće (`--brend*`). Zlatna, zelena i ostale ostaju:
-// zelena je "ima kredita", crvena "ističe vreme" - to su značenja, ne ukras, i
-// ne smeju da zavise od toga koju je boju vlasnik izabrao.
+// Brend: menja se samo boja kuće (`--brend*`). Zelena, zlatna i crvena nose
+// značenje (ima kredita, nagrada, ističe vreme) i ne zavise od izbora vlasnika.
 function primeniBrend(b) {
   if (!b) return;
   S.brend = b;
   const s = document.documentElement.style;
   s.setProperty("--brend", b.akcenat);
-  // Odsjaji, senke i traka za pomeranje se pisu kao rgba(var(--brend-rgb), x).
-  // Dok je boja stajala upisana u CSS-u, izbor vlasnika je menjao samo pola
-  // ekrana - ostalo je ostajalo crveno.
+  // Odsjaji, senke i traka za pomeranje koriste rgba(var(--brend-rgb), x).
   s.setProperty("--brend-rgb", b.rgb);
   s.setProperty("--brend-deep", b.down);
-  // Svetlija nijansa za hover. Server je racuna uz sve ostale i panel je vec
-  // koristi; launcher je jedini nije uzimao, pa je u CSS-u ostala upisana
-  // crvena iz stare palete - glavno dugme je pod misem menjalo boju u onu
-  // koja u ostatku programa znaci "istice vreme".
-  // Stariji server ne salje ovu nijansu. Tada se NE upisuje nista i ostaje ono
-  // sto stoji u :root: upisano `undefined` bi pokvarilo ceo preliv koji ga
-  // koristi, pa bi dugme pod misem ostalo bez podloge - gore nego bez hovera.
+  // Svetlija nijansa za hover (računa je server). Stariji server je ne šalje;
+  // tada ostaje vrednost iz :root, jer bi upisano `undefined` pokvarilo preliv.
   if (b.hover) s.setProperty("--brend-hover", b.hover);
   s.setProperty("--brend-soft", `rgba(${b.rgb}, 0.15)`);
   s.setProperty("--brend-glow", `rgba(${b.rgb}, 0.55)`);
@@ -381,25 +334,22 @@ function primeniTeksturu(t) {
   const vid = Number(S.tekstura?.prozirnost);
   const korak = Number(S.tekstura?.korak);
   const sekundi = Number(S.tekstura?.sekundi);
-  // Prima se samo oblik koji server stvarno salje - url("data:image/svg+xml,...").
+  // Prima se samo oblik koji server šalje: url("data:image/svg+xml,...").
   const ispravna = /^url\("data:image\/svg\+xml,[^"]*"\)$/.test(sara);
   const st = document.body.style;
   st.setProperty("--tekstura", ispravna ? sara : "none");
   st.setProperty("--tekstura-vid", ispravna && vid >= 0 && vid <= 1 ? String(vid) : "0");
-  // Kretanje: 0s znaci da sara stoji. Gornja granica je zastita od zapisa koji
-  // bi napravio animaciju od sat vremena ili obrnuto - trepereci ekran.
+  // Kretanje: 0 s znači da šara stoji; granice sprečavaju animaciju od sat
+  // vremena ili treperenje.
   const kreceSe = ispravna && Number.isFinite(sekundi) && sekundi >= 3 && sekundi <= 120
     && Number.isFinite(korak) && korak > 0;
-  // Korak vazi kad god sara postoji, ne samo kad se pomera: iskre ga koriste da
-  // se crvena figura poklopi sa belom, a nemaju trajanje animacije.
+  // Korak važi i kad šara stoji: iskre ga koriste za poravnanje sa mrežom.
   const imaKorak = ispravna && Number.isFinite(korak) && korak > 0;
   st.setProperty("--tekstura-korak", imaKorak ? `${korak}px` : "0px");
   st.setProperty("--tekstura-sekundi", kreceSe ? `${sekundi}s` : "0s");
 
-  // Vrstu kretanja bira CSS preko ovog atributa. Prima se samo ono sto je
-  // poznato, da nepoznata vrednost ne ostavi ekran u polovicnom stanju.
-  // "Iskre" nemaju trajanje animacije (sekundi = 0), pa se ne traze kroz
-  // kreceSe nego zasebno - njima je dovoljno da sara postoji.
+  // Vrstu kretanja bira CSS preko atributa; prima se samo poznata vrednost.
+  // Iskre nemaju trajanje animacije, pa im je dovoljno da šara postoji.
   const zna = KRETANJA_UI.includes(S.tekstura?.kretanje);
   const iskreRade = zna && S.tekstura.kretanje === "iskre" && ispravna
     && Number.isFinite(korak) && korak > 0 && /^url\("data:image\/svg\+xml,[^"]*"\)$/.test(String(S.tekstura?.iskra || ""));
@@ -411,12 +361,9 @@ function primeniTeksturu(t) {
   pustiIskre(iskreRade ? korak : 0);
 }
 
-// ISKRE
-// Preko nasumicne plocice u mrezi legne ISTA figura u boji kuce, zasvetli i
-// ugasi se. Da bi se crvena figura poklopila sa belom ispod nje, iskra mora da
-// stoji tacno na koraku mreze - zato se pozicija zaokruzuje na ceo korak.
-// Namerno ih je malo i traju kratko: ovo stoji ceo dan iza igara i treba da se
-// primeti tek kad pogled odluta, ne da vuce paznju.
+// Iskre: preko nasumične pločice u mreži zasvetli ista figura u boji kuće.
+// Pozicija se zaokružuje na korak mreže da se figure poklope. Iskri je malo i
+// kratko traju, jer ovo stoji iza igara ceo dan.
 const NAJVISE_ISKRI = 5;
 let iskreKorak = 0, iskreTajmer = null, iskreSloj = null;
 
@@ -433,7 +380,7 @@ function pustiIskre(korak) {
 
   const zapali = () => {
     if (!iskreSloj || iskreSloj.childElementCount >= NAJVISE_ISKRI) return;
-    // Mreza pocinje od 0 0, isto kao pozadina - zato se bira ceo korak.
+    // Mreža počinje od 0 0, kao i pozadina.
     const kolona = Math.floor(Math.random() * Math.ceil(window.innerWidth / korak));
     const red = Math.floor(Math.random() * Math.ceil(window.innerHeight / korak));
     const i = document.createElement("i");
@@ -442,7 +389,7 @@ function pustiIskre(korak) {
     i.style.top = `${red * korak}px`;
     i.style.width = `${korak}px`;
     i.style.height = `${korak}px`;
-    // Svaka gori malo drugacije dugo, da se ne pale u ritmu.
+    // Različito trajanje, da se ne pale u ritmu.
     i.style.animationDuration = `${(2.2 + Math.random() * 1.8).toFixed(2)}s`;
     i.addEventListener("animationend", () => i.remove(), { once: true });
     iskreSloj.appendChild(i);
@@ -452,9 +399,8 @@ function pustiIskre(korak) {
   iskreTajmer = setInterval(zapali, 900);
 }
 
-// DUBINA: blizi sloj sare prati pokret misa.
-// Racuna se u ritmu iscrtavanja, ne na svaki dogadjaj misa - inace bi se posao
-// gomilao dok igrac brzo prevlaci po ekranu.
+// Dubina: bliži sloj šare prati miša. Računa se u ritmu iscrtavanja, ne na
+// svaki događaj miša.
 const KRETANJA_UI = ["klizanje", "talas", "dubina", "iskre"];
 let dubinaUkljucena = false, dubinaZakazana = false, dubinaX = 0, dubinaY = 0;
 
@@ -465,8 +411,7 @@ function dubinaPomeraj(e) {
   dubinaZakazana = true;
   requestAnimationFrame(() => {
     dubinaZakazana = false;
-    // Pomeraj je mali (do 26 px): pozadina treba da "dise" uz pokret, ne da se
-    // vozi po ekranu i vuce pogled sa igara.
+    // Mali pomeraj (do 26 px), da pozadina ne vuče pogled.
     document.body.style.setProperty("--par-x", `${(-dubinaX * 26).toFixed(1)}px`);
     document.body.style.setProperty("--par-y", `${(-dubinaY * 18).toFixed(1)}px`);
   });
@@ -497,44 +442,40 @@ function primeniPozadinu() {
   const aktivan = $$(".screen").find((s) => s.classList.contains("active"))?.id;
   const slika = (S.pozadine || {})[zaEkran[aktivan]] || null;
   const zeljeno = slika ? `url('${S.host}${slika}')` : "";
-  // Prepisivanje iste vrednosti pravi vidljiv trzaj (opacity prelaz krene ispocetka),
-  // pa se sloj dira samo kad se slika stvarno menja.
+  // Sloj se dira samo kad se slika menja; ponovno upisivanje iste vrednosti
+  // pokreće prelaz ispočetka.
   if (el.dataset.art !== zeljeno) {
     el.dataset.art = zeljeno;
     el.style.backgroundImage = zeljeno;
     el.classList.toggle("ima", !!slika);
   }
-  // Prazni ekrani (prijava, zaključan) nose samo jednu karticu, pa slika sme
-  // jače da se vidi. Ekrani sa sadržajem drže jači zastor, da korice i tekst
-  // ostanu glavna stvar.
+  // Ekrani bez sadržaja (prijava, zaključan) puštaju sliku jače; ostali drže
+  // jači zastor da korice i tekst ostanu u prvom planu.
   const prazan = aktivan === "loginScreen" || aktivan === "lockedScreen";
   document.body.classList.toggle("pozadina-prazna", prazan && !!slika);
-  // Prazni ekrani (prijava, zakljucan) nemaju sadrzaj preko sare, pa bi se
-  // ponavljanje videlo kao vodeni zig. Tamo sara ide tise.
+  // Na ekranima bez sadržaja šara ide tiše.
   document.body.classList.toggle("tiha-sara", aktivan === "loginScreen" || aktivan === "lockedScreen" || aktivan === "connScreen");
 }
 
-// Prazan racunar stoji satima na ekranu prijave i to je izlog igraonice.
-// Iza forme ide baner izdvojene igre, mutan i utisan, da ekran ne bude crn.
+// Ekran prijave: iza forme ide mutan baner izdvojene igre, da ekran ne bude
+// crn.
 function postaviPozadinuPrijave() {
   const fon = $("#loginFon");
   if (!fon) return;
-  // Postoji prava pozadina za prijavu (16:9) - ona ide u glavni sloj, a ovaj
-  // pomocni ostaje prazan. Rezervno se uzima baner igre; on je sirok i preko
-  // celog ekrana izgleda bolje nego uspravan omot, pa ide PRE omota.
+  // Sopstvena pozadina prijave ima prednost. Rezervno se uzima baner igre
+  // (širok), pa tek omot.
   const sopstvena = (S.pozadine || {}).prijava;
   const g = sopstvena ? null : (S.games.find((x) => x.banner) || S.games.find((x) => x.image));
   const art = sopstvena ? null : (g && (g.banner || g.image));
   const zeljeno = art ? `url('${S.host}${art}')` : "";
-  // Ne diraj sloj ako se slika nije promenila. Ranije se pri svakom osvezavanju
-  // kataloga vrednost ponovo upisivala, pa je pozadina vidno "skakala".
+  // Sloj se ne dira ako se slika nije promenila.
   if (fon.dataset.art === zeljeno) return;
   fon.dataset.art = zeljeno;
   fon.style.backgroundImage = zeljeno;
   fon.classList.toggle("ima", !!art);
 }
 
-// Server poruke
+// Poruke servera
 function handleMsg(m) {
   switch (m.t) {
     case "welcome":
@@ -548,7 +489,7 @@ function handleMsg(m) {
       primeniPozadinu();
       primeniTeksturu(m.tekstura);
       $("#loginPc").textContent = m.computer?.name || "-";
-      // Ekran prijave nosi i podatke kuće - gost sa ulice ih tu i traži.
+      // Ekran prijave prikazuje i podatke igraonice.
       $("#loginKuca").textContent = S.settings.cafeName || "Igraonica";
       $("#loginCena").textContent = S.settings.ratePerHour > 0 ? money(S.settings.ratePerHour) : "-";
       postaviPozadinuPrijave();
@@ -558,11 +499,14 @@ function handleMsg(m) {
       updateInternet();
       break;
     case "catalog": {
-      // osoblje je izmenilo shop/igre/alate - osveži i izbaci iz korpe što više nije dostupno
+      // Katalog je izmenjen: osvežava se prikaz, a iz korpe izlazi ono čega više nema.
       S.shop = m.shop || []; S.games = m.games || []; if (m.tools) S.tools = m.tools;
-      for (const id of [...S.cart.keys()]) {
+      for (const [id, kol] of [...S.cart]) {
         const it = S.shop.find((x) => x.id === id);
-        if (!it || !it.available) S.cart.delete(id);
+        if (!it || !it.available) { S.cart.delete(id); continue; }
+        // Korpa se svodi na zalihu.
+        const granica = granicaKorpe(it);
+        if (kol > granica) { if (granica > 0) S.cart.set(id, granica); else S.cart.delete(id); }
       }
       if (S.tab === "shop" || S.tab === "home") renderContent();
       break;
@@ -570,10 +514,8 @@ function handleMsg(m) {
     case "lokalno_stanje":
       // Stanje sesije koju vodi launcher dok servera nema (vidi main.js).
       if (!S.player) {
-        // Launcher je ponovo pokrenut usred sesije, a server i dalje ćuti:
-        // sesija se nastavlja iz zapisa, bez pozdrava i bez prijave. Katalog
-        // stiže iz poslednjeg zapamćenog (vidi main.js); ako ga nema, igrač i
-        // dalje vidi svoje vreme, samo bez pločica igara.
+        // Launcher je ponovo pokrenut usred sesije, a server ne radi: sesija se
+        // nastavlja iz zapisa, bez pozdrava; katalog je poslednji zapamćeni.
         if (!m.player) break;
         S.player = { id: m.player.id, username: m.player.username, displayName: m.player.displayName };
         S.balance = m.balance; S.remaining = m.remainingSeconds;
@@ -590,16 +532,14 @@ function handleMsg(m) {
       $("#pPass").value = ""; $("#pUser").value = ""; $("#loginErr").textContent = "";
       S.bezServera = false;
       updateServerStatus(S.wsOk);
-      // Odjava bez servera: prijava ionako ne može da prođe, pa ekran kaže da
-      // se čeka server, umesto da primi lozinku i ćuti.
+      // Odjava bez servera: nova prijava ne može da prođe, pa ekran čeka server.
       if (!S.wsOk) { $("#connText").textContent = "Povezivanje sa serverom..."; show("connScreen"); break; }
       show("loginScreen"); $("#pUser").focus(); resetIdle();
       break;
     case "login_ok":
       clearLoginPending();
-      // SESIJA KOJA SE VRAĆA posle prekida veze, a igrač je već na radnoj
-      // površini (dotle ju je vodio launcher): osveži stanje, ali ga ne vraćaj
-      // na početnu, ne prazni korpu i ne puštaj pozdrav usred igre.
+      // Sesija koja se nastavlja posle prekida veze: osvežava se stanje, bez
+      // povratka na početnu, pražnjenja korpe i pozdrava.
       if (m.nastavak && S.player && S.player.id === m.player?.id && $("#desktopScreen").classList.contains("active")) {
         S.balance = m.balance; S.remaining = m.remainingSeconds;
         if (m.vip) S.vip = m.vip;
@@ -613,14 +553,13 @@ function handleMsg(m) {
       S.player = m.player; S.balance = m.balance; S.remaining = m.remainingSeconds;
       S.skoroIgrane = Array.isArray(m.skoroIgrane) ? m.skoroIgrane : [];
       S.porudzbine = Array.isArray(m.porudzbine) ? m.porudzbine : [];
-      // Igraceva pozadina stize odmah uz prijavu, da kucna ne bljesne pa se
-      // promeni cim se ekran otvori. "mojaTekstura" je null kad igrac nije
-      // birao svoju, pa vazi ono sto je vlasnik podesio.
+      // Igračeva šara stiže uz prijavu, da kućna ne bljesne. `mojaTekstura` je
+      // null kad igrač nije birao svoju.
       if (m.tekstura) primeniTeksturu(m.tekstura);
       S.mojaTekstura = m.mojaTekstura || null;
       S.vip = m.vip || null;
       S.profil = m.profil || null;
-      // Sledeći igrač ne nasleđuje ni tuđi profil ni tuđe čekanje na njega.
+      // Sledeći igrač ne nasleđuje tuđi profil.
       clearTimeout(profilTajmer);
       profilStanje = S.profil ? "stigao" : "nije";
       S.accSekcija = null; // sledeci igrac ne nasledjuje odeljak koji je prethodni gledao
@@ -635,29 +574,24 @@ function handleMsg(m) {
       $("#loginErr").textContent = m.message; $("#pPass").value = "";
       break;
     case "balance":
-      // DOK SE TOČAK VRTI, STANJE SE NE DIRA.
-      //
-      // Server doda nagradu i pošalje novo stanje ODMAH, a točak se vrti pet
-      // sekundi. Kredit se zato tiho menjao usred vrtnje, pre nego što igrač
-      // sazna šta je dobio - a kad se nagrada objavi, brojka se više ne pomera.
-      // Ispada da nagrada nije ni dodata. Zato se poslednje stanje zadrži i
-      // upiše tačno u trenutku kad se nagrada pokaže.
+      // Dok se točak vrti, novo stanje kredita se čuva i upisuje tek kad se
+      // nagrada pokaže (server je dodaje odmah, a vrtnja traje pet sekundi).
       if (S.tocakVrti) { S.tocakStanje = { balance: m.balance, remaining: m.remainingSeconds }; break; }
       S.balance = m.balance; S.remaining = m.remainingSeconds; updateHud();
-      // Iskustvo raste dok naplata tece, pa traka na vrhu pocetne mora da se
-      // pomera dok igrac gleda - inace bi napredak postojao samo u bazi.
+      // Iskustvo raste dok naplata teče, pa se traka ranga osvežava.
       if (m.vip) { S.vip = m.vip; osveziRangTraku(); }
       break;
     case "tocak":
-      // Vlasnik je upalio/ugasio tocak ili promenio nagrade - osvezi prikaz.
+      // Vlasnik je promenio točak ili nagrade.
       S.tocak = m.tocak || null;
       if (S.tab === "account" && !S.tocakVrti) renderContent();
       break;
     case "tocak_rezultat":
-      // Odgovor je stigao - rok za čekanje više ne treba.
       clearTimeout(tocakRokTajmer); tocakRokTajmer = null;
-      // Stanje se osvežava zasebnom "balance" porukom; ovde samo pokrećemo
-      // animaciju koja na kraju pokaže nagradu i novo stanje.
+      // Zakasneo ishod: točak je već pušten, a server je spin upisao. Igrač ipak
+      // saznaje šta je dobio, a točak pokazuje da je nedeljni spin iskorišćen.
+      if (!S.tocakVrti) { zakasneliSpin(m.nagrada, m.sledeciSpin); break; }
+      // Stanje stiže posebnom "balance" porukom; ovde se pokreće animacija.
       animirajTocak(m.index, m.nagrada, m.sledeciSpin);
       break;
     case "tocak_err":
@@ -675,22 +609,10 @@ function handleMsg(m) {
       show("lockedScreen");
       break;
     case "unlock_ok":
-      // OTKLJUCAVANJE OTKLJUCAVA, NE GASI LAUNCHER.
-      //
-      // Ovde je ranije stajalo `if (S.pendingExit) adminExit()`. Ostatak iz
-      // vremena kad je admin izlaz isao kroz istu poruku kao otkljucavanje;
-      // danas ide svojim putem (verify_pin -> pin_ok -> pinPrihvacen).
-      //
-      // Posledica: cim se otvori prozor za admin izlaz (Ctrl+Alt+Shift+Q),
-      // launcher upamti "izlazim" - i onda ga je BILO KAKVO otkljucavanje
-      // gasilo: radnik sa panela, "Otkljucaj sve", ili sam igrac PIN-om na
-      // zakljucanom ekranu. Masina ostaje bez launchera do sledeceg paljenja.
-      //
-      // A splet okolnosti nije redak nego svakodnevni: na zakljucanom ekranu
-      // stoje dva polja za PIN, radnik ukuca u ono koje mu je blize.
-      //
-      // Prozor za PIN se pri tom zatvara: racunar je otkljucan, nema sta vise
-      // da se potvrdjuje.
+      // Otključavanje samo otključava. Izlaz iz launchera ide svojim putem
+      // (verify_pin -> pin_ok -> pinPrihvacen), pa otvoren prozor za izlaz ne sme da
+      // pretvori bilo koje otključavanje u gašenje launchera. Prozor za PIN se
+      // zatvara jer je računar otključan.
       if (S.pendingExit || S.pinSvrha) odustaniOdPina();
       toast("Otključano", "success");
       break;
@@ -741,12 +663,12 @@ function handleMsg(m) {
       postaviPozadinuPrijave();
       break;
     case "brend":
-      // Vlasnik je promenio znak ili boju - vidi se odmah, na svih 13 masina.
+      // Vlasnik je promenio znak ili boju.
       primeniBrend(m.brend);
       break;
     case "tekstura":
       primeniTeksturu(m.tekstura);
-      // Server javlja i sta je igrac izabrao; null znaci "kao u igraonici".
+      // Server javlja i šta je igrač izabrao; null znači "kao u igraonici".
       if ("moja" in m) S.mojaTekstura = m.moja || null;
       if (S.tab === "account") renderContent();
       break;
@@ -781,13 +703,7 @@ function handleMsg(m) {
     case "moje_porudzbine":
       S.porudzbine = Array.isArray(m.porudzbine) ? m.porudzbine : [];
       osveziZnackuNaloga();
-      // I SHOP, NE SAMO NALOG.
-      //
-      // Porudžbine se vide na dva mesta: kao spisak na Nalogu i kao jedna linija
-      // u vrhu Shop-a ("Porudžbina se sprema"). Dok se crtao samo Nalog, igrač
-      // koji je poručio i ostao u Shop-u - a to je upravo ono što radi - gledao
-      // je "sprema se" i pošto mu je piće doneto. Linija bi se ispravila tek kad
-      // izađe sa strane i vrati se na nju.
+      // Porudžbine se vide na Nalogu i kao traka na vrhu Shop-a; osvežavaju se obe.
       if (S.tab === "account" || S.tab === "shop") renderContent();
       break;
     case "pw_ok":
@@ -804,9 +720,8 @@ function handleMsg(m) {
 }
 
 // Setup
-// Ulaz u podešavanja TRAŽI servisni PIN. Ovo dugme se pojavljuje kad server ne
-// odgovara - a to igrač izazove čupanjem mrežnog kabla. Bez provere bi mogao da
-// obriše podešavanje računara ili da ga preusmeri na svoj server.
+// Ulaz u podešavanja traži servisni PIN: dugme se pojavljuje kad server ne
+// odgovara, a to igrač može da izazove izvlačenjem kabla.
 $("#connSetup").addEventListener("click", () => openPin("Servisni PIN - promena adrese servera", false, "setup"));
 
 $("#cfgSave").addEventListener("click", async () => {
@@ -862,11 +777,10 @@ function enterDesktop() {
   startStatusBar();
 }
 
-// DONJA TRAKA (info o računaru)
+// Donja traka (podaci o računaru)
 const setSb = (sel, txt) => { const el = $(sel); if (el) el.querySelector(".sb-txt").textContent = txt; };
 function updateClock() { setSb("#sbClock", new Date().toLocaleTimeString("sr-Latn-RS", { hour: "2-digit", minute: "2-digit" })); }
-// Verzija u donjoj traci. Kad se jedan racunar ponasa drugacije od ostalih,
-// ovo je prvo sto se pogleda - ranije nigde nije pisalo koji je launcher gde.
+// Verzija u donjoj traci.
 async function upisiVerziju() {
   if (!window.crit.verzija) return;
   try { setSb("#sbVerzija", "v" + (await window.crit.verzija())); } catch {}
@@ -874,8 +788,8 @@ async function upisiVerziju() {
 function updateServerStatus(connected) {
   const el = $("#sbNet"); if (!el) return;
   el.classList.toggle("ok", connected);
-  // Igrač usred sesije bez servera nije u kvaru: igra dalje i vreme se računa
-  // ovde. Zato žuta (pažnja), a ne crvena - crvena znači "ističe vreme".
+  // Sesija bez servera nije kvar: igra teče i vreme se računa ovde. Zato
+  // žuta, ne crvena (crvena znači "ističe vreme").
   const bez = !connected && !!S.player;
   el.classList.toggle("bez", bez);
   el.querySelector(".sb-txt").textContent = connected ? "Server: povezan" : bez ? "Bez servera: igraš dalje" : "Server: nema veze";
@@ -890,23 +804,14 @@ async function pollSys() {
     if (t) { t.querySelector(".sb-txt").textContent = s.temp != null ? `${s.temp}°C` : "temp -"; t.classList.toggle("hot", s.temp != null && s.temp >= 80); }
   } catch {}
 }
-// INTERNET PROVERAVA SERVER, NE SVAKI RAČUNAR ZA SEBE
-//
-// Ovde je stajala provera koja je svakih 30 sekundi učitavala
-// `google.com/favicon.ico`. Trinaest mašina, oko 37.000 poziva dnevno ka
-// Google-u iz igraonice - a odgovor na pitanje "ima li kuća internet" je isti
-// za sve njih. Uz to je lagala kad je baš Google nedostupan (filter na ruteru,
-// odvojena gostinska mreža): internet radi, a na svih trinaest ekrana piše da
-// ga nema. Sada proverava server i javlja svima (server/src/internet.js).
-//
-// Tri stanja, ne dva: kad server ne radi, launcher NE ZNA kakav je internet i
-// tako i piše. Izmišljen odgovor bi poslao igrača da traži kvar tamo gde ga nema.
+// Stanje interneta proverava server i javlja svim računarima
+// (server/src/internet.js). Tri stanja: ima, nema i ne zna se (kad server ne
+// radi); poslednje se ne prikazuje kao "nema".
 function updateInternet() {
   const el = $("#sbInet"); if (!el) return;
   const zna = S.wsOk && typeof S.internet === "boolean";
   el.classList.toggle("ok", zna && S.internet);
-  // Crvena tačka znači NE RADI, i samo to. Dok se ne zna, tačka je siva - inače
-  // bi crveno pored crtice reklo "nema interneta", a to niko nije proverio.
+  // Crvena tačka znači da internet ne radi; dok se ne zna, tačka je siva.
   el.classList.toggle("nema", zna && !S.internet);
   el.querySelector(".sb-txt").textContent = !zna ? "Internet: -" : S.internet ? "Internet: OK" : "Internet: nema";
 }
@@ -960,9 +865,8 @@ function stopTimer() { if (S.timer) clearInterval(S.timer); S.timer = null; docu
 
 $$(".tab").forEach((t) => t.addEventListener("click", () => {
   S.tab = t.dataset.tab;
-  // Odeljak naloga se bira pri OTVARANJU, ne pri svakom crtanju. Da se racunao
-  // stalno, ekran bi odskocio sa porudzbina na profil tacno u trenutku kad pice
-  // stigne - a igrac tada bas gleda u taj spisak.
+  // Odeljak naloga se bira pri otvaranju, ne pri svakom crtanju, da ekran ne
+  // skoči sa porudžbina kad piće stigne.
   if (S.tab === "account" && !S.accSekcija) S.accSekcija = podrazumevanaSekcija();
   $$(".tab").forEach((x) => x.classList.toggle("active", x === t));
   renderContent();
@@ -987,25 +891,18 @@ function renderContent() {
   if (S.tab === "account" && S.accSekcija === "podesavanja") vezeKlizace();
 }
 
-// ---- POČETNA (sve u sliderima: igre po kategorijama + internet) ----
+// ---- Početna (police igara po kategorijama i internet) ----
 const HOME_URL = "https://www.google.com";
 
-// Brendirane internet kartice - svaka u bojama i sa logom svoje aplikacije.
-// ZVANICNI LOGOTIPI BRENDOVA
-// Obrisi su preuzeti iz zbirke Simple Icons (simpleicons.org), koja drzi
-// zvanicne oblike logotipa i objavljuje ih kao CC0. Ranije su ovde stajali moji
-// priblizni crtezi - Steam je bio krug sa tackom, Battle.net elipsa. Sad je to
-// stvarni oblik svakog znaka.
+// Brendirane internet kartice.
 //
-// Znak se crta BELO na ploci u boji brenda. Tako je uvek citljiv: Steam i Epic
-// su zvanicno crni, pa bi crn znak na tamnoj kartici nestao.
-//
-// "boja" je zvanicna boja brenda iz iste zbirke. Kod dva brenda zvanicna boja
-// je crna, sto kao akcenat ne radi nista - za njih stoji njihova stvarna
-// prepoznatljiva plava, i to je jedino mesto gde sam odstupio:
-//   Steam      zvanicno #000000  ->  #66C0F4 (plava iz njihovog programa)
-//   TeamSpeak  zvanicno #000000  ->  #2580C3 (plava sa njihovog znaka)
-//   Epic Games zvanicno #313131  ->  #A9AFBA (tamno siva se ne vidi kao ivica)
+// Obrisi logotipa su iz zbirke Simple Icons (simpleicons.org, CC0). Znak se
+// crta belo na ploči u boji brenda, da bude čitljiv i kad je zvanični znak
+// crn. "boja" je zvanična boja brenda iz iste zbirke, osim gde je zvanična
+// crna ili pretamna za akcenat:
+//   Steam      #000000 -> #66C0F4 (plava iz njihovog programa)
+//   TeamSpeak  #000000 -> #2580C3 (plava sa njihovog znaka)
+//   Epic Games #313131 -> #A9AFBA
 const BRANDS = [
   { name: "Steam", url: "https://store.steampowered.com", boja: "#66C0F4",
     logo: `<svg viewBox="0 0 24 24"><path fill="#fff" d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0zM7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25 1.297.539 2.793-.076 3.332-1.375.263-.63.264-1.319.005-1.949s-.75-1.121-1.377-1.383c-.624-.26-1.29-.249-1.878-.03l1.523.63c.956.4 1.409 1.5 1.009 2.455-.397.957-1.497 1.41-2.454 1.012H7.54zm11.415-9.303c0-1.662-1.353-3.015-3.015-3.015-1.665 0-3.015 1.353-3.015 3.015 0 1.665 1.35 3.015 3.015 3.015 1.663 0 3.015-1.35 3.015-3.015zm-5.273-.005c0-1.252 1.013-2.266 2.265-2.266 1.249 0 2.266 1.014 2.266 2.266 0 1.251-1.017 2.265-2.266 2.265-1.253 0-2.265-1.014-2.265-2.265z"/></svg>` },
@@ -1034,21 +931,19 @@ const BRANDS = [
   { name: "Spotify", url: "https://open.spotify.com", boja: "#1DB954",
     logo: `<svg viewBox="0 0 24 24"><path fill="#fff" d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>` },
 
-  // Google se po njihovim pravilima nikad ne preboji - "G" ostaje u sve cetiri
-  // zvanicne boje, na beloj ploci.
+  // Google se po pravilima brenda ne preboji: "G" ostaje u četiri boje na beloj
+  // ploči.
   { name: "Google", url: "https://www.google.com", boja: "#4285F4", light: true,
     logo: `<svg viewBox="0 0 24 24"><path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.4Z"/><path fill="#34A853" d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2.1 1-3.4 1a5.9 5.9 0 0 1-5.5-4H3.2v2.6A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.5 14.1a5.9 5.9 0 0 1 0-3.8V7.7H3.2a10 10 0 0 0 0 9z"/><path fill="#EA4335" d="M12 6.1c1.5 0 2.9.5 3.9 1.5l2.9-2.9A10 10 0 0 0 3.2 7.7l3.3 2.6A5.9 5.9 0 0 1 12 6.1Z"/></svg>` },
 ];
-// pretraga logotipa po imenu - fallback lep izgled za poznate alate bez cover slike
+// Logo brenda po imenu alata, za alate bez okačene slike.
 const BRAND_LOGOS = {};
-// Osoblje kuca ime kako mu dodje: "Team Speak", "Battlenet", "Battle.net".
-// Razmaci, tacke i crtice se skidaju pri poredjenju, da logo ne promasi.
+// Imena se porede bez razmaka, tačaka i crtica ("Team Speak", "Battle.net").
 const kljucBrenda = (ime) => String(ime || "").toLowerCase().replace(/[\s._-]/g, "");
 BRANDS.forEach((b) => (BRAND_LOGOS[kljucBrenda(b.name)] = b));
 
-// Ime cesto nosi i nastavak: "Faceit AC", "Discord PTB", "Battle.net Launcher".
-// Zato se, ako tacno ime ne pogodi, gleda i pocetak. Duzi kljucevi se probaju
-// prvi, da "battlenet" pobedi eventualni kraci kljuc koji je njegov pocetak.
+// Ime često ima i nastavak ("Faceit AC", "Discord PTB"), pa se gleda i
+// početak. Duži ključevi se probaju prvi.
 const KLJUCEVI_BRENDOVA = Object.keys(BRAND_LOGOS).sort((a, b) => b.length - a.length);
 function nadjiBrend(ime) {
   const k = kljucBrenda(ime);
@@ -1058,15 +953,14 @@ function nadjiBrend(ime) {
   return pocetak ? BRAND_LOGOS[pocetak] : null;
 }
 
-// stabilna boja iz imena igre - cover-less kartice dobijaju svoj identitet
+// Stabilna boja iz imena igre, za kartice bez omota.
 function hueFromName(name) {
   let h = 0;
   for (const c of String(name || "")) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return h % 360;
 }
-// dominantna boja limenke sa transparentne slike (canvas), da kartica prati piće
-// Pragovi se daju spolja: limenke u shopu su jarke, ikone programa znaju da budu
-// prigusene (Steam je tamnoplav), pa im treba blazi prag da se boja uopste nadje.
+// Dominantna boja sa providne slike (canvas). Pragovi se zadaju spolja:
+// limenke su jarke, a ikone programa često prigušene.
 function dominantColor(img, { minSat = 0.22, minLum = 26 } = {}) {
   try {
     const cv = document.createElement("canvas");
@@ -1088,9 +982,7 @@ function dominantColor(img, { minSat = 0.22, minLum = 26 } = {}) {
     return `${Math.round(r / n)},${Math.round(g / n)},${Math.round(b / n)}`;
   } catch { return null; }
 }
-// Podloga kartice uzima boju SA SAME LIMENKE. Ranije je boja racunata iz imena
-// pa je iza kartica bila duga bez veze sa picem - zuto iza Coca-Cole, ljubicasto
-// iza vode. Sada je to jedva vidljiv odsjaj u boji proizvoda.
+// Odsjaj iza kartice pića je u boji same limenke.
 function colorizeShop() {
   document.querySelectorAll(".pice img[data-color]").forEach((img) => {
     const apply = () => {
@@ -1099,17 +991,14 @@ function colorizeShop() {
       const card = img.closest(".pice");
       if (card) { card.style.setProperty("--cr", c); card.classList.add("colored"); }
     };
-    // decode() garantuje da su pikseli spremni pre crtanja na canvas
+    // decode() garantuje da su pikseli spremni pre crtanja na canvas.
     const run = () => (img.decode ? img.decode().then(apply).catch(apply) : apply());
     if (img.complete && img.naturalWidth) run();
     else img.addEventListener("load", run, { once: true });
   });
 }
-// Oznaka kategorije se prikazuje samo kad stvarno nesto kaze. Podrazumevana
-// kategorija je "Igre", a to vec pise iznad police - pa je oznaka na svakoj
-// plocici bila ponavljanje, i jos je stajala preko korice i sekla logo igre
-// (Counter-Strike, Minecraft, League of Legends). Kad osoblje razvrsta igre po
-// kategorijama, oznaka se vraca, ali dole gde ne dira sliku.
+// Oznaka kategorije se prikazuje samo kad nešto kaže: podrazumevana
+// "Igre" već piše iznad police.
 const PODRAZUMEVANE_KATEGORIJE = ["igre", "igra", "ostalo", ""];
 function oznakaKategorije(g) {
   const k = String(g.category || "").trim();
@@ -1117,10 +1006,8 @@ function oznakaKategorije(g) {
   return `<div class="tile-badge">${esc(k)}</div>`;
 }
 
-// Dok osoblje ne okaci korice, plocica ne mora da bude prazan obojen blok.
-// Igra se pokrece iz .exe fajla, a taj fajl nosi svoju ikonu - ista ona koja
-// stoji na precici na radnoj povrsini. Zato se uzima odatle.
-// Igre pokrenute preko steam:// nemaju fajl na disku i ostaju na dva slova.
+// Igra bez omota dobija ikonu iz svog .exe fajla. Igre preko steam:// nemaju
+// fajl na disku i ostaju na inicijalima.
 function gameCardHtml(g, i) {
   let cover;
   let cekaIkonu = false;
@@ -1136,20 +1023,8 @@ function gameCardHtml(g, i) {
       cover = `<div class="tile-fallback" style="--h:${hueFromName(g.name)}"><span class="tile-emoji">${mono(g.name)}</span></div>`;
     }
   }
-  // "id" MORA da stoji u ovom atributu.
-  //
-  // Posle pokretanja se serveru šalje { t: "game_start", gameId: g.id }, a id se
-  // čita baš odavde. Dok ga nije bilo, slalo se undefined: server ne bi našao
-  // igru i tiho bi odustao, pa je tabela pokretanja ostajala prazna zauvek.
-  // Zbog toga igraču nisu radile "skoro igrane" igre, vlasniku spisak
-  // najigranijih, a u Logovima nije bilo nijednog zapisa o pokretanju.
-  // PLOČICA JE DUGME, NE DIV.
-  //
-  // Kao div nije mogla da se dohvati tastaturom: igrač koji ne koristi miš (ili
-  // kome miš zataji usred smene) nije mogao da pokrene nijednu igru, a fokus se
-  // nije ni video jer ga plocica nije ni primala. Kao <button> sve to dolazi
-  // samo: Tab je dohvata, Enter i razmak je pokreću, a čitač ekrana je čita kao
-  // dugme. Klik ostaje isti - hvata se preko `data-game`.
+  // Pločica je <button> (Tab, Enter, čitač ekrana). `id` iz data-game se šalje
+  // serveru uz game_start.
   return `<button class="tile" type="button" style="--i:${i}" aria-label="Pokreni ${esc(g.name)}"
     data-game='${esc(JSON.stringify({ id: g.id, path: g.path, args: g.args, name: g.name }))}'>
     <div class="tile-media"${cekaIkonu ? ` data-trazi-ikonu="${esc(g.path)}"` : ""}>
@@ -1160,16 +1035,11 @@ function gameCardHtml(g, i) {
     </div>
   </button>`;
 }
-// Redosled izvora znaka, od najboljeg ka najgrubljem:
-//   1. slika koju je osoblje okacilo u panelu - izricit izbor, uvek pobedjuje
-//   2. zvanicni znak brenda - vektor, ostar svuda, ceo red ujednacen
-//   3. prava ikona iz .exe fajla - za svaki program van spiska brendova
-//   4. prvo slovo imena - da kartica nikad ne ostane prazna
-// U redu alata na ime ostaje malo mesta (na 1366x768 oko 54 px). Imena pisana
-// bez razmaka - "TeamSpeak", "Battle.net", "YouTube" - nemaju gde da se prelome
-// pa se seku na "TEAM S...". Ovde se ubacuje <wbr>: nevidljivo mesto na kome
-// red SME da se prelomi, posle tacke i na granici malo/veliko slovo. Prelom
-// nasred reci se i dalje ne desava.
+// Izvor znaka, redom: slika iz panela, zvanični znak brenda, ikona iz .exe
+// fajla, prvo slovo imena.
+//
+// U redu alata je za ime malo mesta, pa se u imena bez razmaka ("TeamSpeak",
+// "Battle.net") ubacuje <wbr> posle tačke i na granici malo/veliko slovo.
 function prelomIme(ime) {
   return esc(ime)
     .replace(/\.(?=[^\s<])/g, ".<wbr>")
@@ -1188,12 +1058,7 @@ function toolCardHtml(t) {
   }
 
   if (brand) {
-    // Zvanicni znak brenda: beo, na ploci u boji brenda. Ide ISPRED ikone iz
-    // .exe fajla - vektor je ostar na svakoj rezoluciji i ceo red izgleda kao
-    // jedna celina, dok su izvucene ikone bitmape od 48 px razlicitog kvaliteta
-    // (a poneki program nosi i genericku ikonu instalera).
-    // Google je izuzetak: njihov "G" se po pravilima ne preboji, pa stoji u
-    // svoje cetiri boje na beloj ploci.
+    // Zvanični znak brenda (vektor) ima prednost nad ikonom iz .exe fajla.
     return `<button class="site-card brend ${brand.light ? "light" : ""}" data-tool='${data}'
       style="--glow:${brand.boja}">
       <span class="site-logo">${brand.logo}</span>
@@ -1201,9 +1066,8 @@ function toolCardHtml(t) {
     </button>`;
   }
 
-  // Program koji nije poznat brend: prava ikona iz njegovog .exe fajla. Stize
-  // tek posle pitanja glavnom procesu, pa kartica krece od onoga sto vec zna i
-  // sama se dopuni kad ikona stigne - inace bi red treperio pri svakom crtanju.
+  // Program van spiska brendova: ikona iz njegovog .exe fajla. Stiže naknadno,
+  // pa kartica kreće od onoga što se već zna.
   const izExe = t.kind === "app" ? IKONE_PROGRAMA.get(kljucPutanje(t.target)) : undefined;
   if (izExe) {
     return `<button class="site-card exe" data-tool='${data}'>
@@ -1215,24 +1079,19 @@ function toolCardHtml(t) {
   const col = t.color || `hsl(${hueFromName(t.name)} 68% 46%)`;
   return `<button class="site-card letter" data-tool='${data}'
     ${cekaIkonu ? `data-trazi-ikonu="${esc(t.target)}"` : ""}
-    style="--glow:${col}">
+    style="--glow:${esc(col)}">
     <span class="site-logo"><span class="tool-letter">${esc((t.name || "?").trim().charAt(0).toUpperCase())}</span></span>
     <span class="site-traka"></span><span class="site-name">${prelomIme(t.name)}</span>
   </button>`;
 }
 
-// Ikone se pamte po putanji, da se glavni proces ne pita iznova pri svakom
-// crtanju. Vrednost null znaci "pitano, nema ikone" - da se ne pita ponovo.
-// Isti spisak sluzi i precicama i igrama: i jedno i drugo je program na disku.
+// Ikone se pamte po putanji; null znači "pitano, nema ikone". Isti spisak
+// koriste i prečice i igre.
 const IKONE_PROGRAMA = new Map();
 const kljucPutanje = (p) => String(p || "").trim().replace(/^"|"$/g, "").trim();
 
-// Igra pokrenuta preko steam:// ili epic:// nema fajl na disku, pa nema ni sta
-// da se izvuce - takve se ni ne pitaju.
-// Program na disku je i putanja bez nastavka: osoblje drzi precice u C:\games
-// i cesto upise samo "C:\games\cs2", a na disku stoji "cs2.lnk". Glavni proces
-// sam nadje pravi fajl, pa se ovde ne sme unapred odbiti.
-// Odbija se samo ono sto sigurno nije fajl - protokol (steam://) i adresa.
+// Ikona se ne traži za protokol (steam://) i adresu. Putanja bez nastavka
+// je dozvoljena: glavni proces sam nađe prečicu.
 const jeProgramNaDisku = (p) => {
   const put = kljucPutanje(p);
   return !!put && !/^[a-z][a-z0-9+.-]*:\/\//i.test(put);
@@ -1253,14 +1112,11 @@ async function dovuciIkoneAlata() {
       if (url) stiglo = true;
     } catch { IKONE_PROGRAMA.set(p, null); }
   }));
-  // Ponovo se crta samo ako je stvarno stigla neka ikona.
   if (stiglo && S.tab === "home") renderContent();
 }
 
-// Sirova boja iz ikone je neupotrebljiva kao akcenat: Steam je skoro crno plav
-// pa se ne vidi, zuta fascikla bode oci. Ton se zadrzava, a zasicenost i
-// svetlina se svode na isti opseg - tako svih osam kartica ima akcenat iste
-// tezine, a svaka i dalje nosi boju svog programa.
+// Boja iz ikone se svodi na isti opseg zasićenosti i svetline, uz isti ton,
+// pa sve kartice imaju akcenat iste težine.
 function ujednaciBoju(rgb) {
   const [r, g, b] = rgb.split(",").map((n) => Number(n) / 255);
   const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
@@ -1280,8 +1136,7 @@ function ujednaciBoju(rgb) {
   return t.map((v) => Math.round((v + m) * 255)).join(",");
 }
 
-// Boja kartice se vadi iz same ikone, pa svaki alat dobije svoju pravu boju -
-// i onaj koji nije ni na kakvom spisku.
+// Boja kartice se vadi iz ikone.
 function obojiIkoneAlata() {
   document.querySelectorAll(".site-card.exe .exe-ikona").forEach((img) => {
     const primeni = () => {
@@ -1297,11 +1152,18 @@ function obojiIkoneAlata() {
     else img.addEventListener("load", kreni, { once: true });
   });
 }
+// Pokretanje preko glavnog procesa. Ako most pukne, igrač dobija poruku, a
+// pločica ne ostaje na "Pokrećem...".
+async function pokreni(sta) {
+  try {
+    const r = await window.crit.launchGame(sta);
+    return r && typeof r === "object" ? r : { ok: false };
+  } catch { return { ok: false }; }
+}
 async function launchTool(t) {
   if (t.kind === "app") {
-    // `id` i `vrsta` sluze serveru da zapise kvar UZ SAMU precicu - inace se
-    // ona trazi po imenu, a ime se menja.
-    const r = await window.crit.launchGame({ path: t.target, args: t.args, name: t.name, id: t.id, vrsta: "alat" });
+    // `id` i `vrsta` služe serveru da kvar upiše uz samu prečicu.
+    const r = await pokreni({ path: t.target, args: t.args, name: t.name, id: t.id, vrsta: "alat" });
     if (!r.ok) toast(r.error || "Ne mogu da pokrenem alat", "error");
     else if (!r.ignored) toast(`Pokrećem ${t.name || "alat"}...`, "success");
   } else {
@@ -1321,9 +1183,8 @@ function shelfHtml(title, cards, extra = "") {
     <div class="shelf-track ${extra}" data-track>${cards}</div>
   </section>`;
 }
-// PROMO BANERI
-// Kad osoblje okaci promo banere, oni preuzimaju vrh pocetne i smenjuju se
-// sami. Tekst se ne crta preko njih - sve sto treba da pise, pise na slici.
+// Promo baneri: zauzimaju vrh početne i smenjuju se sami. Preko njih se ne
+// crta tekst.
 const PROMO_RAZMAK = 8000;
 let promoTajmer = null, promoIndeks = 0;
 
@@ -1343,51 +1204,26 @@ function prikaziPromo(i) {
   $$(".promo-tacka").forEach((t, n) => t.classList.toggle("aktivna", n === promoIndeks));
 }
 
-// VIP TRAKA NA VRHU POČETNE
+// Traka ranga na vrhu početne: znak kuće, rang, nivo i napredak do sledećeg.
+// Podaci stižu kao `vip` uz "welcome" i "balance":
 //
-// Zamišljena je kao napredak iz igara: znak, nivo, traka koja se puni, i nagrada
-// na kraju. Sam XP sistem još ne postoji - pravila (šta daje iskustvo, koliko,
-// šta se otključava) tek treba da se osmisle.
+//   vip: { nivo: 4, naziv: "Serija", xp: 320, xpDo: 500, poslednji: false,
+//          sledeci: "Kritičan", vip: false, vipDana: 0, mnozilac: 1 }
 //
-// Zato ovde stoji ZAKLJUČANO stanje sa pečatom "USKORO!". To je namerno, i nije
-// isto što i prazna traka: prazna traka je obećanje koje program ne ispunjava, a
-// ovako igrač vidi da stvar POSTOJI i da tek dolazi.
-//
-// Kad XP sistem stigne, server šalje `vip` uz "welcome" i "balance":
-//
-//   vip: { nivo: 4, naziv: "Srebro", xp: 320, xpDo: 500, otkljucano: false }
-//
-// i traka se sama popuni - ništa se ovde ne prepravlja. Dok tog polja nema,
-// prikaz je zaključan. Tako se izgled i pravila razvijaju odvojeno.
+// Bez tog polja (stariji server, igrač nije prijavljen) traka je zaključana.
 function rangTrakaHtml() {
   const v = S.vip;
-  // Tri stanja, ne dva:
-  //   nema podataka  - server je stariji ili igrac nije prijavljen -> "Uskoro!"
-  //   poslednji nivo - traka je puna i NE trazi jos, jer nema sta da trazi
-  //   sve ostalo     - napredak unutar tekuceg nivoa
+  // Tri stanja: nema podataka, poslednji nivo (traka je puna) i napredak
+  // unutar nivoa.
   const ima = !!v && Number.isFinite(v.nivo);
-  // OVO JE TRAKA RANGA, NE VIP-A.
-  //
-  // Dok je VIP bio nagrada za peti nivo, na traci je pisalo "VIP" i to je imalo
-  // smisla. Sada se VIP KUPUJE, pa je isti natpis postao greška koja se vidi na
-  // najvidljivijem mestu u programu: gost koji nije platio ništa gledao je
-  // ogromno zlatno "VIP" iznad svoje trake. Čitalo se kao da ga već ima - a
-  // stvar koju već imaš se ne kupuje.
-  //
-  // Zato traka nosi IME RANGA ("POGODAK"), a reč VIP se pojavljuje samo onome
-  // ko je članarinu stvarno platio, i uz broj preostalih dana: ko ne zna dokle
-  // mu važi, ne obnavlja.
-  //
-  // Klase se zovu `rang-*`, a ne `vip-*` kako su se zvale dok je VIP bio nagrada
-  // za nivo. Ime koje laže je skuplje nego što izgleda: sledeći koji otvori ovaj
-  // deo pomisli da je reč o članarini i doda joj još nešto - a ovde nema ničega
-  // što se plaća. Oznaka člana je jedini izuzetak i zato se zove `rang-clan`.
+  // Traka nosi ime ranga; reč VIP se prikazuje samo članu koji je članarinu
+  // platio, uz broj preostalih dana. Klase su `rang-*`, a `rang-clan` je oznaka
+  // člana.
   const jeClan = ima && !!v.vip;
   const naKraju = ima && v.poslednji;
   const merljiv = ima && !naKraju && Number.isFinite(v.xpDo) && v.xpDo > 0;
   const postotak = naKraju ? 100 : merljiv ? Math.max(0, Math.min(100, (v.xp / v.xpDo) * 100)) : 0;
-  // Samo broj: ime ranga je sada naslov trake, pa bi "Nivo 3 - Pogodak" pored
-  // krupnog "POGODAK" bilo isto dvaput u istom redu.
+  // Samo broj, jer je ime ranga naslov trake.
   const nivo = ima ? `Nivo ${v.nivo}` : "Nivo -";
   const pod = naKraju
     ? "Najviši nivo - dalje se ne ide"
@@ -1395,16 +1231,11 @@ function rangTrakaHtml() {
       ? `${Math.round(v.xp)} / ${Math.round(v.xpDo)} XP do nivoa ${esc(v.sledeci || "")}`
       : "Otključava se igranjem";
 
-  // Zupci dele traku na nivoe - bez njih je to samo linija koja raste, a sa
-  // njima se vidi DOKLE se stiglo i koliko je ostalo.
+  // Zupci dele traku na nivoe.
   const zupci = Array.from({ length: 9 }, (_, i) =>
     `<span class="rang-zub" style="left:${((i + 1) * 10).toFixed(0)}%"></span>`).join("");
 
-  // ZNAK KUCE OSTAJE U VRHU POCETNE.
-  //
-  // Prva verzija VIP trake ga je izbacila - a bas preko klase `brand-logo`
-  // primeniBrend menja logo po igraonici. Bez njega bi svaka igraonica gledala
-  // tudji znak na svom najvidljivijem mestu.
+  // Znak kuće (klasa `brand-logo`, menja ga primeniBrend).
   return `<div class="rang ${ima ? "" : "zakljucan"}${naKraju ? " vrh" : ""}">
     <img class="rang-kuca brand-logo" src="img/crit-logo.png" alt="${esc(S.settings.cafeName || "")}" draggable="false" />
     ${/* U štitu stoji BROJ NIVOA, ne zvezda. Zvezda je bila znak VIP-a, a VIP
@@ -1432,11 +1263,8 @@ function rangTrakaHtml() {
   </div>`;
 }
 
-// Osvežava SAMO traku, ne celu stranu.
-//
-// Iskustvo raste dok naplata teče - na svakih pet sekundi. Da se tada iscrtava
-// cela početna, police bi treperile, drag-to-scroll bi se prekidao, a igrač koji
-// prevlači korice bi to osetio kao trzanje.
+// Osvežava se samo traka: iskustvo raste na svakih pet sekundi, a crtanje
+// cele početne bi prekidalo prevlačenje police.
 function osveziRangTraku() {
   const stara = $(".rang");
   if (!stara) return;
@@ -1447,18 +1275,13 @@ function osveziRangTraku() {
   primeniBrend(S.brend);
 }
 
-// NOV NIVO SE VIDI I ČUJE, NE SAMO UPIŠE.
-//
-// Bez ovoga bi napredak postojao samo u bazi: igrač bi jednom slučajno primetio
-// da mu je traka drugačija, a otključana stvar bi stajala neiskorišćena jer niko
-// nije rekao da postoji. Zato preko ekrana ide obaveštenje sa onim ŠTA je dobio.
+// Nov nivo: obaveštenje sa onim što je otključano i bljesak trake.
 function proslaviNivo(m) {
   const dobio = (m.otkljucano || []).map((o) => o.naziv).filter(Boolean);
   toast(`Nivo ${m.nivo} - ${m.naziv}${dobio.length ? ": " + dobio.join(", ") : ""}`, "nivo", 7000);
   const el = $(".rang");
   if (el) {
-    // Animacija se pokreće ponovo i kad klasa već stoji - inače drugi nivo
-    // zaredom ne bi bljesnuo.
+    // Animacija se pokreće ponovo i kad klasa već stoji.
     el.classList.remove("slavi");
     void el.offsetWidth;
     el.classList.add("slavi");
@@ -1466,11 +1289,8 @@ function proslaviNivo(m) {
   }
 }
 
-// VRH POCETNE
-// Levo VIP traka (ili okaceni promo baneri ako ih osoblje ima - to je prostor
-// koji je vlasnik platio i on ima prednost), desno stanje
-// nagradnog tocka kao traka napretka. Klik na tocak otvara pop-up sa vrtnjom -
-// ranije je ceo tocak stajao razvucen na strani Nalog i gusio je.
+// Vrh početne: levo traka ranga ili promo baneri, desno napredak do
+// nagradnog točka (klik otvara točak).
 function heroHtml() {
   const lista = S.promo || [];
   const levo = lista.length
@@ -1481,28 +1301,12 @@ function heroHtml() {
           `<button class="promo-tacka ${i === 0 ? "aktivna" : ""}" data-promo-idi="${i}" aria-label="Baner ${i + 1}"></button>`).join("")}</div>` : ""}
       </div>`
     : rangTrakaHtml();
-  // Kad je okačen promo baner, on je slika koju je osoblje napravilo i preko nje
-  // ne sme ništa - ni šara ni crvena nit uz ivicu. Klasa "promo" ih gasi.
+  // Preko promo banera se ne crta ni šara ni ivica.
   return `<section class="hero ${lista.length ? "promo" : ""}">${levo}${heroTocakHtml()}</section>`;
 }
 
-// IGRE NE IDU U BANER.
-//
-// Ovde je nekad stajala traka "Nastavi gde si stao" - tri poslednje igre kao
-// sitna dugmad u gornjoj traci. Bila je greška iz dva razloga:
-//
-//   1. Baner je baner. Tu ide promo materijal koji je osoblje napravilo, ili
-//      znak igraonice - jedna mirna slika preko celе širine. Tri male pločice
-//      sa imenima igara u tom prostoru izgledaju kao da su tu upale slučajno.
-//   2. Iste te igre su onda stajale i u traci i na polici odmah ispod nje, pa
-//      se polica NAMERNO nije sortirala da se ne ponove. Time je pokvareno ono
-//      što je zaista korisno: da poslednje igrana igra bude prva na polici.
-//
-// Sada je obrnuto i jednostavnije: baner nosi promo ili znak, a POLICA se ređa
-// po tome šta je igrač poslednje igrao. Ko je sinoć igrao CS2, njega zatiče
-// prvog - na istom mestu i u istom obliku kao i sve ostale igre.
 
-// Widget tocka u baneru: mini tocak, traka napretka i stanje. Ceo je dugme.
+// Točak u vrhu početne: mini točak, traka napretka i stanje. Ceo je dugme.
 function heroTocakHtml() {
   const t = S.tocak;
   if (!t || !t.ukljucen || !(t.nagrade || []).length) return "";
@@ -1536,16 +1340,8 @@ function heroTocakHtml() {
     </span>
   </button>`;
 }
-// REDOSLED IGARA NA POLICI: POSLEDNJE IGRANA JE PRVA.
-//
-// Igrač sedne i traži ono što je sinoć igrao. Ko je poslednji put pokrenuo CS2,
-// zatiče ga prvog - u istoj kartici i istog oblika kao sve ostale, samo na
-// prvom mestu. Iza njih ide redosled koji je osoblje postavilo u panelu.
-//
-// Ranije je ovo radilo SAMO kad traka "Nastavi gde si stao" nije bila
-// prikazana, jer bi se iste igre pojavile dvaput. Ta traka je uklonjena (igre
-// ne idu u baner), pa sortiranje sad važi uvek - a to je i jedini oblik u kom
-// je korisno.
+// Redosled na polici: igre koje je igrač poslednje pokretao su prve, zatim
+// redosled iz panela.
 function poredakIgara() {
   if (!S.skoroIgrane.length) return S.games;
   const mesto = new Map(S.skoroIgrane.map((id, i) => [id, i]));
@@ -1555,18 +1351,8 @@ function poredakIgara() {
   return skoro.concat(ostale);
 }
 
-// PRAZNA POLICA IZGLEDA ISTO NA OBA MESTA.
-//
-// Bile su dve različite: bez igara je nestajao i naslov "Igre" pa se cela strana
-// prerasporedi, a umesto police je stajao veliki znak sa naslovom i objašnjenjem;
-// bez alata je naslov ostajao, a ispod njega go red teksta u stilu pozajmljenom
-// od prazne korpe u Shop-u. Prvog dana u novoj igraonici obe police su prazne, i
-// to je prvo što vlasnik vidi - dve različite prazne police izgledaju kao da je
-// jedna od njih pokvarena.
-//
-// Sada: naslov police uvek stoji (strana ne skače kad osoblje doda prvu igru), a
-// unutra ide isti znak, isti naslov i isto objašnjenje - samo je za igre veći,
-// jer je i mesto veće.
+// Prazna polica: naslov ostaje, a unutra stoji isti znak i objašnjenje za
+// igre i za prečice.
 const policaPrazno = (ikona, naslov, opis, veliko) => `
   <div class="polica-prazno${veliko ? " veliko" : ""}">
     ${icon(ikona, veliko ? 56 : 30)}
@@ -1599,7 +1385,7 @@ function renderHome() {
     </section>
   </div>`;
 }
-// strelice igara: sakrij kad nema šta da se pomera, disable na kraju
+// Strelice police: skrivene kad nema šta da se pomera, isključene na kraju.
 function updateHomeArrows() {
   const shelf = document.querySelector(".games-shelf");
   if (!shelf) return;
@@ -1618,30 +1404,11 @@ function updateHomeArrows() {
 }
 window.addEventListener("resize", () => { if (S.tab === "home") updateHomeArrows(); });
 
-// POLICA KOJA SE OSEĆA DOK SE POMERA
-//
-// Polica je do sada bila spisak koji klizi. Ovde dobija tri stvari koje se ne
-// vide pojedinačno, ali zajedno daju osećaj težine - kao da se pomera nešto što
-// ima masu, a ne tabela:
-//
-//   NAGIB    Dok se vuče, pločice se blago okreću u smeru kretanja i vraćaju kad
-//            se stane. Ugao ide od BRZINE, ne od položaja - spor pokret jedva da
-//            se primeti, nagli se oseti.
-//   PARALAKSA Omot se unutar okvira pomera suprotno od kretanja. Slika tako
-//            "zaostaje" za pločicom i dobija dubinu; bez toga je pločica plosnat
-//            papir koji klizi.
-//   DUBINA   Pločica koju ivica police seče gasi se srazmerno tome koliko je
-//            odsečeno, a cela pločica ostaje puna. Utišana pločica zato govori
-//            jedno: "ima još, pomeri". Dubina je prvo išla po udaljenosti od
-//            sredine - tada je prva igra, najigranija i uvek cela vidljiva,
-//            stalno bila prigušena, kao da je manje važna.
-//
-// ŠTA JE OVDE NAMERNO SKROMNO
-//
-// Ovo je ekran za koji neko plaća po satu, ne demo. Zato: bez odskakanja, bez
-// rotacije koja menja čitljivost imena, bez zamućenja (ono na slabijoj grafici
-// košta više nego sve ostalo zajedno). Sve staje u granice ispod, a jače od
-// toga se brzo prejede i počne da smeta.
+// Polica koja reaguje na pomeranje:
+//   nagib     - pločice se blago okreću u smeru kretanja; ugao zavisi od brzine;
+//   paralaksa - omot unutar okvira zaostaje za pločicom;
+//   dubina    - pločica koju ivica police seče se utišava srazmerno odsečenom.
+// Bez odskakanja, rotacije imena i zamućenja; granice su u POLICA.
 const POLICA = { nagib: 7, paralaksa: 14, dubina: 0.5, trenje: 0.86 };
 
 function ozivipolicu(track) {
@@ -1654,13 +1421,11 @@ function ozivipolicu(track) {
 
   const crtaj = () => {
     kadr = null;
-    // Igrač koji je ugasio animacije ne dobija nijednu - isto pravilo kao za
-    // šaru i prelaze. Tada se sve vrati na nulu i petlja staje.
+    // Sa isključenim animacijama sve se vraća na nulu i petlja staje.
     if (!S.animacije) { ocisti(); return; }
 
     const sada = track.scrollLeft;
-    // Nova brzina je razlika, ali se meša sa starom: sirova razlika po kadru
-    // skače i nagib bi treperio.
+    // Brzina se ublažava sa prethodnom, da nagib ne treperi.
     brzina = brzina * POLICA.trenje + (sada - prosli) * (1 - POLICA.trenje);
     prosli = sada;
 
@@ -1670,12 +1435,8 @@ function ozivipolicu(track) {
     for (const plocica of track.children) {
       const medij = plocica.firstElementChild;
       if (!medij) continue;
-      // DUBINA IDE PO TOME KOLIKO POLICA SEČE PLOČICU, ne po udaljenosti od
-      // sredine. Po sredini je prva igra - najigranija, i uvek cela vidljiva -
-      // stalno bila utišana, a to je govorilo da je manje važna. Ovako se gasi
-      // samo ono što je zaista presečeno ivicom, pa utišana pločica znači jedno:
-      // "ima još, pomeri". Kad polica nema gde da klizi, sve je celo i ništa se
-      // ne menja - što je i tačno.
+      // Dubina zavisi od toga koliko ivica police seče pločicu, ne od udaljenosti
+      // od sredine, pa prva (najigranija) igra nije utišana.
       const levo = plocica.offsetLeft - sada;
       const vidljivo = Math.min(levo + plocica.offsetWidth, sirina) - Math.max(levo, 0);
       const udeo = Math.max(0, Math.min(1, vidljivo / (plocica.offsetWidth || 1)));
@@ -1686,15 +1447,13 @@ function ozivipolicu(track) {
       if (omot) omot.style.setProperty("--par-omot", (-norm * POLICA.paralaksa).toFixed(2) + "px");
     }
 
-    // Petlja radi samo dok se nešto stvarno pomera. Stalni rAF na trinaest
-    // mašina je trošak koji se ne vidi na ekranu, ali se vidi na ventilatoru.
+    // Petlja radi samo dok se nešto pomera.
     if (Math.abs(brzina) > 0.05) kadr = requestAnimationFrame(crtaj);
     else pusti();
   };
 
-  // Kad se stane, nagib i paralaksa se puste na nulu i CSS ih sam odvede nazad
-  // (prelaz je već na .tile-media i na slici). Dubina OSTAJE - ona zavisi od
-  // toga koliko polica seče pločicu, ne od kretanja.
+  // Na zaustavljanju se nagib i paralaksa vraćaju na nulu (CSS prelaz), a
+  // dubina ostaje.
   const pusti = () => {
     brzina = 0;
     for (const plocica of track.children) {
@@ -1717,26 +1476,19 @@ function ozivipolicu(track) {
     }
   };
 
-  // Kad su animacije ugašene, ne budi se petlja nego se ono što je ostalo
-  // zapisano skida. U samom programu se posle prekidača ekran ionako iscrta
-  // iznova, pa se ovo ne vidi - ali vrednost koja ostane da visi na elementu je
-  // greška i onda kad je niko ne gleda.
+  // Sa isključenim animacijama petlja se ne budi, a zapisane vrednosti se skidaju.
   const probudi = () => {
     if (!S.animacije) { if (kadr) { cancelAnimationFrame(kadr); kadr = null; } ocisti(); return; }
     if (!kadr) kadr = requestAnimationFrame(crtaj);
   };
   track.addEventListener("scroll", probudi, { passive: true });
-  // Prevlačenje menja scrollLeft direktno, bez "scroll" događaja u istom kadru -
-  // bez ovoga bi nagib kasnio za prstom.
+  // Prevlačenje menja scrollLeft bez "scroll" događaja u istom kadru.
   track.addEventListener("pointermove", probudi, { passive: true });
   probudi(); // jednom odmah, da dubina stoji i pre prvog pomeranja
 }
 
 // ---- Shop ----
-// Jedan spisak pića i traka kategorija iznad njega - kao jelovnik. Ranije je
-// svaka kategorija imala svoj red kartica; sa sedam artikala to je davalo tri
-// reda od kojih je svaki bio popunjen do pola, pa je pola ekrana bilo prazno.
-// Ovako je sve na jednom mestu, a traka kategorija sluzi za izbor.
+// Jedan spisak pića sa trakom kategorija iznad njega.
 function renderShop() {
   const dostupni = S.shop.filter((i) => i.available);
   const kategorije = [...new Set(dostupni.map((i) => i.category).filter(Boolean))];
@@ -1747,42 +1499,27 @@ function renderShop() {
     `<button class="shop-cip ${(kljuc || null) === izabrana ? "aktivan" : ""}" data-kat="${esc(kljuc || "")}">
       ${esc(ime)}<span>${n}</span>
     </button>`;
-  // Traka ima smisla tek kad ima izmedju cega da se bira.
+  // Traka kategorija samo kad ima više od jedne.
   const traka = kategorije.length > 1
     ? `<div class="shop-filter">${cip("Sve", "", dostupni.length)}${kategorije
         .map((k) => cip(k, k, dostupni.filter((i) => i.category === k).length)).join("")}</div>`
     : "";
 
-  // Traka o porudžbini koja stiže ide IZNAD mreže artikala.
-  //
-  // Ispod nje je bila van vidnog polja: mreža se skroluje, pa je igrač morao da
-  // skroluje do dna da bi saznao stiže li mu piće. A to je jedino zbog čega
-  // traka i postoji - odgovor na prvi pogled.
+  // Traka o porudžbini u toku stoji iznad mreže artikala, da se vidi bez
+  // skrolovanja.
   const telo = dostupni.length
     ? `${traka}${shopPorudzbine()}<div class="shop-grid">${vidljivi.map(shopCardHtml).join("")}</div>`
     : policaPrazno("cup", "Shop je prazan", "Osoblje dodaje pića i grickalice u panelu.", true);
 
-  // KORPE NEMA KAD NEMA STA DA SE STAVI U NJU.
-  //
-  // Prazan shop je pokazivao DVE prazne poruke jednu pored druge: veliku levo
-  // ("Shop je prazan") i visoku praznu kolonu desno sa "Trenutno nema šta da se
-  // poruči". Ista stvar, dvaput, i jedna četvrtina ekrana potrošena na kolonu
-  // koja ne može ništa da primi.
+  // Prazan shop nema ni kolonu korpe.
   return `<div class="shop${dostupni.length ? "" : " bez-korpe"}">
     <div class="shop-products">${telo}</div>
     ${dostupni.length ? `<div class="cart" id="cartBox">${renderCart()}</div>` : ""}
   </div>`;
 }
 
-// Ispod spiska pića stoji šta je igrač poručio i dokle je stiglo. Spisak je i
-// na Nalogu, ali igrač poručuje ovde - pa i status treba da vidi ovde, bez
-// prebacivanja taba.
-// U SHOP-U SAMO JEDNA LINIJA, NE CEO SPISAK.
-//
-// Ceo spisak porudžbina je stajao i ovde i na nalogu - ista stvar dvaput, sa
-// dva različita markupa. Igraču u Shop-u treba samo odgovor na "stiže li",
-// a istorija mu treba na nalogu. Zato ovde ostaje jedna linija dok se nešto
-// sprema, i ona vodi na nalog.
+// U Shop-u stoji jedna linija dok se porudžbina sprema i vodi na Nalog, gde
+// je ceo spisak.
 function shopPorudzbine() {
   const aktivne = aktivnePorudzbine();
   if (!aktivne.length) return "";
@@ -1797,27 +1534,15 @@ function shopPorudzbine() {
 }
 const oblikKom = (n) => (n % 10 === 1 && n % 100 !== 11 ? "komad" : "komada");
 
-// Cena: broj nosi, oznaka valute je sitna uz njega. Tako cena izgleda kao na
-// jelovniku, a ne kao red teksta iste debljine.
+// Cena: krupan broj, sitna oznaka valute.
 function cenaHtml(n, klasa = "cena") {
   return `<span class="${klasa}"><b>${Math.round(Number(n) || 0).toLocaleString("sr-Latn-RS")}</b><i>${esc(S.settings.currency)}</i></span>`;
 }
 
-// Kartica pica: fotografija na mirnoj podlozi, ispod nje ime, cena i jedno
-// malo dugme. Ranije je svaka kartica imala punu crvenu traku "Dodaj" - sedam
-// crvenih pravougaonika jedan do drugog je vikalo preko celog ekrana. Sada je
-// dugme krug sa tankim obodom i boju dobija tek kad je pice u korpi.
-// CELA KARTICA DODAJE U KORPU, NE SAMO DUGME "+".
-//
-// Kartica se na prelazak miša podiže - to je poziv na klik. A klik nije radio
-// ništa: primalo ga je samo malo okruglo dugme u ćošku. Kartica koja se ponaša
-// kao dugme mora i da bude dugme, inače igrač klikne, ne desi se ništa, i on
-// pomisli da program ne radi.
-//
-// Sama kartica NIJE <button>: u njoj već stoje dugmad za količinu, a dugme u
-// dugmetu nije ispravno. Zato nosi `data-add` (isto što nosi i "+"), a
-// tastaturom se do nje stiže preko tog istog dugmeta, koje fokus prima kako
-// treba. Rasprodat artikal se ne dodaje ni klikom na karticu.
+// Kartica pića: slika, ime, cena i malo dugme koje dobija boju kad je piće u
+// korpi. Klik bilo gde na kartici dodaje u korpu (`data-add`); sama kartica
+// nije <button> jer sadrži dugmad za količinu, pa se tastaturom stiže preko
+// dugmeta "+". Rasprodat artikal se ne dodaje.
 function shopCardHtml(i) {
   const nema = i.stock === 0;
   const malo = i.stock != null && i.stock > 0 && i.stock <= 5;
@@ -1848,10 +1573,8 @@ function shopCardHtml(i) {
 
 function renderCart() {
   if (!S.cart.size) {
-    // Korpa se crta samo kad u shopu IMA sta da se stavi u nju (vidi renderShop),
-    // pa ovde ne postoji stanje "nema sta da se poruci".
-    // Prazna korpa govori istim jezikom kao prazna polica na pocetnoj i prazan
-    // shop - isti znak, isti naslov, isto objasnjenje.
+    // Korpa se crta samo kad shop ima artikle (vidi renderShop). Prazna korpa
+    // koristi isti izgled kao prazna polica.
     return `<div class="cart-head"><h3>Korpa</h3></div>
       ${policaPrazno("cup", "Korpa je prazna", "Dodaj piće sa spiska levo.")}`;
   }
@@ -1870,16 +1593,8 @@ function renderCart() {
     </div>`;
   }
   const dovoljno = S.balance >= total;
-  // Kredit se nudi samo ako ga stvarno ima; inace bi igrac birao opciju koja
-  // sigurno pada i tek na kraju dobio poruku da nema para.
-  //
-  // PREBACIVANJE NA KES SE VRACA SAMO OD SEBE.
-  //
-  // Ranije se prebacivalo na kes cim kredita nema, ali se NIKAD nije vracalo.
-  // Igrac sa 100 dinara doda kolu od 130 (skoci na kes), predomisli se i uzme
-  // vodu od 80 - kredit sad ima, a i dalje pise "Kes". Isto i kad ga radnik
-  // dopuni: gost placa kesom nesto sto je vec platio. Zato se pamti da li je
-  // KES BIO IGRACEV IZBOR; ako nije, cim kredit bude dovoljan vraca se na njega.
+  // Kredit se nudi samo ako ga ima dovoljno. Kad se na keš prešlo automatski
+  // (a ne izborom igrača), vraća se na kredit čim ga opet bude dovoljno.
   if (!dovoljno) S.nacinPlacanja = "cash";
   else if (S.nacinPlacanja === "cash" && !S.nacinRucno) S.nacinPlacanja = "credit";
   const nacin = S.nacinPlacanja || "credit";
@@ -1917,16 +1632,8 @@ const STATUS_PORUDZBINE = {
   cancelled: ["Otkazano", "otkazano"],
 };
 
-// Poruka o statusu traje par sekundi i promakne dok je igrac u igri, pa spisak
-// mora negde i da stoji. Zavrsene se prikazuju samo dok su sveze.
-// PORUDŽBINE - JEDNO MESTO.
-//
-// Ranije je isti spisak stajao i u Shop-u i na nalogu, sa dva različita
-// markupa i dva seta CSS klasa. Igrač je istu stvar viđao dvaput, a svaka
-// izmena je morala da se odradi na dva mesta.
-//
-// Sada spisak živi samo ovde. Shop pokazuje jednu liniju dok se porudžbina
-// sprema, jer je to jedino što igraču treba u tom trenutku.
+// Porudžbine igrača: spisak je samo na Nalogu, a Shop prikazuje jednu liniju
+// dok se porudžbina sprema. Završene se prikazuju dok su sveže.
 function sekcijaPorudzbine() {
   const sve = S.porudzbine || [];
   const aktivne = aktivnePorudzbine();
@@ -1974,14 +1681,12 @@ function sekcijaPorudzbine() {
 
 const clockHM = (ts) => new Date(ts).toLocaleTimeString("sr-Latn-RS", { hour: "2-digit", minute: "2-digit" });
 
-// Tacka na tabu Nalog dok porudzbina nije doneta - igrac vidi da nesto stiže
-// i kad je na drugom tabu ili u igri.
+// Značka na tabu Nalog dok porudžbina nije doneta.
 function osveziZnackuNaloga() {
   const tab = $$(".tab").find((t) => t.dataset.tab === "account");
   if (!tab) return;
   const cekaju = (S.porudzbine || []).filter((o) => o.status === "pending" || o.status === "preparing").length;
-  // Znacka je pravi element: aktivan tab vec koristi ::after za crvenu liniju,
-  // pa bi ista kroz ::after progutala natpis na tabu.
+  // Značka je poseban element, jer aktivan tab već koristi ::after.
   let z = tab.querySelector(".tab-znacka");
   if (!cekaju) { if (z) z.remove(); return; }
   if (!z) { z = document.createElement("span"); z.className = "tab-znacka"; tab.appendChild(z); }
@@ -2013,19 +1718,9 @@ function renderAccount() {
   </div>`;
 }
 
-// NALOG JE MENI, NE SPISAK PANELA.
-//
-// Ranije su porudžbine, pozadina i lozinka stajale jedna ispod druge na istom
-// ekranu. Sve se videlo odjednom, ništa nije imalo prednost, a strana je
-// izgledala pretrpano - i rasla je sa svakom novom stvari.
-//
-// Sada je levo meni, desno jedan odeljak. Igrač bira šta gleda, svaki odeljak
-// ima mesta koliko mu treba, a dodavanje novog ne kvari raspored.
+// Nalog je meni sa odeljcima: levo spisak, desno jedan odeljak.
 const ACC_SEKCIJE = [
-  // Profil je prvi: nalog pocinje od toga KO si, pa tek onda od toga sta radis.
   { kljuc: "profil", naziv: "Profil", ikona: "user" },
-  // Rang lista ide odmah uz profil: to su dve strane iste stvari - ko si i gde
-  // si u odnosu na ostale.
   { kljuc: "rang", naziv: "Rang lista", ikona: "postolje" },
   { kljuc: "porudzbine", naziv: "Porudžbine", ikona: "cup" },
   { kljuc: "nagrade", naziv: "Nagrade", ikona: "gift" },
@@ -2035,8 +1730,7 @@ const ACC_SEKCIJE = [
 ];
 function stavkaMenija(s) {
   const aktivna = (S.accSekcija || "profil") === s.kljuc;
-  // Broj aktivnih porudžbina stoji uz stavku: igrač koji čeka piće ne mora da
-  // ulazi u odeljak da bi video da li je stiglo.
+  // Broj aktivnih porudžbina stoji uz stavku menija.
   const cek = s.kljuc === "porudzbine" ? aktivnePorudzbine().length : 0;
   return `<button class="acc-mi ${aktivna ? "aktivna" : ""}" data-acc-sekcija="${s.kljuc}">
     ${icon(s.ikona, 17)}<span>${s.naziv}</span>
@@ -2046,14 +1740,8 @@ function stavkaMenija(s) {
 const aktivnePorudzbine = () =>
   (S.porudzbine || []).filter((o) => o.status === "pending" || o.status === "preparing");
 
-// SA ČIM SE NALOG OTVARA KAD IGRAČ NIJE NIŠTA IZABRAO.
-//
-// Profil je prvi u meniju - nalog počinje od toga ko si. Ali igrač koji je
-// upravo poručio piće otvara Nalog iz jednog razloga: da vidi da li stiže.
-// Njemu profil u tom trenutku ne znači ništa.
-//
-// Zato: dok ima porudžbine u toku, otvara se na njima; inače na profilu. Kad
-// jednom klikne, važi njegov izbor - ovo je samo početno stanje.
+// Početni odeljak: porudžbine dok ih ima u toku, inače profil. Izbor igrača
+// ima prednost.
 function podrazumevanaSekcija() {
   return aktivnePorudzbine().length ? "porudzbine" : "profil";
 }
@@ -2071,23 +1759,12 @@ function sadrzajSekcije() {
   }
 }
 
-// PROFIL: KO SI, DOKLE SI STIGAO, ŠTA SI OSTAVIO ZA SOBOM
+// Profil: znak, ime u izabranoj boji, nivo, lični rekordi, značke i ono što
+// tek može da se otključa.
 //
-// Nalog je do sada bio spisak radnji - poruči, promeni lozinku, izaberi
-// pozadinu. Nigde nije pisalo KO je igrač ni šta je odigrao, pa nalog nije bio
-// njegov nego samo šalter.
-//
-// Ovde stoji sve što je njegovo: znak, ime u boji koju je izabrao, nivo i
-// traka, brojke koje je sam napravio, i spisak onoga što ga tek čeka. Poslednje
-// je namerno: nagrada koja se ne vidi unapred nije nagrada nego iznenađenje, a
-// iznenađenje ne motiviše da se dođe ponovo.
-// KAD PROFILA NEMA, ONDA GA NEKO I TRAŽI.
-//
-// Profil stiže uz prijavu. Ako baš tada pukne veza, ostao bi prazan ekran sa
-// natpisom "Profil se učitava..." - a niko ništa nije tražio, pa se ništa nikad
-// ne bi ni učitalo. Natpis koji nije istinit gori je od poruke o grešci: igrač
-// čeka nešto što ne dolazi.
-// Tri stanja, ne jedno: "nije traženo", "traži se", "nije stiglo".
+// Profil stiže uz prijavu; ako ne stigne (pukla veza), launcher ga traži sam,
+// a posle šest sekundi prikazuje poruku sa dugmetom. Stanja: "nije",
+// "ceka", "stigao", "palo".
 let profilStanje = "nije";
 let profilTajmer = null;
 function traziProfil() {
@@ -2189,14 +1866,8 @@ function sekcijaProfil() {
   </div>`;
 }
 
-// VIP: PONUDA KOJA KAŽE ŠTA SE DOBIJA, PA TEK ONDA KOLIKO KOŠTA.
-//
-// Rang se zarađuje igranjem i besplatan je; VIP se kupuje. Zato ovo nije
-// "zaključano dok ne stigneš do petog nivoa" nego ponuda - i mora da izgleda
-// kao ponuda: prvo pogodnosti, pa cena, pa dugme.
-//
-// Kad je već kupljen, na istom mestu stoji koliko još traje. Gost koji ne zna
-// dokle mu važi ne obnavlja - obnavlja onaj koji vidi da mu ističe.
+// VIP ponuda: pogodnosti, cena i dugme. Kad je članarina aktivna, na istom
+// mestu stoji koliko još traje.
 function vipPonudaHtml(c) {
   if (!c || !c.ukljucen) return "";
   if (c.jeVip) {
@@ -2205,9 +1876,9 @@ function vipPonudaHtml(c) {
         <div class="pf-vip-znak">${icon("gift", 22)}</div>
         <div class="pf-vip-tekst">
           <b>VIP je aktivan</b>
-          <span>Još ${c.dana} ${c.dana === 1 ? "dan" : "dana"}. Iskustvo ti ide x${c.mnozilac}, a točak ti se otvara na ${c.tocakPrag}.</span>
+          <span>Još ${c.dana} ${c.dana === 1 ? "dan" : "dana"}. Iskustvo ti ide x${c.mnozilac}, a točak ti se otvara na ${money(c.tocakPrag)}.</span>
         </div>
-        <button class="btn btn-ghost" id="vipObnovi">Produži za ${c.cena}</button>
+        <button class="btn btn-ghost" id="vipObnovi">Produži za ${money(c.cena)}</button>
       </div>
     </div>`;
   }
@@ -2215,7 +1886,7 @@ function vipPonudaHtml(c) {
     <div class="pf-vip">
       <div class="pf-vip-glava">
         <div class="pf-vip-znak">${icon("gift", 22)}</div>
-        <div class="pf-vip-tekst"><b>Postani VIP</b><span>${c.cena} za ${c.trajanje} dana, skida se sa kredita</span></div>
+        <div class="pf-vip-tekst"><b>Postani VIP</b><span>${money(c.cena)} za ${c.trajanje} dana, skida se sa kredita</span></div>
         <button class="btn btn-primary" id="vipKupi">Uzmi VIP</button>
       </div>
       <div class="pf-vip-spisak">
@@ -2226,11 +1897,7 @@ function vipPonudaHtml(c) {
   </div>`;
 }
 
-// ZNAČKE: ono po čemu se jedan profil razlikuje od drugog.
-//
-// Nivo je jedan broj koji svi imaju. Značka kaže ŠTA je neko radio, i to je ono
-// što se prepričava. Zaključane se PRIKAZUJU, sa trakom napretka: nagrada koja
-// se ne vidi unapred nije nagrada nego iznenađenje.
+// Značke. Zaključane se prikazuju sa trakom napretka.
 function znackeHtml(p) {
   const spisak = p.znacke || [];
   if (!spisak.length) return "";
@@ -2260,10 +1927,7 @@ function znackeHtml(p) {
   </div>`;
 }
 
-// LIČNI REKORDI: brojke koje gost sam ispriča.
-//
-// Prikazuje se samo ono što STVARNO postoji - prazan rekord se izostavlja, a ne
-// prikazuje kao crtica. Red crtica izgleda kao da program nešto ne ume.
+// Lični rekordi; prazni se izostavljaju.
 function rekordiHtml(r) {
   if (!r) return "";
   const DANI = ["nedeljom", "ponedeljkom", "utorkom", "sredom", "četvrtkom", "petkom", "subotom"];
@@ -2285,19 +1949,8 @@ function rekordiHtml(r) {
   </div>`;
 }
 
-// RANG LISTA: NIJE SPISAK NAJBOLJIH NEGO TVOJE MESTO U NJEMU.
-//
-// Gola tabela prvih deset radi samo za tih deset. Jedanaesti je pogleda jednom,
-// vidi da mu do vrha fali pola godine, i više je ne otvori - a on je onaj koga
-// je trebalo pokrenuti.
-//
-// Zato je prvo što se vidi TVOJE mesto i koliko ti fali do sledećeg, pa tek
-// onda vrh. "Sedmi si u kući, do šestog ti fali 400 XP" je rečenica zbog koje
-// neko dođe u utorak. "Prvo mesto: Marko, 34.200 XP" nije.
-//
-// Boje: zlatna samo prvom (biti prvi JESTE nagrada), boja kuće drugom i trećem
-// i tvom redu (to je izbor - "ovo si ti"). Ostali bez boje. Srebrna i bronzana
-// bi bile dve nove boje koje nigde drugde ništa ne znače.
+// Rang lista: prvo mesto igrača i koliko mu fali do sledećeg, pa susedi i
+// vrh. Zlatna samo za prvo mesto; boja kuće za drugo, treće i red igrača.
 function rangRedHtml(r, boje) {
   const heks = (boje && boje[r.izgled?.boja] || {}).heks || "#eef1f8";
   const mesto = r.mesto <= 3 ? `<span class="rl-m m${r.mesto}">${r.mesto}</span>` : `<span class="rl-m">${r.mesto}</span>`;
@@ -2326,8 +1979,7 @@ function sekcijaRang() {
       : `<div class="acc-prazno">${icon("postolje", 34)}<div class="ap-t">Učitavam rang listu</div></div>`;
   }
   const l = p.rang;
-  // Igraonica u kojoj još nema koga da se rangira ne sme da pokaže praznu
-  // tabelu - to izgleda kao kvar. Kaže se šta nedostaje.
+  // Prazna rang lista kaže šta nedostaje umesto prazne tabele.
   if (!l || !(l.vrh || []).length) {
     return `<div class="acc-sek">
       <div class="acc-sek-h"><h3>Rang lista</h3><p>Ko je dokle stigao u ovoj igraonici.</p></div>
@@ -2339,7 +1991,7 @@ function sekcijaRang() {
   const boje = p.boje || {};
   const ja = l.ja;
 
-  // Tvoja kartica stoji PRE spiska. Ona je razlog zbog kog se ova strana otvara.
+  // Kartica igrača stoji pre spiska.
   const tvoje = ja ? `
     <div class="rl-ja">
       <div class="rl-ja-mesto"><b>${ja.mesto}</b><span>od ${l.ukupno}</span></div>
@@ -2376,11 +2028,7 @@ function sekcijaRang() {
   </div>`;
 }
 
-// NAGRADE.
-//
-// Ranije je točak postojao samo kao widget u baneru na početnoj. Ko ga ne
-// primeti tamo, nije ni znao da postoji, niti koliko mu fali do spina. Ovde
-// stoji cela slika: da li može, koliko fali, i šta se može dobiti.
+// Nagrade: stanje nagradnog točka, koliko fali do spina i šta može da se dobije.
 function sekcijaNagrade() {
   const t = S.tocak;
   if (!t || !t.ukljucen || !(t.nagrade || []).length) {
@@ -2427,16 +2075,8 @@ function sekcijaNagrade() {
   </div>`;
 }
 
-// MIŠ I ZVUK.
-//
-// Windows podešavanja su u kiosku zaključana i s razlogom, pa je igraču jedini
-// izlaz bio da zove radnika. Ovde stoji ono što je za igru bitno, a bezbedno je
-// menjati: sve je po korisniku, sve se vraća istim dugmetom, i sve se samo
-// vraća na zatečeno kad se odjavi.
-//
-// Rezolucije i osvežavanja ekrana namerno NEMA: Windows ume da prihvati režim
-// koji monitor ne prikaže, ekran ostane crn, a igrač u kiosku nema čime da
-// vrati staro.
+// Miš i zvuk (vidi windows-podesavanja.js). Rezolucije nema: režim koji
+// monitor ne prikaže ostavio bi crn ekran.
 function sekcijaPodesavanja() {
   const p = S.winPodesavanja;
   if (!p) {
@@ -2449,7 +2089,8 @@ function sekcijaPodesavanja() {
         ? policaPrazno("mis", "Nije pročitano", "Osoblje je obavešteno. Miš i zvuk se i dalje menjaju u samom Windows-u.")
         : ""}</div>`;
   }
-  const mis = p.mis || { brzina: 10, ubrzanje: false };
+  // Nepročitan miš se ne prikazuje kao fabrički.
+  const mis = p.mis;
   const imaZvuk = p.zvuk && p.zvuk.jacina != null;
 
   const klizac = (id, min, max, vred, opis) => `
@@ -2464,16 +2105,18 @@ function sekcijaPodesavanja() {
 
     <div class="pod-grupa">
       <div class="pod-nas">${icon("mis", 15)} Miš</div>
-      <div class="pod-red">
+      ${mis ? `<div class="pod-red">
         <div class="pod-levo"><b>Brzina pokazivača</b><span>Koliko se pokazivač pomeri za isti potez rukom.</span></div>
         ${klizac("podBrzina", 1, 20, mis.brzina, String(mis.brzina))}
       </div>
       <div class="pod-red">
         <div class="pod-levo"><b>Ubrzanje pokazivača</b>
           <span>Dok je uključeno, brži potez pomeri pokazivač dalje - pa se nišan u igri ne može naučiti. Za pucačine se drži isključeno.</span></div>
-        <button class="prekidac ${mis.ubrzanje ? "" : "ugasen"}" id="podUbrzanje" role="switch" aria-checked="${mis.ubrzanje}">
+        <button class="prekidac ${mis.ubrzanje ? "" : "ugasen"}" id="podUbrzanje" role="switch" aria-checked="${!!mis.ubrzanje}">
           <span class="pr-kugla"></span></button>
-      </div>
+      </div>` : `<div class="pod-red">
+        <div class="pod-levo"><b>Miš nije pročitan</b><span>Podešavanje miša na ovom računaru trenutno ne može da se pročita. Osoblje može da ga promeni u Windows-u.</span></div>
+      </div>`}
     </div>
 
     ${imaZvuk ? `<div class="pod-grupa">
@@ -2505,8 +2148,7 @@ function sekcijaPodesavanja() {
   </div>`;
 }
 
-// Klizači: broj se menja odmah pod prstom, a Windows se dira tek kad igrač
-// pusti. Slanje na svaki pomeraj bi otvaralo PowerShell desetinama puta.
+// Klizači: broj se menja odmah, a Windows se menja kad igrač pusti klizač.
 function vezeKlizace() {
   const brz = $("#podBrzina");
   if (brz) {
@@ -2521,8 +2163,6 @@ function vezeKlizace() {
   }
 }
 
-// Slanje ka Windows-u ide preko mosta u main procesu. Klizači se pomeraju
-// često, pa se ne šalje svaki pomeraj: čeka se da igrač pusti miš.
 let _podSlanje = null;
 async function posaljiPodesavanja(sta) {
   clearTimeout(_podSlanje);
@@ -2540,8 +2180,7 @@ async function posaljiPodesavanja(sta) {
   }
 }
 
-// Zvuci i animacije launchera ostaju uz nalog na ovom računaru - igrač koji ih
-// ugasi ne mora to da radi svaki put kad sedne.
+// Zvuci i animacije launchera se pamte na ovom računaru.
 function zapamtiIzborLaunchera() {
   try {
     localStorage.setItem("crit_launcher_izbor",
@@ -2562,15 +2201,9 @@ function primeniIzborLaunchera() {
   document.body.classList.toggle("bez-animacija", !S.animacije);
 }
 
-// Miš i zvuk se čitaju sa računara tek kad igraču zatrebaju - čitanje ide preko
-// PowerShell-a i traje oko sekundu, pa ne sme na svaku prijavu.
-//
-// Tri ishoda, ne dva. Ranije je svaki neuspeh zavrsavao isto: "Učitavam
-// podešavanja računara..." koje nikad ne prestane. Gore od toga: kad citanje
-// vrati gresku, odgovor je i dalje objekat pa se smatrao uspehom - i igracu bi
-// se prikazao klizac na vrednosti 10, kao da je to stvarno stanje njegovog misa.
-// Izmisljena vrednost je gora od poruke: igrac je pomeri, nista se ne desi, i ne
-// zna da li je do njega ili do racunara.
+// Miš i zvuk se čitaju tek kad zatrebaju (PowerShell, oko sekundu). Stanja:
+// "nije", "ceka", "stiglo", "palo"; odgovor sa greškom je "palo", ne
+// podrazumevana vrednost.
 let podesavanjaStanje = "nije";   // nije | ceka | stiglo | palo
 async function ucitajWinPodesavanja() {
   if (S.winPodesavanja || podesavanjaStanje === "ceka" || !window.crit?.podesavanjaCitaj) return;
@@ -2578,7 +2211,7 @@ async function ucitajWinPodesavanja() {
   const gotovo = () => { if (S.tab === "account" && S.accSekcija === "podesavanja") renderContent(); };
   try {
     const r = await window.crit.podesavanjaCitaj();
-    if (r && !r.greska && (r.mis || r.zvuk)) { S.winPodesavanja = r; podesavanjaStanje = "stiglo"; }
+    if (r && !r.greska && (r.mis || r.zvuk?.jacina != null)) { S.winPodesavanja = r; podesavanjaStanje = "stiglo"; }
     else podesavanjaStanje = "palo";
   } catch { podesavanjaStanje = "palo"; }
   gotovo();
@@ -2596,30 +2229,18 @@ function sekcijaLozinka() {
   </div>`;
 }
 
-// NAGRADNI TOČAK
-// Jednom nedeljno može da zavrti svako ko je za tih 7 dana potrošio bar prag.
-// Ishod bira server; ovde se samo prikazuje stanje i animira rezultat.
-// BOJE POLJA - IZ ISTE KUĆE KAO I OSTATAK PROGRAMA.
+// Nagradni točak: jednom nedeljno za svakog ko je za sedam dana potrošio bar
+// prag. Ishod bira server; ovde se prikazuje stanje i animira rezultat.
 //
-// Bile su crvena, tamnocrvena, dve skoro crne, siva i zlatna - iz palete koja je
-// odavno zamenjena. Točak je zbog toga bio jedino mesto u launcheru koje ne liči
-// na ostatak: crven i crn usred plavog i zlatnog programa. A crvena ovde još i
-// protivreči sama sebi - u ostatku programa znači "ističe vreme" i "zaključano",
-// dok je točak jedina prava nagrada.
-//
-// Sada: zlatna (nagrada), boja kuće, i dve mirne tamne za "Ništa". Ista boja se
-// NAMERNO ne ponavlja na 120 stepeni - takav raspored je na malom točku u vrhu
-// početne davao oblik znaka za radijaciju.
-//
-// Boja kuće se čita u trenutku crtanja, ne upisuje ovde: vlasnik je menja iz
-// panela i točak mora da je prati kao i sve ostalo.
+// Boje polja: zlatna (nagrada), boja kuće i dve tamne za "Ništa". Ista boja
+// se ne ponavlja na 120 stepeni. Boja kuće se čita pri crtanju.
 function tocakBoje() {
   const st = getComputedStyle(document.documentElement);
   const kuca = (st.getPropertyValue("--brend") || "#2f6ae8").trim();
   const kucaDublja = (st.getPropertyValue("--brend-deep") || "#2454c4").trim();
   return ["#ffb527", "#1b2440", kuca, "#243154", "#e8941f", kucaDublja];
 }
-// POP-UP sa točkom. Otvara se klikom na widget u baneru.
+// Pop-up sa točkom.
 function otvoriTocak() {
   const t = S.tocak;
   if (!t || !t.ukljucen || !(t.nagrade || []).length) return;
@@ -2657,10 +2278,8 @@ function tocakAkcijaHtml() {
     <div class="tocak-nota">Potroši još <b>${money(preostalo)}</b> pa se točak otključava.</div>`;
 }
 
-// SVG točak sa poljima. Polje 0 počinje na vrhu i ide u smeru kazaljke.
-// "velicina" je gustina detalja: mali točak u baneru nema natpise, ali zadržava
-// glavčinu i paoke - bez njih je na 84px izgledao kao znak opasnosti, a ne kao
-// točak.
+// SVG točak; polje 0 počinje na vrhu i ide u smeru kazaljke. Mali točak u
+// baneru nema natpise, ali ima glavčinu i paoke.
 function tocakSVG(nagrade, velicina = 200) {
   const n = nagrade.length, seg = 360 / n, cx = 100, cy = 100, r = 96;
   const BOJE = tocakBoje();
@@ -2673,22 +2292,19 @@ function tocakSVG(nagrade, velicina = 200) {
     const boja = BOJE[i % BOJE.length];
     s += `<path d="M${cx} ${cy} L${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)} Z" fill="${boja}" stroke="#070c1c" stroke-width="${mali ? 1.6 : 1}"/>`;
     if (mali) continue; // na 84px natpisi bi bili mrlje
-    // Natpis stoji USPRAVNO. Radijalno okrenut tekst se na donjoj polovini cita
-    // ukoso i deluje aljkavo; ovako je svaki iznos citljiv bez naginjanja glave.
+    // Natpis stoji uspravno, da se čita bez naginjanja.
     const [lx, ly] = tacka(am, r * 0.66);
     s += `<text x="${lx.toFixed(2)}" y="${ly.toFixed(2)}" fill="#fff" font-family="'Segoe UI',Arial,sans-serif" font-size="11" font-weight="700"
       text-anchor="middle" dominant-baseline="central">${esc(nagrade[i].naziv)}</text>`;
   }
-  // Obruc i glavcina. Na malom tocku glavcina je TAMNA sa tankim prstenom:
-  // puna crvena sredina je sa tri crvena isecka na 120 stepeni davala oblik
-  // znaka za radijaciju umesto tocka.
+  // Obruč i glavčina; na malom točku glavčina je tamna sa tankim prstenom.
   s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="${mali ? 5 : 3}"/>`;
   s += `<circle cx="${cx}" cy="${cy}" r="${mali ? 24 : 17}" fill="#0b0c11" stroke="rgba(255,255,255,0.22)" stroke-width="2"/>`;
   s += `</svg>`;
   return s;
 }
 
-// "3 dana", "5č" - koliko do sledećeg spina.
+// Koliko do sledećeg spina ("3 dana", "5č").
 function odbrojavanjeDana(ts) {
   const ms = ts - Date.now();
   if (ms <= 0) return "sada";
@@ -2698,22 +2314,9 @@ function odbrojavanjeDana(ts) {
   return sati + (sati === 1 ? " sat" : sati < 5 ? " sata" : " sati");
 }
 
-// ZAGLAVLJENA VRTNJA MORA DA SE SAMA OTPUSTI.
-//
-// Klik odmah upali "vrtnja traje", a ishod se ČEKA SA SERVERA. Dok vrtnja traje,
-// prikazano stanje kredita se NAMERNO ne dira: server nagradu doda odmah, a
-// točak se vrti pet sekundi, pa bi se brojka promenila pre nego što igrač sazna
-// šta je dobio.
-//
-// Ako odgovor nikad ne stigne - veza pukne baš u tih pet sekundi, server se
-// restartuje, ruter se resetuje - vrtnja ostaje "u toku" ZAUVEK. Od tog trenutka
-// se svako novo stanje odbacuje: HUD stoji zamrznut dok naplata teče dalje.
-// Igrač gleda "1000 din, ostalo 8:20" dok mu vreme stvarno curi, i računar se
-// zaključa bez ijednog upozorenja. Dopuna na kasi se takođe ne vidi, pa radnik
-// dopunjuje drugi put.
-//
-// Zato dve mreže: rok u kom odgovor mora da stigne, i otpuštanje čim veza padne
-// (preko te veze odgovor ionako više ne može da dođe).
+// Vrtnja koja čeka odgovor servera ima rok. Dok traje, prikazano stanje
+// kredita se ne menja; da odgovor nikad ne stigne, gornja traka bi ostala
+// zamrznuta dok naplata teče. Vrtnja se otpušta posle roka i čim veza padne.
 const TOCAK_ROK = 12000; // koliko se čeka odgovor servera
 let tocakRokTajmer = null;
 
@@ -2723,7 +2326,7 @@ function otpustiTocak(razlog) {
   clearTimeout(tocakRokTajmer); tocakRokTajmer = null;
   clearInterval(_tikTajmer); _tikTajmer = null;
   document.querySelector(".tocak-obl")?.classList.remove("vrti");
-  // Stanje zadržano tokom vrtnje se sada upisuje - inače bi ostalo zarobljeno.
+  // Stanje zadržano tokom vrtnje se upisuje.
   if (S.tocakStanje) {
     S.balance = S.tocakStanje.balance;
     S.remaining = S.tocakStanje.remaining;
@@ -2749,6 +2352,16 @@ function zavrtiTocakKlik() {
   window.crit.toServer({ t: "tocak_spin" });
 }
 
+function zakasneliSpin(nagrada, sledeciSpin) {
+  if (S.tocak) { S.tocak.moze = false; S.tocak.sledeciSpin = sledeciSpin || (Date.now() + 7 * 86400000); }
+  const dobio = nagrada && nagrada.kredit > 0;
+  toast(dobio ? `Točak: osvojio si ${money(nagrada.kredit)}` : "Točak: ovaj put bez nagrade.",
+    dobio ? "success" : "info", 7000);
+  const akcija = $("#tocakAkcija");
+  if (akcija && $("#tocakOverlay").classList.contains("active")) akcija.innerHTML = tocakAkcijaHtml();
+  if (S.tab === "home" || S.tab === "account") renderContent();
+}
+
 const SPIN_TRAJANJE = 5200;
 let _tocakUgao = 0, _tikTajmer = null;
 
@@ -2757,35 +2370,26 @@ function animirajTocak(index, nagrada, sledeciSpin) {
   const n = S.tocak?.nagrade?.length || 1;
   if (!krug) { zavrsiSpin(nagrada, sledeciSpin); return; }
   const seg = 360 / n;
-  // Da polje 'index' stane pod kazaljku (vrh): centar polja je (index+0.5)*seg,
-  // pa se tocak okrene tako da taj centar dodje na 0. Puni krugovi su radi
-  // efekta, a mala nasumicnost unutar polja da ne staje uvek na isto mesto.
+  // Centar polja `index` dolazi pod kazaljku (vrh); puni krugovi su efekat, a
+  // mala nasumičnost sprečava da točak uvek stane na isto mesto.
   const jitter = (Math.random() - 0.5) * seg * 0.55;
   const cilj = 360 * 8 + (360 - ((index + 0.5) * seg)) - jitter;
   const obl = document.querySelector(".tocak-obl");
   obl?.classList.add("vrti");
 
-  // ZALET PA PUŠTANJE.
-  //
-  // Ranije je točak kretao pun gas iz mesta i stajao naglo - izgleda kao da je
-  // brojka bila unapred izabrana, jer i jeste. Pravi točak se prvo malo povuče
-  // unazad, pa poleti. Taj kratak potez unazad je jedino što gledaocu daje
-  // osećaj da je zamah stvaran.
+  // Kratak zalet unazad pre vrtnje.
   krug.style.transition = "transform 380ms cubic-bezier(.34,.02,.42,1)";
   krug.style.transform = `rotate(${_tocakUgao - 14}deg)`;
 
   _tocakUgao += cilj;
-  // Kucanje kazaljke i osluškivanje kraja kreću TEK sa pravom vrtnjom. Da su
-  // postavljeni odmah, zalet bi im bio prvi "transitionend" i vrtnja bi se
-  // završila pre nego što je i počela.
+  // Kucanje i kraj vrtnje se prate tek od prave vrtnje, inače bi zalet bio
+  // prvi "transitionend".
   setTimeout(() => {
-    // Duga kriva koja se gasi u nulu: brzo na početku, pa sve sporije, sa
-    // dugim repom na kraju gde se polje "smiruje" pod kazaljkom.
+    // Brzo na početku, pa sve sporije, sa dugim smirivanjem pod kazaljkom.
     krug.style.transition = `transform ${SPIN_TRAJANJE}ms cubic-bezier(.08,.62,.02,1)`;
     krug.style.transform = `rotate(${_tocakUgao}deg)`;
 
-    // Kucanje kazaljke: gusto na početku, sve ređe kako točak usporava. Ritam
-    // prati istu krivu kao i rotacija, pa zvuk i slika idu zajedno.
+    // Kucanje kazaljke prati istu krivu kao rotacija.
     const pocetak = performance.now();
     const ukupnoPolja = (cilj / 360) * n;
     let odsvirano = 0;
@@ -2796,8 +2400,7 @@ function animirajTocak(index, nagrada, sledeciSpin) {
       if (preslo - odsvirano >= 1) {
         odsvirano = Math.floor(preslo);
         sfx.tik();
-        // Kazaljka odskoči na svaki zubac - inače stoji ukočena dok se ispod
-        // nje sve vrti, i ceo pokret izgleda kao slika koja se rotira.
+        // Kazaljka odskoči na svaki zubac.
         const kaz = document.querySelector(".tocak-kazaljka");
         if (kaz) { kaz.classList.remove("kuc"); void kaz.offsetWidth; kaz.classList.add("kuc"); }
       }
@@ -2806,7 +2409,7 @@ function animirajTocak(index, nagrada, sledeciSpin) {
 
     const kraj = () => { krug.removeEventListener("transitionend", kraj); zavrsiSpin(nagrada, sledeciSpin); };
     krug.addEventListener("transitionend", kraj);
-    // sigurnosni put ako transitionend ne stigne (npr. prozor u pozadini)
+    // Rezerva ako transitionend ne stigne (prozor u pozadini).
     setTimeout(() => { if (S.tocakVrti) zavrsiSpin(nagrada, sledeciSpin); }, SPIN_TRAJANJE + 600);
   }, 380);
 }
@@ -2818,7 +2421,7 @@ function zavrsiSpin(nagrada, sledeciSpin) {
   clearInterval(_tikTajmer); _tikTajmer = null;
   const obl = document.querySelector(".tocak-obl");
   obl?.classList.remove("vrti");
-  // Osveži lokalno stanje: iskorišćen spin, novi datum, potrošnja ostaje.
+  // Spin je iskorišćen; novi datum.
   if (S.tocak) { S.tocak.moze = false; S.tocak.sledeciSpin = sledeciSpin || (Date.now() + 7 * 86400000); }
   const dobio = nagrada && nagrada.kredit > 0;
   if (dobio) obl?.classList.add("dobitak");
@@ -2830,9 +2433,7 @@ function zavrsiSpin(nagrada, sledeciSpin) {
       <div class="tocak-nota">Sledeći spin za <b>${odbrojavanjeDana(S.tocak?.sledeciSpin || Date.now())}</b>.</div>
       <button class="btn btn-ghost tocak-zatvori" id="tocakGotovo">Zatvori</button>`;
   }
-  // Stanje zadržano tokom vrtnje se upisuje BAŠ SADA, da igrač vidi kako kredit
-  // raste u istom trenutku kad sazna šta je dobio. To je jedina veza između
-  // nagrade i naloga koju igrač ima.
+  // Kredit se osvežava u trenutku kad se nagrada prikaže.
   if (S.tocakStanje) {
     S.balance = S.tocakStanje.balance;
     S.remaining = S.tocakStanje.remaining;
@@ -2843,18 +2444,15 @@ function zavrsiSpin(nagrada, sledeciSpin) {
     sfx.success();
     const r = obl?.getBoundingClientRect();
     if (r) burstCoins(r.left + r.width / 2, r.top + r.height / 2);
-    // Iznos odleti od točka ka kreditu u HUD-u: bez toga igrač ne poveže
-    // osvojeno sa stanjem na nalogu.
+    // Iznos odleti od točka ka kreditu.
     letiNaKredit(nagrada.kredit);
   }
-  // Widget u baneru mora da pokaže novo stanje čim se pop-up zatvori.
+  // Točak u vrhu početne pokazuje novo stanje.
   if (S.tab === "home") renderContent();
 }
 
-// MOJA POZADINA
-// Igrac bira svoju saru na svom nalogu. Vazi dok je prijavljen; kad se odjavi,
-// racunar se vraca na ono sto je vlasnik podesio. Izbor se pamti uz nalog, pa
-// ga igrac zatekne i kad sledeci put sedne za drugi racunar.
+// Moja pozadina: igrač bira svoju šaru. Važi dok je prijavljen, a izbor se
+// pamti uz nalog, pa važi i na drugom računaru.
 function panelMojaPozadina() {
   const t = S.teksture;
   if (!t?.spisak) return ""; // stariji server ovo ne salje
@@ -2894,8 +2492,8 @@ function panelMojaPozadina() {
   </div>`;
 }
 
-// Uzorci se crtaju posle ubacivanja u stranu: sara sadrzi navodnike, pa ne sme
-// kroz style="..." atribut - tamo bi se string prekinuo na prvom navodniku.
+// Uzorci se crtaju posle ubacivanja u stranu: šara sadrži navodnike i ne sme
+// kroz style="..." atribut.
 function obojiUzorkePozadine() {
   const t = S.teksture;
   if (!t?.spisak) return;
@@ -2907,13 +2505,12 @@ function obojiUzorkePozadine() {
     const o = k === "kuca" ? t.spisak[S.tekstura?.kljuc || "nema"] : t.spisak[k];
     if (!o?.sara) { el.style.backgroundImage = "none"; return; }
     el.style.backgroundImage = o.sara;
-    // Kvadratic je izlog sare, ne pregled jacine. Pri slaboj jacini se na
-    // tamnoj plocici nije video nikakav uzorak, pa se biralo naslepo.
+    // Uzorak se prikazuje jasno bez obzira na izabranu jačinu.
     el.style.opacity = String(Math.max(vid, 0.9));
   });
 }
 
-// Salje izbor serveru. Menja se samo jedno polje, ostala ostaju kakva su bila.
+// Šalje se samo izmenjeno polje.
 function posaljiMojuPozadinu(izmena) {
   if (!S.wsOk) { toast("Pozadina se čuva čim se server vrati.", "error"); return; }
   const moja = S.mojaTekstura;
@@ -2926,20 +2523,15 @@ function posaljiMojuPozadinu(izmena) {
 }
 
 // ---- Delegacija klikova ----
-// Jedan slušalac na #content umesto kačenja po elementu: sadržaj se često
-// prerenderuje, pa bi se listeneri gomilali (npr. korpa bi dodavala po 2-3
-// komada na jedan klik).
+// Jedan slušalac na #content, jer se sadržaj često iscrtava iznova.
 const MAX_QTY = 20; // server ograničava na 20 po artiklu - poštuj isto ovde
 
 $("#content").addEventListener("click", (e) => {
-  // ako je upravo bilo prevlačenje slajdera, ne tretiraj kao klik
+  // Posle prevlačenja police klik se ne računa.
   if (_dragged) { _dragged = false; return; }
 
-  // Izgled profila: boja imena i okvir oko znaka.
-  //
-  // Zakljucano se ni ne salje - dugme je sivo i ne reaguje. Server svejedno
-  // proverava isto (vidi sacuvajProfilIgraca): launcher stoji na racunaru
-  // igraca, pa nije mesto na kom se odlucuje sta sme.
+  // Izgled profila: boja imena i okvir oko znaka. Zaključano se ne šalje, a
+  // server proverava isto (sacuvajProfilIgraca).
   if (e.target.closest("[data-profil-ponovo]")) {
     traziProfil();
     renderContent();
@@ -2960,8 +2552,7 @@ $("#content").addEventListener("click", (e) => {
     return;
   }
 
-  // Meni na nalogu. Isti atribut nosi i traka u Shop-u, pa ona vodi pravo na
-  // odeljak sa porudžbinama - bez drugog spiska.
+  // Meni naloga; isti atribut nosi i traka u Shop-u.
   const sek = e.target.closest("[data-acc-sekcija]");
   if (sek) {
     S.accSekcija = sek.dataset.accSekcija;
@@ -2976,7 +2567,7 @@ $("#content").addEventListener("click", (e) => {
     return;
   }
 
-  // Nagradni točak sa naloga otvara isti pop-up kao i widget na početnoj.
+  // Točak sa naloga otvara isti pop-up kao i na početnoj.
   if (e.target.closest("#nagZavrti")) { otvoriTocak(); return; }
 
   // ---- Miš i zvuk ----
@@ -3000,15 +2591,13 @@ $("#content").addEventListener("click", (e) => {
     return;
   }
   if (e.target.closest("#podVrati")) {
-    // Fabričko je ono što Windows podrazumeva: brzina 10, ubrzanje isključeno.
     S.sfxUkljucen = true; S.animacije = true;
     zapamtiIzborLaunchera(); primeniIzborLaunchera();
     posaljiPodesavanja({ mis: { brzina: 10, ubrzanje: false }, zvuk: { jacina: 50 } });
     return;
   }
 
-  // Moja pozadina: izbor se odmah salje serveru, on vrati novu saru i ekran se
-  // promeni pred igracem - bez dugmeta "sacuvaj".
+  // Moja pozadina: izbor se odmah šalje serveru, bez dugmeta "sačuvaj".
   const sara = e.target.closest("[data-moja-sara]");
   if (sara) return posaljiMojuPozadinu({ kljuc: sara.dataset.mojaSara });
   const jac = e.target.closest("[data-moja-jacina]");
@@ -3029,7 +2618,7 @@ $("#content").addEventListener("click", (e) => {
   const toolEl = e.target.closest("[data-tool]");
   if (toolEl) return void launchTool(JSON.parse(toolEl.dataset.tool));
 
-  // Traka kategorija u shopu: prazna vrednost znači "sve".
+  // Traka kategorija: prazna vrednost znači "sve".
   const katEl = e.target.closest("[data-kat]");
   if (katEl) {
     S.shopFilter = katEl.dataset.kat || null;
@@ -3037,9 +2626,8 @@ $("#content").addEventListener("click", (e) => {
     return;
   }
 
-  // "Manje" i "Više" se gledaju PRE "dodaj". Cela kartica nosi `data-add`, pa bi
-  // klik na "manje" - koje stoji u njoj - prvo naišao na karticu i DODAO umesto
-  // da oduzme.
+  // "Manje" i "više" se proveravaju pre "dodaj", jer cela kartica nosi
+  // `data-add`.
   const decEl = e.target.closest("[data-dec]");
   if (decEl) return cartChange(Number(decEl.dataset.dec), -1);
 
@@ -3049,7 +2637,7 @@ $("#content").addEventListener("click", (e) => {
   const addEl = e.target.closest("[data-add]");
   if (addEl) return cartChange(Number(addEl.dataset.add), +1);
 
-  // Klik na tacku prebacuje baner i pomera odbrojavanje od nule.
+  // Klik na tačku prebacuje baner i pokreće odbrojavanje ispočetka.
   const tacka = e.target.closest("[data-promo-idi]");
   if (tacka) { prikaziPromo(Number(tacka.dataset.promoIdi)); pokreniPromo(); return; }
 
@@ -3068,16 +2656,13 @@ $("#content").addEventListener("click", (e) => {
   if (e.target.closest("#heroTocak")) return otvoriTocak();
 });
 
-// Pop-up nagradnog točka stoji IZVAN #content (kao i ostali overlay-i), pa ga
-// delegacija odozgo ne vidi. Dok su dugmad točka bila u toj delegaciji, pop-up
-// se otvarao ali se NIJE mogao ni zavrteti ni zatvoriti - jedini izlaz je bio
-// gašenje launchera. Zato točak ima svoj slušalac, na svom overlay-u.
+// Pop-up točka je izvan #content, pa ima svoj slušalac.
 $("#tocakOverlay").addEventListener("click", (e) => {
   if (e.target.closest("#tocakSpin")) return zavrtiTocakKlik();
   if (e.target.closest("#tocakX") || e.target.closest("#tocakGotovo")) return zatvoriTocak();
   if (e.target === e.currentTarget) return zatvoriTocak(); // klik na tamnu podlogu
 });
-// Escape zatvara pop-up. Igrač koji ne nađe X mora nekako da izađe.
+// Escape zatvara pop-up.
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if ($("#tocakOverlay").classList.contains("active")) zatvoriTocak();
@@ -3092,25 +2677,33 @@ async function launchFromTile(el) {
   el.classList.add("launching");
   if (label) label.textContent = "Pokrećem...";
   setTimeout(done, 3000);
-  const r = await window.crit.launchGame({ ...g, vrsta: "igra" });
+  const r = await pokreni({ ...g, vrsta: "igra" });
   if (!r.ok) { done(); toast(r.error || "Nije moguće pokrenuti igru", "error"); }
   else if (!r.ignored) {
     toast(`Pokrećem ${g.name || "igru"}...`, "success");
-    // Javi serveru tek kad je igra stvarno krenula, da neuspeli pokušaji ne
-    // ulaze u statistiku ni u redosled police.
+    // Serveru se javlja tek kad igra stvarno krene, da neuspeli pokušaji ne
+    // ulaze u statistiku.
     window.crit.toServer({ t: "game_start", gameId: g.id });
     S.skoroIgrane = [g.id, ...S.skoroIgrane.filter((x) => x !== g.id)].slice(0, 8);
   }
 }
 
+// Koliko sme u korpu: najviše MAX_QTY i ne više od zalihe.
+function granicaKorpe(it) {
+  const zaliha = it && it.stock != null ? Math.max(0, Number(it.stock) || 0) : Infinity;
+  return Math.min(MAX_QTY, zaliha);
+}
 function cartChange(id, delta) {
   novPoId(); // promenjena korpa = druga porudzbina, pa i nov broj pokusaja
   const cur = S.cart.get(id) || 0;
   const next = cur + delta;
+  const granica = granicaKorpe(S.shop.find((x) => x.id === id));
   if (next <= 0) S.cart.delete(id);
-  else if (next > MAX_QTY) {
-    S.cart.set(id, MAX_QTY);
-    toast(`Najviše ${MAX_QTY} komada po artiklu`, "error");
+  else if (next > granica) {
+    if (granica > 0) S.cart.set(id, granica); else S.cart.delete(id);
+    toast(granica <= 0 ? "Ovoga više nema na stanju"
+      : granica < MAX_QTY ? `Na stanju je još ${granica} ${oblikKom(granica)}`
+      : `Najviše ${MAX_QTY} komada po artiklu`, "error");
   } else S.cart.set(id, next);
   refreshCart();
   osveziPice(id);
@@ -3124,8 +2717,7 @@ function saveAccountPassword() {
 
 function refreshCart() { const box = $("#cartBox"); if (box) box.innerHTML = renderCart(); }
 
-// Kartica pica mora da prati korpu (brojka i plus/minus), ali se ne sme
-// preiscrtati cela mreza - igracu bi odskocila lista pod prstom.
+// Kartica pića prati korpu bez ponovnog crtanja cele mreže.
 function osveziPice(id) {
   const stara = $(`[data-pice="${id}"]`);
   const it = S.shop.find((x) => x.id === id);
@@ -3135,12 +2727,9 @@ function osveziPice(id) {
   stara.replaceWith(pom.firstElementChild);
 }
 
-// ---- Kupovina VIP-a (zaključano dok server ne odgovori) ----
-//
-// Dira novac, pa važi isto pravilo kao za porudžbinu: dupli klik na sporoj
-// mreži bi naplatio dvaput. Dugme se otključava i kad server zaćuti, da gost ne
-// ostane zarobljen - server u međuvremenu odbija drugu kupovinu jer je kredit
-// već skinut, pa se dvostruka naplata ne može desiti ni tada.
+// ---- Kupovina VIP-a ----
+// Dugme je zaključano dok server ne odgovori. Posle roka se otključava, a
+// server drugu kupovinu odbija jer je kredit već skinut.
 let vipUToku = false;
 function kupiVip(btn) {
   if (vipUToku) return;
@@ -3156,7 +2745,7 @@ function kupiVip(btn) {
   window.crit.toServer({ t: "kupi_vip" });
 }
 
-// ---- Slanje porudžbine (zaključano dok server ne odgovori) ----
+// ---- Slanje porudžbine ----
 let orderPending = false;
 function setOrderBusy(b) {
   const btn = $("#orderBtn");
@@ -3164,16 +2753,9 @@ function setOrderBusy(b) {
 }
 function clearOrderPending() { orderPending = false; clearTimeout(sendOrder._t); setOrderBusy(false); }
 
-// BROJ POKUŠAJA - isti dok se korpa ne promeni.
-//
-// Dugme se otključava posle osam sekundi bez odgovora, da igrač ne ostane
-// zarobljen kad server zaćuti. U tom procepu drugi klik bi prošao kao NOVA
-// porudžbina i naplatio dvaput. Zato uz nju ide broj koji se ne menja pri
-// ponavljanju: server po njemu prepozna da je to isti pokušaj i vrati stari
-// odgovor umesto da napravi drugi račun.
-//
-// Nov broj se pravi tek kad porudžbina prođe ili se korpa promeni - onda je to
-// stvarno druga porudžbina i treba da se naplati.
+// Broj pokušaja ostaje isti dok se korpa ne promeni. Dugme se otključava
+// posle osam sekundi bez odgovora, a server po istom broju prepoznaje
+// ponovljen pokušaj i ne pravi drugi račun.
 let poId = null;
 const novPoId = () => { poId = null; };
 function sendOrder() {
@@ -3185,12 +2767,12 @@ function sendOrder() {
   orderPending = true;
   setOrderBusy(true);
   window.crit.toServer({ t: "order", items, payment: S.nacinPlacanja === "cash" ? "cash" : "credit", poId });
-  // ako server ne odgovori, ne ostavljaj dugme zauvek zaključano
+  // Bez odgovora dugme se otključava posle osam sekundi.
   clearTimeout(sendOrder._t);
   sendOrder._t = setTimeout(clearOrderPending, 8000);
 }
 
-// DRAG-TO-SCROLL (slajderi na Početnoj)
+// Prevlačenje police mišem
 let _drag = null, _dragged = false;
 $("#content").addEventListener("pointerdown", (e) => {
   const track = e.target.closest(".shelf-track");
@@ -3212,12 +2794,10 @@ window.addEventListener("pointerup", () => {
   _drag = null;
 });
 
-// (Sajt-alati otvaraju sistemski pregledač preko shell.openExternal - vidi main.js openBrowser.)
 
-// Locked
-// Polje za PIN ne stoji igraču pred nosom - dok ga osoblje ne pozove, na
-// ekranu nema šta da se pogađa. Poziva se hotkey-om ili klikom na napomenu,
-// da otključavanje radi i ako neki drugi program preotme Ctrl+Alt+U.
+// Zaključan ekran
+// Polje za PIN osoblja je skriveno dok ga osoblje ne otvori prečicom ili
+// klikom na napomenu.
 function otkrijPinOsoblja() {
   $("#lockPinBox").classList.remove("hidden");
   $("#lockStaff").classList.add("hidden");
@@ -3232,8 +2812,7 @@ $("#lockStaff").addEventListener("click", otkrijPinOsoblja);
 
 $("#lockUnlock").addEventListener("click", async () => {
   const pin = $("#lockPin").value.trim(); if (!pin) return;
-  // Bez servera PIN osoblja ne može da se proveri. Proverava se servisni PIN,
-  // lokalno, a server kad se vrati ne zaključava ponovo (vidi main.js).
+  // Bez servera se proverava servisni PIN, lokalno (vidi main.js).
   if (!S.wsOk && window.crit.otkljucajBezServera) {
     const r = await window.crit.otkljucajBezServera(pin);
     if (!r || !r.ok) { $("#lockErr").textContent = "Pogrešan servisni PIN."; return; }
@@ -3247,17 +2826,17 @@ $("#lockUnlock").addEventListener("click", async () => {
 });
 $("#lockPin").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#lockUnlock").click(); });
 
-// Message overlay
+// Poruka
 $("#msgOk").addEventListener("click", () => $("#msgOverlay").classList.remove("active"));
 
-// PIN OVERLAY (admin exit)
+// Prozor za PIN (izlaz, podešavanje)
 function openPin(title, isExit, svrha = "izlaz") {
   S.pendingExit = !!isExit;
   S.pinSvrha = svrha;
   $("#pinTitle").textContent = title; $("#pinInput").value = ""; $("#pinErr").textContent = "";
   $("#pinOverlay").classList.add("active"); $("#pinInput").focus();
 }
-// Jedno mesto za odustajanje, da se Escape i dugme "Odustani" ne razilaze.
+// Jedno mesto za odustajanje (Escape i "Odustani").
 function odustaniOdPina() {
   S.pendingExit = false;
   S.pinSvrha = null;
@@ -3267,11 +2846,8 @@ function odustaniOdPina() {
 $("#pinCancel").addEventListener("click", odustaniOdPina);
 $("#pinOk").addEventListener("click", async () => {
   const pin = $("#pinInput").value.trim(); if (!pin) return;
-  // Ulaz u podešavanja se uvek proverava lokalno: tu se ide baš kad servera
-  // nema, pa provera preko servera ne bi mogla ni da se izvrši.
-  // Za ostalo se pita server (PIN se menja centralno, u panelu), a kad veze
-  // nema pada se na servisni PIN - inače bi pri padu servera osoblje ostalo
-  // zaključano na svih trinaest mašina bez načina da izađe.
+  // Ulaz u podešavanja i sve bez veze sa serverom proverava se servisnim
+  // PIN-om, lokalno. Ostalo proverava server (PIN osoblja iz panela).
   if (S.pinSvrha === "setup" || !S.wsOk) {
     const r = await window.crit.proveriServisniPin(pin);
     if (r && r.ok) return pinPrihvacen();
@@ -3281,7 +2857,7 @@ $("#pinOk").addEventListener("click", async () => {
   window.crit.toServer({ t: "verify_pin", pin });
 });
 
-// Jedno mesto za "PIN je prihvaćen", bez obzira ko ga je proverio.
+// PIN je prihvaćen, bez obzira ko ga je proverio.
 async function pinPrihvacen() {
   const svrha = S.pinSvrha;
   S.pinSvrha = null;
@@ -3303,7 +2879,7 @@ async function pinPrihvacen() {
 }
 $("#pinInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#pinOk").click(); });
 
-// ZVUČNI FEEDBACK (delegacija)
+// Zvuk na prelaz i klik (delegacija)
 let _lastHover = null;
 document.addEventListener("pointerover", (e) => {
   const el = e.target.closest(".tile, .tab, .pice, .site-card, .hero-play");
@@ -3314,10 +2890,10 @@ document.addEventListener("pointerdown", (e) => {
   if (e.target.closest(".btn, .tab, .tile, .site-card, .hero-play, .pice-plus, .pice-step button, .qbtn, .shelf-arr")) sfx.click();
 });
 
-// IDLE ATTRACT - reset na svaku aktivnost
+// Mamac na ekranu prijave se resetuje na svaku aktivnost.
 ["pointermove", "pointerdown", "keydown"].forEach((ev) => document.addEventListener(ev, resetIdle, { passive: true }));
 
-// blokiraj kontekst meni i osvezavanje
+// Bez kontekst menija i osvežavanja stranice.
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 document.addEventListener("keydown", (e) => {
   if (e.key === "F5" || (e.ctrlKey && (e.key === "r" || e.key === "R"))) e.preventDefault();
@@ -3325,13 +2901,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if ($("#msgOverlay").classList.contains("active")) $("#msgOverlay").classList.remove("active");
     else if ($("#confirmOverlay").classList.contains("active")) $("#confirmOverlay").classList.remove("active");
-    // Escape mora da ostavi ISTO stanje kao dugme "Odustani". Ranije je čistio
-    // samo `pendingExit`, a `pinSvrha` je ostajala od prethodnog otvaranja - pa
-    // je posle odustajanja od "Promeni adresu servera" u stanju visilo "setup".
-    // Danas se to ne može iskoristiti, jer svako otvaranje PIN-a svrhu upisuje
-    // iznova. Ali svrha koja preživi odustajanje je napunjen pištolj: prva
-    // sledeća upotreba PIN-a koja je ne postavi izričito obrisala bi launcheru
-    // adresu servera umesto da izađe iz kioska.
+    // Escape ostavlja isto stanje kao dugme "Odustani".
     else if ($("#pinOverlay").classList.contains("active")) { odustaniOdPina(); }
   }
 });

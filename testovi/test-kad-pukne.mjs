@@ -1,6 +1,5 @@
 import { citajIzvor } from "./_okruzenje.mjs";
-// Šta korisnik vidi kad nešto pukne. Ovo su mesta na kojima je sistemska ili
-// engleska poruka izlazila pred radnika i igrača - a oni od nje nemaju ništa.
+// Šta korisnik vidi kad nešto pukne: poruke na srpskom, bez sistemskog teksta.
 //
 // Uživo se proverava tako što se serveru prekine rad usred rada u panelu:
 //   1. podigni server, prijavi se u panel
@@ -53,10 +52,9 @@ for (const [slucaj, tekst] of [
 ]) proveri(`prevod postoji: ${slucaj}`, main.includes(tekst));
 proveri("nijedna sirova poruka ne ide igracu", !/game-error", \{ name: [^}]*message: (e|greska)\.message/.test(main)
   && !/game-error", \{ name: [^}]*message: greska \}/.test(main));
-// Igra se pokrece na dva nacina i OBA moraju da prevode: precica (.lnk/.url/
-// .bat) ide kroz shell.openPath, a pravi .exe kroz spawn. Ranije se ovde brojalo
-// koliko puta se `objasniGresku` pojavi - a to pukne cim se kod prepravi, iako
-// prevod i dalje postoji. Sada se gleda SVAKA putanja za sebe.
+// Igra se pokrece na dva nacina i oba moraju da prevode gresku: precica
+// (.lnk/.url/.bat) ide kroz shell.openPath, a .exe kroz spawn. Gleda se svaka
+// putanja za sebe.
 const lnkOd = main.indexOf("shell.openPath(gamePath)");
 const lnkBlok = main.slice(Math.max(0, lnkOd - 700), lnkOd + 300);
 // Trazi se child.on("error") IZ POKRETANJA IGRE, ne prvi u fajlu - prvi
@@ -70,13 +68,8 @@ proveri("spawn ide kroz prevod", /objasniGresku\(/.test(spawnBlok), "child.on(er
 proveri("i odbijeno obecanje ide kroz prevod",
   /\.catch\(\(e\) => javiKvar\(objasniGresku\(e\)\)\)/.test(main),
   "jedan pokvaren .lnk bi inace ostavio racunar na golom Windowsu");
-// SVAKA PORUKA KAZE I STA SAD.
-//
-// Provere PRE pokretanja odavno zavrsavaju sa "Pozovite osoblje"; poruke koje
-// nastanu kad pokretanje stvarno pukne nisu, pa je isti kvar davao dve razlicite
-// poruke - jedna kaze sta da se radi, druga ostavi igraca da gleda u ekran.
-// Igrac ne zna da je "nije pronadjena" nesto sto osoblje popravi za pola minuta;
-// on samo predje na drugu igru i niko ne sazna da precica fali.
+// Svaka poruka o neuspelom pokretanju kaze i sta dalje ("Pozovite osoblje"),
+// kao i provere pre pokretanja.
 for (const [slucaj, tekst] of [
   ["fajl ne postoji", "Igra nije pronađena na ovom računaru. Pozovite osoblje."],
   ["nema dozvole", "Windows nije dozvolio pokretanje. Pozovite osoblje."],
@@ -108,7 +101,8 @@ proveri("tacan razlog i dalje ide osoblju",
 // misa. Pomeri ga, nista se ne desi, i ne zna je li do njega ili do racunara.
 // A kad citanje pukne, ekran je zauvek stajao na "Ucitavam podesavanja...".
 proveri("procitana greska se ne prikazuje kao stanje",
-  /if \(r && !r\.greska && \(r\.mis \|\| r\.zvuk\)\)/.test(launcher));
+  // Zvuk bez jacine se ne racuna: sam objekat zvuka stize i kad nista nije procitano.
+  /if \(r && !r\.greska && \(r\.mis \|\| r\.zvuk\?\.jacina != null\)\)/.test(launcher));
 proveri("neuspelo citanje ne visi na 'Ucitavam'",
   /podesavanjaStanje === "palo"/.test(launcher),
   "ekran koji zauvek nesto ucitava je gori od poruke o gresci");
@@ -149,15 +143,9 @@ proveri("server ne gasi proces posle pada",
 
 // ---- STANJE "CEKAM ODGOVOR" MORA DA SE SAMO OTPUSTI ----
 //
-// Tri mesta u launcheru upale "cekam server" i cekaju odgovor: prijava,
-// porudzbina i nagradni tocak. Ako odgovor nikad ne stigne - veza pukne, server
-// se restartuje, ruter se resetuje - to stanje ostaje upaljeno zauvek.
-//
-// Kod tocka je posledica bila najgora: dok "vrtnja traje", launcher NAMERNO
-// odbacuje svako novo stanje kredita (da se brojka ne promeni pre nego sto igrac
-// sazna sta je dobio). Zaglavljena vrtnja je zato ZAMRZAVALA HUD: igrac gleda
-// "1000 din, ostalo 8:20" dok mu vreme stvarno curi, racunar se zakljuca bez
-// upozorenja, a dopuna na kasi se ne vidi pa radnik dopunjuje drugi put.
+// Prijava, porudzbina i nagradni tocak cekaju odgovor servera. Ako odgovor ne
+// stigne (pukla veza, restart servera), stanje cekanja mora samo da istekne; kod
+// tocka bi inace HUD ostao zamrznut.
 for (const [sta, sablon] of [
   ["prijava", /clearLoginPending\._t = setTimeout\(clearLoginPending/],
   ["porudzbina", /sendOrder\._t = setTimeout\(clearOrderPending/],
@@ -189,6 +177,38 @@ proveri("kad kredit bude dovoljan, izbor se vraca",
 proveri("nova porudzbina krece sa cistim izborom",
   (launcher.match(/S\.nacinRucno = false/g) || []).length >= 2,
   "i pri prijavi i posle poslate porudzbine");
+
+// ---- TOCAK: ZAKASNEO ISHOD I POKIDANA VEZA ----
+//
+// Server upise spin PRE nego sto posalje ishod. Kad ishod zakasni preko roka,
+// ili veza pukne posle upisa, launcher ne sme da tvrdi nesto sto ne zna.
+proveri("zakasneo ishod tocka se prikaze, ne baca se", /if \(!S\.tocakVrti\) \{ zakasneliSpin\(/.test(launcher),
+  "igrac ne bi saznao sta je dobio, a tocak bi nudio spin koji je vec iskoriscen");
+proveri("zakasneo ishod zatvara nedeljni spin", /function zakasneliSpin[\s\S]{0,120}S\.tocak\.moze = false/.test(launcher));
+proveri("pad veze ne obecava da spin nije potrosen", !/Veza je pukla usred vrtnje\. Spin nije potrošen/.test(launcher),
+  "server je mozda vec upisao spin");
+
+// ---- POKRETANJE KAD MOST PUKNE ----
+proveri("pokretanje igre i alata ide kroz jedno mesto koje hvata gresku",
+  /async function pokreni\(sta\) \{\s*try \{[\s\S]{0,160}\} catch \{ return \{ ok: false \}; \}/.test(launcher) &&
+  (launcher.match(/window\.crit\.launchGame\(/g) || []).length === 1,
+  "neuhvacena greska ostavlja plocicu na 'Pokrecem...' bez poruke");
+
+// ---- KORPA I ZALIHA ----
+proveri("korpa ne prima vise nego sto je na stanju", /function granicaKorpe\(/.test(launcher) &&
+  /const granica = granicaKorpe\(S\.shop\.find/.test(launcher),
+  "server bi odbio tek na 'Poruci', posle celog izbora");
+proveri("nov katalog svodi korpu na zalihu",
+  /case "catalog": \{[\s\S]{0,500}if \(kol > granica\) \{ if \(granica > 0\) S\.cart\.set\(id, granica\); else S\.cart\.delete\(id\); \}/.test(launcher));
+proveri("VIP ponuda pise cenu sa valutom", /Produži za \$\{money\(c\.cena\)\}/.test(launcher) &&
+  /\$\{money\(c\.cena\)\} za \$\{c\.trajanje\} dana/.test(launcher));
+
+// ---- MIS KOJI NIJE PROCITAN ----
+const winPod = citajIzvor("client/windows-podesavanja.js");
+proveri("neprocitan mis je null, ne fabricka vrednost", /mis: mis\.greska \? null : mis/.test(winPod),
+  "odjava bi racunaru nametnula izmisljenu brzinu, a klizac bi pokazao broj koji niko nije procitao");
+proveri("prazan izlaz zvuka nije nula", /r\.izlaz === "" \? NaN/.test(winPod));
+proveri("ekran ne izmislja mis", /const mis = p\.mis;/.test(launcher) && !/p\.mis \|\| \{ brzina/.test(launcher));
 
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 process.exit(pao ? 1 : 0);

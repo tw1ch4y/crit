@@ -1,13 +1,8 @@
-// Provera da ugradjeni font STVARNO ima nasa slova i da se stvarno ucitava.
+// Provera da ugradjeni font ima nasa slova (č ć š ž đ) i da se ucitava. Bez
+// njih pregledac za ta slova tiho uzme sistemski font.
 //
-// Ovo nije sitnica: vecina gaming fontova nema c c s z dj. Kad ih nema,
-// pregledac tiho uzme sistemski font samo za ta slova - pa u istoj reci stoje
-// dva pisma ("POKREĆI" napola u jednom, napola u drugom). Nista ne pukne,
-// samo izgleda jeftino, i primeti se tek na ekranu u igraonici.
-//
-// Metod: ista slova se izmere u ugradjenom fontu i u namerno nepostojecem
-// fontu (koji uvek pada na sistemski). Ako su sirine IDENTICNE, znaci da je i
-// ugradjeni font pao na sistemski - to jest da slovo nema.
+// Ista slova se mere u ugradjenom fontu i u nepostojecem fontu (koji uvek pada
+// na sistemski). Iste sirine znace da slova nema.
 //
 //   node proba-fonta.mjs
 import fs from "node:fs";

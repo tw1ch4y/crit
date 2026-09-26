@@ -1,90 +1,69 @@
-# Provera sistema
+# Provere
 
-Pokreni **`PROVERI-SISTEM.bat`** (ili `node pokreni-sve.mjs`) posle svake izmene u kodu.
-Prolazi kroz preko 1400 provera i na kraju kaže drži li sistem.
+```bash
+node testovi/pokreni-sve.mjs      # ili PROVERI-SISTEM.bat
+```
 
-Svaka suita diže **svoj server na svom portu i svoju praznu bazu** u `testovi/.radno/`.
-Prava baza iz `server/data/` se ne dira ni u jednom testu.
+Pokreće sve suite `test-*.mjs` jednu za drugom i na kraju ispisuje zbir. Svaka
+suita diže svoj server na svom portu i svoju praznu bazu u `testovi/.radno/`;
+prava baza iz `server/data/` se ne dira. Radne baze ostaju samo kad nešto
+padne, da bi mogle da se pregledaju.
 
-## Šta se proverava
+## Suite
 
-| Suita | Šta pokriva |
+Deo suita diže pravi server i razgovara sa njim preko HTTP-a i WebSocket-a kao
+panel i launcher; deo proverava izvorni kod (pravila koja se ne mogu pustiti
+na razvojnom računaru, npr. šta launcher upisuje u registar).
+
+| Oblast | Suite |
 |---|---|
-| `kasa` | obračun smene: dopune, ispravke, keš i kupovina sa naloga, pazar, manjak, zamrznuta zatvorena smena, otkazana porudžbina |
-| `neispravni-unosi` | šta se desi kad u polja uđe glupost: minus, tekst, ogroman broj, HTML, duple smene |
-| `mirovanje` | odjava igrača koji je ustao: prag, odbrojavanje, otkazivanje, oslobađanje računara |
-| `odbrojavanje` | brojanje na ekranu igrača (bez pokretanja launchera, sa lažnim Windows brojačem) |
-| `gosti` | brzo otvaranje naloga za grupu, redosled imena, prijava izdiktiranom lozinkom |
-| `ciscenje-gostiju` | brisanje potrošenih gostiju bez diranja redovnih igrača |
-| `igre` | beleženje pokretanja, statistika najigranijih, redosled po igraču |
-| `poredak` | redosled police u launcheru |
-| `porudzbine` | igrač bira kredit ili keš, otkazivanje, pazar smene, logovi |
-| `zalihe` | javljanje kad piće ide ka kraju i kad nestane, pregled za dopunu |
-| `moje-porudzbine` | igrač vidi svoje porudžbine i status uživo, ne vidi tuđe |
-| `kopije` | spisak i preuzimanje rezervnih kopija, radnik nema pristup, ime fajla ne izlazi iz foldera |
-| `restart` | nestanak struje: server se stvarno gasi i diže, pa se proverava šta je preživelo (smena, obračun, sesije, kredit, zalihe, naplata bez nadoknade unazad) |
-| `pozadine` | kačenje pozadina ekrana, trenutna primena na launcherima, radnik nema pristup, test čisti za sobom |
-| `slike` | omoti i baneri igara, slike prečica, i da spisak ugrađenih logoa u panelu prati onaj u launcheru |
-| `promo` | promo baneri: kačenje, redosled, skrivanje, brisanje, trenutna primena na launcherima |
-| `veza` | namerno gađanje WebSocketa: pokvarene poruke, tuđi tokeni, brzo prekidanje veze, dve veze za isti računar |
-| `nadogradnja` | postojeća baza iz igraonice preživljava novu verziju servera |
-| `lokalna-sesija` | račun launchera bez servera, na brojkama: sat, zaključavanje na isteku, potpisan zapis na disku, pomeren sat Windows-a |
-| `offline-naplata` | pravi server prima izveštaj launchera posle prekida: naplati tačno razliku, ne naplaćuje dvaput, ne više od kredita, ne dira sesiju koju je osoblje zatvorilo |
-| `rad-bez-servera` | veze u launcheru koje rad bez servera spajaju u celinu - svaka od njih, kad pukne, izgleda kao da sat stoji a igra radi besplatno |
-| `nadzornik` | odluke nadzornika bez pravog servera: razmak između pokretanja, mirno vreme posle kog se broji ispočetka, zaglavljen server, zauzet port, zamena koda pre pokretanja |
-| `nadzornik-uzivo` | pravi nadzornik i pravi server: ubijen server se diže sam, drugi nadzornik ne diže drugi server, gašenje upiše bazu, zauzet port ne diže server u krug, a ubijen nadzornik povuče server i provera ih diže - ali ne i namerno ugašen |
-| `autostart-servera` | ono što se na razvojnom računaru ne pušta: zakazani zadaci (pri paljenju, SYSTEM, provera na 5 minuta, sami sebe provere i vrate), `.bat` skripte bez putanje u zagradama i sa CRLF |
-| `paket-servera` | paket za nadogradnju servera: otisak svakog fajla, podmetnute putanje, pokvaren paket i fajl koji se raspakuje u ogroman |
-| `zamena-servera` | zamena koda prekinuta posle svakog koraka - uvek se završi ili vrati, nikad pola staro pola novo |
-| `nadogradnja-servera-uzivo` | ceo put sa panela nad kopijom servera: prava servisera, nova verzija se diže, podaci preživljavaju, pokvarena verzija se vraća sama |
+| novac i smene | `kasa`, `kraj-dana`, `obracun-shopa`, `promet-danas`, `izvestaj`, `jedan-posao`, `dvostruka-naplata`, `naplata-otporna`, `poklonjen-kredit`, `paketi`, `kredit-vreme` |
+| igrači | `gosti`, `igre`, `poredak`, `upozorenje-vreme`, `ciscenje-gostiju`, `mirovanje`, `odbrojavanje`, `nivoi`, `xp`, `znacke`, `rang-lista`, `vip`, `vip-clanarina`, `tocak`, `pogadjanje` |
+| shop | `porudzbine`, `moje-porudzbine`, `porudzbina-zloupotreba`, `zalihe`, `kategorije` |
+| računari i veza | `veza`, `mrtva-veza`, `gasenje-racunara`, `daljinski-procesi`, `internet`, `sat`, `restart`, `otpornost`, `opterecenje` |
+| rad bez servera | `lokalna-sesija`, `offline-naplata`, `rad-bez-servera`, `kad-pukne` |
+| launcher i kiosk | `kiosk-beg`, `kiosk-oporavak`, `kiosk-windows`, `launcher-ne-pada`, `bez-zamrzavanja`, `prvi-plan`, `optimizacija`, `igracka-podesavanja`, `igra-ne-radi`, `razvojni-racunar` |
+| nadogradnje | `nadogradnja`, `nadogradnja-launchera`, `pomocnik-nadogradnje`, `nadogradnja-vidljiva`, `paket-servera`, `zamena-servera`, `nadogradnja-servera-uzivo`, `verzija` |
+| server i nadzornik | `nadzornik`, `nadzornik-uzivo`, `autostart-servera`, `zastitna-zaglavlja`, `neispravni-unosi`, `prava-radnika`, `uklanjanje`, `serviser`, `servisni-pin`, `fabricka-lozinka`, `izolacija` |
+| kopije i disk | `kopije`, `kopija-van`, `vracanje-kopije`, `skladiste`, `kopija-koda` |
+| izgled | `panel`, `raspored`, `citljivost`, `znacenje-boja`, `boja-kuce`, `css-promenljive`, `font`, `tekst-na-ekranu`, `pozadine`, `tekstura`, `slike`, `promo`, `baner`, `brend`, `ime-igraonice` |
+| paket | `paket`, `preuzimanje`, `prvi-dan`, `zivo` |
 
-## Alati koji gledaju pravi launcher
+## Alati sa pravim launcherom
 
-Suite iznad proveravaju server. Ovi alati puštaju **pravi launcher u pravom
-Electronu** i mere ono što se ne vidi iz koda — raspored na ekranu, da li
-animacija stvarno radi, da li font ima naša slova, da li porudžbina prođe od
-klika do baze.
+Alati `proba-*.mjs` i `pregled-*.mjs` puštaju pravi launcher u Electronu i
+mere ono što se iz koda ne vidi: raspored na ekranu, animacije, font, tok
+porudžbine od klika do baze. Otvaraju prozore i traju duže, pa nisu deo
+`pokreni-sve.mjs`.
 
-**Pokreni ih sve odjednom:** `node pokreni-probe.mjs` (sam diže server i katalog,
-traje nekoliko minuta). Za jedan alat: `node pokreni-probe.mjs klikova`.
+```bash
+node testovi/pokreni-probe.mjs            # svi alati
+node testovi/pokreni-probe.mjs klikova    # alati čije ime sadrži "klikova"
+```
 
-Pojedinačno traže da server već radi na 8096.
-
-> **Zašto ovo nije isto što i suite.** U suitama je oko 40% tvrdnji provera
-> izvornog koda - hvataju da je neko obrisao liniju, ali ne dokazuju da funkcija
-> radi. Alati ispod otvaraju pravi prozor, kliknu dugme i mere šta se desilo.
-> Baš su oni našli da se nagradni točak ne može ni zavrteti ni zatvoriti, i da
-> animacije stoje mrtve na računaru sa isključenim Windows animacijama - a
-> nijedan test to nije prijavio.
-
-| Alat | Šta radi |
+| Alat | Namena |
 |---|---|
-| `pregled-electron.mjs` | slika **svih 9 ekrana** na 1920x1080 i 1366x768, plus 3 obaveštenja preko igre. Uz svaku sliku meri šta ispada iz ekrana, šta ulazi pod donju traku, koji je tekst odsečen i koji se font primenio. Slike u `.slike/` |
-| `proba-porudzbine.mjs` | ceo tok porudžbine kroz launcher: dodavanje u korpu, izbor keš/kredit, slanje, provera šta je stiglo u bazu, promena statusa. Preko **pravog WebSocketa**, ne kroz lažni most |
-| `proba-kretanja.mjs` | meri da li animacije šare stvarno rade — pozicija pozadine kroz vreme, maska kod talasa, dva sloja kod dubine, iskre. Sa `--reduced` pušta isto na računaru kakav je u igraonici (Windows sa isključenim animacijama) — pod tim uslovom su animacije jednom bile potpuno mrtve |
-| `proba-police.mjs` | meri da li polica igara stvarno oživi dok se skroluje — nagib u smeru kretanja, paralaksa omota i utišavanje pločica koje polica seče na ivici. Uz to meri da naslovi igara ostanu u ISTOJ LINIJI: ime stoji unutar okvira koji se animira, pa je ranija dubina (`scale`) razbacala red za 46px, a nijedna provera to nije videla |
-| `proba-klikova.mjs` | prolazi kroz sve ekrane i za **svako dugme** proverava da li klik uopšte stiže do koda. Nastao posle kvara u kom se nagradni točak otvarao, ali se nije mogao ni zavrteti ni zatvoriti: delegacija klikova visi na `#content`, a pop-up stoji izvan njega. Alat sam sebe proverava — ako presretač ne uhvati nijednog slušaoca ili launcher uopšte ne krene, javlja da provera nije ispravna umesto da kaže da je sve u redu |
-| `proba-fonta.mjs` | da li ugrađeni font stvarno ima č ć š ž đ. Poredi širinu slova sa fontom i bez njega |
-| `proba-procesa.mjs` | daljinski task manager: traži popis sa računara, gasi **pravi** pokrenut program i proverava da ga stvarno više nema. Diže i svoj server, ne treba mu spoljni |
-| `proba-straze.mjs` | straža nad programima skinutim kroz pregledač, sa **pravim PowerShell-om**: kopija `ping.exe` pokrenuta iz lažnih Preuzimanja mora da bude ugašena za par sekundi; za sve vreme sme da radi **jedan** pomoćni proces (ranije je na svake 4 s kretao novi, bez roka); i pomoćni proces mora sam da nestane kad launcher umre bez pozdrava. Radi u svojoj privremenoj fascikli i ne dira ništa van nje |
-| `proba-bez-servera.mjs` | **pravi launcher i pravi server koji se ubije usred igranja.** Igrač mora da ostane na radnoj površini, sat mora da ide dalje, odjava bez servera mora da prođe, računar mora da se zaključa kad lokalno istekne (i da ga osoblje otključa servisnim PIN-om), launcher ponovo pokrenut dok server ćuti mora da nastavi sesiju - a kad se server vrati, naplaćuje se tačno odigrano. Do sada je u svim tim slučajevima sat stajao, a igra radila besplatno |
-| `proba-podesavanja.mjs` | miš i zvuk koje igrač menja sa svog naloga. Menja ih kroz PRAVI launcher, proverava da su stigli do Windows-a, pa odjavljuje igrača i proverava da je vraćeno zatečeno. **Menja podešavanja mašine na kojoj se pušta**, ali ih na kraju vraća bez obzira na ishod |
-| `proba-obavestenja.mjs` | obaveštenje **preko igre**: igrač je u punom ekranu i ne vidi launcher, pa upozorenje o vremenu i poruka osoblja idu u zaseban prozor iznad svega. Prijavljuje igrača kroz sam launcher, spušta mu kredit ispod praga i čita šta je u tom prozoru stvarno pisalo. Do sada nije bilo pokriveno nijednom tvrdnjom, a to je najvidljivija zaštita koju igrač ima |
-| `proba-veza.mjs` | pravi launcher i otkucaj servera. Server gasi vezu koja ne odgovori na ping - ovde se gleda da **pravi** launcher to preživi kroz tri kruga, jer bi inače svih 13 računara ispadalo svakih 30 sekundi. Zatim se server ubije i proverava da se launcher sam vrati |
-| `proba-nadogradnja-pin.mjs` | servisni PIN posle nadogradnje. Tri puta pušta pravi launcher preko istog korisničkog naloga, a između pokretanja prepisuje `podesavanja.json` fabričkim — tačno kao instaler. Bez toga se PIN tiho vraćao na `1234` na svakoj mašini pri svakoj novoj verziji |
-| `proba-beg.mjs` | *(u scratchpad-u)* pokušaj bega iz kioska preko „Promeni adresu servera" kad server ne odgovara |
-| `pregled-launchera.mjs` | UI launchera u običnom pregledaču, bez Electrona, za brzu doradu CSS-a. Posle: `--obrisi` |
-| `godina-rada.mjs` | puni bazu **stvarnim obimom** rada igraonice i meri šta se dešava kad naraste: veličina baze, brzina svake strane panela, koliko zauzmu rezervne kopije, i koliko se od svega toga vrati posle održavanja. `--dana 1825` za pet godina. Odatle su brojke u DEPLOY.md |
-| `server-za-pregled.mjs` | diže server na **odvojenim podacima** (`.radno/pregled-data`, ne dira `server/data`) i puni ga kao pravu igraonicu: 13 računara, pun šank, igrači sa kreditom, otvorena smena. Treba ga za `pregled-panela.mjs` i za gledanje panela uživo. Na praznoj bazi se meri prazno stanje umesto pravog rasporeda |
-| `pregled-panela.mjs` | slika svaku stranu panela na 1920x1080 i 1366x768 i meri šta ispada iz ekrana, koji je tekst odsečen i koliko je strana popunjena. Traži server na portu 8096 (gore). Namerno skraćen tekst (`text-overflow: ellipsis` uz `title`) ne prijavljuje — alat koji viče na isto pri svakom pokretanju prestane da se čita |
+| `pregled-electron.mjs` | slike svih ekrana na 1920x1080 i 1366x768, sa merenjem onoga što ispada ili se seče |
+| `pregled-panela.mjs` | isto za sve strane panela; traži `server-za-pregled.mjs` na portu 8096 |
+| `pregled-launchera.mjs` | ekran launchera u običnom pregledaču, za doradu CSS-a |
+| `proba-klikova.mjs` | svako dugme na svakom ekranu stiže do svog koda |
+| `proba-admin-izlaz.mjs` | otključavanje računara ne gasi launcher, a izlaz traži PIN |
+| `proba-pokretanje-igre.mjs`, `proba-precica.mjs` | klik na igru stiže do baze; putanja bez nastavka nalazi prečicu |
+| `proba-pokretanje-van-kataloga.mjs` | launcher odbija da pokrene ono što nije u katalogu |
+| `proba-servisni-pin-server.mjs` | servisni PIN iz panela stiže na launcher i važi bez servera |
+| `proba-tocak-zaglavljen.mjs` | točak čiji odgovor ne stigne ne zamrzava kredit |
+| `proba-porudzbine.mjs` | porudžbina kroz launcher preko pravog WebSocket-a do baze |
+| `proba-police.mjs`, `proba-kretanja.mjs`, `proba-tocka.mjs` | animacije police, šara i točka, i sa isključenim Windows animacijama |
+| `proba-fonta.mjs` | ugrađeni font ima č, ć, š, ž, đ |
+| `proba-obavestenja.mjs` | obaveštenje preko igre pri isteku vremena i poruci osoblja |
+| `proba-bez-servera.mjs` | server se ugasi usred igranja: sat ide, odjava i zaključavanje rade, posle se naplati odigrano |
+| `proba-veza.mjs` | launcher preživljava otkucaje servera i vraća se posle njegovog pada |
+| `proba-procesa.mjs` | daljinski spisak procesa gasi pravi pokrenut program |
+| `proba-straze.mjs` | straža nad preuzetim programima sa pravim PowerShell-om |
+| `proba-nadogradnja-pin.mjs` | servisni PIN preživljava prepisan `podesavanja.json` |
+| `proba-podesavanja.mjs` | miš i zvuk kroz launcher; **menja podešavanja računara** i vraća ih na kraju; odbija da radi na računaru sa `CRIT-NE-DIRAJ.txt` |
+| `godina-rada.mjs` | puni bazu obimom rada igraonice (`--dana 1825` za pet godina) i meri veličinu i brzinu |
+| `server-za-pregled.mjs` | server na odvojenim podacima (`.radno/pregled-data`), napunjen kao prava igraonica |
 
-Zašto su odvojeni od suita: traže Electron i pokrenut server, traju duže, i
-gledaju izgled — a suite moraju da budu brze i da rade bez ičega spolja.
-
-**Ostavljaju za sobom** radne baze u `.radno/` i slike u `.slike*/`. Ni jedno
-ni drugo ne ide u paket.
-
-## Ako nešto padne
-
-Ispis pokaže koja provera i sa kojim vrednostima. Radni folderi ostaju u
-`testovi/.radno/` pa baza može da se otvori i pogleda.
+Slike ostaju u `testovi/.slike*/`, radne baze u `testovi/.radno/`; ni jedno
+ni drugo ne ide u git ni u paket.

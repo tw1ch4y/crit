@@ -3,31 +3,16 @@ import path from "node:path";
 import { spawn, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { KOREN, radniFolder } from "./_okruzenje.mjs";
-// RACUNAR SE UVEK VRACA - I KAD NADOGRADNJA NE USPE
+// Racunar se uvek vraca, i kad nadogradnja ne uspe.
 //
-// Posle preuzimanja, instalaciju vode dve kratke batch skripte: glavna saceka
-// instalater i vrati launcher, a osigurac vrati launcher i kad glavna zapne.
-// Dok one rade, na racunaru NEMA launchera - nema kioska, nema naplate, samo
-// Windows.
+// Instalaciju vode dve batch skripte: glavna ceka instaler i vraca launcher, a
+// osigurac vraca launcher i kad glavna zapne. Skripte se ovde pokrecu tacno kao
+// u launcheru (odvojeno, sakriveno, bez izlaza), jer u tom okruzenju:
+//   1. `tasklist` ne radi, a greska se ne vidi
+//   2. `start /wait` se nikad ne vrati
 //
-// OVA PROBA JE VEC DVAPUT NASLA KVAR, i to takav koji se sa strane ne vidi.
-// Launcher skripte pokrece ODVOJENO, sakriveno i bez izlaza, a u tom okruzenju
-// dve najobicnije stvari ne rade i obe o tome cute:
-//   1. `tasklist` ne moze da se izvrsi, greska ode u nista, a odgovor ispadne
-//      "instalatera nema vise" - launcher bi se vratio nasred instalacije.
-//   2. `start /wait` se nikad ne vrati - skripta stane zauvek, a racunar ostane
-//      bez launchera do kraja smene.
-// Obe rade savrseno kad se skripta pokrene rucno, iz otvorenog prozora. Zato se
-// ovde pokrece TACNO onako kako je pokrece launcher.
-//
-// KAKO PROBA CISTI ZA SOBOM
-//
-// Prva verzija je ostavljala otvorene prozore: lazni launcher je bio .cmd, a
-// `start` batch fajl otvara sa `/K` - prozor ostane zauvek. Uz lazni instalater
-// koji "visi" dva minuta, posle nekoliko prolaza je na ekranu stajala gomila
-// crnih prozora. Zato je lazni launcher sada .vbs (wscript ga pokrece bez
-// konzole i sam se gasi), trajanja su svedena na sekunde, a na kraju se gasi
-// sve sto je proba mogla da ostavi.
+// Lazni launcher je .vbs (wscript bez konzole), trajanja su u sekundama, a na
+// kraju se gasi sve sto je proba mogla da ostavi.
 const require = createRequire(import.meta.url);
 const { napraviSkriptu, napraviOsigurac, KOD_OSIGURAC } =
   require(path.join(KOREN, "client", "nadogradnja-skripta.js"));
@@ -46,16 +31,10 @@ const RADNO = radniFolder("pomocnik-nadogradnje");
 const ISHOD = path.join(RADNO, "ishod.txt");
 const MARKER = path.join(RADNO, "launcher-se-vratio.txt");
 
-// STA JE PROBA OSTAVILA DA RADI.
-//
-// Trazi se dvostruko suzeno: samo procesi koje ova proba uopste i pravi
-// (cmd/ping/wscript) i samo oni cija komandna linija pokazuje na OVAJ radni
-// folder. Tako ne moze da se dodirne nijedan tudji proces na racunaru.
-//
-// Suzenje po imenu nije opreznost viska nego ispravka: prvo se gledala samo
-// komandna linija, pa je proba brojala i sam `node` koji je pokrece (ime fajla
-// joj je u komandnoj liniji) i `powershell` koji broji (isti tekst mu je u
-// argumentu). Prijavila je dva zaostala procesa kojih nije bilo.
+// Sta je proba ostavila da radi: samo procesi koje proba pravi
+// (cmd/ping/wscript) i samo oni cija komandna linija pokazuje na ovaj radni
+// folder. Bez suzenja po imenu brojali bi se i `node` koji pokrece probu i
+// `powershell` koji broji.
 const MOJI = "@('cmd.exe','PING.EXE','wscript.exe')";
 const USLOV = `$_.Name -in ${MOJI} -and $_.CommandLine -like '*${RADNO.replace(/'/g, "''")}*'`;
 const ps = (naredba) => {

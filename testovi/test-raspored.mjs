@@ -33,8 +33,7 @@ proveri("dodavanje ide malim okruglim dugmetom", launcher.includes('class="pice-
 proveri("krug dobija boju kuce tek pod misem", /\.pice-plus:hover \{[^}]*background: var\(--brend\)/.test(jedanRed));
 
 // ---- SHOP: samo jedna linija dok nesto stize ----
-// Ceo spisak je ranije stajao i ovde i na nalogu. Igracu u Shop-u treba samo
-// odgovor na to da li stize; istorija mu treba na nalogu.
+// Igracu u Shop-u treba samo odgovor na to da li stize; istorija je na nalogu.
 proveri("shop javlja da porudzbina stize", launcher.includes("shopPorudzbine()"));
 proveri("to je jedna traka, ne spisak", /\.shop-traka \{/.test(jedanRed));
 proveri("traka se vidi kao nesto na sta se klikce", /\.shop-traka \{[^}]*cursor: pointer/.test(jedanRed));
@@ -48,11 +47,8 @@ proveri("traka stoji IZNAD mreze artikala",
 
 // ---- BANER JE BANER: IGRE NE IDU U NJEGA ----
 //
-// U gornjoj traci je nekad stajala traka "Nastavi gde si stao" - tri poslednje
-// igre kao sitna dugmad. Bilo je pogresno dvaput: baner je mesto za promo
-// materijal osoblja ili znak igraonice (jedna mirna slika preko cele sirine), a
-// zbog te trake se polica NAMERNO nije sortirala, da se iste igre ne ponove -
-// pa je pokvareno ono sto je zaista korisno.
+// Gornja traka nosi promo materijal ili znak igraonice; igre su na polici,
+// sortirane po poslednjem igranju.
 proveri("u baneru nema igara", !/hero-nastavi|hn-igra/.test(launcher),
   "baner nosi promo ili znak, ne pločice sa imenima igara");
 proveri("promo baner osoblja ima prednost nad znakom", /const lista = S\.promo \|\| \[\];/.test(launcher));
@@ -83,10 +79,7 @@ proveri("slika precice prati velicinu logotipa", /\.site-card\.cover \.site-cove
 
 // ---- NALOG JE MENI, NE SPISAK PANELA ----
 //
-// Porudzbine, pozadina i lozinka su ranije stajale jedna ispod druge na istom
-// ekranu. Sve se videlo odjednom, nista nije imalo prednost, strana je izgledala
-// pretrpano i rasla je sa svakom novom stvari. Sada je levo meni, desno jedan
-// odeljak.
+// Levo meni (porudzbine, pozadina, lozinka), desno jedan odeljak.
 proveri("nalog ima meni i sadrzaj", /\.acc-telo \{[^}]*grid-template-columns: 216px minmax\(0, 1fr\)/.test(jedanRed));
 proveri("meni ima svoje stavke", /\.acc-mi \{/.test(jedanRed));
 proveri("izabrana stavka se jasno vidi", /\.acc-mi\.aktivna \{[^}]*box-shadow: inset 2px 0 0 var\(--brend\)/.test(jedanRed),
@@ -115,10 +108,8 @@ proveri("znacka nestaje kad nema porudzbina", /if \(!cekaju\) \{ if \(z\) z\.rem
 proveri("oznaka kategorije stoji dole, ne preko logotipa", /\.tile-badge \{[^}]*bottom: 46px/.test(jedanRed));
 
 // ---- PUKLA VEZA USRED IGRANJA ----
-// Do sada je igracu nestajao ceo ekran na "Povezivanje sa serverom...", sat je
-// stajao, a igra iza toga je radila besplatno. Sada igrac ostaje u svojoj
-// sesiji i vreme se racuna na racunaru (vidi lokalna-sesija.js), pa bi poruka
-// "vreme ti se ne trosi" bila laz - i nje vise nema.
+// Igrac ostaje u svojoj sesiji, a vreme se racuna na racunaru (vidi
+// lokalna-sesija.js). Poruka "vreme ti se ne trosi" zato ne sme da postoji.
 const html = citajIzvor("client/renderer/index.html");
 proveri("nema vise poruke da se vreme ne trosi", !/Vreme ti se ne troši dok nema veze/.test(html),
   "vreme se sada racuna i bez servera - poruka bi igracu lagala");
@@ -138,12 +129,8 @@ proveri("poruka praznog shopa stoji u sredini",
   /\.shop-products \.polica-prazno\.veliko \{[^}]*flex: 1/.test(jedanRed),
   "bez toga bi se zalepila uz vrh prazne strane");
 
-// KORPE NEMA KAD NEMA STA DA SE STAVI U NJU.
-//
-// Ranije je prazan shop pokazivao DVE prazne poruke jednu pored druge: veliku
-// levo ("Shop je prazan") i visoku praznu kolonu desno sa "Trenutno nema sta da
-// se poruci". Ista stvar dvaput, i cetvrtina ekrana na kolonu koja ne moze
-// nista da primi. Sada se korpa i ne crta, a poruka uzima celu sirinu.
+// Korpe nema kad nema sta da se stavi u nju: prazan shop pokazuje jednu poruku
+// preko cele sirine.
 proveri("prazan shop nema korpu", /\$\{dostupni\.length \? `<div class="cart"/.test(launcher),
   "dve prazne poruke jedna pored druge govore istu stvar dvaput");
 proveri("bez korpe poruka uzima celu sirinu", /\.shop\.bez-korpe \{[^}]*grid-template-columns: minmax\(0, 1fr\)/.test(jedanRed));

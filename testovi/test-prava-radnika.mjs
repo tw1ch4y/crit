@@ -1,13 +1,8 @@
 import { radniFolder, podigniServer, ucitajWebSocket } from "./_okruzenje.mjs";
 const WebSocket = await ucitajWebSocket();
-// STA RADNIK SME, A STA NE
-//
-// Radnik ceo dan drzi panel otvoren i mora da radi posao: dopune, kasa, smena,
-// otkljucavanje racunara. Ali ne sme da menja pravila igraonice ni da sebi
-// napravi vlasnicki nalog.
-//
-// Ovo se ne proverava citanjem koda: pravi se PRAVI radnicki nalog, uzima se
-// PRAVI token i kuca se na sve osetljive rute redom.
+// Sta radnik sme, a sta ne: dopune, kasa, smena i otkljucavanje da; pravila
+// igraonice i vlasnicki nalog ne. Pravi se pravi radnicki nalog i kuca se na
+// sve osetljive rute redom.
 const BASE = "http://127.0.0.1:8163";
 const DATA = radniFolder("prava-data");
 await podigniServer(DATA, 8163);
@@ -85,10 +80,8 @@ proveri("obrisan radnik vise ne moze da radi", posle.status === 401,
   `status ${posle.status} - stari token bi i dalje radio`);
 
 // ---- OTPUSTEN RADNIK ----
-// Nalog se GASI, ne brise: smena koju je otvorio i dopune koje je upisao moraju
-// da ostanu potpisane, inace obracun smene nema smisla. Ranije je brisanje
-// pucalo na stranom kljucu cim je radnik jednom radio - vlasnik nije mogao da
-// mu oduzme pristup, a nalog i token su nastavljali da rade.
+// Nalog se gasi, ne brise: smena koju je otvorio i dopune koje je upisao ostaju
+// potpisane. Ugasen nalog i njegov token vise ne rade.
 const spisak = (await vlasnik("/api/admins")).telo;
 const ugasen = spisak.find((a) => a.username === "pera");
 proveri("ugasen nalog se i dalje vidi vlasniku", !!ugasen,

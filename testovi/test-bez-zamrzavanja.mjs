@@ -1,25 +1,15 @@
 import { EventEmitter } from "node:events";
 import { createRequire } from "node:module";
 import { citajIzvor, brojac } from "./_okruzenje.mjs";
-// RAČUNAR NE SME DA STANE ZBOG LAUNCHERA
+// Launcher ne sme da optereti računar dok igra radi. Proverava se da se ne vrati:
 //
-// Prijava iz igraonice: računar se retko, ali se dešava, "zakoči". Uzrok nije
-// bio Electron, nego ono što je launcher radio iza igre:
+//   1. PowerShell sa WMI popisom procesa na svake četiri sekunde, bez roka
+//   2. čitanje temperature procesora preko WMI razreda koji traži administratora
+//   3. `exec` kroz cmd.exe, gde rok gasi cmd a ne program ispod njega
+//   4. beskonačna animacija zastora iza igre
 //
-//   1. NA SVAKE ČETIRI SEKUNDE, celu sesiju, nov PowerShell koji preko WMI
-//      popiše sve procese. Pola sekunde do sekunde procesora po pozivu (izmereno),
-//      trzaj slike na četiri sekunde - i BEZ ROKA: kad WMI zapne, svaki krug
-//      doda još jedan zaglavljen PowerShell dok memorija ne nestane.
-//   2. Temperatura procesora na 15 sekundi, preko WMI razreda koji traži
-//      administratora. Nalog igrača to nije - upit nije uspeo NIJEDNOM, a
-//      ponavljao se ceo dan.
-//   3. `exec` svuda: komanda ide kroz cmd.exe, pa i tamo gde je rok postojao,
-//      rok je gasio cmd, a zaglavljen program ispod njega je ostajao.
-//   4. Zastor iza igre sa beskonačnom animacijom preko celog ekrana.
-//
-// Ovde se čuva da se to ne vrati - i PONAŠANJE straže koja je zamenila prvu
-// tačku, bez Windows-a (lažni pomoćni proces). Sa pravim PowerShell-om to meri
-// proba-straze.mjs.
+// i ponašanje straže koja je zamenila prvu tačku, sa lažnim pomoćnim procesom.
+// Sa pravim PowerShell-om to meri proba-straze.mjs.
 const { proveri, kraj } = brojac();
 const require = createRequire(import.meta.url);
 const procesi = require("../client/procesi.js");

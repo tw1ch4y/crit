@@ -93,8 +93,10 @@ exit /b 1
 :serverUgasen
 
 rem --- trenutnu bazu snimi sa strane pre nego sto je pregazis ---
-for /f "tokens=2 delims==" %%T in ('wmic os get localdatetime /value 2^>nul ^| find "="') do set "sada=%%T"
-set "pecat=%sada:~0,4%-%sada:~4,2%-%sada:~6,2%_%sada:~8,2%-%sada:~10,2%-%sada:~12,2%"
+rem wmic vise ne postoji na novim Windows 11, pa datum daje PowerShell.
+set "pecat="
+for /f "delims=" %%T in ('powershell -NoProfile -Command "Get-Date -Format yyyy-MM-dd_HH-mm-ss"') do set "pecat=%%T"
+if not defined pecat set "pecat=%random%-%random%"
 
 if exist "data\crit.db" (
   if not exist "data\pre-vracanja" mkdir "data\pre-vracanja"

@@ -2,20 +2,12 @@ import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
 import { KOREN, radniFolder, ugasiLaunchere, putanjaElektrona } from "./_okruzenje.mjs";
-// SERVISNI PIN SE UPISUJE JEDNOM, U PANELU, I STIZE NA SVE RACUNARE
+// Servisni PIN se upisuje jednom, u panelu, i stize na sve racunare.
 //
-// Taj PIN cuva ulaz u podesavanja launchera i izlaz iz kioska KAD SERVER NE
-// RADI. Ranije se upisivao rucno, u podesavanja.json pored programa, na svakoj
-// masini posebno. To nije bila nezgodna procedura nego los dizajn: PIN koji se
-// menja na trinaest mesta ne promeni se nigde. Ostajao je fabricki 1234 - bas
-// onaj kojim igrac koji iscupa mrezni kabl preusmerava racunar na svoj server.
-//
-// Ovde se proverava ono sto se iz koda ne vidi: da PIN sa servera stvarno
-// STIGNE do pravog launchera, da ga on ZAPAMTI preko restarta, da radi KAD
-// SERVERA NEMA, i - najvaznije - da fabricki 1234 posle toga PRESTANE da vazi.
-//
-// Uz to i obrnuta strana: zastita ne sme da bude prestroga. Pogresan potez ovde
-// zakljucava osoblje na svih trinaest masina bez nacina da izadje.
+// PIN cuva ulaz u podesavanja launchera i izlaz iz kioska kad server ne radi.
+// Proverava se da PIN sa servera stigne do launchera, da ga launcher zapamti
+// preko restarta, da radi bez servera i da fabricki 1234 posle toga ne vazi.
+// Zastita ne sme da zakljuca osoblje bez nacina da izadje.
 //
 //   node proba-servisni-pin-server.mjs
 const PORT = 8206;

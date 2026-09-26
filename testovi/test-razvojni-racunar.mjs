@@ -4,30 +4,16 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { citajIzvor, KOREN } from "./_okruzenje.mjs";
-// RAČUNAR NA KOM SE PROGRAM PIŠE NE SME DA STRADA OD SOPSTVENOG PROGRAMA.
+// Računar na kom se program piše ne sme da strada od sopstvenog programa.
 //
-// Launcher radi četiri stvari koje menjaju sam Windows, a ne samo njegov prozor:
-//   1. politike u registru (Task Manager, Win taster, odjava, gašenje)
-//   2. plan napajanja
-//   3. gašenje svega što je pokrenuto tokom sesije
-//   4. ČIŠĆENJE SESIJE - briše profile Chrome/Edge/Firefox/Opera/Brave, prijave
-//      na Steam/Epic/Riot/Battle.net/EA/Ubisoft, skorašnje dokumente, i prazni
-//      korpu za otpatke
+// Launcher menja Windows: politike u registru, plan napajanja, gašenje procesa
+// iz sesije i čišćenje sesije (profili pregledača, prijave na Steam/Epic/Riot/
+// Battle.net/EA/Ubisoft, skorašnji dokumenti, korpa). Čišćenje je nepovratno.
+// Proverava se da postoji više nezavisnih brava, ne samo zastavica --no-lock.
 //
-// Četvrta je nepovratna. Na razvojnom računaru to je gubitak svih prijava i
-// istorije pregledača, bez pitanja, u jednoj sekundi.
-//
-// Dosad je sve to čuvala JEDNA zastavica iz komandne linije (--no-lock). Alati u
-// ovom folderu pokreću pravi launcher; dovoljno je da jedan od njih zastavicu
-// zaboravi. Zastavica koja se pamti nije brava.
-//
-// Ovde se proverava da brava stvarno postoji i da je više njih, nezavisnih.
-//
-// PAŽNJA za onoga ko menja ovaj test: NIKAD ne puštaj `ocistiSesiju` tako da
-// prođe. Ono uzima staze iz PRAVOG okruženja (LOCALAPPDATA, APPDATA), pa bi
-// obrisalo prave profile na mašini na kojoj se test pušta. Sve provere ispod
-// ili traže ODBIJANJE, ili idu kroz `--suvo` (probni rad) uz izmišljeno
-// okruženje - i to oboje odjednom.
+// PAŽNJA: `ocistiSesiju` nikad ne sme da prođe u ovom testu; uzima staze iz
+// pravog okruženja (LOCALAPPDATA, APPDATA). Sve provere ispod traže odbijanje
+// ili idu kroz `--suvo` uz izmišljeno okruženje.
 const OVDE = path.dirname(fileURLToPath(import.meta.url));
 
 let pao = 0, prosao = 0;

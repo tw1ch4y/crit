@@ -1,18 +1,13 @@
-// Brisanje tragova igrača kad se sesija završi: prijave na pregledače,
-// prijave na Steam/Epic/Riot/Battle.net, privremeni fajlovi, skorašnji dokumenti.
+// Brisanje tragova igrača na kraju sesije: prijave na pregledače i
+// pokretače igara, privremeni fajlovi, skorašnji dokumenti, korpa za otpatke.
 //
-// OVO JE NEPOVRATNO. Zato brave, redom kojim se proveravaju - čišćenje se
-// izvršava samo ako je ISPUNJENO SVE:
-//   0. u korisničkom folderu NEMA fajla `CRIT-NE-DIRAJ.txt`
-//      (jedina brava koja ne zavisi od načina pokretanja - vidi niže)
-//   1. launcher je INSTALIRAN, ne pokrenut iz izvornog koda (app.isPackaged)
-//   2. launcher nije u --dev ni --no-lock režimu
-//   3. podesavanja.json ima  "ciscenjeSesije": true
-//   4. nije prosleđen --suvo (probni rad, samo ispisuje šta bi obrisao)
-//
-// Brave 1 i 2 stoje u main.js i dolaze ovamo kao `dozvoljeno`. Brava 0 je ovde
-// i namerno je nezavisna: da zaboravljena zastavica u nekom alatu ne može da
-// obriše profile na računaru na kom se program piše.
+// Brisanje je nepovratno, pa se radi samo kad je ispunjeno sve:
+//   0. u korisničkom folderu nema fajla `CRIT-NE-DIRAJ.txt`;
+//   1. launcher je instaliran (app.isPackaged);
+//   2. launcher nije u --dev ni --no-lock režimu;
+//   3. podesavanja.json ima "ciscenjeSesije": true;
+//   4. nije prosleđen --suvo (probni rad, samo ispis).
+// Uslovi 1 i 2 su u main.js i stižu kao `dozvoljeno`.
 
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
@@ -21,23 +16,11 @@ const { execFile } = require("node:child_process");
 
 const SUVO = process.argv.includes("--suvo"); // probni rad: ništa se ne briše
 
-// ---- POSLEDNJA BRAVA: RAČUNAR KOJI SE NIKAD NE ČISTI ----
+// ---- Zaštićen računar ----
 //
-// Sve ostale brave su u main.js i zavise od toga kako je launcher pokrenut.
-// Ova ne zavisi ni od čega osim od jednog fajla na disku, i zato postoji.
-//
-// Ono što se ovde briše je NEPOVRATNO: profili pregledača sa svim prijavama,
-// prijave na Steam/Epic/Riot/Battle.net, skorašnji dokumenti, korpa za otpatke.
-// Na računaru na kom se program piše to je gubitak koji se ne vraća - a
-// dovoljna je jedna zaboravljena zastavica u nekom alatu da se desi.
-//
-// Zato: napravi prazan fajl `CRIT-NE-DIRAJ.txt` u svom korisničkom folderu
-// (`%USERPROFILE%`) i ovaj računar se ne čisti nikad, bez obzira na sve ostalo.
-// Na računarima igrača tog fajla nema, pa tamo sve radi kao i do sada.
-//
-// Provera je namerno po IMENU FAJLA, ne po podešavanju u bazi ili u JSON-u:
-// podešavanje se prepisuje pri nadogradnji, a fajl u korisničkom folderu ne
-// dira niko.
+// Fajl `CRIT-NE-DIRAJ.txt` u korisničkom folderu (%USERPROFILE%) isključuje
+// čišćenje bez obzira na način pokretanja. Proverava se po imenu fajla, jer
+// podesavanja.json nadogradnja prepisuje.
 const STOP_FAJL = "CRIT-NE-DIRAJ.txt";
 function racunarJeZasticen(env) {
   const home = (env || process.env).USERPROFILE || "";
@@ -57,9 +40,9 @@ function citajPodesavanja(resourcesPath, execPath, dirname) {
   return {};
 }
 
-// Fascikle i fajlovi koje brišemo. Namerno ciljamo profile pregledača u celini
-// (pola-obrisan profil ume da ostavi kolačiće prijave) i fajlove sa prijavama
-// game launchera - ne diramo instalacije ni sačuvane igre.
+// Mete brisanja. Profili pregledača se brišu celi (delimično obrisan profil
+// ume da zadrži kolačiće prijave), a kod pokretača igara samo fajlovi sa
+// nalogom, ne instalacije ni sačuvane igre.
 function mete(env) {
   const LOCAL = env.LOCALAPPDATA || "";
   const ROAM = env.APPDATA || "";
@@ -67,36 +50,45 @@ function mete(env) {
   const PF86 = env["ProgramFiles(x86)"] || "C:\\Program Files (x86)";
 
   return [
-    // pregledači
+    // Pregledači
     { opis: "Chrome profil", put: path.join(LOCAL, "Google", "Chrome", "User Data") },
     { opis: "Edge profil", put: path.join(LOCAL, "Microsoft", "Edge", "User Data") },
     { opis: "Firefox profili", put: path.join(ROAM, "Mozilla", "Firefox", "Profiles") },
     { opis: "Opera profil", put: path.join(ROAM, "Opera Software") },
     { opis: "Brave profil", put: path.join(LOCAL, "BraveSoftware") },
 
-    // prijave na game launchere (samo fajl sa nalogom, ne i igre)
+    // Pokretači igara (samo prijava)
     { opis: "Steam prijava", put: path.join(PF86, "Steam", "config", "loginusers.vdf") },
+    // Noviji Steam čuva zapamćenu prijavu i ovde, šifrovanu za Windows nalog
+    // koji svi igrači dele.
+    { opis: "Steam zapamćena prijava", put: path.join(LOCAL, "Steam", "local.vdf") },
     { opis: "Epic prijava", put: path.join(LOCAL, "EpicGamesLauncher", "Saved", "Config", "Windows", "GameUserSettings.ini") },
     { opis: "Riot prijava", put: path.join(LOCAL, "Riot Games", "Riot Client", "Data", "RiotGamesPrivateSettings.yaml") },
     { opis: "Battle.net prijava", put: path.join(ROAM, "Battle.net", "Battle.net.config") },
     { opis: "EA prijava", put: path.join(LOCAL, "Electronic Arts", "EA Desktop", "cookiestorage") },
     { opis: "Ubisoft prijava", put: path.join(LOCAL, "Ubisoft Game Launcher", "user.dat") },
+    { opis: "Minecraft nalozi", put: path.join(ROAM, ".minecraft", "launcher_accounts.json") },
+    { opis: "Minecraft Microsoft prijava", put: path.join(ROAM, ".minecraft", "launcher_msa_credentials.bin") },
+    { opis: "Roblox prijava", put: path.join(LOCAL, "Roblox", "LocalStorage") },
 
-    // tragovi rada
+    // Discord drži token u Local Storage-u, Spotify automatsku prijavu u `prefs`.
+    { opis: "Discord prijava", put: path.join(ROAM, "discord", "Local Storage") },
+    { opis: "Discord sesija", put: path.join(ROAM, "discord", "Session Storage") },
+    { opis: "Spotify prijava", put: path.join(ROAM, "Spotify", "prefs") },
+
+    // Tragovi rada
     { opis: "Privremeni fajlovi", put: env.TEMP || path.join(LOCAL, "Temp"), sadrzaj: true },
     { opis: "Skorašnji dokumenti", put: path.join(ROAM, "Microsoft", "Windows", "Recent"), sadrzaj: true },
 
-    // Keš šejdera. Igre ga same naprave ponovo, pa je brisanje bezbedno, ali
-    // se za mesec dana nakupi i po nekoliko GB - a pokvaren keš je čest uzrok
-    // trzanja u igri koje izgleda kao kvar na grafičkoj.
+    // Keš šejdera: igre ga prave ponovo, a za mesec dana naraste na nekoliko GB
+    // i kad se pokvari pravi trzanje u igri.
     { opis: "DirectX keš šejdera", put: path.join(LOCAL, "D3DSCache"), sadrzaj: true },
     { opis: "NVIDIA keš šejdera", put: path.join(LOCAL, "NVIDIA", "DXCache"), sadrzaj: true },
     { opis: "NVIDIA GL keš", put: path.join(LOCAL, "NVIDIA", "GLCache"), sadrzaj: true },
     { opis: "AMD keš šejdera", put: path.join(LOCAL, "AMD", "DxCache"), sadrzaj: true },
 
-    // Lične fascikle NISU u podrazumevanom čišćenju. Na računarima sa OneDrive-om
-    // one su preusmerene u oblak, pa bi brisanje obrisalo fajlove i sa naloga -
-    // nepovratno. Uključuju se samo ručno: "ciscenjeLicnihFascikli": true
+    // Lične fascikle se ne brišu podrazumevano: sa OneDrive-om su u oblaku, pa
+    // bi brisanje otišlo i sa naloga. Uključuje se sa "ciscenjeLicnihFascikli".
     { opis: "Preuzimanja", put: path.join(HOME, "Downloads"), sadrzaj: true, licno: true },
     { opis: "Radna površina", put: path.join(HOME, "Desktop"), sadrzaj: true, licno: true },
   ];
@@ -107,30 +99,21 @@ function uOblaku(put) {
   return /[\\/](OneDrive|Dropbox|Google ?Drive|iCloud)/i.test(put);
 }
 
-// Registry vrednosti: Steam pamti poslednji nalog i van fajla
-// Program i argumenti odvojeno, i uvek sa rokom - vidi pokreniKomandu u main.js.
+// Steam pamti poslednji nalog i u registru.
 const REG_KOMANDE = [
   ["reg", ["delete", "HKCU\\Software\\Valve\\Steam", "/v", "AutoLoginUser", "/f"]],
   ["reg", ["delete", "HKCU\\Software\\Valve\\Steam", "/v", "RememberPassword", "/f"]],
 ];
 
-// Korpa za otpatke se ne brise kao fascikla - Windows je cuva po disku i
-// direktno brisanje ume da je ostavi u nevaljanom stanju. Ovo je zvanicni put.
-// Cisti se samo korpa TEKUCEG korisnika (naloga za igrace).
+// Korpa za otpatke se prazni zvaničnim putem (Clear-RecycleBin), samo za
+// tekućeg korisnika.
 const KORPA_KOMANDA = ["powershell", ["-NoProfile", "-NonInteractive", "-Command",
   "Clear-RecycleBin -Force -ErrorAction SilentlyContinue"]];
 
-// BRISANJE JE ASINHRONO.
-//
-// Profil pregledača su desetine hiljada fajlova. Dok se brisao sa `rmSync`,
-// glavni proces launchera je posle svake odjave stajao sekundama: ekran ne
-// reaguje, nadzor prozora stoji, server ne dobija otkucaj. Iz stolice to
-// izgleda kao da se računar zakočio.
-//
-// Ceo profil se briše sa ponovnim pokušajima: pregledač koji se upravo gasi još
-// drži svoje fajlove, a pola obrisan profil ume da ostavi kolačiće prijave.
-// Sadržaj Temp-a ide bez ponavljanja - tu su zaključani fajlovi normalni, a
-// čekanje na svaki bi trajalo minutima.
+// Brisanje je asinhrono: profil pregledača ima desetine hiljada fajlova, a
+// glavni proces ne sme da stoji. Profili se brišu sa ponovnim pokušajima
+// (pregledač koji se gasi još drži fajlove); sadržaj Temp-a bez njih, jer su
+// zaključani fajlovi tamo uobičajeni.
 async function obrisi(meta, log, licneDozvoljene) {
   const { put, opis, sadrzaj, licno } = meta;
   if (!put || put.length < 8) return; // odbrana od prazne/kratke putanje
@@ -142,7 +125,7 @@ async function obrisi(meta, log, licneDozvoljene) {
 
   try {
     if (sadrzaj) {
-      // briše sadržaj, ali ostavlja samu fasciklu
+      // Briše sadržaj, fascikla ostaje.
       for (const e of await fsp.readdir(put)) {
         try { await fsp.rm(path.join(put, e), { recursive: true, force: true }); } catch {}
       }
@@ -164,7 +147,6 @@ async function obrisi(meta, log, licneDozvoljene) {
  * @param {function} o.log
  */
 function ocistiSesiju({ dozvoljeno, resourcesPath, execPath, dirname, log = () => {} }) {
-  // Prvo brava koja ne zavisi ni od čega drugog - vidi racunarJeZasticen gore.
   if (racunarJeZasticen(process.env)) {
     log(`čišćenje ODBIJENO: ovaj računar je zaštićen (${STOP_FAJL} u korisničkom folderu)`);
     return { radjeno: false, razlog: "zasticen" };
@@ -179,8 +161,7 @@ function ocistiSesiju({ dozvoljeno, resourcesPath, execPath, dirname, log = () =
 
   log(SUVO ? "čišćenje sesije (PROBNI RAD - ništa se ne briše)" : "čišćenje sesije");
   const licneDozvoljene = pod.ciscenjeLicnihFascikli === true;
-  // Odluka DA LI se čisti je gore i vraća se odmah; samo brisanje ide dalje,
-  // meta za metom, i pozivalac ga čeka kroz `posao`.
+  // Odluka da li se čisti vraća se odmah; samo brisanje ide kroz `posao`.
   const posao = (async () => {
     for (const m of mete(process.env)) await obrisi(m, log, licneDozvoljene);
     if (!SUVO) {

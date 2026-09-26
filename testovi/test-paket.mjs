@@ -124,24 +124,17 @@ proveri("postavi-bazu postavlja 9 alata sa logotipima", setup.includes("const AL
 // točak; okačen promo bi ih prekrio, a generisani baner igre bi na ekranu
 // prijave pobedio pravu koricu (baner ima prednost nad omotom).
 //
-// Ali se skida SAMO generisani baner, a promo se ne dira: oba su ranije brisana
-// bez reči, pa je nestajalo i ono što je vlasnik sam okačio.
+// Skida se samo generisani baner; promo koji je vlasnik okačio se ne dira.
 proveri("postavi-bazu ne pravi banere ni promo",
   setup.includes("banner=NULL WHERE banner LIKE '%/baner-igra-%'") && !setup.includes('db.exec("DELETE FROM promo")'));
 
 // ---- SKRIPTA ZA POSTAVLJANJE BAZE NIŠTA NE BRIŠE ----
 //
-// Naučeno skupo. Radila je `DELETE FROM games` pa upisivala svoj ukucani
-// spisak od sedam igara. Svaka igra koju je vlasnik dodao kroz panel - Apex
-// Legends, World of Warcraft - nestajala je pri svakom pokretanju, a odmah
-// zatim bi čišćenje "orphana" obrisalo i njihove korice sa diska. Vlasnik ih je
-// dodavao iznova i iznova ih gubio; po brojevima igara u bazi (111 pa naviše)
-// videlo se da se to desilo bar desetak puta.
+// postavi-bazu.mjs dopunjuje katalog, ne zamenjuje ga: igre koje je vlasnik
+// dodao kroz panel ostaju, pa i njihovi omoti.
 //
-// Skripta postoji da igraonica radi IZ KUTIJE, a to je dopuna, ne zamena.
-//
-// Komentari se izbacuju pre provere: u njima bas i pise sta se ranije brisalo,
-// pa bi ih gola pretraga po tekstu prijavila kao da se i dalje brise.
+// Komentari se izbacuju pre provere, da reči iz komentara ne budu shvaćene kao
+// kod.
 const bezKomentara = setup.split(/\r?\n/).filter((r) => !r.trim().startsWith("//")).join("\n");
 for (const sta of ["games", "tools", "promo", "tocak_nagrade"]) {
   proveri(`postavi-bazu ne brise ${sta}`, !new RegExp(`DELETE FROM ${sta}\\b`).test(bezKomentara),
@@ -170,14 +163,8 @@ proveri("uzima se najskoriji instaler", paket.includes("sort((a, b) => b.vreme -
 
 // ---- PAKET NE SME DA PONESE ZASTARELU BAZU ----
 //
-// SQLite ovde radi u WAL rezimu: sveze izmene stoje u `crit.db-wal` dok se ne
-// prepisu u glavni fajl. Paket je kopirao `crit.db` kao obican fajl, a `-wal`
-// namerno preskakao - pa je u igraonicu odlazila baza BEZ poslednjih izmena, i
-// to bez ijedne poruke.
-//
-// Desilo se tacno to: dve igre dodate kroz panel bile su u WAL-u, u paket je
-// otisla baza sa sedam umesto devet igara, a ciscenje orphana je odmah zatim
-// obrisalo i njihove omote jer ih "baza ne koristi".
+// SQLite radi u WAL rezimu: sveze izmene stoje u `crit.db-wal`. Baza se zato
+// snima sa VACUUM INTO, ne kopira kao fajl.
 proveri("baza se SNIMA (VACUUM INTO), ne kopira kao fajl",
   /VACUUM INTO/.test(paket) && /function snimiBazu\(\)/.test(paket),
   "obicno kopiranje ostavlja ono sto je jos u WAL-u");
@@ -190,13 +177,8 @@ proveri("paket staje ako baza pominje sliku koje nema",
 
 // ---- PAKET SE PROVERAVA TAKO STO SE POKRENE ----
 //
-// Ovaj fajl cita kod i proverava da su pravila na mestu. To ne pusta ono sto ce
-// stvarno otici u igraonicu - a bas tu se lomilo: paket je otisao sa bazom bez
-// poslednjih izmena, pa je ciscenje odmah obrisalo i omote igara kojih u toj
-// bazi nema. Sve je izgledalo uredno dok se ne stigne na lice mesta.
-//
-// Zato postoji alat koji dize server IZ SAME KUTIJE. Ovde se cuva da postoji i
-// da radi ono zbog cega je napravljen.
+// alati/proveri-paket.mjs dize server iz samog paketa. Ovde se cuva da alat
+// postoji i da proverava ono zbog cega je napravljen.
 const provera = citajIzvor("alati/proveri-paket.mjs");
 proveri("postoji alat koji pusta paket", /spawn\(process\.execPath, \[path\.join\(SRV, "src", "index\.js"\)\]/.test(provera),
   "citanje koda ne dokazuje da ce se paket podici");
@@ -207,7 +189,7 @@ proveri("alat proverava i verziju instalera", /instaler je verzija \$\{verzija\}
   "instaler druge verzije znaci launcher koji ne odgovara panelu");
 proveri("alat ne pada na port glavnog servera", /PORT \|\| "8211"/.test(provera),
   "server igraonice ume da radi na istom racunaru dok se paket proverava");
-proveri("alat kaze gde se pusta", /node alati\/proveri-paket\.mjs/.test(citajIzvor("SLEDECI-KORACI.md")),
+proveri("alat kaze gde se pusta", /node alati\/proveri-paket\.mjs/.test(citajIzvor("docs/RAZVOJ.md")),
   "alat koji niko ne zna da postoji se ne pusta");
 
 console.log(`\n${prosao}/${prosao + pao} proslo`);

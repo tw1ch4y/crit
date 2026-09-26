@@ -1,14 +1,10 @@
 import { radniFolder, podigniServer, citajIzvor } from "./_okruzenje.mjs";
-// KRAJ DANA I OBRACUN
+// Kraj dana i obracun smene:
 //
-// Uvece radnik broji kasu i zatvara smenu. Skoro nikad se ne poklopi tacno u
-// dinar: vrati se novac gostu, uzme se kusur za sitno, neko se prebroji. Ono
-// sto tada mora da radi:
-//
-//   1. da se razlika izracuna i pokaze
-//   2. da se VIDI unazad, bez otvaranja svake smene ponaosob
-//   3. da moze da se objasni, jer posle mesec dana gola brojka lici na kradju
-//   4. da zatvorena smena zauvek ostane sa istim brojkama
+//   1. razlika u kasi se izracuna i prikaze
+//   2. vidi se unazad, bez otvaranja svake smene
+//   3. razlika moze da se objasni beleskom
+//   4. zatvorena smena zauvek ostaje sa istim brojkama
 const BASE = "http://127.0.0.1:8195";
 const DATA = radniFolder("kraj-dana-data");
 await podigniServer(DATA, 8195);

@@ -1,12 +1,6 @@
 import { citajIzvor } from "./_okruzenje.mjs";
-// BEG IZ KIOSKA
-// Za racunarom sedi tinejdzer koji ima vremena i koji ce probati sve. Ovde se
-// gleda da nijedan put napolje ne stoji otvoren.
-//
-// Najozbiljniji nadjen put nije bio precica nego MREZNI KABL:
-// iscupa se kabl -> launcher posle par sekundi ponudi "Promeni adresu servera"
-// -> to je brisalo podesavanje BEZ ijedne provere -> masina se preusmeri na
-// server koji igrac drzi na telefonu i on sam sebi otvori besplatnu igru.
+// Beg iz kioska: nijedan put napolje ne sme da stoji otvoren (precice,
+// podesavanja, promena adrese servera bez PIN-a posle iscupanog kabla).
 
 let pao = 0, prosao = 0;
 const proveri = (n, u, d = "") => { if (u) { prosao++; console.log("  OK   " + n); } else { pao++; console.log("  PAO  " + n + (d ? "  -> " + d : "")); } };
@@ -116,6 +110,15 @@ proveri("ekran salje PIN uz izlaz",
   /const pin = \$\("#pinInput"\)\.value\.trim\(\);[\s\S]{0,80}adminExit\(pin\)/.test(rend) && /adminExit: \(pin\) =>/.test(preload));
 proveri("nova adresa se prima samo dok racunar nije podesen",
   /ipcMain\.handle\("save-config", \(e, c\) => \{[\s\S]{0,400}if \(config\.configured\) return \{ ok: false/.test(main));
+
+// ---- 8) EKRAN NE DOBIJA VIŠE NEGO ŠTO MU TREBA ----
+proveri("ekran ne dobija token racunara",
+  /ipcMain\.handle\("get-config", \(\) => \(\{ host: config\.host, configured: config\.configured \}\)\)/.test(main),
+  "token je kljuc kojim se racunar predstavlja serveru");
+proveri("pregledac se otvara samo za internet adrese",
+  /ipcMain\.handle\("open-browser", \(e, url\) => \{[\s\S]{0,120}if \(adresa && !\/\^https\?/.test(main),
+  "openExternal pokrece i file:// - program pored kataloga i straze");
+proveri("boja precice ide u stil tek posle ciscenja", /style="--glow:\$\{esc\(col\)\}"/.test(rend));
 
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 process.exit(pao ? 1 : 0);

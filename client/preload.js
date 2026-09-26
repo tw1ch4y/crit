@@ -16,16 +16,13 @@ contextBridge.exposeInMainWorld("crit", {
   onNeedSetup: (cb) => ipcRenderer.on("need-setup", () => cb()),
   onHotkey: (cb) => ipcRenderer.on("hotkey", (e, h) => cb(h)),
   onGameError: (cb) => ipcRenderer.on("game-error", (e, d) => cb(d)),
-  // Vreme istice. Ide kroz svoj kanal, a ne kroz obavestenje preko igre, jer se
-  // zvuk cuje i kad je launcher iza igre u punom ekranu - a prozor se tada cesto
-  // ne vidi uopste.
+  // Vreme ističe: poseban kanal, jer se zvuk launchera čuje i kad je iza igre.
   onVremeIstice: (cb) => ipcRenderer.on("vreme-istice", (e, d) => cb(d)),
   onBlokirano: (cb) => ipcRenderer.on("blokirano", (e, d) => cb(d)),
   sysStats: () => ipcRenderer.invoke("sys-stats"),
   programIcon: (putanja) => ipcRenderer.invoke("program-icon", putanja),
   verzija: () => ipcRenderer.invoke("verzija"),
-  // Servisni PIN se proverava LOKALNO, bez servera - da osoblje može da uđe u
-  // podešavanja i izađe iz launchera i kad server ne radi.
+  // Servisni PIN se proverava lokalno, pa radi i kad server ne radi.
   proveriServisniPin: (pin) => ipcRenderer.invoke("proveri-servisni-pin", pin),
   // Otključavanje posle isteklog vremena dok servera nema - vidi main.js.
   otkljucajBezServera: (pin) => ipcRenderer.invoke("otkljucaj-bez-servera", pin),

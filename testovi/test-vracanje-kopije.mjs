@@ -2,13 +2,9 @@ import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
 import { KOREN, radniFolder, citajIzvor } from "./_okruzenje.mjs";
-// VRACANJE REZERVNE KOPIJE
-// Kopije se prave same, na svakih 15 minuta. Niko ih ne proba dok mu ne
-// zatrebaju - a tada je kasno da se ispostavi da su neupotrebljive.
-//
-// Ovde se izvodi ceo krug: podaci -> kopija -> nove izmene -> vracanje kopije
-// -> server ponovo -> provera da je stanje bas ono iz kopije. Vracanje se radi
-// istim koracima koje radi VRATI-KOPIJU.bat (obrisi WAL i SHM, prepisi bazu).
+// Vracanje rezervne kopije, ceo krug: podaci -> kopija -> nove izmene ->
+// vracanje -> server ponovo -> stanje je ono iz kopije. Vracanje ide istim
+// koracima kao VRATI-KOPIJU.bat (obrisi WAL i SHM, prepisi bazu).
 const BASE = "http://127.0.0.1:8143";
 const DATA = radniFolder("vracanje-data");
 
@@ -121,14 +117,9 @@ proveri("skripta trazi potvrdu", /DA/.test(bat));
 
 // ---- 8) kopije se ne gomilaju bez kraja ----
 //
-// Na svakih 15 minuta bi za mesec dana bilo oko 3000 fajlova. Pravila cuvanja
-// se u celini proveravaju u test-skladiste; ovde se proverava SPOJ: da i rucno
-// napravljena kopija povlaci sredjivanje. Bez toga bi automatska kopija cistila
-// za sobom, a dugme "Napravi kopiju sada" ne bi - pa bi se gomilalo tiho.
-// Ide kroz PRAVI server koji ovaj test ionako drzi upaljen. Uvoz modula ovde bi
-// radio nad podrazumevanim folderom (server/data), jer ovaj proces nema
-// CRIT_DATA_DIR - server je u zasebnom procesu. Tako bi test dirao pravu bazu
-// igraonice umesto svoju.
+// I rucno napravljena kopija pokrece sredjivanje starih (pravila cuvanja su u
+// test-skladiste). Ide kroz pravi server: ovaj proces nema CRIT_DATA_DIR, pa bi
+// uvoz modula radio nad server/data.
 {
   const dir = path.join(DATA, "backups");
   fs.mkdirSync(dir, { recursive: true });

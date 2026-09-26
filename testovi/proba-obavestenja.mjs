@@ -2,18 +2,12 @@ import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
 import { KOREN, radniFolder, ugasiLaunchere, putanjaElektrona } from "./_okruzenje.mjs";
-// OBAVESTENJE PREKO IGRE
+// Obavestenje preko igre.
 //
-// Igrac je skoro uvek u punom ekranu i ne vidi launcher. Zato launcher pravi
-// zaseban prozor iznad svega: tu stize upozorenje da vreme istice, poruka
-// osoblja i odbrojavanje pred zatvaranje zbog mirovanja.
-//
-// To je najvidljivija zastita koju igrac ima. Ako tiho pukne, igrac ostane
-// zakljucan nasred meca bez ijednog upozorenja, a osoblje sazna tek kad neko
-// dodje da se zali. Dosad nije bilo provereno nijednom tvrdnjom.
-//
-// Ne moze da se proveri iz koda: prozor postoji samo u pravom Electronu, pravi
-// ga tek prvo obavestenje, i sadrzaj mu stize kroz IPC.
+// Launcher pravi zaseban prozor iznad igre u punom ekranu: upozorenje da vreme
+// istice, poruka osoblja i odbrojavanje pred zatvaranje zbog mirovanja. Prozor
+// postoji samo u pravom Electronu, nastaje sa prvim obavestenjem, a sadrzaj stize
+// kroz IPC.
 //
 //   node proba-obavestenja.mjs
 const PORT = 8191;
@@ -111,10 +105,8 @@ proveri("launcher se povezao", povezan);
 
 // ---- 1) PORUKA OSOBLJA STIZE PREKO IGRE ----
 //
-// Pre slanja se menja BOJA KUCE, na neku koja se ne moze pomesati sa fabrickom.
-// Obavestenje je zaseban prozor i ne vidi CSS launchera, pa je do sada nosilo
-// plavu upisanu u sam fajl - istu u svakoj igraonici, bez obzira sta je vlasnik
-// izabrao. A to je jedino sto igrac gleda dok je u igri.
+// Pre slanja se menja boja kuce, na neku koja se ne moze pomesati sa fabrickom:
+// obavestenje je zaseban prozor i boju dobija uz poruku.
 await api("/api/brend/boja", "POST", { akcenat: "#8a45d6" });
 await cekaj(1200);
 
@@ -148,8 +140,8 @@ app.whenReady().then(async () => {
     if (w && w.webContents.isLoading()) w = null;
     if (!w) await new Promise((r) => setTimeout(r, 300));
   }
-  // Cekaj da launcher STVARNO dodje do ekrana za prijavu. Ranije se forma
-  // slala dok je jos stajao "Povezivanje...", pa je klik padao u prazno.
+  // Ceka se da launcher stvarno dodje do ekrana za prijavu; dok stoji
+  // "Povezivanje...", klik pada u prazno.
   const aktivni = () => w.webContents.executeJavaScript(
     '[...document.querySelectorAll(".screen")].find(s => s.classList.contains("active"))?.id').catch(() => "greska");
   let pre = "?";

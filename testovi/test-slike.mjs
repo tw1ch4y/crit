@@ -108,10 +108,8 @@ proveri("zvanicni znak brenda ima prednost nad ikonom iz .exe",
 proveri("boja kartice se vadi iz same ikone", launcher.includes("obojiIkoneAlata"));
 
 // ---- zvanicni znakovi ----
-// Ranije su ovde stajali moji priblizni crtezi (Steam je bio krug sa tackom).
-// Sad su obrisi iz zbirke Simple Icons, pa svaki znak mora da bude ozbiljne
-// duzine - kratka putanja znaci da se neko vratio na crtez od tri poteza.
-// Blok se deli po brendovima pa se svaki gleda zasebno - Google ima cetiri
+// Obrisi su iz zbirke Simple Icons, pa svaki znak mora da ima putanju ozbiljne
+// duzine. Blok se deli po brendovima i svaki se gleda zasebno; Google ima cetiri
 // odvojene putanje (jednu po boji), pa se duzine sabiraju.
 const brendovi = deo.split(/\{\s*name:/).slice(1).map((komad) => ({
   ime: (/^\s*"([^"]+)"/.exec(komad) || [])[1] || "?",
@@ -187,7 +185,7 @@ proveri("dva slova stoje na istom mestu kao ikona",
 // logo igre (Counter-Strike, Minecraft, League of Legends).
 // Funkcija se izvlaci iz izvora i STVARNO pokrece, da se proveri ponasanje a ne
 // samo da li neki tekst postoji u fajlu.
-const izvorOznake = launcher.slice(launcher.indexOf("const PODRAZUMEVANE_KATEGORIJE"), launcher.indexOf("// Dok osoblje ne okaci korice"));
+const izvorOznake = launcher.slice(launcher.indexOf("const PODRAZUMEVANE_KATEGORIJE"), launcher.indexOf("function gameCardHtml"));
 const oznakaKategorije = new Function("esc", izvorOznake + "\nreturn oznakaKategorije;")((s) => String(s));
 
 for (const k of ["Igre", "igre", "  Igra  ", "Ostalo", "", null, undefined]) {

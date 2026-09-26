@@ -1,18 +1,10 @@
 import { radniFolder, podigniServer, citajIzvor, brojac } from "./_okruzenje.mjs";
-// BOJA KUCE SE BIRA, NE KUCA
+// Boja kuce se bira iz ponudjenih.
 //
-// Do sada je izbor bio polje za heks i sistemski biraс. To radi, ali trazi da
-// vlasnik ZNA koja boja valja - a ne zna, i nema kako da zna: boja mora da se
-// cita na tamnoj podlozi, da nosi belo slovo na dugmetu, i da se ne pomesa sa
-// bojama koje u ovom programu NESTO ZNACE (zelena "ima kredita", zlatna
-// "nagrada", crvena "istice vreme").
-//
-// Ovde se cuva troje:
-//   1. da fabricka boja stoji na JEDNOM mestu (panel ju je ponavljao, pa je
-//      dugme "Fabricka" vracalo staru crvenu i posle promene fabricke)
-//   2. da spisak gotovih ne nudi ono na sta isti program upozorava
-//   3. da upozorenje UPOZORAVA, a ne zabranjuje - vlasnik odlucuje kako mu
-//      izgleda igraonica, program samo kaze sta ga to kosta
+//   1. fabricka boja stoji na jednom mestu
+//   2. spisak gotovih boja ne nudi ono na sta program upozorava (zelena "ima
+//      kredita", zlatna "nagrada", crvena "istice vreme", slab kontrast)
+//   3. upozorenje ne zabranjuje: vlasnik moze da izabere i takvu boju
 const BASE = "http://127.0.0.1:8189";
 await podigniServer(radniFolder("boja-data"), 8189);
 const { proveri, kraj } = brojac();

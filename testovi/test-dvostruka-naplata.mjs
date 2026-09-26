@@ -1,19 +1,11 @@
 import { radniFolder, podigniServer, ucitajWebSocket, citajIzvor } from "./_okruzenje.mjs";
 const WebSocket = await ucitajWebSocket();
-// ISTA PORUDZBINA SE NE NAPLACUJE DVAPUT - I KAD DUGME ZAKAZE
+// Ista porudzbina se ne naplacuje dvaput.
 //
-// Dugmad se zakljucavaju do odgovora servera, i u launcheru i u panelu. Ali ta
-// brava ima rok: posle osam sekundi bez odgovora dugme se otkljucava, da radnik
-// ne ostane zarobljen kad server zacuti. U tom procepu - spor server, mreza koja
-// se zagrcnula, odgovor koji je stigao prekasno - drugi klik prolazi kao NOVA
-// porudzbina i gost je naplacen dvaput.
-//
-// Zato uz svaku porudzbinu ide njen BROJ POKUSAJA, isti pri svakom ponavljanju.
-// Server pamti sta je sa tim brojem vec uradio i drugi put vraca isti odgovor.
-//
-// Ovo je druga brava, ne zamena za prvu: prva sprecava da se klikne, druga da se
-// naplati. Ovde se gadja BAS server, bez ijednog dugmeta - onako kako bi ga
-// gadjao zakasneo zahtev.
+// Dugme se otkljucava posle osam sekundi bez odgovora, pa zakasneli drugi klik
+// moze da stigne kao nova porudzbina. Zato svaka porudzbina nosi broj pokusaja;
+// server pamti sta je sa tim brojem uradio i drugi put vraca isti odgovor. Ovde
+// se server gadja direktno, bez dugmeta.
 const BASE = "http://127.0.0.1:8178", WSB = "ws://127.0.0.1:8178";
 await podigniServer(radniFolder("dvostruka-data"), 8178);
 

@@ -2,16 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { KOREN, radniFolder, brojac, citajIzvor } from "./_okruzenje.mjs";
-// KOD MORA DA POSTOJI I KAD OVAJ DISK OTKAZE
-//
-// Baza igraonice ide van racunara sama. Ali sam program - izvorni kod i cela
-// istorija izmena - postoji samo na jednom disku, na razvojnom laptopu. Otkaz
-// tog diska znaci da igraonica nastavi da radi (server je na drugoj masini), a
-// da se program vise ne moze ni ispraviti ni nadograditi.
-//
-// `git bundle` je jedan fajl sa svim granama i svim commitovima. Ovde se ne
-// proverava da je fajl NASTAO nego da se iz njega moze VRATITI ceo projekat -
-// kopija koja se ne moze vratiti nije kopija.
+// Kopija koda van razvojnog racunara (`git bundle`: sve grane i commitovi).
+// Proverava se da se iz kopije moze vratiti ceo projekat, ne samo da fajl
+// nastane.
 const { proveri, kraj } = brojac();
 
 const RADNO = radniFolder("kopija-koda");
@@ -55,7 +48,7 @@ const d = new Date();
 const danas = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 proveri("datum je danasnji, po lokalnom vremenu", (kopije[0] || "").includes(danas), `${kopije[0]} vs ${danas}`);
 
-// OVO JE CELA POENTA: iz kopije se vraca ceo projekat.
+// Iz kopije se vraca ceo projekat.
 const vraceno = path.join(RADNO, "vraceno");
 const klon = spawnSync("git", ["clone", "-q", path.join(usb, kopije[0]), vraceno], { encoding: "utf8" });
 proveri("IZ KOPIJE SE KLONIRA CEO PROJEKAT", klon.status === 0, (klon.stderr || "").slice(0, 150));

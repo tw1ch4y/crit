@@ -1,23 +1,11 @@
 import { radniFolder, podigniServer, ucitajWebSocket } from "./_okruzenje.mjs";
 const WebSocket = await ucitajWebSocket();
-// RACUNAR KOME JE ISCUPAN KABL
+// Racunar kome je iscupan kabl.
 //
-// Kad se racunaru prekine mreza nasilno - iscupan kabl, zamrznut Windows,
-// ruter se resetovao - TCP veza ne umire odmah. Ostaje otvorena i po nekoliko
-// sati, jer nijedna strana nema sta da posalje pa niko ne primeti da druge
-// strane nema.
-//
-// Za igraonicu to znaci dve stvari, obe skupe:
-//   1. panel pokazuje racunar kao ZAUZET, pa radnik tamo ne posadi nikoga
-//   2. naplata tece dalje, a za tim racunarom niko ne sedi
-//
-// Naplata je vec napisana da se PAUZIRA kad racunar nije na mrezi. Ali ta
-// zastita se oslanja na to da server zna da racunara nema - a to zna samo ako
-// ga pita. Zato server salje ping i gasi vezu koja ne odgovori.
-//
-// Ovde se to izvodi nad pravim serverom: klijentu se zaustavi citanje sa
-// uticnice, tako da ping stigne ali odgovor nikad ne krene - tacno kao
-// zamrznuta masina.
+// TCP veza posle nasilnog prekida ostaje otvorena satima. Server zato salje ping
+// i gasi vezu koja ne odgovori, pa panel prikaze racunar kao nedostupan, a
+// naplata stane. Klijentu se ovde zaustavi citanje sa uticnice: ping stigne, a
+// odgovor nikad ne krene.
 const PORT = 8187;
 const BASE = `http://127.0.0.1:${PORT}`;
 const WSB = `ws://127.0.0.1:${PORT}`;

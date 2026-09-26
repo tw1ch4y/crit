@@ -1,13 +1,7 @@
 import { citajIzvor } from "./_okruzenje.mjs";
-// PODESAVANJA KOJA IGRAC SME DA MENJA
-//
-// Windows podesavanja su u kiosku zakljucana i s razlogom, pa je igracu jedini
-// izlaz bio da zove radnika za svaku sitnicu. Launcher zato nudi ono sto je za
-// igru bitno, a bezbedno je menjati.
-//
-// Sto se stvarno primeni na Windows-u i sto se pri odjavi vrati - to proverava
-// proba-podesavanja na pravoj masini. Ovde se cuvaju PRAVILA: sta sme da udje u
-// taj spisak i sta ne, jer se to iz koda ne vidi.
+// Podesavanja koja igrac sme da menja iz launchera (Windows podesavanja su u
+// kiosku zakljucana). Ovde se cuvaju pravila: sta sme u taj spisak, a sta ne.
+// Primenu na Windows-u i vracanje pri odjavi proverava proba-podesavanja.
 const win = citajIzvor("client/windows-podesavanja.js");
 const launcher = citajIzvor("client/renderer/js/launcher.js");
 const main = citajIzvor("client/main.js");
@@ -68,13 +62,9 @@ proveri("zvuk koji ne prođe se sakrije, ne prikaže prazan", /const imaZvuk = p
 
 // ---- SVAKI MODUL MORA DA UDJE U PAKET ----
 //
-// electron-builder pakuje samo ono sto je nabrojano u build.files. Novi modul
-// koji se tamo ne doda NE ide u instaler, a main.js ga zahteva - launcher se
-// srusi pri pokretanju, i to tek na racunaru u igraonici. Na racunaru na kom se
-// radi sve izgleda ispravno, jer se tamo cita iz izvornog foldera.
-//
-// Zato se ovde poredi: svaki lokalni modul koji main.js zahteva mora da bude i
-// u spisku za pakovanje.
+// electron-builder pakuje samo ono sto je u build.files. Svaki lokalni modul koji
+// main.js zahteva mora da bude i na tom spisku, inace se instalirani launcher
+// srusi pri pokretanju.
 import fs from "node:fs";
 import path from "node:path";
 import { KOREN } from "./_okruzenje.mjs";

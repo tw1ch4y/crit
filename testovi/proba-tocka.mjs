@@ -2,19 +2,11 @@ import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
 import { KOREN, radniFolder, ugasiLaunchere, putanjaElektrona } from "./_okruzenje.mjs";
-// NAGRADNI TOCAK: DA SE VIDI DA JE NAGRADA STIGLA NA NALOG
+// Nagradni tocak: kredit se na ekranu menja tek kad se nagrada objavi.
 //
-// Vlasnik je pri probi zavrteo tocak i javio da NE VIDI da mu je nagrada
-// dodata. Kredit jeste bio dodat - server ga upisuje ispravno - ali se to nije
-// videlo, i to iz preciznog razloga:
-//
-// server posalje novo stanje ODMAH, a tocak se vrti pet sekundi. Kredit se
-// zato menjao usred vrtnje, pre nego sto igrac sazna sta je dobio. Kad se
-// nagrada konacno objavi, brojka se vise ne pomera - pa deluje da nista nije
-// dodato.
-//
-// Ovo se ne moze proveriti iz koda: trazi pravi Electron, pravu animaciju i
-// merenje KADA se brojka promenila u odnosu na trenutak objave nagrade.
+// Server novo stanje salje odmah, a tocak se vrti pet sekundi; promena usred
+// vrtnje se ne primeti kao nagrada. Meri se trenutak promene brojke u odnosu na
+// objavu nagrade, u pravom Electronu.
 //
 //   node proba-tocka.mjs
 const PORT = 8197;
@@ -141,7 +133,7 @@ const objava = Number(nalaz?.objava);
 proveri("nagrada je objavljena", Number.isFinite(objava) && objava > 0, String(nalaz?.objava));
 proveri("piše koliko je osvojeno", /250/.test(nalaz?.tekstDobitka || ""), nalaz?.tekstDobitka);
 
-// SUSTINA: kredit se sme promeniti TEK kad se nagrada objavi.
+// Kredit se sme promeniti tek kad se nagrada objavi.
 const promene = trag.filter((x) => Number(x.v) >= POCETNO + NAGRADA);
 const prvaSaNagradom = promene.length ? promene[0].t : null;
 proveri("kredit je stvarno narastao za nagradu", prvaSaNagradom != null,

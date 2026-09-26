@@ -1,17 +1,10 @@
 import { radniFolder, podigniServer, citajIzvor, brojac } from "./_okruzenje.mjs";
-// JEDNA KATEGORIJA, JEDNA POLICA
+// Jedna kategorija, jedna polica.
 //
-// Polje za kategoriju je obicno polje za kucanje, i tako mora da ostane - niko
-// ne zna unapred sta ce igraonica prodavati. Ali covek koji u utorak upise
-// "Pice" u cetvrtak upise "pice" ili "Pice " sa razmakom, i u launcheru osvanu
-// dve police za istu stvar, obe sa po tri artikla. Igrac tada ne zna gde da
-// trazi, a vlasnik ne vidi u cemu je stvar - obe police izgledaju ispravno.
-//
-// Ovde se cuva dvoje:
-//   1. da server sam poklopi ono sto je SIGURNO ista rec (veliko/malo slovo,
-//      razmak, kvacica) i uzme POSTOJECI zapis - onaj koji je vlasnik vec video
-//   2. da panel ponudi ono sto vec postoji, jer stvarno drugaciji zapis
-//      ("Pice" i "Pica") racun ne moze da razlikuje od namere
+//   1. server sam spaja zapise koji su sigurno ista rec (veliko/malo slovo,
+//      razmak, kvacica) i uzima postojeci
+//   2. panel nudi postojece kategorije, jer stvarno drugaciji zapis ("Pice" i
+//      "Pica") racun ne moze da razlikuje od namere
 const BASE = "http://127.0.0.1:8191";
 await podigniServer(radniFolder("kategorije-data"), 8191);
 const { proveri, kraj } = brojac();
@@ -83,15 +76,9 @@ proveri("polje i dalje prima novu kategoriju", !/<select id="siCat"/.test(panel)
 
 // ---- ISTO IME ARTIKLA: PITANJE, NE ZABRANA ----
 //
-// Kategorije se same usklade, ali imena ne mogu: dva reda u bazi se ne mogu
-// spojiti u jedan, jer svaki nosi svoju cenu, svoju zalihu i svoju istoriju
-// prodaje. Dva reda "Probni napitak 0.5" znace dve iste plocice na kasi koje radnik
-// ne ume da razlikuje, zalihu podeljenu na dve strane (jedna pise "rasprodato"
-// dok druga ima dvadeset komada) i istu stvar brojanu dvaput u izvestaju.
-//
-// Zato se javi, a vlasnik odlucuje - ponekad se bas to i hoce.
-// (Ime je namerno izmisljeno: fabricki sank vec nosi Coca-Colu, pa bi test
-// pukao na prvom redu - i to je samo po sebi dokaz da provera radi.)
+// Dva artikla istog imena se ne spajaju (svaki ima svoju cenu, zalihu i
+// istoriju), ali panel pita pre upisa. Ime je izmisljeno jer fabricki sank vec
+// nosi Coca-Colu.
 const prvi = await api("/api/shop", "POST", { name: "Probni napitak 0.5", price: 130, category: "Sokovi", stock: 10 });
 proveri("prvi artikal prolazi", prvi.status === 200, JSON.stringify(prvi.body));
 

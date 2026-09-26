@@ -1,9 +1,8 @@
 // Server na odvojenim podacima, za pregled panela (pregled-panela.mjs) i za
 // gledanje uzivo u pregledacu. Ne dira server/data.
 //
-// Baza se puni kao prava igraonica: 13 racunara, pun sank, nekoliko igraca sa
-// kreditom i otvorena smena. Na praznoj bazi se meri prazno stanje umesto
-// pravog rasporeda, pa se odsecen tekst i pretrpani redovi nikad ne vide.
+// Baza se puni kao igraonica u radu: 13 racunara, pun sank, nekoliko igraca sa
+// kreditom i otvorena smena.
 //
 //   node server-za-pregled.mjs           port 8096
 //   PORT=9000 node server-za-pregled.mjs
@@ -22,9 +21,8 @@ const api = (p, m = "GET", b) => fetch(BASE + p, { method: m,
   headers: { "content-type": "application/json", authorization: "Bearer " + token },
   body: b ? JSON.stringify(b) : undefined }).then((r) => r.json()).catch(() => null);
 
-// Svaki deo se puni zasebno. Ranije je sve zavisilo od jednog uslova "ima li
-// racunara", pa je prolaz koji je napravio racunare a pukao na igracima
-// ostavljao bazu zauvek pola prazna - a sledeci put se preskakalo sve.
+// Svaki deo se puni zasebno, pa prekinut prolaz ne ostavlja bazu napola
+// praznu.
 if (!(await api("/api/computers"))?.length) {
   await api("/api/computers/bulk", "POST", { count: 13, prefix: "PC-" });
 }

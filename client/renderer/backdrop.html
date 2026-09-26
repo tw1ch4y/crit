@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Crit</title>
-  <!-- Isti font kao u launcheru: i ovaj ekran igrac vidi, kad se igra pokrene. -->
+  <!-- Isti font kao u launcheru. -->
   <link rel="stylesheet" href="css/font.css" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
@@ -23,11 +23,8 @@
       background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 5px; padding: 2px 7px; font-family: inherit; font-size: 12px; color: #a8acbf;
     }
-    /* Zastor stoji vidljiv IZA IGRE celu sesiju, preko celog ekrana. Igra u
-       ekskluzivnom punom ekranu Chromium-u ne javlja uvek da ga pokriva, pa je
-       beskonačna animacija umela da se crta i dok je niko ne vidi - uporedo sa
-       igrom, na istoj grafičkoj. Sada stoji dok zastor nema fokus, a kreće tek
-       kad igrač stvarno gleda u njega (igra je zatvorena). */
+    /* Zastor je iza igre celu sesiju; animacija radi samo dok zastor ima fokus,
+       da ne troši grafičku uporedo sa igrom. */
     .pulse { animation: p 3s ease-in-out infinite; animation-play-state: paused; }
     body.vidljiv .pulse { animation-play-state: running; }
     @keyframes p { 50% { opacity: 0.55; } }

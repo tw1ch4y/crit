@@ -1,21 +1,9 @@
 import { radniFolder, podigniServer, brojac } from "./_okruzenje.mjs";
-// ZNACKE SE RACUNAJU IZ ONOGA STO VEC POSTOJI
+// Znacke se racunaju iz podataka koji vec postoje:
 //
-// Nivo kaze KOLIKO je neko trosio; znacka kaze STA je radio - i to je ono sto se
-// pamti i prepricava. Ovde se cuva troje:
-//
-//   1. da znacke rade UNAZAD. Gost koji dolazi sest meseci otvori profil prvog
-//      dana kad ovo stigne i zatekne zid zaradjenih znacaka, a ne prazan ekran
-//      uz "kreni da skupljas". Sistem koji pocinje od nule kaznjava bas one
-//      goste koji su najduze tu - a njih igraonica najmanje sme da izgubi.
-//
-//   2. da se broj spinova NE cita iz logova. Odrzavanje sece stare zapise, pa
-//      bi znacka "10 spinova" jednog dana tiho nestala sa profila gosta koji je
-//      stvarno vrteo trideset puta.
-//
-//   3. da se zakljucana znacka VIDI, sa napretkom. Nagrada koja se ne vidi
-//      unapred nije nagrada nego iznenadjenje, a iznenadjenje ne tera nikoga da
-//      dodje ponovo.
+//   1. rade unazad: stari gost odmah dobija zaradjene znacke
+//   2. broj spinova se ne cita iz logova (odrzavanje sece stare zapise)
+//   3. zakljucana znacka se vidi, sa napretkom
 const BASE = "http://127.0.0.1:8193";
 await podigniServer(radniFolder("znacke-data"), 8193);
 const { proveri, kraj } = brojac();
@@ -132,7 +120,7 @@ proveri("spinovi se broje sa igraca", naso2("prvi-spin").zaradjena && naso2("spi
   `spinova: ${p2.rekordi.spinova}`);
 proveri("dobitak sa tocka se pamti", naso2("dobitnik").zaradjena && p2.rekordi.dobitakUkupno === 340);
 
-// Brisanje logova NE sme da promeni nijednu znacku - to je cela poenta brojaca.
+// Brisanje logova ne sme da promeni nijednu znacku.
 db.prepare("DELETE FROM logs").run();
 const p3 = svc.profilIgraca(id);
 proveri("brisanje logova ne dira znacke",

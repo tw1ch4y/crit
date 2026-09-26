@@ -32,9 +32,8 @@ export function issueAdminToken(admin) {
 }
 export function getAdmin(token) {
   if (!token) return null;
-  // "a.active = 1" je ovde, a ne samo pri prijavi: kad se radniku ugasi nalog,
-  // token koji vec ima u pregledacu mora da prestane da radi ODMAH. Inace bi
-  // otpusten radnik nastavio da dopunjuje kredit dok mu token ne istekne.
+  // `a.active = 1` i ovde, da token radnika kome je oduzet pristup odmah
+  // prestane da važi.
   const row = db
     .prepare("SELECT t.admin_id, t.created_at, a.username, a.role FROM admin_tokens t JOIN admins a ON a.id = t.admin_id WHERE t.token = ? AND a.active = 1")
     .get(String(token));
@@ -45,18 +44,9 @@ export function revokeAdminToken(token) {
   db.prepare("DELETE FROM admin_tokens WHERE token = ?").run(String(token));
 }
 
-// Tokeni igrača su UKLONJENI, nisu zaboravljeni.
-//
-// Postojale su `issuePlayerToken` / `getPlayer` / `revokePlayerToken` koje niko
-// nikad nije pozvao. Neupotrebljen kod u fajlu koji čuva prijavu je opasan na
-// svoj način: pri sledećem čitanju liči na deo zaštite koji radi, pa se na
-// njega računa. Igrač se prijavljuje isključivo kroz WebSocket launchera
-// (`clientLogin`), gde sesiju drži veza samog računara - token mu ne treba.
-//
-// Kad igrač bude gledao svoj kredit sa telefona, token će mu trebati - ali onda
-// mora da ide U BAZU, kao `admin_tokens` gore. Onaj stari je stajao u memoriji
-// procesa, pa bi svaki restart servera izbacio sve prijavljene: ista greška
-// koja je za panel već jednom ispravljena.
+// Igrač se prijavljuje samo kroz WebSocket launchera (clientLogin), pa
+// tokeni igrača ne postoje. Ako zatrebaju (npr. pregled kredita sa
+// telefona), idu u bazu, kao admin_tokens.
 
 // ---- Express middleware ----
 export function requireAdmin(req, res, next) {
@@ -67,27 +57,16 @@ export function requireAdmin(req, res, next) {
   next();
 }
 
-// ---- ULOGE ----
+// ---- Uloge ----
 //
-// Tri, i idu odozdo nagore. Viša uvek sme sve što sme niža.
+// Radnik < vlasnik < serviser; viša uloga sme sve što sme niža.
 //
-//   radnik    svakodnevni rad: kontrolna tabla, igrači, porudžbine, kasa
-//   vlasnik   sve u svojoj igraonici: cene, podešavanja, katalog, radnici
-//   serviser  onaj ko je program postavio i ko ga održava
+//   radnik    kontrolna tabla, igrači, porudžbine, kasa
+//   vlasnik   sve u igraonici: cene, podešavanja, katalog, radnici
+//   serviser  održavanje programa i nadogradnje
 //
-// SERVISER JE ODVOJEN OD VLASNIKA NAMERNO. Vlasnik je gazda svoje igraonice,
-// ali ne i programa: ne dodaje i ne uklanja serviserske naloge. To postoji zbog
-// dve stvari koje dolaze sa izdavanjem programa drugim igraonicama:
-//
-//   1. PODRŠKA. Kad vlasnik zaboravi svoju lozinku ili se sam zaključa, mora
-//      postojati neko ko to može da razreši a da se ne dira baza ručno.
-//   2. LICENCIRANJE (kasnije). Uslovi pod kojima program radi ne mogu da stoje
-//      pod nalogom onoga na koga se odnose.
-//
-// Šta serviser NE radi: ne skriva se. Serviserski nalog se VIDI na strani
-// Radnici, označen, i vlasnik u svakom trenutku zna ko još ima pristup njegovim
-// podacima. Ne može da ga ukloni - to je cena podrške - ali ne može ni da bude
-// obmanut da ga nema.
+// Vlasnik ne dodaje i ne uklanja servisere, pa podrška može da uđe i kad se
+// vlasnik zaključa. Serviserski nalog se vidi na strani Radnici.
 export const RANG = { staff: 1, owner: 2, serviser: 3 };
 export const rang = (uloga) => RANG[uloga] || 0;
 export const jeServiser = (a) => rang(a?.role) >= RANG.serviser;

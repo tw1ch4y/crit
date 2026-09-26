@@ -3,26 +3,19 @@ import path from "node:path";
 
 // ---------- ZAMENA KODA SERVERA ----------
 //
-// Nadogradnju sa panela izvodi NADZORNIK, ne server: server ne može da zameni
-// fajlove iz kojih radi. Server proveri paket i raspakuje ga u
-// data\nadogradnja-servera\novi, zamoli nadzornika, i ugasi se uredno. Nadzornik
-// onda zameni kod i podigne novu verziju - a ako se ona ne javi, vraća staru.
+// Zamenu izvodi nadzornik, jer server ne može da zameni fajlove iz kojih radi.
+// Server raspakuje paket u data\nadogradnja-servera\novi, javi nadzorniku i
+// ugasi se.
 //
-// NESTANAK STRUJE USRED ZAMENE
+// Zamena je više preimenovanja, pa se pre prvog upisuje zapis (zamena.json):
+// šta se menja i gde je sklonjeno staro. Ako zapis postoji pri pokretanju
+// nadzornika, zamena nije potvrđena i staro se vraća, na kom god koraku da
+// je stala. Zapis se briše kad se nova verzija javi svojim brojem.
 //
-// Zamena je nekoliko preimenovanja, ne jedno. Da računar ostane bez struje
-// između njih, na disku bi stajao server pola nov, pola star - i to je jedino
-// stanje gore od neuspele nadogradnje, jer ne radi ni stara ni nova verzija.
-//
-// Zato se PRE prvog pomeranja upiše zapis (zamena.json): šta se menja i gde je
-// sklonjeno staro. Nadzornik ga pri svakom pokretanju pogleda; ako zapis stoji,
-// zamena nije potvrđena i vraća se staro - bez obzira na kom je koraku stala.
-// Zapis se briše tek kad se nova verzija javi sa svojim brojem.
-//
-// Vraćanje ne zavisi od toga dokle se stiglo:
-//   - staro je sklonjeno  -> ono što stoji na mestu se briše, staro se vraća
+// Vraćanje po stavci:
+//   - staro je sklonjeno  -> trenutno se briše, staro se vraća
 //   - stavka je nova      -> briše se
-//   - staro nije ni takn  -> ostaje gde jeste
+//   - staro nije dirano   -> ostaje
 
 // U public\ stoje i stvari koje nisu program: stare otpremljene slike i proba.
 const PUBLIC_NIJE_PROGRAM = new Set(["uploads", "_proba"]);
@@ -30,9 +23,8 @@ const pun = (koren, rel) => path.join(koren, ...rel.split("/"));
 const postoji = (p) => { try { fs.lstatSync(p); return true; } catch { return false; } };
 const cekajSinhrono = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
-// Windows ne da da se preimenuje folder u kom neko drži otvoren fajl -
-// antivirus koji baš skenira node_modules, Explorer otvoren u src\. To obično
-// prođe za sekundu, pa se pokušava ponovo pre nego što se odustane.
+// Windows ne da preimenovanje foldera u kom je otvoren fajl (antivirus,
+// Explorer); obično prođe za sekundu, pa se pokušava ponovo.
 function uporno(radnja) {
   for (let i = 0; ; i++) {
     try { return radnja(); }
@@ -65,7 +57,7 @@ export function stavkeZaZamenu(novi) {
 
 /**
  * Menja kod servera novom verzijom. Staro ide u `rezerva`.
- * Posle ovoga zapis `marker` STOJI - briše ga `potvrdi` kad se nova verzija javi.
+ * Posle ovoga zapis `marker` ostaje; briše ga `potvrdi` kad se nova verzija javi.
  */
 export function zameni({ folderServera, novi, rezerva, marker, _prekiniPosle = Infinity }) {
   const stavke = stavkeZaZamenu(novi);

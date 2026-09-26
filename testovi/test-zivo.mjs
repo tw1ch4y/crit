@@ -1,7 +1,6 @@
 import { citajIzvor } from "./_okruzenje.mjs";
-// Stvari koje su "napisane u kodu" ali u igraonici nisu radile. Obe su prosle
-// kroz sve dosadasnje provere jer se ne vide iz koda koji se cita red po red -
-// vide se tek kad se klikne, ili tek na racunaru podesenom kao u igraonici.
+// Stvari koje se vide tek kad se klikne ili na racunaru podesenom kao u
+// igraonici.
 //
 // Puni vizuelni test kretanja je zaseban alat (radi pravi Electron prozor):
 //   node proba-kretanja.mjs 8096            (server mora da radi)

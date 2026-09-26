@@ -1,25 +1,14 @@
 // ---------- NADZOR SERVERA ----------
 //
-// Server je do sada živeo u prozoru "Pokreni server.bat": petlja koja ga
-// podigne ponovo kad padne. To je hvatalo pad, i ništa drugo:
+// Nadzornik drži server: diže ga posle pada (sa sve dužim razmakom kad pada
+// zaredom), gasi i diže zaglavljen server, i ne diže ga u krug kad je port
+// zauzet. Pokreće ga zakazani zadatak pri paljenju računara ili "Pokreni
+// server.bat".
 //
-//   - prozor se zatvori jednim klikom na X, i server nestane do sutra
-//   - server koji se ZAGLAVI (radi, a ne odgovara) petlja ne vidi - nije pao
-//   - server koji pada odmah pri pokretanju (zauzet port, pokvaren fajl) se
-//     diže u krug na tri sekunde, ceo dan, i puni zapis istom greškom
-//
-// Nadzornik je proces koji drži server, i sam ne radi ništa drugo - zato nema
-// ni čime da padne. Pokreće ga zakazani zadatak pri paljenju računara, pre
-// prijave na Windows i bez prozora (vidi "Podesi autostart.bat"), a ručno
-// "Pokreni server.bat".
-//
-// Ovde je samo odlučivanje: kad ponovo pokrenuti, koliko čekati, kad proglasiti
-// server zaglavljenim. Bez procesa, bez mreže i bez sata - sve to se ubacuje,
-// pa se ponašanje proverava na brojkama (test-nadzornik.mjs).
+// Ovde su samo odluke, bez procesa, mreže i sata, pa se proveravaju na
+// brojkama (test-nadzornik.mjs).
 
-// Čekanje pre ponovnog pokretanja posle pada, raste sa svakim padom zaredom.
-// Server koji pada odmah ne sme da se diže u krug, a onaj koji je pao jednom
-// treba da se vrati odmah.
+// Čekanje pre ponovnog pokretanja, raste sa svakim padom zaredom.
 export const ODMORI_MS = [1000, 2000, 5000, 10000, 30000, 60000];
 // Server koji je radio ovoliko pa pao nije "pada u krug" - čekanje kreće iz početka.
 export const STABILNO_MS = 10 * 60 * 1000;

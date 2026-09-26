@@ -62,13 +62,8 @@ proveri("na prvom nivou nista nije otkljucano",
   otkljucanoZa(0).every((o) => !o.otkljucano),
   "inace nagrada ne bi bila nagrada");
 proveri("sara se otkljucava na drugom nivou", smeDa(1200, "sara") && !smeDa(1199, "sara"));
-// VIP VISE NIJE NAGRADA ZA NIVO.
-//
-// Dok je bio, kuca ga je DAVALA - i to bas najboljim gostima, kojima je time
-// pravila popust iako bi ionako dosli. Sada su to dve odvojene stvari: rang se
-// ZARADJUJE igranjem i besplatan je, a VIP se KUPUJE i nosi pogodnosti.
-// Ono sto se i dalje zaradjuje mora da ostane zarada - zato ovde ne sme da se
-// pojavi nista sto se placa.
+// VIP nije nagrada za nivo: rang se zaradjuje igranjem, a VIP se kupuje. Nista
+// sto se placa ne sme da se otkljuca nivoom.
 proveri("VIP se ne otkljucava nivoom", !smeDa(999999, "vip"),
   "rang je status i besplatan je; VIP je prihod i kupuje se - vidi vip.js");
 proveri("nivoom se otkljucava samo izgled",

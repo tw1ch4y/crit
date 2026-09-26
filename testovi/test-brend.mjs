@@ -1,16 +1,9 @@
 import { radniFolder, podigniServer, ucitajWebSocket, citajIzvor } from "./_okruzenje.mjs";
 const WebSocket = await ucitajWebSocket();
-// ZNAK I BOJA - PO IGRAONICI, NE UŠIVENI U PROGRAM
+// Znak i boja se podešavaju po igraonici, iz panela.
 //
-// Program se izdaje JEDAN, a svaka igraonica ima svoje ime, svoj znak i svoju
-// boju. Dok su logo i crvena stajali usiveni u fajlove, druga igraonica je
-// morala da dobije prepravljenu kopiju - pa bi i svaka nadogradnja morala da se
-// pravi posebno za svakoga, sto se posle deset igraonica ne moze odrzavati.
-//
-// Ovde se proverava da se izgled stvarno menja iz panela, da stigne i do
-// launchera, i da se pri tom NE dira ono sto nosi znacenje: zelena je "ima
-// kredita", zlatna je "nagrada". To nisu ukras i ne smeju da zavise od toga
-// koju je boju vlasnik izabrao.
+// Proverava se da izmena stigne do launchera i da ne dira boje sa znacenjem
+// (zelena "ima kredita", zlatna "nagrada").
 const BASE = "http://127.0.0.1:8177", WSB = "ws://127.0.0.1:8177";
 await podigniServer(radniFolder("brend-data"), 8177);
 
@@ -26,8 +19,7 @@ const api = (p, m = "GET", b, t = token) => fetch(BASE + p, { method: m,
 
 // ---- 1) fabricko stanje ----
 let b = (await api("/api/brend")).body;
-// Fabricka boja je plava sa znaka. Crvena je ranije bila fabricka, pa je ceo
-// program delovao sumorno - vidi banner.js.
+// Fabricka boja je plava sa znaka (vidi banner.js).
 proveri("nova igraonica krece od fabricke boje", b.akcenat === "#2f6ae8", b.akcenat);
 proveri("nema svog znaka dok ga ne okaci", b.logo === null, String(b.logo));
 proveri("iz jedne boje se izvode sve nijanse",

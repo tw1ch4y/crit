@@ -1,7 +1,6 @@
 import { WebSocketServer } from "ws";
 
-// Transport sloj. Ne zna poslovnu logiku - samo prenosi poruke.
-// index.js povezuje handlere sa servisom.
+// Transport: prenosi poruke, bez poslovne logike (handlere povezuje index.js).
 
 const panels = new Set(); // ws konekcije admin panela
 const clients = new Map(); // computerId -> ws (Electron launcheri)
@@ -18,32 +17,20 @@ export function setHandlers(h) {
   handlers = { ...handlers, ...h };
 }
 
-// KOLIKO SE CEKA DA SE VIDI DA RACUNARA NEMA
-//
-// Kad se racunaru prekine mreza nasilno - iscupan kabl, zamrznut Windows, ruter
-// se resetovao - TCP veza ne umire odmah. Ostaje otvorena i po nekoliko sati,
-// jer nijedna strana nema sta da posalje pa niko ne primeti da druge nema.
-//
-// Za igraonicu je to skupo dvaput: panel pokazuje racunar kao ZAUZET pa radnik
-// tamo ne posadi nikoga, a naplata tece dalje jer se oslanja na to da server
-// zna da racunara nema. Naplata JESTE napisana da se pauzira kad racunar padne,
-// ali se ta zastita nikad nije ni aktivirala - server nije imao kako da sazna.
-//
-// Zato server pinguje svaku vezu. Ko ne odgovori do sledeceg ping-a, gasi se.
-// 15 sekundi znaci da se gubitak vidi za najvise 30, pa igrac plati najvise
-// pola minuta vremena koje nije proveo. Krace bi trosilo mrezu bez potrebe,
-// duze bi se videlo na racunu.
+// Server pinguje svaku vezu; veza koja ne odgovori do sledećeg pinga se
+// gasi. TCP veza posle izvučenog kabla ili zamrznutog Windows-a inače ostaje
+// otvorena satima, a naplata se pauzira tek kad server zna da računara nema.
+// Sa 15 s gubitak se vidi za najviše 30 s.
 const PING_MS = 15000;
 
-// Najveća poruka koju launcher šalje je spisak procesa za daljinski task
-// manager - desetine kilobajta. Podrazumevana granica biblioteke je 100 MB:
-// jedan pokvaren ili zlonameran klijent bi toliko držao u memoriji servera.
+// Najveća poruka od launchera je spisak procesa (desetine KB);
+// podrazumevana granica biblioteke je 100 MB.
 export const NAJVECA_PORUKA = 2 * 1024 * 1024;
 
 export function initWs(server, { authComputer, authAdmin }) {
   const wss = new WebSocketServer({ server, path: "/ws", maxPayload: NAJVECA_PORUKA });
-  // Greske http servera ws prosledjuje ovde, a bez slusaoca bi ih bacio kao
-  // neuhvacene i server bi ostao ziv bez porta. Obradjuje ih index.js.
+  // Greške http servera obrađuje index.js; bez slušaoca bi ih ws bacio kao
+  // neuhvaćene.
   wss.on("error", () => {});
 
   const otkucaj = setInterval(() => {
@@ -59,9 +46,7 @@ export function initWs(server, { authComputer, authAdmin }) {
     // Sveza veza vazi kao ziva do prvog ping-a koji ostane bez odgovora.
     ws.zivo = true;
     ws.on("pong", () => { ws.zivo = true; });
-    // Greška na jednoj vezi (pokvaren okvir, prevelika poruka) je njena stvar:
-    // biblioteka tada sama zatvara tu vezu. Bez slušaoca bi se ista greška
-    // bacila kao neuhvaćena i punila zapis servera.
+    // Greška na jednoj vezi: biblioteka je zatvara sama.
     ws.on("error", () => {});
     const url = new URL(req.url, "http://x");
     const kind = url.searchParams.get("kind"); // "client" | "panel"
@@ -82,20 +67,17 @@ export function initWs(server, { authComputer, authAdmin }) {
       const old = clients.get(comp.id);
       if (old && old !== ws) try { old.close(); } catch {}
       clients.set(comp.id, ws);
-      // Verzija launchera dolazi uz adresu. Stariji launcheri je ne salju, pa
-      // ostaje prazna - i to je podatak: znaci da je racunar zaostao.
+      // Verzija launchera iz adrese; stariji launcher je ne šalje.
       const verzija = (url.searchParams.get("v") || "").slice(0, 20);
-      // Launcher koji je radio bez servera to najavljuje u samoj adresi. Tada
-      // se sesija ne vraća dok ne stigne izveštaj - vidi clientOfflineIzvestaj.
-      // Numeracija verzija (vidi verzije.js). Launcher iz stare numeracije je ne
-      // šalje - to je 0.
+      // offline=1: launcher je radio bez servera; sesija se vraća tek posle
+      // izveštaja (clientOfflineIzvestaj). `n` je numeracija verzija (verzije.js),
+      // 0 za staru.
       const numeracija = Math.min(99, Math.max(0, parseInt(url.searchParams.get("n"), 10) || 0));
       handlers.onClientOpen(comp, ws, ip, verzija, { offline: url.searchParams.get("offline") === "1", numeracija });
 
       ws.on("message", (buf) => {
         let msg;
-        // JSON.parse("null") ne baca gresku nego vrati null, a "[]" vrati niz -
-        // bez ove provere bi jedna takva poruka srusila ceo server.
+        // JSON.parse("null") vraća null, a "[]" niz; prolazi samo objekat.
         try { msg = JSON.parse(buf.toString()); } catch { return; }
         if (!msg || typeof msg !== "object" || Array.isArray(msg)) return;
         // Jedna losa poruka sa jednog racunara ne sme da obori celu igraonicu.
@@ -124,12 +106,8 @@ export function initWs(server, { authComputer, authAdmin }) {
   return wss;
 }
 
-// Zatvara panel koji je vec otvoren kod odredjenog naloga.
-//
-// Token se proverava pri POVEZIVANJU. Kad se radniku oduzme pristup, njegov
-// panel je i dalje otvoren i nastavlja da prima promet uzivo dok ne osvezi
-// stranu. Nista ne moze da uradi - svaki zahtev se proverava iznova - ali ni to
-// ne treba da gleda.
+// Zatvara otvoren panel naloga kome je oduzet pristup (token se proverava
+// pri povezivanju).
 export function izbaciPanel(adminId) {
   let izbaceno = 0;
   for (const ws of panels) {
@@ -141,8 +119,7 @@ export function izbaciPanel(adminId) {
   return izbaceno;
 }
 
-// Zatvara vezu računara koji je uklonjen iz igraonice. Token mu više ne važi,
-// ali već otvorena veza bi inače radila dalje.
+// Zatvara vezu uklonjenog računara.
 export function izbaciRacunar(computerId) {
   const ws = clients.get(computerId);
   if (!ws) return false;

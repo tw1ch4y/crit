@@ -1,9 +1,5 @@
-// Provera da launcher nalazi PRAVI fajl kad je u panel upisana putanja bez
-// nastavka. Osoblje drzi precice u C:\games i cesto upise samo "C:\games\cs2",
-// a na disku stoji "cs2.lnk".
-//
-// Bez ovoga igrac dobije "nije instalirana na ovom racunaru", iako jeste - i to
-// se ne vidi ni iz koda ni iz testova nad serverom.
+// Provera da launcher nalazi fajl kad je u panelu upisana putanja bez
+// nastavka ("C:\games\cs2" za "cs2.lnk").
 //
 //   node proba-precica.mjs <folder sa .lnk fajlovima>
 import fs from "node:fs";

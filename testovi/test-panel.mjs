@@ -67,9 +67,8 @@ proveri("ugaseni racunari imaju svoj naslov", app.includes('slobodni-naslov">Uga
 proveri("naslov 'Slobodno' stoji samo kad ima spremnih", /if \(spremni\.length\) delovi\.push/.test(app));
 proveri("kad su svi ugaseni pise se sta da se radi", app.includes("klikni da upališ"));
 proveri("drugi naslov u traci ima razmak", /\.slobodni-naslov:not\(:first-child\) \{[^}]*margin-left/.test(jedanRed));
-// Daljinsko paljenje radi samo za racunar sa upisanom MAC adresom. Ranije su
-// svi ugaseni stajali kao dugme "klikni da upalis", pa je klik na dvanaest od
-// trinaest davao samo poruku o gresci.
+// Daljinsko paljenje radi samo za racunar sa upisanom MAC adresom; ostali
+// ugaseni racunari ga ne nude.
 proveri("bez MAC adrese nema obecanja da ce se upaliti", /const moze = !ugasen \|\| !!c\.mac/.test(app));
 proveri("takav racunar je vidno prigusen", /\.slobodan-pc\.bez-mac \{[^}]*cursor: default/.test(jedanRed));
 proveri("naslov trake obecava paljenje samo ako neko moze", /const imaMac = ugaseni\.some\(\(c\) => c\.mac\)/.test(app));
@@ -193,16 +192,8 @@ proveri("kod koji se izvrsava u strani stoji u zasebnim fajlovima", pregled.incl
 
 // ---- DUPLI KLIK NE SME DA NAPLATI DVAPUT ----
 //
-// Radnik na kasi radi u zurbi i pred gostom. Dok se dugme nije zakljucavalo,
-// tri brza klika na "Naplati" pravila su TRI racuna: izmereno u pravom
-// pregledacu, 390 dinara umesto 130. Dupli klik na "Dodaj" je isto tako
-// dopunjavao kredit dvaput.
-//
-// Oba se otkriju tek na kraju smene, kao razlika u kasi koju niko ne ume da
-// objasni - a razlika u kasi mora da ima ime.
-//
-// U launcheru je ta zastita postojala od ranije ("Poruci" se zakljucava do
-// odgovora servera); u panelu je nije bilo, a bas se on koristi u guzvi.
+// "Naplati" i "Dodaj" se zakljucavaju do odgovora servera, kao "Poruci" u
+// launcheru.
 proveri("postoji jedno mesto koje zakljucava dugme", /async function jednomKlik\(btn, posao/.test(app));
 proveri("dugme se vraca bez obzira na ishod", /finally \{[\s\S]{0,200}btn\.disabled = false/.test(app),
   "neuspeo zahtev ne sme da ostavi radnika sa zakljucanim dugmetom");
@@ -241,13 +232,9 @@ proveri("nijedno dugme koje menja novac nije ostalo bez zastite", nezasticeni.le
 
 // ---- GRUPNA AKCIJA KOJA GASI IGRU MORA DA PITA ----
 //
-// "Zakljucaj" i "Odjavi" na racunaru sa igracem zatvaraju sesiju i GASE MU
-// IGRU - isto kao "Ugasi", samo sto su "Ugasi" i "Restart" imali potvrdu a ova
-// dva nisu. Jedan promasen klik na punoj igraonici prekida mec svima odjednom,
-// a gost koji tako izgubi partiju sledeci put ide preko puta.
-//
-// Potvrda pri tom mora da kaze KOLIKO IH TRENUTNO IGRA - to je jedini broj koji
-// tu nesto znaci. "Zakljucace se 5 racunara" ne govori nista.
+// "Zakljucaj" i "Odjavi" na racunaru sa igracem zatvaraju sesiju i gase igru,
+// pa traze potvrdu kao "Ugasi" i "Restart". Potvrda kaze koliko njih trenutno
+// igra.
 proveri("grupna akcija broji koliko ih trenutno igra",
   /const igraju = ids\.filter\(\(id\) => state\.computers\.find\(\(c\) => c\.id === id\)\?\.player\)\.length/.test(app));
 for (const akcija of ["lock", "logout"]) {

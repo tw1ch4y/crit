@@ -1,22 +1,14 @@
-# SERVER SE PODIZE SAM, PRI PALJENJU RACUNARA - I BEZ PRIJAVE NA WINDOWS
+# Autostart servera: zakazani zadatak pri paljenju racunara, kao SYSTEM, bez
+# prozora i bez prijave na Windows. Zadatak pokrece nadzornik.mjs, a on drzi
+# server.
 #
-# Do sada je autostart bio precica u Startup folderu. Ona se pokrece tek kad se
-# neko prijavi na Windows, i otvara prozor koji se zatvori jednim klikom. Ako se
-# glavni racunar restartuje nocu (Windows Update, nestanak struje), server ne
-# radi do jutra - dok neko ne sedne i ne prijavi se.
+# Drugi zadatak ("provera") radi na 5 minuta i dize nadzornika ako je ugasen
+# silom; vidi "--provera" u nadzornik.mjs.
 #
-# Sada je to zakazani zadatak koji se pokrece pri paljenju racunara, kao SYSTEM,
-# bez prozora. Pokrece nadzornika (nadzornik.mjs), a on drzi server.
+# Ako se server ne javi posle pokretanja, oba zadatka se uklanjaju.
 #
-# Uz njega ide i drugi zadatak, PROVERA NA 5 MINUTA: nadzornik ugasen silom
-# (Task Manager) povuce i server, a "ponovo pri gresci" to ne pokriva. Vidi
-# "--provera" u nadzornik.mjs.
-#
-# Skripta sama proverava da je proradilo: pokrene zadatak i saceka da server
-# odgovori. Ako ne odgovori, zadaci se uklanjaju i sve ostaje kao pre.
-#
-# Pokrece se preko "Podesi autostart.bat" (on trazi administratora). Tekst je
-# bez kvacica: Windows PowerShell 5.1 fajl bez BOM-a cita u staroj kodnoj strani.
+# Poziva se iz "Podesi autostart.bat" (trazi administratora). Samo ASCII:
+# Windows PowerShell 5.1 fajl bez BOM-a cita u staroj kodnoj strani.
 
 $ErrorActionPreference = "Stop"
 $Ime = "Crit Server"
@@ -29,7 +21,7 @@ function Zdravlje {
   catch { return $false }
 }
 
-# Nadzornik moze da radi pod bilo kojim od dva zadatka: provera ga digne pod svojim.
+# Nadzornik moze da radi pod bilo kojim od dva zadatka.
 function Radi-Neki {
   foreach ($z in @($Ime, $ImeProvere)) {
     $t = Get-ScheduledTask -TaskName $z -ErrorAction SilentlyContinue
@@ -39,7 +31,7 @@ function Radi-Neki {
 }
 
 function Ukloni-Zadatak {
-  # Provera prva: da ne digne nadzornika izmedju dva brisanja.
+  # Provera se brise prva, da ne digne nadzornika izmedju dva brisanja.
   foreach ($z in @($ImeProvere, $Ime)) {
     Stop-ScheduledTask -TaskName $z -ErrorAction SilentlyContinue
     Unregister-ScheduledTask -TaskName $z -Confirm:$false -ErrorAction SilentlyContinue
@@ -47,8 +39,8 @@ function Ukloni-Zadatak {
 }
 
 function Ugasi-Postojeci {
-  # Nadzornik se gasi uredno kad se u data\ pojavi ovaj fajl. Uredno gasenje
-  # brise i data\nadzor.json, pa ga provera na 5 minuta ne podize ponovo.
+  # data\nadzor-stani gasi nadzornika uredno; tada brise i data\nadzor.json,
+  # pa ga provera ne podize ponovo.
   New-Item -ItemType File -Force -Path (Join-Path $Folder "data\nadzor-stani") | Out-Null
   for ($i = 0; $i -lt 30; $i++) {
     if (-not (Radi-Neki)) { break }
@@ -76,9 +68,7 @@ if (-not (Test-Path (Join-Path $Folder "node_modules"))) {
   exit 1
 }
 
-# Zadatak radi kao SYSTEM. Fajl u folderu koji sinhronizuje OneDrive moze da
-# bude samo "u oblaku" (postoji, a sadrzaja nema na disku) - SYSTEM ga tada ne
-# procita, i server ne krene.
+# OneDrive fajl moze biti samo "u oblaku", a SYSTEM ga tada ne moze da procita.
 if ($Folder -match "OneDrive") {
   Write-Host "  [PAZNJA] Server je u folderu koji sinhronizuje OneDrive:"
   Write-Host "           $Folder"
@@ -103,9 +93,8 @@ try {
   $akcija  = New-ScheduledTaskAction -Execute $node -Argument $skripta -WorkingDirectory $Folder
   $okidac  = New-ScheduledTaskTrigger -AtStartup
   $ko      = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
-  # Bez vremenskog ogranicenja (zadatak radi dok racunar radi), nikad dva
-  # odjednom, i ponovo na minut ako zadatak ne uspe da se POKRENE. Nadzornika
-  # koji je posle ugasen to ne pokriva - za to je provera ispod.
+  # Bez vremenskog ogranicenja, nikad dva odjednom, ponovo na minut ako zadatak
+  # ne uspe da se pokrene. Ugasenog nadzornika dize provera ispod.
   $pravila = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
     -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew
   Register-ScheduledTask -TaskName $Ime -Action $akcija -Trigger $okidac -Principal $ko -Settings $pravila `
@@ -141,11 +130,9 @@ if (-not $ok) {
   exit 1
 }
 
-# PROVERA NA 5 MINUTA. Svaki dan od ponoci, na 5 minuta, ceo dan: tako zapisano
-# "zauvek" prima svaka verzija Windows-a (beskonacno trajanje ponavljanja neke
-# odbiju). Dok nadzornik radi, pokrenuta provera odmah izadje; kad ga nema, a nije
-# ugasen uredno, digne ga. Ako Windows ovo ne prihvati, autostart ostaje - samo
-# bez provere - i to se kaze.
+# Provera: dnevni okidac od ponoci sa ponavljanjem na 5 minuta tokom dana
+# (neograniceno ponavljanje neke verzije Windows-a odbijaju). Ako je Windows ne
+# prihvati, autostart ostaje bez provere i skripta to ispisuje.
 $provera = $false
 try {
   $okidacProvere = New-ScheduledTaskTrigger -Daily -At "00:00"

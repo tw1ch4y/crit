@@ -1,8 +1,6 @@
 /* CRIT - Admin panel */
 :root {
-  /* Podloga je plava sa znaka igraonice, ne skoro crna - vidi launcher.css.
-     Panel i launcher se gledaju jedan pored drugog, pa moraju da budu iz iste
-     kuće. */
+  /* Podloga je plava iz znaka, ista kao u launcheru. */
   --bg: #070c1c;
   --surface: #101a33;
   --surface-2: #16213e;
@@ -14,25 +12,19 @@
   --hair: rgba(255, 255, 255, 0.06);
   --text: #eceff6;
   --text-2: #9aa5c4;
-  /* Treći stepen teksta mora da se čita: stara vrednost (#69728f) davala je
-     2.9-4.1:1 prema podlogama, ispod granice od 4.5:1. Ista vrednost stoji i u
-     launcheru - panel i launcher se gledaju jedan pored drugog. */
+  /* Treći stepen teksta: kontrast najmanje 4.5:1; ista vrednost u launcheru. */
   --text-3: #8c96b7;
   /* Fabrička boja kuće. Vlasnik je menja iz panela (Izgled launchera). */
   --accent: #2f6ae8;
-  /* Svetlija nijansa fabričke boje, ista vrednost koju daje `nijanse()` na
-     serveru. Ovo je samo zaklon dok se boja kuće ne učita - ali dok je bila
-     #4a80f2, panel je na tren pokazivao jednu nijansu pa se prelomio u
-     drugu. */
+  /* Svetlija nijansa fabričke boje (isto što daje `nijanse()` na serveru), dok
+     se boja kuće ne učita. */
   --accent-hover: #4c7feb;
   --accent-down: #2454c4;
   --accent-soft: rgba(47, 106, 232, 0.14);
   --accent-line: rgba(47, 106, 232, 0.45);
   --online: #3dc97e;
   --online-soft: rgba(61, 201, 126, 0.11);
-  /* "Standby" je pomeren ka tirkiznoj otkad je boja kuće plava - dve plave,
-     jedna do druge, ne bi se razlikovale, a ovo je STANJE računara i mora da se
-     čita na prvi pogled. */
+  /* Standby je tirkizan, da se razlikuje od plave boje kuće. */
   --standby: #3fc9e0;
   --standby-rgb: 63, 201, 224;
   --standby-soft: rgba(63, 201, 224, 0.13);
@@ -41,8 +33,7 @@
   --offline: #5d6684;
   --danger: #e5484d;
   --danger-soft: rgba(229, 72, 77, 0.11);
-  /* Nagrada - ista zlatna kao u launcheru (--gold), da VIP oznaka na kasi bude
-     ista boja kao ona koju gost gleda na svom ekranu. */
+  /* Zlatna, ista kao u launcheru. */
   --gold: #ffb527;
   --gold-soft: rgba(255, 181, 39, 0.13);
   --r-sm: 8px;
@@ -56,20 +47,10 @@
 }
 
 
-/* LESTVICA VELICINA SLOVA:  11 12 13 14 15 17 19 24 30 36 44 64
+/* Lestvica veličina slova:  11 12 13 14 15 17 19 24 30 36 44 64
 
-   Nije ukras nego pravilo. Ranije je bilo 23 razlicite velicine (11, 11.5, 12,
-   12.5, 13, 13.5 ...) - nijedna od tih razlika se ne vidi kao greska, ali se
-   vidi kao NEUREDNOST: dve oznake istog reda, jedna 11 a druga 11.5, i strana
-   izgleda kao da je pravljena u vise navrata.
-
-   Svaki korak postoji zato sto je u programu vec bio potreban; medjukoraci su
-   spusteni na najblizi. Nova vrednost van lestvice znaci ili da treba nov
-   korak - pa se dodaje ovde i u test-citljivost.mjs, svesno - ili da je neko
-   meruckao dok mu ne legne. Od ovog drugog se lestvica i raspala.
-
-   Donja granica je 11px: launcher se gleda iz stolice. Jedini izuzetak je
-   donja navigacija panela na telefonu, i to pise uz nju. */
+   Nova vrednost van lestvice se dodaje i ovde i u test-citljivost.mjs.
+   Donja granica je 11px; izuzetak je donja navigacija na telefonu. */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
 body {
@@ -230,10 +211,8 @@ label.lbl, .field label { display: block; font-size: 12px; color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
 
-/* Na ekranu visine 768px ceo meni ne staje - poslednjih 184px je ispadalo, pa
-   se do "Radnika" i "Podešavanja" stizalo samo skrolovanjem bocne trake, a to
-   se ne primeti dok se ne potrazi. Na niskim ekranima naslovi grupa postaju
-   tanka crta: podela ostaje, imena stavki se ne smanjuju. */
+/* Na niskim ekranima naslovi grupa u meniju postaju tanka linija, da ceo meni
+   stane. */
 @media (max-height: 860px) {
   .sidebar { padding-top: 10px; }
   .side-logo { padding: 0 10px 10px; }
@@ -451,9 +430,7 @@ td { padding: 12px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.035); ve
 tr:last-child td { border-bottom: none; }
 tbody tr { transition: background var(--tr); }
 tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
-/* Red igrača se ceo klikće (otvara nalog), pa mora i da se pritisne. Bez toga
-   klik na ime nije davao nikakav znak da je stigao - a spisak se na dodirnom
-   ekranu kucka baš po redu, ne po dugmetu. */
+/* Ceo red igrača se klikće, pa ima i stanje pritiska. */
 tbody tr[data-prow]:active { background: rgba(255, 255, 255, 0.05); }
 .mono { font-variant-numeric: tabular-nums; }
 .muted { color: var(--text-2); }
@@ -477,10 +454,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .pill.red { background: var(--danger-soft); color: var(--danger); }
 .pill.blue { background: var(--standby-soft); color: var(--standby); }
 .pill.gray { background: rgba(255, 255, 255, 0.06); color: var(--text-3); }
-/* Zlatna znači NAGRADA, isto kao u launcheru - točak, VIP, prelazak nivoa. Ne
-   koristi se ni za šta drugo, inače prestane da znači bilo šta. Žuta (--locked)
-   je "pažnja" i to su dve različite stvari; zato se i vrednosti razlikuju po
-   tonu, ne samo po imenu. */
+/* Zlatna znači nagradu (točak, VIP, nov nivo); žuta (--locked) je pažnja. */
 .pill.gold { background: var(--gold-soft); color: var(--gold); }
 .pos { color: var(--online); font-weight: 600; }
 .zero { color: var(--danger); font-weight: 600; }
@@ -504,8 +478,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
   display: flex; flex-direction: column;
 }
-/* VIP porudžbina stoji prva u spisku - to je pogodnost koja se plaća. Leva
-   zlatna ivica je da se vidi ZAŠTO je prva, bez čitanja. */
+/* VIP porudžbina je prva; zlatna ivica kaže zašto. */
 .order.vip { border-color: rgba(255, 181, 39, 0.35); box-shadow: inset 3px 0 0 var(--gold); }
 .order-head { display: flex; align-items: center; gap: 8px; padding: 12px 12px 0; }
 .order-id { font-weight: 650; font-size: 14px; font-variant-numeric: tabular-nums; }
@@ -547,8 +520,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .empty-inner .e-s { font-size: 13px; color: var(--text-3); line-height: 1.55; margin-bottom: 12px; }
 
 /* POS layout */
-/* Racun je puna kolona uz spisak, ne mala kutija zalepljena uz vrh. Dok je bio
-   visok koliko sadrzaj, prazan racun je bio kvadratic od 150px u praznom uglu. */
+/* Račun je puna kolona uz spisak. */
 .pos-layout {
   display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px;
   align-items: stretch; min-height: calc(100vh - 172px);
@@ -557,9 +529,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .pos-layout .cart > #cartBody { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .pos-layout .cart .cart-list { flex: 1; min-height: 0; max-height: none; }
 @media (max-width: 900px) { .pos-layout { grid-template-columns: 1fr; min-height: 0; } .pos-layout .cart { position: static; max-height: none; } }
-/* Jedan spisak, traka kategorija iznad. Ranije je svaka kategorija imala svoj
-   red plocica pa su se dve delile istu traku, a radnik je pred gostom trazio
-   po ekranu ono sto staje u jedan red. */
+/* Jedan spisak, traka kategorija iznad. */
 .pos-grid { min-width: 0; }
 .pos-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
 .pos-cip {
@@ -573,8 +543,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .pos-cip:hover { border-color: var(--line-3); background: var(--surface-2); color: var(--text); }
 .pos-cip.aktivan { color: var(--text); background: var(--accent-soft); border-color: var(--accent-line); }
 .pos-cip.aktivan span { color: var(--accent); }
-/* Plocice su krupne: radnik ih kuca brzo dok gost stoji pred njim, pa cilj
-   mora da bude velik. */
+/* Krupne pločice za brzo kucanje. */
 .pos-stavke { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(224px, 100%), 1fr)); gap: 10px; align-content: start; }
 .pos-item {
   position: relative; display: flex; align-items: center; gap: 12px;
@@ -674,12 +643,8 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .seg button.active { background: rgba(255, 255, 255, 0.09); color: #fff; font-weight: 600; }
 
 /* PROIZVODI (kartice) */
-/* Kategorije se redjaju jedna pored druge, sirina ide iz broja artikala. Kad je
-   svaka uzimala ceo red, jedan Red Bull je trosio traku visoku 330px i osam
-   artikala se razvuklo na skoro dva ekrana skrolovanja. */
-/* Razmak izmedju redova drzi sam kontejner. Kad je stajao kao margina na
-   naslovu, prvi naslov u drugom redu je bio 22px vise od svojih suseda - ne zna
-   se unapred koliko sekcija stane u red, pa se margina ne moze gadjati redom. */
+/* Kategorije idu jedna pored druge; širina zavisi od broja artikala. */
+/* Razmak između redova drži kontejner, ne margina naslova. */
 /* Naslov kategorije iznad grupe (koristi se na strani Igre, kad ih ima vise). */
 .kat-naslov { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; margin: 20px 0 12px; }
 .kat-naslov:first-child { margin-top: 0; }
@@ -748,10 +713,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .log-row.kvar .log-ic { background: var(--danger-soft); color: var(--danger); }
 .log-row.kvar { box-shadow: inset 3px 0 0 var(--danger); }
 .log-row.kvar .log-text b { color: var(--text); }
-/* Vreme i kategorija stoje desno, u svojoj koloni. Kad su stajali ispod teksta,
-   svaki zapis je uzimao dva reda a desnih 60% reda je ostajalo prazno - i
-   vremena se nisu poredjala jedno ispod drugog, pa se lista nije mogla
-   prelistati pogledom. */
+/* Vreme i kategorija u svojoj koloni desno. */
 .log-text { flex: 1; min-width: 0; font-size: 13px; line-height: 1.4; color: var(--text-2); }
 .log-text b { color: var(--text); font-weight: 600; }
 .log-kat {
@@ -859,12 +821,9 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .confirm-ic svg { width: 21px; height: 21px; }
 .confirm-ic.danger { background: var(--danger-soft); color: var(--danger); }
 .confirm-t { font-size: 15px; font-weight: 650; margin-bottom: 6px; letter-spacing: -0.01em; }
-/* "pre-line" da prazan red u poruci ostane prazan red. Bez toga se upozorenje
-   slepi uz prethodnu recenicu i procita se kao nastavak, a ne kao upozorenje. */
+/* "pre-line": prazan red u poruci ostaje prazan red. */
 .confirm-s { font-size: 13px; color: var(--text-2); line-height: 1.55; white-space: pre-line; }
-/* Ono sto se NE SME prevideti pre potvrde - npr. da tri gosta trenutno igraju i
-   da ce im igra biti ugasena. Stoji odvojeno od obicnog objasnjenja, jer se
-   objasnjenje posle petog puta preskace pogledom. */
+/* Ono što ne sme da se previdi pre potvrde, odvojeno od objašnjenja. */
 .confirm-hi {
   margin-top: 10px; padding: 8px 12px; border-radius: var(--r);
   background: var(--danger-soft); border: 1px solid rgba(229, 72, 77, 0.32);
@@ -890,13 +849,10 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 
 /* Podešavanja */
 .settings-col { display: grid; gap: 16px; max-width: 760px; }
-/* Na sirokom ekranu je kolona stajala levo, a desnih 700px prazno - strana se
-   skrolovala preko puna dva ekrana bez potrebe. Kartice se ne razvlace, samo
-   stanu jedna pored druge. */
+/* Na širokom ekranu kartice podešavanja stoje u dve kolone. */
 @media (min-width: 1500px) {
   .settings-col { grid-template-columns: 1fr 1fr; align-items: start; max-width: 1240px; }
-  /* Cene ostaju levo preko oba reda, Server i Kopije jedno ispod drugog desno -
-     inace bi Kopije pale nazad u levu kolonu i desno bi opet zjapila praznina. */
+  /* Cene levo preko oba reda, Server i Kopije desno. */
   .settings-col > .card:first-child { grid-row: span 2; }
 }
 .set-rows .set-row {
@@ -910,14 +866,8 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .set-row .sr-d.upozorenje { color: var(--locked); }
 .set-row .sr-c { width: 230px; flex-shrink: 0; }
 .card-foot { padding: 12px 16px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; }
-/* .card-sub je NASLOV odeljka: dve-tri reči, velikim slovima. Sve preko toga se
-   piše u .card-nota.
-
-   Ista klasa je nosila i naslove ("Poslednje kopije") i cela objašnjenja od tri
-   reda. U verzalu nestaje oblik reči, pa se rečenica od tri reda ne čita nego
-   preskače - a baš u tim rečenicama stoji jedino mesto gde piše šta neka opcija
-   radi. Nizovi velikih slova još i razmiču letter-spacing-om, što ih razvlači
-   preko celog reda. */
+/* .card-sub je naslov odeljka (dve-tri reči, verzal); duži tekst ide u
+   .card-nota. */
 .card-sub {
   padding: 12px 16px 0; font-size: 11px; font-weight: 600; color: var(--text-3);
   text-transform: uppercase; letter-spacing: 0.06em; border-top: 1px solid var(--line);
@@ -933,11 +883,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
   position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
   font-size: 12px; color: var(--text-3); pointer-events: none;
 }
-/* VIP članarina (podešavanja)
-
-   Tri brojke odgovaraju na jedino pitanje zbog kog vlasnik i otvara ovu
-   karticu: isplati li se. Stoje iznad polja za kucanje, jer se cena menja
-   PREMA njima - a ne obrnuto. */
+/* VIP članarina (podešavanja): brojke stoje iznad polja. */
 .vip-brojke {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
   margin: 12px 16px 0; background: var(--line); border: 1px solid var(--line); border-radius: var(--r-sm);
@@ -949,8 +895,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .vb-k { font-size: 11px; color: var(--text-3); margin-top: 2px; line-height: 1.4; }
 @media (max-width: 560px) { .vip-brojke { grid-template-columns: 1fr; } }
 
-/* Spisak pogodnosti je isti onaj koji gost vidi u launcheru. Stoji ovde da
-   vlasnik zna ŠTA tačno prodaje kad odredi cenu. */
+/* Spisak pogodnosti, isti kao u launcheru. */
 .vip-pogodnosti { padding: 4px 16px 14px; }
 .vip-pog { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--hair); }
 .vip-pog:last-child { border-bottom: none; }
@@ -988,8 +933,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .nad-vrh { display: flex; gap: 40px; padding: 12px 16px 4px; flex-wrap: wrap; }
 .nad-nota { padding: 8px 16px 12px; font-size: 13px; color: var(--text-2); line-height: 1.5; }
 .nad-nota.upozorenje { color: var(--locked); }
-/* Masine koje zaostaju. Zauzeta se vidi kao PRIGUSENA, a ne kao greska - ona
-   nije problem nego red cekanja: dobice nadogradnju cim se gost digne. */
+/* Računari koji zaostaju; zauzet je prigušen (čeka red), ne greška. */
 .nad-masine { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 16px 12px; }
 .nad-masina {
   display: flex; align-items: center; gap: 8px; padding: 6px 10px;
@@ -1013,9 +957,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .nivo-c .faint { font-size: 13px; }
 
 /* Igre */
-/* Kolona mora da bude dovoljno siroka da se procita putanja. Na 300px je na ime
-   i putanju ostajalo ~134px, pa je svaka putanja zavrsavala kao "C:/igre/Fort..."
-   - a putanja je bas ono sto se ovde proverava. */
+/* Kolona dovoljno široka za putanju. */
 .game-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(384px, 100%), 1fr)); gap: 12px; }
 .game-card {
   display: flex; align-items: flex-start; gap: 12px;
@@ -1029,8 +971,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
   display: grid; place-items: center; font-size: 24px; line-height: 1;
   overflow: hidden;
 }
-/* Omot igre je 3:4. U kvadratu se secao sa obe strane, pa se na panelu video
-   drugi kadar nego u launcheru - a ovde se bas gleda da li omot valja. */
+/* Omot igre je 3:4, kao u launcheru. */
 .game-emoji.omot { width: 46px; height: 61px; border-radius: 8px; }
 .game-emoji img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .game-info { flex: 1; min-width: 0; }
@@ -1041,8 +982,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
   margin-top: 2px; line-height: 1.45; word-break: break-all;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-/* Poslednji neuspeo pokušaj. Crvena je ovde na mestu - to je kvar, a ne
-   upozorenje: stavka koju gost vidi u launcheru NE RADI. */
+/* Poslednji neuspeo pokušaj pokretanja: crveno. */
 .kvar-red {
   display: flex; align-items: baseline; gap: 6px; margin-top: 6px;
   padding: 6px 8px; border-radius: var(--r-sm);
@@ -1150,8 +1090,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .promo-akcije { display: flex; gap: 4px; flex-shrink: 0; }
 
 /* Izgled launchera: pozadine ekrana */
-/* Uputstvo koje se skuplja. Zatvoreno je jedan red visok kao zaglavlje kartice,
-   pa strana pocinje onim sto se stvarno menja. */
+/* Uputstvo koje se skuplja. */
 .poz-pomoc > summary {
   padding: 12px 16px; display: flex; align-items: center; gap: 10px;
   cursor: pointer; list-style: none; user-select: none;
@@ -1170,8 +1109,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .poz-uputstvo span { font-size: 15px; font-weight: 650; color: var(--text); font-variant-numeric: tabular-nums; }
 .poz-uputstvo i { font-style: normal; font-size: 12px; color: var(--text-2); line-height: 1.5; }
 
-/* Izbor teksture pozadine. Uzorak se crta na tamnom kvadratu, istom bojom i
-   istom prozirnoscu kao u launcheru - da izbor u panelu ne laze o rezultatu. */
+/* Uzorak šare, istom bojom i prozirnošću kao u launcheru. */
 .tex-nota { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); margin-bottom: 12px; }
 .tex-nota svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--text-3); }
 .tex-jacina { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -1184,14 +1122,10 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
   font: inherit; color: inherit; transition: border-color 0.15s ease, transform 0.15s ease;
 }
 .tex-kartica:hover { border-color: var(--line-2); transform: translateY(-2px); }
-/* Boja kuce se ovde zove --accent. Dok je pisalo var(--brand) - promenljive
-   koja ne postoji - izabrana sara nije imala vidljiv okvir, pa se nije videlo
-   sta je izabrano. */
+/* Okvir izabrane šare u boji kuće (--accent). */
 .tex-kartica.izabrana { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-/* Uzorak stoji na PODLOZI LAUNCHERA, ne na crnoj. Vlasnik po ovim sličicama
-   bira šta će igračima ceo dan stajati iza igara; podloga koja nije ona prava
-   pokazuje drugu šaru nego što će se videti. Ista vrednost stoji i u
-   launcher.css (.pu-slika) - to su dva pregleda iste stvari. */
+/* Uzorak stoji na podlozi launchera (ista vrednost kao .pu-slika u
+   launcher.css). */
 .tex-uzorak {
   display: grid; place-items: center; height: 92px; margin-bottom: 8px;
   background-color: var(--bg); background-repeat: repeat; border-bottom: 1px solid var(--line);
@@ -1268,10 +1202,8 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .slobodni-traka.puna { color: var(--text-2); font-size: 13px; }
 .slobodni-traka.puna svg { width: 15px; height: 15px; color: var(--text-3); }
 
-/* Fabricka lozinka na vlasnickom nalogu - stoji na kontrolnoj tabli dok se ne
-   promeni. Namerno je upadljivo: preko panela se dopunjuje kredit. */
-/* Koliko vremena kupuje uneti iznos. Gost pruži novac i pita koliko dobija;
-   bez ovoga radnik računa u glavi, pred gostom i u gužvi. */
+/* Fabrička lozinka vlasnika: upozorenje na kontrolnoj tabli. */
+/* Koliko vremena donosi upisan iznos. */
 .tu-racun:not(:empty) {
   margin-top: 12px; padding: 10px 12px; border-radius: var(--r-sm);
   background: rgba(255, 255, 255, 0.035); box-shadow: inset 0 0 0 1px var(--line);
@@ -1290,23 +1222,15 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
   background: var(--danger-soft); border: 1px solid rgba(255, 77, 79, 0.35);
 }
 .upozorenje-fabricko svg { width: 20px; height: 20px; flex-shrink: 0; color: var(--danger); margin-top: 1px; }
-/* SAMO NEPOSREDNA DECA, ne svaki potomak.
-   Naslov i objasnjenje su blokovi jer stoje jedno ispod drugog. Dok je pravilo
-   hvatalo SVAKI span unutra, svaki <span class="mono"> u recenici je postajao
-   svoj red - pa se uputstvo "u podfolderu resources, fajl podesavanja.json"
-   lomilo na pet redova i prestajalo da lici na recenicu. */
+/* Samo neposredna deca su blokovi, da <span> u rečenici ne pređe u nov red. */
 .upozorenje-fabricko > div > b { display: block; font-size: 14px; color: var(--text); margin-bottom: 2px; }
 .upozorenje-fabricko > div > span { font-size: 13px; color: var(--text-2); line-height: 1.55; display: block; }
 /* Naziv fajla ili putanja usred recenice - ostaje u redu i ne prelama se na pola. */
 .upozorenje-fabricko .mono { color: var(--text); background: rgba(255, 255, 255, 0.06);
   padding: 1px 4px; border-radius: 4px; white-space: nowrap; }
-/* Dugme vodi pravo na promenu lozinke. Ranije je tu pisalo "klikni na svoje ime
-   dole levo" - a na telefonu profil stoji gore desno, pa je uputstvo vodilo na
-   pogresnu stranu ekrana. */
 .upozorenje-fabricko .btn { margin-top: 10px; }
 
-/* Stoji UMESTO spiska kad podaci nisu stigli. Namerno ne lici na obicno prazno
-   stanje - prazno stanje kaze "nema ih", ovo kaze "nisu ucitani". */
+/* Umesto spiska kad podaci nisu stigli; razlikuje se od praznog stanja. */
 .ucitavanje-palo {
   padding: 32px 20px; text-align: center; color: var(--text-2);
   display: flex; flex-direction: column; align-items: center; gap: 8px;
@@ -1335,8 +1259,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .slobodan-pc.bez-mac:hover { color: var(--text-2); background: transparent; border-color: var(--line-3); }
 .slobodan-pc.bez-mac:active { transform: none; }
 
-/* Kad radnik klikne ime u traci, kartica tog racunara ostane obelezena par sekundi.
-   Staticni prsten, ne animacija - tabla se iscrtava iznova svake sekunde. */
+/* Istaknut računar (klik u traci): statičan prsten par sekundi. */
 .station.istaknut { box-shadow: 0 0 0 2px rgba(var(--standby-rgb), 0.7), 0 0 22px -4px rgba(var(--standby-rgb), 0.45); }
 
 /* Upozorenja da igracu istice vreme (stoje dok ih radnik ne skloni) */
@@ -1403,9 +1326,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
     background: rgba(11, 12, 15, 0.92);
     backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
     padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px)); z-index: 50;
-    /* Stavki ima vise nego sto stane na telefon, pa se traka pomera prstom.
-       Bledi kraj sa desne strane je jedini nagovestaj da ima jos - bez njega
-       izgleda kao da je spisak zavrsen tamo gde ga ekran preseca. */
+    /* Na telefonu se traka pomera prstom; bledi desni kraj kaže da ima još. */
     overflow-x: auto; scrollbar-width: none;
     -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 26px), transparent);
     mask-image: linear-gradient(90deg, #000 calc(100% - 26px), transparent);
@@ -1413,15 +1334,13 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
   .sidebar::-webkit-scrollbar { display: none; }
   .side-logo, .nav-sec { display: none; }
 
-  /* Podnozje bocnog menija se premesta u gornju traku (vidi smestiProfil u
-     app.js). Ovde se samo polozi vodoravno i skrati na ono sto staje. */
+  /* Podnožje bočnog menija u gornjoj traci (smestiProfil u app.js). */
   .side-foot { margin: 0; padding: 0; display: flex; align-items: center; gap: 8px; }
   .side-foot::before { display: none; }
   .side-foot #shiftBar { margin: 0; }
   .side-foot .btn-block { width: auto; white-space: nowrap; }
   .profile { padding: 4px 8px; gap: 6px; }
-  /* Ime i uloga se citaju sa avatara i iz menija - na uskom ekranu bi gurali
-     dugme za smenu van trake. */
+  /* Na uskom ekranu ime i uloga se ne prikazuju. */
   .profile > div:not(.avatar) { display: none; }
   .shift-bar { padding: 0; background: none; border: none; }
   .shift-bar .sb-info { display: none; }
@@ -1433,9 +1352,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
   }
   @keyframes pf-in { from { opacity: 0; transform: translateY(-6px) scale(0.96); } }
   .nav { flex-direction: row; gap: 2px; width: 100%; overflow-y: visible; margin: 0; padding: 0; }
-  /* Jedini tekst u programu ispod 11px, i namerno: petnaest stavki mora da
-     stane u širinu telefona, a telefon se gleda iz ruke, ne iz stolice. Uz
-     natpis stoji i ikona, pa se stavka prepoznaje i pre nego što se pročita. */
+  /* Jedini tekst ispod 11px: petnaest stavki na širini telefona, uz ikone. */
   .nav-item { position: relative; flex-direction: column; gap: 2px; padding: 6px 6px; font-size: 10px; flex: 1; min-width: 58px; text-align: center; }
   .nav-item span.label { font-size: 10px; font-weight: 500; }
   .nav-item svg { width: 19px; height: 19px; }
@@ -1472,14 +1389,12 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
   html { scroll-behavior: auto; }
 }
 
-/* ZNAK I BOJA IGRAONICE (Izgled launchera)
-   Program se izdaje jedan, a svaka igraonica ima svoj znak i svoju boju. */
+/* Znak i boja igraonice (Izgled launchera) */
 .brend-red { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
 .brend-logo-box {
   flex: 1 1 260px; min-height: 96px; display: flex; align-items: center; justify-content: center;
   padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--r);
-  /* Sahovnica ispod: znak je najcesce PNG sa providnoscu, pa se na ravnoj
-     podlozi ne vidi ima li belu ivicu ili je stvarno providan. */
+  /* Šahovnica ispod znaka pokazuje providnost. */
   background:
     linear-gradient(45deg, rgba(255, 255, 255, 0.03) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.03) 75%) 0 0/16px 16px,
     linear-gradient(45deg, rgba(255, 255, 255, 0.03) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.03) 75%) 8px 8px/16px 16px;
@@ -1487,10 +1402,8 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .brend-logo-box img { max-width: 100%; max-height: 84px; object-fit: contain; }
 .brend-akcije { display: flex; flex-direction: column; gap: 8px; min-width: 190px; }
 
-/* BOJA KUĆE: proba, pa tek onda primena.
-   Sve unutar .bk-proba nosi svoj --accent, pa proba menja SAMO sebe. Da se
-   postavlja na koren, panel bi ostao prefarban i kad vlasnik ode sa stranice
-   bez potvrde - a boja nije primenjena. */
+/* Proba boje: .bk-proba nosi svoj --accent, pa se menja samo proba, ne ceo
+   panel. */
 .bk-proba {
   margin-top: 12px; border: 1px solid var(--line-2); border-radius: var(--r-lg); overflow: hidden;
   background: linear-gradient(180deg, var(--surface-2), var(--bg));
@@ -1506,9 +1419,7 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
   content: ""; position: absolute; left: 0; right: 0; bottom: -12px; height: 2px;
   border-radius: 2px; background: var(--accent);
 }
-/* Kredit je zelen zato što zelena u celom programu znači "ima kredita". Stoji
-   ovde namerno: ako se boja kuće približi zelenoj, vlasnik to vidi na probi, a
-   ne tek kad trinaest igrača pomeša stanje naloga sa bojom kuće. */
+/* Kredit je zelen i u probi, da se vidi ako je boja kuće preblizu zelenoj. */
 .bk-proba-kredit { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--online); font-variant-numeric: tabular-nums; }
 .bk-proba-telo { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 16px; }
 .bk-proba-dugme {
@@ -1534,23 +1445,20 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
   transition: border-color var(--tr), background var(--tr), color var(--tr);
 }
 .bk-uzorak:hover { border-color: var(--line-3); color: var(--text); }
-/* Izabrani se poznaje po SVOJOJ boji, ne po boji kuće: dok se bira, boja kuće
-   je još stara, pa bi oznaka govorila o pogrešnoj boji. */
+/* Izabrani uzorak se označava svojom bojom. */
 .bk-uzorak.aktivna { border-color: var(--bk); background: var(--surface-3); color: var(--text); font-weight: 650; }
 .bk-krug {
   width: 18px; height: 18px; border-radius: 50%; flex: none; background: var(--bk);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
   display: grid; place-items: center;
 }
-/* Kvačica u krugu, a ne samo okvir: srebro i čelik su bledi, pa se na tamnoj
-   podlozi okvir te boje jedva vidi i ne zna se šta je izabrano. */
+/* Kvačica u krugu (bledi tonovi se slabo vide kao okvir). */
 .bk-krug::after { content: ""; width: 7px; height: 4px; border: 2px solid #fff; border-top: 0; border-right: 0; transform: rotate(-45deg) translate(1px, -1px); opacity: 0; }
 .bk-uzorak.aktivna .bk-krug { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5); }
 .bk-uzorak.aktivna .bk-krug::after { opacity: 1; }
 .bk-ime { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Svoja boja je izuzetak, ne prvi izbor: ko ima tačnu boju iz svog znaka
-   otvori ovo, ostali biraju sa spiska i ne moraju da znaju šta je heks. */
+/* Svoja boja (heks) je dodatna opcija. */
 .bk-svoja-x {
   display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 6px 2px;
   background: none; border: 0; cursor: pointer; color: var(--text-2); font: inherit; font-size: 13px; font-weight: 600;
@@ -1570,33 +1478,20 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
   background: var(--locked-soft); color: var(--text); font-size: 13px; line-height: 1.5;
 }
 .bk-zamerka svg { flex: none; margin-top: 1px; color: var(--locked); }
-/* Bez ove rečenice upozorenje liči na kvar i vlasnik se vrti u krug tražeći
-   "ispravnu" boju. Igraonica je njegova; program kaže šta ga izbor košta. */
 .bk-zamerka-pod { font-size: 12px; color: var(--text-3); padding-left: 2px; }
 
 .bk-akcije { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
 .bk-nap { font-size: 12px; line-height: 1.4; }
 
-/* RAZDVAJANJE PODATAKA U REDU
-   "18:53 · sa kredita · 210 RSD" - tackica kao SLOVO menja velicinu sa fontom,
-   ne moze da se stisa, i zavrsi u tekstu koji neko kopira. Ovde je razmak, a
-   gde treba i NACRTANA tackica. Isto radi launcher (.por-meta u launcher.css). */
+/* Razdvajanje podataka u redu: razmak i nacrtana tačka, ne znak "·" (isto
+   kao .por-meta u launcher.css). */
 .uz { display: inline-flex; align-items: center; gap: 8px; }
 .uz-tacka { width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: 0.5; flex: none; }
 
 /* ============================================================================
-   STANJA U PANELU: PRELAZAK, PRITISAK, FOKUS
-
-   Isto pravilo kao u launcheru, i iz istog razloga. Izmereno na svih petnaest
-   strana: prelazak miša je imalo skoro sve, PRITISAK pet elemenata, a FOKUS
-   samo dugmad i kvačice.
-
-   Panel se koristi i sa TELEFONA, jednom rukom, dok neko čeka za kasom - tamo
-   se pritisak vidi umesto kursora i jedini je znak da je dodir primljen. A
-   radnik za kasom radi tastaturom: Tab kroz spisak, Enter na naplatu.
-
-   Prsten je spoljašnji (panel nema odsečene uglove kao launcher), pa prati
-   zaobljenje i ne ulazi u sadržaj.
+   Stanja: prelazak, pritisak, fokus - kao u launcheru. Pritisak je na telefonu
+   jedini znak da je dodir primljen, a na kasi se radi i tastaturom. Prsten je
+   spoljašnji i prati zaobljenje.
    ========================================================================== */
 .nav-item:focus-visible,
 .profile:focus-visible,
@@ -1613,8 +1508,7 @@ summary:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
 }
-/* Prekidač je sakriveno polje sa nacrtanom sklopkom - prsten mora na sklopku,
-   jer se samo ona vidi. */
+/* Prsten na nacrtanoj sklopki prekidača. */
 .switch input:focus-visible + .slider { box-shadow: 0 0 0 3px var(--accent-soft); }
 
 /* PRITISAK: kratko i suvo, isto svuda. */
@@ -1631,8 +1525,7 @@ summary:active {
   filter: brightness(0.94);
 }
 .switch:active .slider { transform: scale(0.96); }
-/* Prelazak misa se vidi na samoj sklopci - ceo prekidac je dodirna povrsina, a
-   nacrtan je samo taj deo. */
+/* Prelazak miša se vidi na sklopki. */
 .switch:hover .slider { border-color: var(--line-3); }
 .switch:hover input:checked + .slider { border-color: var(--accent-hover); }
 

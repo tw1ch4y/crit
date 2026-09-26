@@ -1,15 +1,10 @@
 /* CRIT LAUNCHER - GAMING EDITION */
 
-/* Font se ucitava iz css/font.css - deli ga i prozor obavestenja
-   koji iskace preko igre (overlay.html), pa ne sme da stoji samo ovde. */
+/* Font se učitava iz css/font.css (deli ga i overlay.html). */
 
 
 :root {
-  /* PODLOGA JE PLAVA SA ZNAKA, NE CRNA.
-     Na znaku "Crit!" crvena stoji na žutom prasku, a sve to na plavom - i tek
-     zajedno izgleda kao strip. Izvučena sama, na skoro crno, ista ta crvena
-     izgleda kao horor. Zato podloga sada nosi plavu, a crvena je ostala samo
-     tamo gde nešto ZNAČI: vreme koje ističe i zaključan ekran. */
+  /* Podloga je plava iz znaka; crvena je samo za "vreme ističe" i zaključan ekran. */
   --bg: #070c1c;
   --bg-2: #0b1226;
   --panel: #111a36;
@@ -19,45 +14,26 @@
   --line-2: rgba(255, 255, 255, 0.15);
   --text: #f1f4fb;
   --text-2: #a4adca;
-  /* TREĆI STEPEN TEKSTA MORA DA SE ČITA.
-     Bio je #626c8c: odnos prema podlozi 3.75:1, a na svetlijim pločama 2.6:1 -
-     ispod granice od 4.5:1 na kojoj se sitno slovo još čita. Njime su pisane
-     baš oznake koje kažu ŠTA je broj pored njih ("KREDIT", "PREOSTALO"), i to
-     na ekranu koji igrač gleda iz stolice, ne iz ruke. Ova vrednost daje
-     4.5-6.5:1 na svakoj podlozi u programu. Ista je i u panelu - jedna kuća,
-     jedna lestvica. */
+  /* Treći stepen teksta: kontrast 4.5-6.5:1 na svakoj podlozi; ista vrednost
+     je u panelu. */
   --text-3: #8c96b7;
 
-  /* Boja kuće. Menja je vlasnik iz panela (Izgled launchera), ovde je samo
-     fabrička vrednost - plava sa znaka. Ime je `--brend`, ne `--red`: dok se
-     zvala `--red` a držala plavu, svako čitanje ovog fajla je vodilo na pogrešan
-     trag. */
-  /* Podloga i u brojevima: velovi i senke preko ekrana pisu se kao
-     rgba(var(--bg-rgb), x). Dok su bile upisane kao crna, one su preko plave
-     podloge radile tacno ono sto ne treba - obezbojile su je nazad ka sivom. */
+  /* Boja kuće (menja je vlasnik iz panela); ovde je fabrička. */
+  /* Podloga u brojevima, za velove i senke: rgba(var(--bg-rgb), x). */
   --bg-rgb: 7, 12, 28;
   --brend-rgb: 47, 106, 232;
   --brend: #2f6ae8;
   --brend-deep: #2454c4;
-  /* SVETLIJA BOJA KUĆE, ZA HOVER.
-     Server je već računa (`nijanse().hover`) i šalje uz brend, a panel je
-     koristi kao `--accent-hover`. Launcher je jedini nije uzimao, pa je
-     glavno dugme na prelaz mišem imalo upisanu crvenu - ostatak palete od
-     pre nego što je kuća postala plava. Crvena ovde znači "ističe vreme" i
-     "zaključano": dugme koje pocrveni kad pređeš preko njega izgleda kao da
-     nešto nije u redu, baš u trenutku kad igrač hoće da ga pritisne. */
+  /* Svetlija boja kuće za hover (računa je server, `nijanse().hover`). */
   --brend-hover: #4c7feb;
   --brend-soft: rgba(47, 106, 232, 0.15);
   --brend-glow: rgba(47, 106, 232, 0.55);
-  /* ČETIRI BOJE KOJE NEŠTO ZNAČE. Ne biraju se i ne koriste se za ukras - po
-     njima igrač na prvi pogled zna šta gleda, pa svaka mora da znači jedno:
-       zlatna  nagrada (točak, VIP, prelazak nivoa, otključano)
+  /* Boje koje nose značenje (ne koriste se kao ukras):
+       zlatna  nagrada (točak, VIP, nov nivo, otključano)
        zelena  ima kredita
        žuta    pažnja: malo na stanju, uskoro ističe
        crvena  ističe vreme, zaključano, nema na stanju
-     Boja kuće ne sme da im se približi - to čuva `zamerkeNaBoju` u service.js.
-     Žuta je dobila svoju vrednost: dok je bila ista kao zlatna, oznaka "malo na
-     stanju" je izgledala kao nagrada, a razlika je postojala samo u imenu. */
+     Boja kuće ne sme da im se približi (`zamerkeNaBoju` u service.js). */
   --gold: #ffb527;
   --gold-glow: rgba(255, 181, 39, 0.55);
   --green: #33e284;
@@ -70,42 +46,23 @@
   --cut: 13px;
   --cut-lg: 18px;
   --tr: 0.16s cubic-bezier(0.22, 0.8, 0.3, 1);
-  /* KRIVA I KRATKO VREME - ZASEBNO.
-     --tr nosi i trajanje i krivu zajedno, pa se ne može upotrebiti tamo gde
-     treba samo jedno. Zato su se u fajlu pojavili --ease-out (kriva) i --t-brzo
-     (kratko trajanje) - ali nikad nisu bili definisani.
-     CSS na nepoznatu promenljivu bez rezerve odbaci CELO pravilo: deset
-     animacija i pet prelaza jednostavno nisu radili, a nigde nije bilo greške.
-     Stajali su mrtvi: ulazna animacija početne, ulaz odeljka na Nalogu i
-     pomeranje trake nagradnog točka. */
+  /* Kriva i kratko trajanje, odvojeno od --tr. Nedefinisana promenljiva bez
+     rezervne vrednosti poništava celo pravilo. */
   --ease-out: cubic-bezier(0.22, 0.8, 0.3, 1);
   --t-brzo: 0.12s;
-  /* Chakra Petch ide na naslove, brojke i sve po cemu se klikce (tabovi,
-     dugmad, polja za unos) - tu se vidi karakter. Duza objasnjenja i uputstva
-     ostaju u sistemskom fontu, koji je citljiviji u sitnom.
-     Chakra Petch ima najvise debljinu 700; gde je ranije stajalo 900, sada
-     stoji 700 - inace bi pregledac sam "zadebljao" vec masna slova i ona bi
-     izgledala razlivena. */
+  /* Chakra Petch za naslove, brojeve i kontrole; duži tekst u sistemskom fontu.
+     Najveća debljina fonta je 700. */
   --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
   --font-display: "Chakra Petch", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
   --font-ui: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
 }
 
 
-/* LESTVICA VELICINA SLOVA:  11 12 13 14 15 17 19 24 30 36 44 64
+/* Lestvica veličina slova:  11 12 13 14 15 17 19 24 30 36 44 64
 
-   Nije ukras nego pravilo. Ranije je bilo 23 razlicite velicine (11, 11.5, 12,
-   12.5, 13, 13.5 ...) - nijedna od tih razlika se ne vidi kao greska, ali se
-   vidi kao NEUREDNOST: dve oznake istog reda, jedna 11 a druga 11.5, i strana
-   izgleda kao da je pravljena u vise navrata.
-
-   Svaki korak postoji zato sto je u programu vec bio potreban; medjukoraci su
-   spusteni na najblizi. Nova vrednost van lestvice znaci ili da treba nov
-   korak - pa se dodaje ovde i u test-citljivost.mjs, svesno - ili da je neko
-   meruckao dok mu ne legne. Od ovog drugog se lestvica i raspala.
-
-   Donja granica je 11px: launcher se gleda iz stolice. Jedini izuzetak je
-   donja navigacija panela na telefonu, i to pise uz nju. */
+   Nova vrednost van lestvice se dodaje i ovde i u test-citljivost.mjs.
+   Donja granica je 11px (launcher se gleda iz stolice); izuzetak je donja
+   navigacija panela na telefonu. */
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
 html, body { height: 100%; overflow: hidden; }
 body {
@@ -118,8 +75,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Pozadina: svetlo pada odozgo, dno je tamnije - sadrzaj tako ima na cemu da
-   stoji umesto da lebdi na ravnoj crnoj. Bez sara i bez animacija. */
+/* Pozadina: svetlo odozgo, tamnije dno. */
 body::before {
   content: ""; position: fixed; inset: 0; z-index: -3; pointer-events: none;
   background:
@@ -129,19 +85,10 @@ body::before {
     linear-gradient(180deg, #0c0c12 0%, var(--bg) 46%, #050508 100%);
 }
 
-/* TEKSTURA POZADINE
-   Sitna sara koja se ponavlja preko celog ekrana. Crta se ovde, ne kaci se kao
-   slika - ostra je na svakoj rezoluciji i ne opterecuje mrezu. Stoji IZNAD
-   okacene pozadine, pa se vidi i kad je slika postavljena i kad nije; tako cela
-   pozadina dobije izgled stampanog stripa, isto kao logotip.
-   Bira se u panelu, sara i jacina odvojeno. Podrazumevano je iskljucena.
-   Sama sara stize sa servera (jedna definicija, u service.js), pa se pregled u
-   panelu i ono sto igrac vidi ne mogu razici. Ovde stoji samo kako se crta.
-
-   Sloj je namerno veci od ekrana (inset: -60px): kod "dubine" se pomera za
-   pokretom misa, pa bez te rezerve ivice ekrana ostanu prazne.
-   Sve animacije rade nad POZICIJOM pozadine, maskom i transformacijom - to su
-   poslovi kompozitora, ne procesora, pa ne smetaju igri u prvom planu. */
+/* Tekstura pozadine: šara koja se ponavlja preko ekrana, iznad okačene
+   pozadine. Definicija stiže sa servera (service.js), ovde je samo crtanje.
+   Sloj je veći od ekrana (inset: -60px) zbog pomeranja kod "dubine".
+   Animacije menjaju samo poziciju pozadine, masku i transformaciju (kompozitor). */
 body::after {
   content: ""; position: fixed; inset: -60px; z-index: -1; pointer-events: none;
   background-image: var(--tekstura, none);
@@ -149,13 +96,10 @@ body::after {
   opacity: var(--tekstura-vid, 0); transition: opacity 0.35s ease;
   transform: translate3d(var(--par-x, 0px), var(--par-y, 0px), 0);
 }
-/* Na ekranu prijave i zakljucanom ekranu preko sare nema sadrzaja koji je
-   prekriva, pa se ponavljanje vidi kao vodeni zig preko celog ekrana. Tu ide
-   znatno tise - posao nosi pozadinska slika, sara je samo tekstura ispod. */
+/* Na prijavi i zaključanom ekranu šara ide tiše. */
 body.tiha-sara::after { opacity: calc(var(--tekstura-vid, 0) * 0.34); }
 
-/* KLIZANJE - sara polako putuje po dijagonali.
-   Pomera se za TACNO jednu plocicu, pa se petlja zatvara bez vidljivog skoka. */
+/* Klizanje: šara putuje po dijagonali, tačno jednu pločicu po krugu. */
 body[data-kretanje="klizanje"]::after {
   animation: tekstura-klizi var(--tekstura-sekundi, 0s) linear infinite;
   will-change: background-position;
@@ -164,9 +108,7 @@ body[data-kretanje="klizanje"]::after {
   to { background-position: var(--tekstura-korak, 0px) var(--tekstura-korak, 0px); }
 }
 
-/* TALAS - sara stoji, ali preko nje polako prelazi pojas svetla, kao odsjaj.
-   Radi se maskom: sara se u pojasu vidi punom jacinom, van njega prigusenije.
-   Mirnije je od klizanja jer se nista ne pomera, samo "dise" u prolazu. */
+/* Talas: preko šare prelazi pojas svetla (maska). */
 body[data-kretanje="talas"]::after {
   -webkit-mask-image: linear-gradient(112deg, rgba(0, 0, 0, 0.38) 12%, #000 26%, rgba(0, 0, 0, 0.38) 42%);
   mask-image: linear-gradient(112deg, rgba(0, 0, 0, 0.38) 12%, #000 26%, rgba(0, 0, 0, 0.38) 42%);
@@ -180,10 +122,7 @@ body[data-kretanje="talas"]::after {
   to   { -webkit-mask-position: 260% 260%; mask-position: 260% 260%; }
 }
 
-/* DUBINA - dva sloja iste sare, zadnji krupniji i sporiji.
-   Blizi sloj prati pokret misa (--par-x/--par-y postavlja launcher), pa se
-   pozadina pomera KAD IGRAC POMERI MIS, umesto da se vrti sama od sebe.
-   To je jedini nacin kretanja koji reaguje na coveka za racunarom. */
+/* Dubina: dva sloja šare; bliži prati miša (--par-x/--par-y). */
 body[data-kretanje="dubina"]::after {
   background-image: var(--tekstura, none), var(--tekstura, none);
   background-size: auto, calc(var(--tekstura-korak, 64px) * 2.1);
@@ -199,11 +138,8 @@ body[data-kretanje="dubina"]::after {
   }
 }
 
-/* ISKRE - pojedine figure u mrezi zasvetle u boji kuce pa se ugase.
-   Svaka iskra je jedna plocica mreze: ista sara, samo crvena, polozena tacno
-   preko bele ispod nje. Zato izgleda kao da je bas TA figura zasvetlela, a ne
-   kao da je neko nalepio crveni kvadrat.
-   Sloj stoji odmah iznad teksture i ispod celog sadrzaja. */
+/* Iskre: pojedine figure zasvetle u boji kuće. Iskra je jedna pločica mreže,
+   položena tačno preko figure ispod. Sloj je iznad teksture, ispod sadržaja. */
 .iskre-sloj {
   position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;
 }
@@ -227,30 +163,23 @@ body[data-kretanje="dubina"]::after {
 }
 
 /* Racunar koji trazi manje kretanja na sistemskom nivou ga ovde i ne dobija. */
-/* Sara i iskre se NE gase na prefers-reduced-motion - vidi objasnjenje uz
-   drugi blok istog upita, na dnu fajla. Prekidac je u panelu (kretanje
-   "Mirno"), i vlasnik ga bira svesno. */
+/* Šara i iskre se ne gase na prefers-reduced-motion (vidi drugi blok istog
+   upita na dnu fajla); kretanje "Mirno" bira vlasnik. */
 
-/* Pozadina koju osoblje kaci kroz panel, po ekranu. Stoji ispod celog sadrzaja
-   i uvek ide sa tamnim slojem preko - inace tekst ne bi bio citljiv ni na
-   jednoj slici. Zato slika sme da bude bilo koja, dizajn i dalje drzi. */
+/* Pozadina iz panela, po ekranu, uvek sa tamnim slojem preko. */
 .pozadina {
   position: fixed; inset: 0; z-index: -2; pointer-events: none; opacity: 0;
   background-size: cover; background-position: center center;
   transition: opacity 0.45s ease;
 }
 .pozadina.ima { opacity: 1; }
-/* Zastor preko okacene slike. Drzi tekst citljivim, ali ne sme da pojede sliku:
-   pozadine koje pravi server vec nose svoju vinjetu, pa je ovde dovoljan blag
-   prelaz odozgo i odozdo. Ranije je ovde bio jos jedan taman krug u SREDINI -
-   tacno tamo gde stoji sadrzaj - pa je svetlo iz slike nestajalo i svaki ekran
-   je izgledao kao ravna crna ploha. */
+/* Zastor preko okačene slike: blag prelaz odozgo i odozdo (serverske
+   pozadine već imaju vinjetu). */
 .pozadina::after {
   content: ""; position: absolute; inset: 0;
   background: linear-gradient(180deg, rgba(var(--bg-rgb), 0.74) 0%, rgba(var(--bg-rgb), 0.5) 42%, rgba(var(--bg-rgb), 0.82) 100%);
 }
-/* Na praznim ekranima (prijava, zakljucan) slika sme najjace da se vidi -
-   tamo preko nje ide samo jedna kartica. */
+/* Na ekranima bez sadržaja slika se vidi jače. */
 body.pozadina-prazna .pozadina::after {
   background: linear-gradient(180deg, rgba(var(--bg-rgb), 0.42) 0%, rgba(var(--bg-rgb), 0.16) 45%, rgba(var(--bg-rgb), 0.55) 100%);
 }
@@ -364,11 +293,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .btn-lg { padding: 16px 24px; font-size: 15px; }
 .btn-block { width: 100%; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
-/* Isključeno dugme nema hover - zato `:not(:disabled)` stoji gore, na samim
-   pravilima. Ranije je ovde stajalo `.btn:disabled:hover` koje je VRAĆALO
-   podlogu na plavi preliv glavnog dugmeta: svako sivo i providno dugme je,
-   dok je isključeno, pod mišem postajalo plavo - izgledalo je kao da može da
-   se pritisne baš kad ne može. */
+/* Isključeno dugme nema hover (`:not(:disabled)` na pravilima iznad). */
 .err { color: var(--red-status); font-size: 14px; min-height: 20px; margin-bottom: 4px; font-weight: 600; }
 
 /* Setup / login */
@@ -385,24 +310,20 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 }
 .login-fon.ima { opacity: 0.75; }
 /* Tamni krug pod formom da tekst ostane citljiv, ivice ekrana zive. */
-/* Zastor je SIROK, ne krug u sredini: sadrzaj sada stoji u dve kolone preko
-   skoro cele sirine, pa bi uzak krug ostavio ivice svetlije od teksta. */
+/* Zastor je širok, jer sadržaj stoji u dve kolone. */
 .login-fon::after {
   content: ""; position: absolute; inset: 0;
   background:
     radial-gradient(86% 70% at 50% 52%, rgba(var(--bg-rgb), 0.86), rgba(var(--bg-rgb), 0.5) 74%, rgba(var(--bg-rgb), 0.72)),
     linear-gradient(180deg, rgba(var(--bg-rgb), 0.35), transparent 30%, transparent 72%, rgba(var(--bg-rgb), 0.45));
 }
-/* Ekran prijave: znak kuce levo, forma desno, tanka nit izmedju. Prazan
-   racunar ovako izgleda kao izlog, a ne kao mala kartica na crnom ekranu. */
+/* Ekran prijave: znak kuće levo, forma desno, tanka linija između. */
 .login-sadrzaj {
   position: relative; z-index: 1;
   display: grid; grid-template-columns: auto 1px auto; align-items: center;
   gap: clamp(38px, 6vw, 84px); padding: 0 24px;
 }
-/* Sve tri celije dobijaju SVOJE mesto. Bez toga pseudo-element (koji je prvi u
-   redosledu) zauzme prvu kolonu, znak kuce odleti u trecu, a forma se prelomi
-   u novi red - ekran je izgledao razbijen. */
+/* Svaka ćelija ima svoje mesto u mreži (i pseudo-element). */
 .login-sadrzaj::before {
   content: ""; grid-column: 2; grid-row: 1; align-self: stretch; margin: 12px 0;
   background: linear-gradient(180deg, transparent, var(--line-2) 18%, var(--line-2) 82%, transparent);
@@ -422,8 +343,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   font-size: clamp(11px, 0.8vw, 12px); letter-spacing: 0.36em;
   text-transform: uppercase; color: var(--text-3);
 }
-/* Dva podatka koja gost sa ulice stvarno pita. Cena je krupna, jer je to prvo
-   pitanje; oznaka racunara mu treba tek kad zove osoblje. */
+/* Cena i oznaka računara. */
 .lb-cinjenice { display: flex; gap: 32px; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); }
 .lb-c { display: flex; flex-direction: column; gap: 6px; }
 .lb-c-l {
@@ -552,10 +472,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .content .section-title { animation: sec-in 0.42s var(--tr) both; }
 @keyframes sec-in { from { opacity: 0; transform: translateX(-14px) skewX(-7deg); } to { opacity: 1; transform: skewX(-7deg); } }
 
-/* PRAZNA POLICA - jedan izgled, dve velicine.
-   Bez igara i bez precica su ranije izgledale kao dve razlicite stvari: jedna je
-   imala znak i naslov, druga go red teksta u stilu pozajmljenom od prazne korpe.
-   Prvog dana u novoj igraonici obe police su prazne i to je prvo sto se vidi. */
+/* Prazna polica: isti izgled za igre i prečice, dve veličine. */
 .polica-prazno {
   display: grid; justify-items: center; gap: 4px; text-align: center;
   padding: 24px 16px; color: var(--text-3);
@@ -566,8 +483,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .polica-prazno.veliko .pp-t { font-size: 17px; }
 .polica-prazno .pp-s { font-size: 13px; }
 .polica-prazno.veliko .pp-s { font-size: 14px; }
-/* Prazna polica igara i dalje uzima prostor koji bi imala i puna - da strana ne
-   skoci kad osoblje doda prvu igru. */
+/* Prazna polica igara zadržava visinu pune. */
 .games-shelf.prazna { justify-content: center; }
 
 .empty-view { min-height: 52vh; display: grid; place-items: center; }
@@ -586,36 +502,21 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   clip-path: polygon(0 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%);
   display: grid; place-items: center;
   box-shadow: inset 0 0 0 1px var(--line-2);
-  /* Nagib dolazi iz skrolovanja (vidi ozivipolicu u launcher.js) i u miru je
-     nula, pa ovo ne menja ništa dok se polica ne pomeri.
-
-     DUBINA UTIŠAVA, NE SKUPLJA. Ovde je stajalo i `scale(var(--dub))`, pa se
-     ceo okvir smanjivao prema ivicama police. A IME IGRE STOJI UNUTAR OVOG
-     OKVIRA (`.tile-scrim` je u `.tile-media`): skupljanje ga je podizalo i
-     smanjivalo, pa naslovi na polici nisu stajali u istoj liniji - razlika je
-     bila oko 13px i izgledala je kao da je red pokvaren, a ne kao dubina.
-     Providnost radi isto, a red ostaje prav. */
+  /* Nagib dolazi od skrolovanja (ozivipolicu u launcher.js). Dubina menja samo
+     providnost: ime igre je unutar okvira, pa bi skaliranje poremetilo red
+     naslova. */
   transform: perspective(900px) rotateY(var(--nagib, 0deg));
   opacity: var(--dub, 1);
   transition: box-shadow var(--tr), filter var(--tr), opacity 0.24s var(--tr);
 }
-/* ZUM I PARALAKSA DELE ISTI `transform`.
-
-   Hover zumira sliku, a skrolovanje je pomera u dubinu (vidi ozivipolicu u
-   launcher.js). Da svaki pise svoj `transform`, drugi bi brisao prvog - pa se
-   oba slazu ovde, kroz promenljive. */
+/* Zum na hover i paralaksa dele isti `transform`, preko promenljivih. */
 .tile-media img {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
   transform: translate3d(var(--par-omot, 0px), 0, 0) scale(var(--zum, 1));
   transition: transform 0.35s var(--tr);
 }
 .tile-emoji { font-size: 64px; line-height: 1; opacity: 0.8; filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.5)); }
-/* Oznaka kategorije. Stoji DOLE levo, iznad imena - korice gotovo uvek nose
-   naziv igre pri vrhu, pa bi oznaka gore sekla logo.
-   Bila je zlatna. Zlatna u ovom programu znaci NAGRADU (tocak, VIP, prelazak
-   nivoa), a na polici je stajalo dvanaest zlatnih natpisa odmah ispod zlatne
-   VIP trake - oko je vukla kategorija igre, a ne ono sto se stvarno dobija.
-   Kategorija je podatak, ne nagrada, pa je i boja mirna. */
+/* Oznaka kategorije dole levo (korice imaju naziv pri vrhu), u mirnoj boji. */
 .tile-badge {
   position: absolute; bottom: 46px; left: 9px; z-index: 5;
   font-size: 11px; font-weight: 700; font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.1em;
@@ -626,8 +527,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 /* ime na dnu preko slike (scrim) */
 .tile-scrim { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; padding: 32px 12px 12px; background: linear-gradient(transparent, rgba(var(--bg-rgb), 0.94) 60%); transition: background var(--tr); }
 .tile-name { font-weight: 700; font-size: 15px; font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.02em; line-height: 1.2; }
-/* Dugme za pokretanje izlazi IZNAD imena, ime ostaje na svom mestu.
-   Igrac na hover mora i dalje da vidi koju igru pokrece. */
+/* Dugme za pokretanje izlazi iznad imena. */
 .tile-hover {
   position: absolute; left: 0; right: 0; top: 0; bottom: 62px; z-index: 3;
   display: grid; place-content: center; justify-items: center;
@@ -646,14 +546,12 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   font-size: 11px; font-weight: 700; font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.2em; color: #fff;
   text-shadow: 0 0 12px var(--brend-glow); opacity: 0; transform: translateY(6px); transition: 0.22s var(--tr);
 }
-/* Omot lezi na podlozi (senka), a na hover se podigne ka igracu. Pokret ide
-   na dodir misa, ne sam od sebe - to je razlika izmedju osecaja i ukrasa. */
+/* Na hover se omot podiže. */
 .tile { transition: transform 0.18s var(--tr); }
 .tile-media { box-shadow: inset 0 0 0 1px var(--line-2), 0 12px 26px -14px rgba(0, 0, 0, 0.9); }
 .tile:hover { transform: translateY(-6px); }
 .tile:active { transform: translateY(-2px); }
-/* Ono na šta igrač pokaže izlazi napred celo, pa i pločica koju ivica seče:
-   dubina kaže "ima još tamo", a prelazak mišem je već odgovor na to. */
+/* Pločica pod mišem je uvek cela, i kad je ivica police seče. */
 .tile:hover .tile-media { box-shadow: inset 0 0 0 1.5px var(--brend), 0 22px 42px -16px rgba(0, 0, 0, 0.95), 0 0 34px -10px var(--brend-glow); opacity: 1; }
 .tile:hover .tile-media img { --zum: 1.07; }
 .tile:hover .tile-scrim { background: linear-gradient(transparent, rgba(var(--bg-rgb), 0.97) 55%); }
@@ -674,12 +572,9 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .tile.launching .tile-hover .play-label { opacity: 1; transform: none; color: var(--gold); text-shadow: 0 0 12px var(--gold-glow); }
 
 /* POČETNA: hero baner */
-/* Svetlo iza cele strane dolazi od izdvojene igre: mutna, utisana kopija
-   njenog banera. Dubina iz sadrzaja, ne iz sara. */
-/* VRH POČETNE
-   Traka nosi dve stvari: znak kuće (ili okačene promo banere) levo, i stanje
-   nagradnog točka desno. Visina je fiksna i mirna - ranije je traka bila
-   "izdvojena igra" na odnosu 9.4:1 sa praznom sredinom. */
+/* Svetlo iza strane: mutna kopija banera izdvojene igre. */
+/* Vrh početne: znak kuće ili promo baneri levo, nagradni točak desno.
+   Visina je fiksna. */
 .hero {
   position: relative; z-index: 1; flex: 0 0 auto; overflow: hidden;
   display: flex; align-items: stretch; gap: 0;
@@ -697,10 +592,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; pointer-events: none;
   background: linear-gradient(90deg, var(--brend), rgba(var(--brend-rgb), 0.05) 72%, transparent);
 }
-/* Sredina banera je izmedju znaka kuce i tocka ostajala prazna ploha. Ranije su
-   tu stajale kose niti - videle su se kao sitne linije i izgledale kao greska u
-   slici. Sada dubinu daje samo MEKO SVETLO: siroki odsjaj u boji kuce iza
-   znaka, i tiha svetlost odozgo. Nema nijedne ivice koja se moze primetiti. */
+/* Dubina banera: širok odsjaj u boji kuće iza znaka i tiho svetlo odozgo. */
 .hero::before {
   content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent 64%);
@@ -724,9 +616,8 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 
 /* --- levo: okačeni promo baneri (ako ih osoblje ima) --- */
 .hero-promo { position: relative; flex: 1 1 auto; min-width: 0; }
-/* Baner koji je osoblje okačilo vidi se CEO. Šablon u panelu je 2800x400
-   (7:1), a mesto u vrhu je šire i niže od toga jer desno stoji točak - sa
-   "cover" bi se slici odsecao vrh i dno. Sa "contain" ništa se ne gubi. */
+/* Okačen baner se vidi ceo (contain): mesto na vrhu je šire i niže od
+   šablona. */
 .promo-slajd {
   position: absolute; inset: 0; background-size: contain; background-position: center;
   background-repeat: no-repeat;
@@ -754,10 +645,9 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 }
 .hero-tocak:hover { background: linear-gradient(100deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.08)); }
 .hero-tocak:active .hw-tocak { transform: scale(0.95); }
-/* Kazaljka iznad tocka je ono sto oko prepozna kao "tocak srece". Bez nje je
-   sest isecaka na 84px izgledalo kao znak opasnosti. */
+/* Kazaljka iznad točka. */
 .hw-tocak { position: relative; flex: 0 0 auto; width: 84px; height: 84px; display: block; }
-/* Kazaljka je BELA: na zlatnom prstenu (stanje "spreman") zlatna se gubila. */
+/* Kazaljka je bela: na zlatnom prstenu (stanje "spreman") zlatna se gubila. */
 .hw-kaz {
   position: absolute; top: -7px; left: 50%; transform: translateX(-50%); z-index: 3;
   width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent;
@@ -768,8 +658,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   box-shadow: 0 0 0 3px var(--bg), 0 0 0 4px rgba(var(--brend-rgb), 0.5), 0 8px 22px -8px rgba(0, 0, 0, 0.9);
 }
 .hw-krug .tocak-svg { width: 100%; height: 100%; display: block; border-radius: 50%; }
-/* Kad je spin spreman, prsten pulsira. Tocak se NE vrti u mestu - na 84px se
-   vrtnja pretvara u mrlju i oblik prestaje da lici na tocak. */
+/* Spreman spin: prsten pulsira; točak se ne vrti u mestu. */
 .hero-tocak.spreman .hw-krug {
   box-shadow: 0 0 0 3px var(--bg), 0 0 0 4px var(--gold), 0 0 24px -4px var(--gold-glow);
   animation: hw-puls 2.4s ease-in-out infinite;
@@ -815,8 +704,6 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   content: ""; position: absolute; left: 0; top: 1px; bottom: 1px; width: 4px;
   background: linear-gradient(180deg, var(--brend), var(--brend-deep));
 }
-/* Naslov police i strelice razdvaja prazan prostor, ne ukrasna linija.
-   Duga linija koja bledi u prazno je ukras bez funkcije. */
 .shelf-head .razmak { flex: 1; }
 .shelf-head .shelf-arrows { order: 3; }
 .shelf-arrows { display: flex; gap: 6px; }
@@ -845,32 +732,22 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 
 /* polica IGARA - tačno 8 vidljivih, veće kartice, klizni prelaz */
 .games-shelf { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 12px; min-height: 0; }
-/* Visinu diktira slobodan prostor police, a sirina se racuna iz odnosa strana.
-   Tako se omot nikad ne prelomi i ime igre ostane vidljivo i na 768 piksela. */
+/* Visinu daje slobodan prostor police, širinu odnos strana. */
 .games-shelf .shelf-track {
   --gap: 16px; gap: var(--gap); scroll-snap-type: x proximity; padding: 6px 2px 8px;
-  /* Traka mora da ima svoju visinu iz police, inace bi je uzimala od kartica
-     a kartice od nje - i sve bi ispalo nula. */
+  /* Traka uzima visinu iz police. */
   flex: 1 1 auto; min-height: 0; align-items: stretch;
 }
-/* Plocica se rasteze do visine police. Granica postoji da na velikom ekranu
-   korica ne naraste preko svake mere, ali je podignuta sa 336 na 430 - na
-   1080p je ranije ostajalo 127 px mrtvog prostora izmedju imena igara i reda
-   sa alatima, a taj prostor je bolje dati samim koricama.
-   Granica je sa 430 podignuta na 505: na 1080p je i dalje ostajalo 163 px
-   praznine ispod korica. Na 505 se u red i dalje vidi pet igara. */
+/* Pločica se rasteže do visine police, najviše 505px (pet igara u redu na
+   1080p). */
 .games-shelf .tile { flex: 0 0 auto; align-self: stretch; max-height: 505px; scroll-snap-align: start; }
 .games-shelf .tile-media { height: 100%; width: auto; }
 .games-shelf .tile-name { font-size: clamp(13px, 1vw, 15px); }
 .games-shelf .tile-badge { font-size: 11px; }
 
 /* fallback pozadina za igru bez cover slike - svoja boja iz imena */
-/* PLOCICA BEZ KORICA
-   Dok osoblje ne okaci poster, plocica mora da bude MIRNA. Ranije je bila jak
-   obojen blok sa dva slova preko pola visine - u polici od sedam igara to je
-   vikalo glasnije nego prava korica i police su izgledale kao gomila sarenih
-   kutija. Sad je tamna, boja iz imena se vidi samo kao tiho svetlo pri vrhu,
-   pa igre sa pravim posterom odmah iskacu iz reda. */
+/* Pločica bez omota je tamna i mirna; boja iz imena se vidi samo kao svetlo
+   pri vrhu. */
 .tile-fallback {
   position: absolute; inset: 0; display: grid; place-items: center;
   background:
@@ -881,18 +758,15 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   content: ""; position: absolute; inset: 0;
   background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.022) 0 2px, transparent 2px 15px);
 }
-/* Dva slova samo kad ni ikone nema (igra preko steam://). Sitna i prigusena -
-   to je oznaka da slika fali, ne ukras. */
+/* Inicijali samo kad nema ni ikone (igra preko steam://). */
 .tile-fallback .tile-emoji {
   position: relative; font-family: var(--font-display);
   font-size: clamp(19px, 2vw, 30px); font-weight: 700; letter-spacing: 0.1em;
   color: rgba(255, 255, 255, 0.24);
 }
-/* Prava ikona igre, izvucena iz njenog .exe fajla. Ikona je 48 px pa se ne
-   razvlaci preko cele plocice - stoji na svojoj ploci, kao znak. */
+/* Ikona iz .exe fajla (48 px), na svojoj ploči. */
 .tile-fallback.ikona .tile-ikona {
-  /* Izvor je 48 px. Preko toga se ikona muti, pa se ne razvlaci - umesto toga
-     se povecava PLOCA ispod nje, da kompozicija ne pliva u praznoj plocici. */
+  /* Ikona se ne razvlači preko 48 px; uvećava se ploča ispod nje. */
   position: relative; width: 48px; height: 48px; object-fit: contain;
   padding: clamp(18px, 2.2vw, 32px); box-sizing: content-box; border-radius: 20px;
   margin-bottom: 24px; /* opticka sredina prostora iznad imena */
@@ -900,11 +774,8 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.075), 0 12px 28px -14px rgba(0, 0, 0, 0.9);
   filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.55));
 }
-/* Dva slova stoje na istom mestu kao ikona, da red ne poskakuje kad neka igra
-   ima ikonu a neka nema.
-   26px NIJE korak lestvice razmaka nego IZMERENO poravnanje prema ploci ispod
-   ikone. Kad je jednom spusteno na 24, dva slova su se pomerila i red je
-   poskakivao - lestvica vazi za ritam, ne za poravnanje. */
+/* Inicijali na istom mestu kao ikona. 26px je poravnanje prema ploči ikone,
+   ne korak lestvice. */
 .tile-fallback .tile-emoji { margin-bottom: 26px; }
 
 /* INTERNET - sve kartice u jednom redu (8), krupnije, bez slajdera */
@@ -932,15 +803,10 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .sb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); flex-shrink: 0; }
 .sb-item.ok { color: var(--text-2); }
 .sb-item.ok .sb-dot { background: var(--green); box-shadow: 0 0 7px var(--green-glow); }
-/* Crveno znaci NE RADI. Kad se ne zna (server ne javlja, pa launcher nema
-   odakle da sazna kakav je internet), tacka ostaje siva - crvena tacka pored
-   crtice bi rekla "nema interneta", a to niko nije proverio. Traka onda salje
-   igraca da trazi kvar tamo gde ga mozda nema. */
+/* Crvena tačka samo kad internet ne radi; nepoznato stanje je sivo. */
 #sbNet:not(.ok) .sb-dot, #sbInet.nema .sb-dot { background: var(--red-status); box-shadow: 0 0 7px var(--red-glow); }
 #sbInet:not(.ok):not(.nema) .sb-dot { background: var(--text-3); box-shadow: none; }
-/* Igrač usred sesije dok servera nema: nije kvar nego stanje na koje treba
-   obratiti pažnju - vreme se računa na računaru, a shop i točak čekaju. Žuta,
-   ne crvena: crvena u ovom programu znači "ističe vreme" i "zaključano". */
+/* Sesija bez servera: žuto (pažnja), ne crveno. */
 #sbNet.bez .sb-dot { background: var(--amber); box-shadow: 0 0 7px rgba(255, 122, 38, 0.55); }
 #sbNet.bez .sb-txt { color: var(--text); }
 #sbClock .sb-txt, #sbPc .sb-txt { color: var(--text-2); }
@@ -948,18 +814,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .sb-item.hot .sb-txt, .sb-item.hot svg { color: var(--red-status); }
 
 /* NALOG (redizajn) */
-/* Sadrzaj krece od vrha, ne iz sredine ekrana. Centriran po visini je plutao
-   u sredini sa velikom prazninom iznad i ispod, a kad igrac ima porudzbine
-   strana bi poskakivala jer bi se sredina pomerala. Sirina je veca da dve
-   kartice ispune red umesto da stoje u uskoj koloni. */
-/* Nalog stoji u DVE kolone: levo ono što se čita (podaci, porudžbine, lozinka),
-   desno izbor pozadine koji je visok. Ranije je sve bilo u jednoj uskoj traci
-   pa je strana morala da se skroluje, a sa strane je zjapilo po 300 px praznine
-   na svakoj ivici. */
-/* NALOG: zaglavlje, pa meni levo i jedan odeljak desno.
-   Ranije su svi paneli stajali jedan pored drugog u mreži - sve se videlo
-   odjednom, ništa nije imalo prednost, a strana je rasla sa svakom novom
-   stvari. Sada igrač bira šta gleda i odeljak dobija ceo prostor. */
+/* Nalog: zaglavlje, pa meni levo i jedan odeljak desno. */
 .account {
   height: 100%; max-width: 1560px; margin: 0 auto; padding-top: 8px;
   display: flex; flex-direction: column; gap: 16px; min-height: 0;
@@ -1046,13 +901,9 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 }
 .por-levo { flex: 1; min-width: 0; }
 .por-desno { flex-shrink: 0; display: flex; align-items: center; gap: 12px; }
-/* Stavke stoje kao pojedinačni komadi, ne kao jedan red teksta razdvojen
-   zarezima: "2x Coca-Cola" se pročita odjednom, a spisak od tri pića se ne
-   slije u rečenicu. */
+/* Stavke porudžbine kao pojedinačni komadi. */
 .por-stavke { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 14px; line-height: 1.3; }
-/* Kolicina je masna i bela, naziv mirniji: oko prvo uhvati KOLIKO, pa onda
-   cita STA. Kolicina je bila zlatna - a zlatna u ovom programu znaci nagradu,
-   pa je "1x" izgledalo kao da se nesto dobija. */
+/* Količina masno i belo, naziv mirnije. */
 .por-st { color: var(--text-2); }
 .por-st b { color: var(--text); font-weight: 700; margin-right: 2px; }
 .por-meta { display: flex; align-items: center; gap: 8px; color: var(--text-3); font-size: 12px; margin-top: 6px; font-variant-numeric: tabular-nums; }
@@ -1074,13 +925,8 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 }
 .por-red.ceka { box-shadow: inset 0 0 0 1px rgba(var(--brend-rgb), 0.42); }
 .por-red.ceka .por-status { color: var(--brend); background: rgba(var(--brend-rgb), 0.16); }
-/* Zivotni vek porudzbine ima svoje tri boje, i nijedna nije zlatna:
-     ceka / sprema se   boja kuce - posao je u toku, program radi na tome
-     doneto             zelena - gotovo
-     otkazano           precrtano i sivo
-   Crveno se ne koristi: crveno znaci da nesto ne valja, a porudzbina koja se
-   sprema je dobra vest. Zlatna se ne koristi jer znaci nagradu - a stajala je
-   na istom ekranu na kom stoji i pravi nagradni tocak. */
+/* Boje porudžbine: čeka i sprema se - boja kuće; doneto - zelena; otkazano -
+   precrtano i sivo. Bez crvene i zlatne. */
 .por-red.sprema { box-shadow: inset 0 0 0 1px rgba(var(--brend-rgb), 0.5); }
 .por-red.sprema .por-status { color: var(--brend); background: rgba(var(--brend-rgb), 0.18); }
 .por-red.gotovo { opacity: 0.6; }
@@ -1088,9 +934,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .por-red.otkazano { opacity: 0.55; }
 .por-red.otkazano .por-stavke { text-decoration: line-through; color: var(--text-3); }
 
-/* ---- Miš i zvuk ----
-   Ono što igrač sme da menja: sve po korisniku, sve povratno, sve se vraća na
-   zatečeno kad se odjavi. */
+/* ---- Miš i zvuk ---- */
 .pod-grupa { margin-bottom: 16px; }
 .pod-nas {
   display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
@@ -1123,8 +967,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; color: var(--text);
 }
 
-/* Prekidač: ugašen je siv i kugla je levo, upaljen je crven i kugla desno.
-   Bez pomeraja kugle boja sama ne kaže dovoljno na tamnoj pozadini. */
+/* Prekidač: boja i položaj kugle. */
 .prekidac {
   position: relative; flex-shrink: 0; width: 50px; height: 27px; padding: 0; cursor: pointer;
   background: var(--brend); border: 0; border-radius: 14px;
@@ -1146,9 +989,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
   transition-duration: 0.001ms !important;
 }
 
-/* ---- Nagrade ----
-   Točak je ranije postojao samo kao widget u baneru na početnoj. Ko ga tamo ne
-   primeti, nije ni znao da postoji ni koliko mu fali do spina. */
+/* ---- Nagrade ---- */
 .nag-spreman, .nag-ceka, .nag-napredak {
   padding: 20px 20px; background: rgba(255, 255, 255, 0.035);
   box-shadow: inset 0 0 0 1px var(--line);
@@ -1173,25 +1014,18 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .nag-stavka.prazna { opacity: 0.5; }
 .nag-stavka.prazna svg { color: var(--text-3); }
 
-/* Broj porudzbina koje jos nisu donete, na tabu "Nalog".
-   Znacka je PRAVI element, ne ::after - aktivan tab vec koristi ::after za
-   crvenu liniju ispod sebe. Kad su bili isti, dva pravila su se stopila u
-   crveni blok koji je progutao ceo tab i rec "NALOG" se nije videla.
-   Stoji desno od natpisa, u svom prostoru, pa nista ne prekriva. */
+/* Broj porudžbina u toku na tabu "Nalog". Poseban element, jer aktivan tab
+   koristi ::after za liniju. */
 .tab-znacka {
   min-width: 18px; height: 18px; padding: 0 4px; border-radius: 999px;
   background: var(--brend); color: #fff; font-size: 11px; font-weight: 800; line-height: 1;
   display: grid; place-items: center; flex: 0 0 auto;
   box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.8);
 }
-/* MOJA POZADINA (na nalogu igraca)
-   Uzorak se crta istom sarom i istom prozirnoscu kao na ekranu, da izbor ne
-   laze o rezultatu. Klik odmah menja ekran - nema dugmeta "sacuvaj", jer se
-   rezultat vidi iza samog panela. */
+/* Moja pozadina (nalog igrača): uzorak koristi istu šaru i prozirnost kao
+   ekran; izbor se primenjuje odmah. */
 
-/* NAGRADNI TOČAK - pop-up
-   Ranije je stajao razvucen na strani Nalog i gusio je. Sada se otvara klikom
-   na widget u baneru, u svom prozoru, gde ima mesta za vrtnju. */
+/* Nagradni točak - pop-up */
 .tocak-dlg { width: 440px; padding: 24px 28px 24px; }
 .dlg-x {
   position: absolute; top: 14px; right: 14px; width: 32px; height: 32px;
@@ -1219,17 +1053,14 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
   border-top: 20px solid var(--gold); filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
   transform-origin: 50% 2px;
 }
-/* Kazaljka odskoči na svaki zubac. Bez toga stoji ukočena dok se ispod nje sve
-   vrti, pa ceo pokret izgleda kao slika koja se okreće, a ne kao točak. */
+/* Kazaljka odskoči na svaki zubac. */
 .tocak-kazaljka.kuc { animation: kaz-kuc 130ms var(--ease-out); }
 @keyframes kaz-kuc {
   40% { transform: translateX(-50%) rotate(11deg); }
   100% { transform: translateX(-50%) rotate(0deg); }
 }
 
-/* Osvojeni iznos odleti sa točka na kredit u HUD-u i tamo se "zalepi". Bez toga
-   igrač vidi dve nepovezane stvari: poruku o nagradi i brojku koja se u
-   međuvremenu promenila. */
+/* Osvojen iznos odleti sa točka na kredit. */
 .leti-kredit {
   position: fixed; z-index: 90; pointer-events: none;
   font-family: var(--font-display); font-weight: 700; font-size: 24px;
@@ -1285,10 +1116,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 }
 .poz-uzorak:hover { transform: translateY(-3px); box-shadow: inset 0 0 0 1px var(--line-2); }
 .poz-uzorak.izabran { box-shadow: inset 0 0 0 1.5px var(--brend), 0 12px 26px -14px var(--brend-glow); }
-/* Uzorak se gleda na PODLOZI PROGRAMA, ne na crnoj.
-   Stajao je na #101018 - skoro crnoj iz stare palete - pa je pokazivao kako bi
-   sara izgledala u nekom drugom programu. Igrac po ovim slicicama bira sta ce
-   mu ceo dan stajati iza igara; ako slicica laze o podlozi, laze i o sari. */
+/* Uzorak šare stoji na podlozi programa. */
 .pu-slika {
   display: block; height: 62px; margin-bottom: 8px;
   background-color: var(--bg); background-repeat: repeat; border-bottom: 1px solid var(--line);
@@ -1302,21 +1130,12 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .pp-l { display: block; margin-bottom: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; font-family: var(--font-ui); text-transform: uppercase; color: var(--text-3); }
 .pp-dugmad { display: flex; gap: 6px; }
 
-/* Promena lozinke: dva polja i dugme u jednom redu. Panel je iste sirine kao
-   ostali na Nalogu, a sadrzaj se ne razvlaci preko celog ekrana. */
-/* DUGME STOJI U ISTOM REDU SA POLJIMA, NE ISPOD NJIH.
-
-   `.field` svuda nosi `margin-bottom: 16px` (tamo gde polja stoje jedno ispod
-   drugog to je razmak između njih). Ovde su polja i dugme u ISTOM redu, poravnata
-   po dnu - pa je ta donja margina gurala polja 16px naviše, a dugme je ostajalo
-   samo, spušteno. Izgledalo je kao da je zalepljeno ispod, a ne uz njih.
-
-   Razmak u ovom redu drži `gap`, pa margina ovde nema šta da radi. */
+/* Promena lozinke: dva polja i dugme u jednom redu. */
+/* Polja i dugme su u istom redu, poravnati po dnu; razmak drži `gap`, pa se
+   donja margina `.field` ovde poništava. */
 .acc-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; max-width: 660px; }
 .acc-form .field { flex: 1 1 190px; min-width: 0; margin-bottom: 0; }
-/* Ista visina kao polje, do piksela. Izmereno u pravom Electronu: polje je 46px
-   (12 + tekst + 12, uz ivicu od 1px sa obe strane). Na 47px su se dna poklapala
-   a vrhovi razilazili za piksel - dovoljno da red izgleda neuredno. */
+/* Visina polja (46px). */
 .acc-form .btn { flex: 0 0 auto; height: 46px; padding: 0 20px; }
 @media (max-width: 900px) {
   .acc-stats { gap: 20px; }
@@ -1324,14 +1143,8 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 }
 
 /* brendirane internet kartice - svaka u bojama svoje aplikacije */
-/* KARTICA ALATA (Internet i alati)
-   Stoji polozeno i nize od polica igara - igre su glavna stvar na ekranu, ovo
-   je red alatki. Logo levo na svojoj ploci, ime desno kao potpis.
-   Boja brenda ne farba celu karticu nego radi tri tiha posla: drzi ivicu levo,
-   obasja logo iza ploce i pali senku na prelazu misem. Tako ceo red izgleda
-   kao jedna celina, a svaka kartica i dalje nosi svoj brend. Pun brendirani
-   blok bi u nizu od osam bio sarena traka koja tuce igre iznad.
-   Postoji samo ovaj oblik kartice - alati se nigde drugde ne crtaju. */
+/* Kartica prečice (Internet i alati): niža od polica igara, logo levo na
+   ploči, ime desno. Boja brenda je na ivici, iza logoa i u senci. */
 .site-card {
   position: relative; flex: 1 1 0; min-width: 0; height: clamp(72px, 8.6vh, 92px);
   padding: 0 12px 0 12px; overflow: hidden; cursor: pointer;
@@ -1347,27 +1160,14 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
   background: var(--glow, var(--brend));
   transition: box-shadow var(--tr);
 }
-/* Svetlo brenda ostaje PLITKO i skupljeno uz levu ivicu.
-   Prvo je bilo jako i razliveno preko cele kartice, ali ikone programa su
-   svakakvih boja - zuta fascikla je karticu farbala u blatnjavo zuto. Ovako
-   boja i dalje kaze koji je alat, a osam kartica u nizu ostaje jedan miran red
-   umesto sarene trake koja tuce igre iznad. */
+/* Svetlo brenda je plitko i uz levu ivicu. */
 .site-card::after {
   content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.3;
   background: linear-gradient(90deg, var(--glow, var(--brend)), transparent 46%);
   transition: opacity var(--tr);
 }
-/* BOJA BRENDA KAŽE KO SI, BOJA KUĆE KAŽE ŠTA RADIŠ.
-
-   Hover je ovde uzimao boju samog logotipa (--glow, izvučena iz slike). Na
-   YouTube-u to znači da prelaskom miša plava kuća postane CRVENA - a crvena u
-   ovom programu ima svoje značenje: ističe vreme, zaključano, nema na stanju.
-   Uz to je svaka kartica na hover svetlela drugom bojom, pa red od devet
-   prečica nije imao nijedno zajedničko pravilo.
-
-   Sada: u miru kartica nosi svoj brend (po tome se Steam razlikuje od Twitch-a
-   na prvi pogled), a čim se dodirne - svetli bojom kuće, isto kao pločica igre
-   i kao izabran artikal u Shop-u. Jedan jezik na celom ekranu. */
+/* U miru kartica nosi boju brenda, a na hover boju kuće, kao pločica igre i
+   izabran artikal. */
 .site-card:hover {
   transform: translateY(-4px);
   box-shadow: inset 0 0 0 1px rgba(var(--brend-rgb), 0.45),
@@ -1377,8 +1177,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .site-card:hover .site-logo { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), 0 8px 20px -8px var(--brend-glow); }
 .site-card:active { transform: translateY(-1px); }
 
-/* Logo stoji na svojoj ploci - ikone izvucene iz .exe fajlova imaju svakakve
-   pozadine i oblike, pa im zajednicka podloga daje red koji sami nemaju. */
+/* Logo na zajedničkoj ploči. */
 .site-logo {
   position: relative; z-index: 1; flex: 0 0 auto;
   width: clamp(38px, 3.1vw, 54px); height: clamp(38px, 3.1vw, 54px);
@@ -1388,9 +1187,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 }
 .site-logo svg { width: 58%; height: 58%; overflow: visible; }
 
-/* Poznat brend: beo znak na ploci u BOJI BRENDA. Steam i Epic su zvanicno crni,
-   pa bi crn znak na tamnoj kartici prosto nestao - ovako je svaki citljiv, a
-   ploca odmah kaze o kom je alatu rec. */
+/* Poznat brend: beo znak na ploči u boji brenda. */
 .site-card.brend .site-logo {
   background: var(--glow);
   background-image: linear-gradient(155deg, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0.28));
@@ -1409,19 +1206,13 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
   font-family: var(--font-ui);
   text-transform: uppercase; letter-spacing: 0.04em; color: #eceef4;
   line-height: 1.22;
-  /* Ime sme da predje u DVA reda. Na 1366x768 osam precica deli 1306px, pa je
-     na ime ostajalo oko 64px - "TEAM SPEAK", "BATTLENET" i "EPIC GAMES" su se
-     secli na "TEAM S...". Dva reda stanu pored logotipa, a "..." ostaje samo za
-     imena koja ni tada ne mogu da stanu.
-     Prelom ide SAMO na razmaku: sa "break-word" se "BATTLENET" na 1280 lomio
-     nasred reci u "BATTLENE / T". Bolje je da jedna duga rec bude skracena sa
-     "..." nego preseceva na pola. */
+  /* Ime prečice sme u dva reda (na 1366x768 je za ime oko 64px). Prelom samo na
+     razmaku; reč koja ni tada ne stane dobija "...". */
   overflow: hidden; overflow-wrap: normal; word-break: normal;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
 }
 
-/* Alat sa slikom koju je osoblje okacilo: slika popunjava mesto logotipa, da
-   red ostane ujednacen umesto da jedna kartica ispadne iz stroja. */
+/* Okačena slika popunjava mesto logotipa. */
 .site-card.cover .site-cover {
   position: relative; z-index: 1; flex: 0 0 auto; overflow: hidden; border-radius: 13px;
   width: clamp(38px, 3.1vw, 54px); height: clamp(38px, 3.1vw, 54px);
@@ -1429,15 +1220,13 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 }
 .site-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-/* Alat bez ijedne slike i bez poznatog brenda - prvo slovo imena na ploci u
-   boji, da kartica izgleda namerno a ne kao propust. */
+/* Bez slike i bez poznatog brenda: prvo slovo imena na ploči u boji. */
 .site-card.letter .site-logo { background: linear-gradient(150deg, var(--glow), rgba(0, 0, 0, 0.45)); }
 .site-card.letter .tool-letter {
   font-family: var(--font-display); font-weight: 700; font-size: clamp(19px, 1.5vw, 24px);
   color: #fff; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
-/* Google je izuzetak: njihov "G" se po pravilima ne preboji, pa ide u svoje
-   cetiri boje - a to trazi belu plocu ispod. */
+/* Google "G" ostaje u svoje četiri boje, na beloj ploči. */
 .site-card.light .site-logo {
   background: #fff; background-image: none;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.14), 0 6px 14px -8px rgba(0, 0, 0, 0.85);
@@ -1447,11 +1236,8 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 /* (Ugrađeni pregledač uklonjen - sajt-alati sada otvaraju sistemski Chrome preko shell.openExternal.) */
 
 /* ===== SHOP =====
-   Jelovnik, ne izlog. Fotografija pića stoji na mirnoj podlozi koja uzima
-   boju SA SAME LIMENKE (colorizeShop je upisuje u --cr), ispod nje ime i cena
-   u jednom redu i jedno malo okruglo dugme. Ranije je svaka kartica imala punu
-   crvenu traku "Dodaj", pa je sedam crvenih pravougaonika bilo prvo što se
-   vidi na ekranu; sada crveno postoji samo na dugmetu "Poruči" i pod mišem. */
+   Slika pića na podlozi u boji same limenke (colorizeShop upisuje --cr), ispod
+   ime i cena u jednom redu i malo okruglo dugme. */
 .content.shop-mode { overflow: hidden; padding: 20px 28px 16px; }
 .shop { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; min-height: 0; }
 
@@ -1460,17 +1246,13 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
   display: flex; flex-direction: column;
 }
 .shop-products .empty-view { flex: 1; }
-/* Prazan shop nema korpu (vidi renderShop), pa poruka uzima celu sirinu -
-   inace bi stajala u levoj trecini a desno bi zjapila kolona koja ne moze nista
-   da primi. */
+/* Prazan shop nema korpu, pa poruka zauzima celu širinu. */
 .shop.bez-korpe { grid-template-columns: minmax(0, 1fr); }
 .shop-products .polica-prazno.veliko { flex: 1; align-content: center; }
 /* Prazna korpa: znak i tekst po sredini kolone, kao i ostale prazne police. */
 .cart .polica-prazno { flex: 1; align-content: center; padding: 24px 12px; }
 
-/* Traka kategorija stoji iznad jednog jedinog spiska. Ranije je svaka
-   kategorija imala svoj red kartica, pa je sa sedam artikala svaki red bio
-   popunjen do pola i pola ekrana je zjapilo prazno. */
+/* Traka kategorija iznad jednog spiska. */
 .shop-filter {
   display: flex; flex-wrap: wrap; gap: 8px;
   padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--line);
@@ -1489,8 +1271,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 }
 .shop-cip:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
 .shop-cip.aktivan { color: #fff; background: rgba(255, 255, 255, 0.07); box-shadow: inset 0 0 0 1px var(--line-2); }
-/* Broj artikala na izabranom cipu: cip je vec osvetljen, drugi signal na
-   istom mestu samo dodaje suma - a zlatna ovde nista ne znaci. */
+/* Broj artikala na izabranom čipu. */
 .shop-cip.aktivan span { color: var(--text); }
 
 .shop-grid {
@@ -1509,23 +1290,16 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .pice:hover { transform: translateY(-3px); box-shadow: inset 0 0 0 1px var(--line-2); }
 .pice.izabrano { box-shadow: inset 0 0 0 1px rgba(var(--brend-rgb), 0.62); }
 
-/* Slika: fiksna visina i contain, da se visoka limenka i niska flašica
-   poravnaju u istom redu bez izobličenja. */
+/* Slika fiksne visine (contain), da se limenka i flašica poravnaju. */
 .pice-slika {
-  /* DVA REDA KARTICA MORAJU DA STANU BEZ SKROLOVANJA.
-     To je pisalo i ranije, ali nije vazilo: racunato je na prazan Shop, a cim
-     igrac ima porudzbinu u toku, traka "Porudzbina se sprema" pojede 49 px i
-     drugi red ostane bez cene i dugmeta "+" ispod ivice ekrana. Bas tada igrac
-     i gleda Shop - porucio je i ceka.
-     Izmereno na 1366x768 sa trakom: za dva reda ima 482 px, a trebalo je 535.
-     Odavde: slika 134 px na 768, 215 px na 1080p (ranije 161 i 227). */
+  /* Dva reda kartica staju bez skrolovanja i kad je traka "Porudžbina se
+     sprema" prikazana (49 px). Na 1366x768 slika je 134 px, na 1080p 215 px. */
   position: relative; height: clamp(120px, calc(26vh - 66px), 280px); overflow: hidden;
   background:
     radial-gradient(120% 78% at 50% 6%, rgba(var(--cr), 0.13), transparent 68%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(0, 0, 0, 0.16));
 }
-/* Apsolutno u odnosu na okvir: procenat visine se tako uvek računa, pa visoka
-   limenka i niska flašica staju u isti okvir i nijedna ga ne probija. */
+/* Apsolutno u okviru, pa se procenat visine uvek računa. */
 .pice-slika img {
   position: absolute; inset: 14px 14px 11px; z-index: 1;
   width: 100%; height: 100%; margin: auto; object-fit: contain;
@@ -1557,8 +1331,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .pice.nema:hover { transform: none; box-shadow: inset 0 0 0 1px var(--line); }
 
 .pice-dno { flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; }
-/* Ime ide malim slovima. VELIKA SLOVA na svakoj kartici su činila da ceo
-   spisak viče, a i brend se čita tačnije: "Coca-Cola Zero", ne "COCA-COLA ZERO". */
+/* Ime u običnim slovima ("Coca-Cola Zero"). */
 .pice-ime {
   font-family: var(--font-ui); font-size: 13px; font-weight: 600; line-height: 1.32;
   letter-spacing: 0.01em; color: var(--text);
@@ -1600,10 +1373,8 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
   font-weight: 700; font-size: 14px; color: var(--text); font-variant-numeric: tabular-nums;
 }
 
-/* ---- Traka o porudzbini koja stize ----
-   Ceo spisak porudzbina je ranije stajao i ovde i na nalogu, sa dva razlicita
-   markupa. Igracu u Shop-u treba samo odgovor na to da li stize, pa je ostala
-   jedna linija koja vodi na nalog, gde je istorija. */
+/* ---- Traka o porudžbini u toku ----
+   Jedna linija koja vodi na Nalog, gde je ceo spisak. */
 .shop-traka {
   width: 100%; margin-bottom: 12px; padding: 12px 16px; cursor: pointer;
   display: flex; align-items: center; gap: 12px; text-align: left;
@@ -1679,9 +1450,8 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .ce-s { font-size: 12px; color: var(--text-3); }
 
 .cart-foot { padding: 16px 20px 16px; border-top: 1px solid var(--line); }
-/* Izbor plaćanja: dve jednake ponude, ne padajući meni - igrač bira jednim
-   klikom. Izabrano je zlatno, ne crveno: crveno ostaje samo dugmetu "Poruči"
-   da se na ekranu uvek zna šta je jedan glavni potez. */
+/* Plaćanje: dve jednake ponude, jednim klikom. Izabrano je zlatno; crvena
+   ostaje samo za "Poruči". */
 .placanje { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .nacin {
   display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
@@ -1732,9 +1502,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
   box-shadow: inset 0 0 0 1px var(--line-2);
 }
 /* Zaključan ekran */
-/* Zakljucan ekran ima SVOJU pozadinu (duboko crveno svetlo). Ranije je preko
-   svega isao jos i backdrop-filter: blur - a iza nema sta da se muti, jer je
-   desktop sakriven; jedini efekat je bio da se pozadina razmaze u mrlju. */
+/* Zaključan ekran ima svoju pozadinu (crveno svetlo), bez zamućenja. */
 #lockedScreen { background: rgba(var(--bg-rgb), 0.28); }
 .lock-icon {
   width: 96px; height: 96px; margin-bottom: 28px;
@@ -1746,7 +1514,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 }
 @keyframes lock-in { from { opacity: 0; transform: scale(0.85); } }
 .lock-icon svg { width: 42px; height: 42px; stroke-width: 1.7; }
-/* Zakljucan zbog isteklog vremena - crveno, jer to ZNACI, i ne menja se sa bojom kuce. */
+/* Zakljucan zbog isteklog vremena - crveno, jer to znaci, i ne menja se sa bojom kuce. */
 .lock-icon.time { background: rgba(var(--red-status-rgb), 0.14); color: var(--red-status); box-shadow: 0 0 44px -6px rgba(var(--red-status-rgb), 0.5), inset 0 0 0 1px rgba(var(--red-status-rgb), 0.4); }
 .lock-title { font-family: var(--font-display); font-size: 36px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
 .lock-sub { color: var(--text-2); font-size: 15px; margin-top: 12px; text-align: center; max-width: 460px; line-height: 1.6; }
@@ -1793,8 +1561,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .dialog .field input { text-align: center; letter-spacing: 6px; font-weight: 800; }
 
 /* Toast */
-/* Poruke stoje IZNAD donje trake, ne preko nje. Traka je 38 px, pa 38+18
-   ostavlja jasan razmak i poruka se cita bez smetnje. */
+/* Poruke stoje iznad donje trake (38 px). */
 .toasts { position: fixed; bottom: 56px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 10px; z-index: 400; align-items: center; max-width: min(760px, 88vw); }
 .toast {
   display: flex; align-items: center; gap: 10px;
@@ -1872,29 +1639,16 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
 }
 @keyframes boot-bar { to { width: 100%; } }
 
-/* SMANJEN MOTION - pazljivo, ne preko svega
-   Windows sa iskljucenim animacijama ("Adjust for best performance", Ease of
-   Access, ili bilo koja "debloat" skripta) javlja prefers-reduced-motion:
-   reduce - a to je na racunarima u igraonici skoro pravilo, jer se bas tako
-   podesavaju za igre.
-   Ovde je ranije stajalo pravilo koje je sa !important gasilo SVE animacije na
-   strani. Posledica: na tim racunarima sara u pozadini je stajala mrtva i
-   nagradni tocak se nije vrteo, iako je vlasnik oboje izricito upalio u panelu.
-   Kretanje sare ima svoj pravi prekidac - Izgled launchera > Mirno. Zato ovde
-   ostaju samo ulazne animacije kartica, koje nista ne znace ako izostanu. */
+/* Smanjeno kretanje. Windows podešen za igre (isključene animacije) javlja
+   prefers-reduced-motion: reduce, pa se ovde gase samo ulazne animacije
+   kartica. Kretanje šare i točak imaju svoj prekidač u panelu ("Mirno"). */
 @media (prefers-reduced-motion: reduce) {
   .tile, .pice, .hero { animation: none !important; }
 }
 
 /* ---------- VIP traka na vrhu početne ---------- */
-/*
-   Zlatna je ovde namerna: u celom programu ona znači NAGRADU (nagradni točak),
-   a VIP je nagrada. Boja kuće se ne koristi jer bi se VIP izgubio među ostalim
-   dugmadima - ovo mora da se izdvoji.
-
-   Zaključano stanje nije prazna traka nego traka sa pečatom: prazna traka je
-   obećanje koje program ne ispunjava, a pečat kaže da stvar tek dolazi.
-*/
+/* Zlatna: VIP je nagrada, pa se izdvaja od ostale dugmadi. Zaključano stanje
+   ima pečat. */
 .rang {
   position: relative; flex: 1; min-width: 0; height: 100%;
   display: flex; align-items: center; gap: 20px; padding: 0 24px;
@@ -1906,8 +1660,7 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
     radial-gradient(120% 200% at 8% 50%, rgba(255, 181, 39, 0.10), transparent 58%),
     linear-gradient(100deg, rgba(255, 181, 39, 0.05), transparent 60%);
 }
-/* Znak kuce, pa tanka pregrada, pa VIP. Dva znaka jedan do drugog moraju da
-   budu razdvojena - inace se citaju kao jedan zbrkan oblik. */
+/* Znak kuće, tanka pregrada, pa rang. */
 .rang-kuca { flex: none; height: 46px; width: auto; display: block;
   filter: drop-shadow(0 4px 16px rgba(var(--brend-rgb), 0.4)); }
 .rang-znak { flex: none; width: 52px; height: 56px; position: relative;
@@ -1919,9 +1672,7 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
   fill: rgba(255, 181, 39, 0.10); stroke: var(--gold); stroke-width: 2;
   stroke-linejoin: round;
 }
-/* U stitu stoji BROJ NIVOA. Zvezda je bila znak VIP-a, a VIP se sada kupuje -
-   zvezda na traci svakog gosta bi znacila da ga svi imaju. Broj je uz to jedina
-   stvar na traci koja raste. */
+/* U štitu je broj nivoa. */
 .rang-broj {
   fill: var(--gold); font-family: var(--font-display); font-size: 19px; font-weight: 700;
   letter-spacing: 0; paint-order: stroke;
@@ -1929,9 +1680,7 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
 .rang.zakljucan .rang-stit { stroke: rgba(255, 181, 39, 0.42); fill: rgba(255, 181, 39, 0.05); }
 .rang.zakljucan .rang-broj { fill: rgba(255, 181, 39, 0.34); }
 
-/* Rec VIP stoji SAMO onome ko je clanarinu platio, i uz broj preostalih dana:
-   ko ne zna dokle mu vazi, ne obnavlja. Zlatna je ovde na mestu - clanarina je
-   nagrada, i jedina je zlatna stvar u traci pored samog stita. */
+/* Oznaka VIP samo za člana, uz broj preostalih dana. */
 .rang-clan {
   display: inline-flex; align-items: center; gap: 5px;
   font-family: var(--font-ui); font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
@@ -1953,7 +1702,7 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
   text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3);
 }
 
-/* Traka: zupci je dele na nivoe, pa se vidi DOKLE se stiglo, ne samo da raste. */
+/* Traka: zupci je dele na nivoe, pa se vidi dokle se stiglo, ne samo da raste. */
 .rang-traka {
   position: relative; height: 12px; border-radius: 3px;
   background: rgba(var(--bg-rgb), 0.65);
@@ -2003,8 +1752,7 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
   font-family: var(--font-display); font-size: 36px; font-weight: 700; color: var(--text);
   position: relative;
 }
-/* Okviri se razlikuju OBLIKOM, ne samo bojom: igrač koji ih bira mora da vidi
-   razliku i na malom znaku, a ne da pogađa koja je nijansa koja. */
+/* Okviri se razlikuju oblikom, ne samo bojom. */
 .pf-znak.okvir-tanki { box-shadow: 0 0 0 2px var(--brend); }
 .pf-znak.okvir-dvojni { box-shadow: 0 0 0 2px var(--brend), 0 0 0 6px rgba(var(--brend-rgb), 0.28); }
 .pf-znak.okvir-zlatni { box-shadow: 0 0 0 3px var(--gold), 0 0 26px -6px var(--gold-glow); }
@@ -2037,12 +1785,8 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
 .pf-xp-pod { font-size: 12px; color: var(--text-3); }
 
 .pf-brojke { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr)); gap: 10px; }
-/* PROFIL GOVORI ISTIM OBLIKOM KAO OSTATAK PROGRAMA.
-   Sve u launcheru ima odsečen ugao (`clip-path`) i unutrašnji prsten umesto
-   okvira - police, redovi porudžbina, značke. Profil je jedini držao zaobljene
-   kartice sa `border-radius`, a značke stoje TAČNO ISPOD njegovih brojki, na
-   istom ekranu: gore zaobljeno, dole odsečeno. Dve vrste kartice jedna ispod
-   druge izgledaju kao da su iz dva programa. */
+/* Kartice profila koriste odsečen ugao (`clip-path`) i unutrašnji prsten,
+   kao ostatak launchera. */
 .pf-brojka {
   background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line);
   clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
@@ -2060,8 +1804,7 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
   text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-2);
   display: flex; align-items: center; gap: 10px;
 }
-/* Brava kaže NA KOM NIVOU stvar dolazi, ne samo da je zaključana - "još malo"
-   je poziv, a "zaključano" je zid. */
+/* Brava kaže na kom nivou stvar dolazi. */
 .pf-brava {
   display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
   border-radius: 999px; background: rgba(255, 181, 39, 0.12);
@@ -2085,8 +1828,7 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
   clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
   font-family: var(--font-ui); font-size: 13px; font-weight: 700;
 }
-/* Prelaz stoji dole, uz ostale stvari koje se klikću - ovde je bio `all`, a
-   `all` preliva i ono što ne treba i svakako ga je to pravilo pregazilo. */
+/* Prelaz je dole, uz ostale kontrole. */
 .pf-okvir:hover { color: var(--text); box-shadow: inset 0 0 0 1px var(--brend); }
 .pf-okvir.aktivna { background: var(--brend-soft); box-shadow: inset 0 0 0 1px var(--brend); color: var(--text); }
 
@@ -2110,8 +1852,7 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
 .pf-n-stanje { flex: none; color: var(--text-3); display: flex; }
 .pf-nagrada.ima .pf-n-stanje { color: var(--green); }
 
-/* Nov nivo: traka bljesne jednom. Bez toga bi se promenila tiho, a igrač bi je
-   primetio tek slučajno - i otključana stvar bi stajala neiskorišćena. */
+/* Nov nivo: traka bljesne jednom. */
 .rang.slavi { animation: rang-slavi 2.4s ease-out; }
 @keyframes rang-slavi {
   0% { box-shadow: inset 0 0 0 0 var(--gold-glow); }
@@ -2122,29 +1863,14 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
 .toast.nivo .t-ic { color: var(--gold); }
 
 /* ============================================================================
-   STANJA: PRELAZAK MIŠA, PRITISAK, FOKUS
+   Stanja: prelazak miša, pritisak, fokus - na svemu što se klikće, svuda isto.
 
-   Tri stanja, na svemu što se klikće, i svuda ista. Do sada je hover imalo
-   skoro sve, PRITISAK samo sedam elemenata, a FOKUS - nijedan.
-
-   Zašto to nije sitnica:
-
-     PRITISAK. Kiosk radi na jeftinijim mišem i na mreži koja ume da zastane.
-     Kad se klik ne vidi, igrač klikne drugi put. Na "Poruči" to je bila dupla
-     porudžbina - zato dugmad koja diraju novac imaju svoju bravu (jednomKlik).
-     Ostalo se rešava time da se pritisak VIDI.
-
-     FOKUS. Igrač se prijavljuje tastaturom: ime, Tab, lozinka, Enter. Bez
-     vidljivog fokusa ne zna gde je. Isto važi kad miš zataji usred smene, a
-     radnik treba da dođe do "Odjava" ili do servisnog izlaza.
-
-   Prsten je UNUTRAŠNJI (inset). Skoro sve u launcheru ima odsečen ugao preko
-   `clip-path`, a clip-path seče sve što izađe iz oblika - i `outline` i spoljnu
-   senku. Unutrašnji prsten prati isti oblik i vidi se i na odsečenom uglu.
+   Pritisak se vidi, da se na sporoj mreži ne klikće dvaput. Fokus se vidi,
+   jer se prijava radi tastaturom. Prsten je unutrašnji (inset): `clip-path`
+   odseca `outline` i spoljnu senku.
    ========================================================================== */
 
-/* Mišem se prsten NE ostavlja - samo tastaturom. `:focus-visible` to radi sam;
-   ovde se gasi podrazumevani outline koji Chrome crta preko odsečenog ugla. */
+/* Prsten samo za tastaturu (`:focus-visible`); podrazumevani outline se gasi. */
 :focus { outline: none; }
 
 .tab:focus-visible,
@@ -2174,8 +1900,7 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
 .pice-plus:focus-visible, .qbtn:focus-visible, .promo-tacka:focus-visible,
 .pice-step button:focus-visible { border-radius: 50%; }
 
-/* PRITISAK: kratko i suvo. Sve što se već diže na prelazak miša ovde se vraća
-   na svoje mesto - pokret nadole je ono što ruka očekuje od dugmeta. */
+/* Pritisak: kratko pomeranje nadole. */
 .tab:active,
 .acc-mi:active,
 .shelf-arr:active,
@@ -2194,39 +1919,29 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
 }
 .pice-plus:active, .qbtn:active, .pice-step button:active { transform: scale(0.92); }
 
-/* Prelaz mora da POSTOJI da bi se pritisak uopšte video: bez njega je promena
-   trenutna u oba smera i oko je ne uhvati. `--t-brzo` je namerno kratko - ovo
-   je odgovor na dodir, ne animacija. */
+/* Prelaz postoji da bi se pritisak video; `--t-brzo` je kratak. */
 .tab, .acc-mi, .shelf-arr, .shop-cip, .pf-boja, .pf-okvir, .nacin, .shop-traka, .dlg-x,
 .pice-plus, .qbtn, .pice-step button {
   transition: background var(--t-brzo), color var(--t-brzo),
               transform var(--t-brzo), filter var(--t-brzo);
 }
-/* Prsten se NE preliva. Tastatura ide brzo - dok bi se prsten pojavljivao, fokus
-   je vec dva polja dalje. Pojavi se odmah ili ne sluzi nicemu. */
+/* Prsten fokusa bez prelaza. */
 :focus-visible { transition: none; }
 
-/* KARTICA PIĆA JE DUGME, PA SE TAKO I PONAŠA.
-   Podizala se na prelazak miša - to je poziv na klik - a klik nije primala.
-   Rasprodata se ne diže i ne prima klik: obećanje koje ne može da ispuni. */
+/* Kartica pića prima klik; rasprodata se ne diže i ne prima klik. */
 .pice[data-add] { cursor: pointer; }
 .pice.nema { cursor: default; }
 .pice.nema:hover { transform: none; box-shadow: inset 0 0 0 1px var(--line); }
 
-/* PLOČICA IGRE JE SADA <button>. Dugme donosi svoje podrazumevano poravnanje i
-   popunu, pa se vraća na ono što je pločica imala kao div. */
-/* Dugme donosi svoju popunu i poravnanje teksta; sirina i prikaz se NE diraju -
-   plocica je clan police (flex), pa joj sirinu odredjuje polica. Kad je ovde
-   stajalo width: 100%, u polici se videla samo jedna igra. */
+/* Pločica igre je <button>. */
+/* Poništava popunu i poravnanje dugmeta; širinu određuje polica (flex). */
 .tile { padding: 0; text-align: left; }
 
 /* ============================================================================
    VIP PONUDA, ZNAČKE I REKORDI NA PROFILU
    ========================================================================== */
 
-/* VIP je JEDINA prava nagrada koja se ovde kupuje, pa nosi zlatnu - istu koju
-   nosi točak i prelazak nivoa. Ovde zlatna ne protivreči ničemu: ovo jeste
-   nagrada, i jedina je na ekranu. */
+/* VIP nosi zlatnu (nagrada), kao točak i nov nivo. */
 .pf-vip {
   background: linear-gradient(135deg, rgba(255, 181, 39, 0.10), rgba(255, 181, 39, 0.02) 62%), var(--panel-2);
   box-shadow: inset 0 0 0 1px rgba(255, 181, 39, 0.32);
@@ -2250,8 +1965,7 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
 .pf-vip-red b { display: block; color: var(--text); font-size: 13px; font-weight: 700; }
 
 /* ---- ZNAČKE ---- */
-/* Zarađena je bela i sa kvačicom; zaključana je mirna, ali se VIDI, i nosi
-   traku dokle je stiglo. Nagrada koja se ne vidi unapred nije nagrada. */
+/* Zarađena značka je bela sa kvačicom; zaključana je mirna, sa trakom napretka. */
 .pf-broj {
   margin-left: 8px; font-family: var(--font-ui); font-size: 12px; font-weight: 700;
   color: var(--text-3); letter-spacing: 0;
@@ -2290,14 +2004,8 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
 .pf-rek span { font-size: 12px; color: var(--text-3); }
 .pf-rek b { font-family: var(--font-display); font-size: 15px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
 
-/* VIP boja i okvir se u spisku poznaju po zlatnoj tački - da se odmah vidi šta
-   ide uz članarinu, a šta se zarađuje nivoom.
-
-   KRUG JE NOSI SPOLJA, ČIP IZNUTRA. Na krugu tačka sedi na samoj ivici i vidi
-   se čija je. Na čipu je stajala isto tako, na -2px od ugla - ali čip je širok
-   pravougaonik, pa je tačka lebdela u praznom iznad njega i izgledala kao mrlja
-   na ekranu, a ne kao oznaka. Uz to čip sada ima odsečen ugao, a `clip-path`
-   seče sve što izađe iz oblika: spolja bi potpuno nestala. */
+/* VIP boja i okvir imaju zlatnu tačku. Na krugu je na ivici, a na čipu
+   unutra (`clip-path` bi odsekao sve van oblika). */
 .pf-boja[data-vip]::after {
   content: ""; position: absolute; top: -2px; right: -2px; width: 7px; height: 7px;
   border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 2px var(--panel);
@@ -2308,15 +2016,10 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
 }
 .pf-boja { position: relative; }
 
-/* ---- RANG LISTA IGRAONICE ----
+/* ---- Rang lista ----
 
-   Prvo TVOJE mesto, pa tek onda vrh. Gola tabela prvih deset radi samo za tih
-   deset; jedanaesti je pogleda jednom i vise je ne otvori - a bas njega treba
-   pokrenuti.
-
-   Boje: zlatna samo prvom (biti prvi JESTE nagrada, i jedina je na ekranu),
-   boja kuce drugom, trecem i tvom redu (boja kuce znaci izbor - "ovo si ti").
-   Srebrna i bronzana bi bile dve nove boje koje nigde drugde nista ne znace. */
+   Prvo mesto igrača, pa vrh. Zlatna samo za prvo mesto; boja kuće za drugo,
+   treće i red igrača. */
 .rl-ja {
   display: flex; align-items: center; gap: 16px; padding: 16px; margin-bottom: 20px;
   background: linear-gradient(135deg, rgba(var(--brend-rgb), 0.14), rgba(var(--brend-rgb), 0.02) 62%), var(--panel-2);

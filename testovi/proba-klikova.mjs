@@ -1,15 +1,7 @@
-// Provera da SVAKO dugme u launcheru stvarno stiže do koda.
-//
-// Zašto postoji: nagradni točak se otvarao, ali se nije mogao ni zavrteti ni
-// zatvoriti. Uzrok nije bio u samom točku - delegacija klikova visi na
-// #content, a pop-up stoji IZVAN njega, pa klik nikad nije stigao do slušaoca.
-// Takav kvar se ne vidi iz koda koji se čita red po red, ne pada nijedan test,
-// i otkrije se tek kad neko klikne. Zato se ovde otvara pravi prozor, prolazi
-// kroz sve ekrane i za svaki element koji se klikće proverava da li na njemu
-// ili iznad njega uopšte postoji slušalac klika.
-//
-// Slušaoci se hvataju tako što se addEventListener presretne PRE nego što se
-// launcher učita - drugačije se ne može saznati ko šta sluša.
+// Provera da svako dugme u launcheru ima slušaoca klika na sebi ili iznad sebe.
+// Otvara pravi prozor, prolazi kroz sve ekrane i proverava svaki element koji se
+// klikće. Slušaoci se beleže presretanjem addEventListener pre učitavanja
+// launchera.
 //
 //   node proba-klikova.mjs            (server na 8096)
 //   node proba-klikova.mjs 8097
@@ -75,16 +67,11 @@ fs.mkdirSync(RADNO, { recursive: true });
 
 // Presretač: pamti svaki element koji dobije slušaoca klika.
 //
-// Mora da se izvrši PRE launcher.js, i to u ISTOM JS svetu u kom launcher radi.
-// Zato ide kroz preload i webFrame.executeJavaScript - to je jedini put koji
-// radi uz contextIsolation. (executeJavaScript posle loadFile je prekasno;
-// CDP Page.addScriptToEvaluateOnNewDocument traži Page.enable, koji u ovoj
-// verziji Electrona nikad ne odgovori.)
-// Broje se SAMO "click" slušaoci, i to samo na pravim elementima. document,
-// window, <html> i <body> se namerno preskaču: launcher na document drži
-// slušaoca za zvuk klika (pointerdown) i za tastere. Kad se i to računalo,
-// svaki element je ispadao "pokriven" i provera je uvek javljala da je sve u
-// redu - i onda kad dugme stvarno ne radi.
+// Izvršava se pre launcher.js, u istom JS svetu, preko preload-a i
+// webFrame.executeJavaScript (jedini put uz contextIsolation; CDP
+// Page.addScriptToEvaluateOnNewDocument traži Page.enable, koji ovde ne
+// odgovara). Broje se samo "click" slušaoci na elementima; document, window,
+// <html> i <body> se preskaču, jer bi inače svaki element ispao pokriven.
 const PRESRETAC = `
 (() => {
   window.__slusaoci = new Set();
@@ -134,13 +121,8 @@ for (const k of ["save-config", "reset-config", "launch-game", "open-browser",
   "focus-launcher", "admin-exit", "renderer-ready", "podesavanja-citaj", "podesavanja-primeni", "proveri-servisni-pin", "otkljucaj-bez-servera"])
   ipcMain.handle(k, () => true);
 
-// STA JE LAUNCHER STVARNO POSLAO SERVERU.
-//
-// Ostatak ovog alata proverava da klik ima slusaoca - to hvata mrtvo dugme, ali
-// ne i dugme koje slusa a nista ne posalje. Kod kupovine VIP-a to je razlika
-// izmedju "ne radi" i "uzeo pare": gost klikne, nista se ne desi, i on klikne
-// ponovo. Zato se poruke ka serveru ovde pamte, pa se posle proverava da li je
-// bas ona prava izasla.
+// Poruke koje je launcher poslao serveru. Dugme koje ima slusaoca a nista ne
+// posalje hvata se tek ovde (npr. kupovina VIP-a).
 const poslato = [];
 ipcMain.handle("to-server", (e, poruka) => { poslato.push(poruka); return true; });
 const cekaj = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -171,16 +153,9 @@ const PREGLED = \`(() => {
   return { van, bezStanja: stanjaVan(), slusalaca: window.__slusaoci ? window.__slusaoci.size : -1, crit: typeof window.crit, ekranAktivan: ([...document.querySelectorAll(".screen")].find((e) => e.classList.contains("active")) || {}).id, skenirano: document.querySelectorAll(\${JSON.stringify(KLIKABILNO)}).length, tocakOtvoren: document.querySelector("#tocakOverlay").classList.contains("active") };
 })()\`;
 
-// TRI STANJA NA SVEMU STO SE KLIKCE.
-//
-// Klik koji stize do koda jos ne znaci da se od njega nesto VIDI. Kiosk radi na
-// jeftinim misevima i na mrezi koja ume da zastane; kad se pritisak ne vidi,
-// igrac klikne drugi put. A fokusa nije imao NIJEDAN element: igrac se prijavljuje
-// tastaturom (ime, Tab, lozinka, Enter) i nije video gde je, a kad mis zataji
-// usred smene, radnik nije mogao da dodje ni do "Odjava".
-//
-// Pravila se citaju iz STVARNIH stilova ucitanih u prozoru, ne iz izvora - tako
-// se hvata i ono sto je pravilom prekriveno ili pogresno napisano.
+// Tri stanja na svemu sto se klikce: prelazak, pritisak, fokus. Pravila se
+// citaju iz stilova ucitanih u prozoru, ne iz izvora, pa se hvata i pravilo koje
+// je prekriveno ili pogresno napisano.
 const STANJA = \`
 window.stanjaVan = function () {
   const pravila = { hover: [], pritisak: [], fokus: [] };

@@ -1,13 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { radniFolder, podigniServer } from "./_okruzenje.mjs";
-// DA DISK NIKAD NE PUKNE
-//
-// Glavni racunar u igraonici niko nece odrzavati. Sve sto raste bez granice pre
-// ili kasnije napuni disk, a kad disk stane server ne moze da pise i CELA
-// igraonica staje: niko se ne prijavljuje, kasa ne radi, sesije se ne
-// naplacuju. Ovde se proverava da tri kocnice stvarno rade - na pravim
-// podacima, ne citanjem koda.
+// Disk ne sme da se napuni: sve sto raste ima granicu. Proverava se da tri
+// kocnice stvarno rade, na pravim podacima.
 const BASE = "http://127.0.0.1:8181";
 const DATA = radniFolder("skladiste-data");
 await podigniServer(DATA, 8181);
@@ -43,9 +38,9 @@ proveri("stari zapisi su obrisani", brojLogova() === 50, `${brojLogova()} umesto
 proveri("sveži zapisi su ostali", db.prepare("SELECT COUNT(*) c FROM logs WHERE action='novo'").get().c === 50);
 
 // ---- 2) LOGOVI SE SEKU I PO BROJU ----
-// Ovo je ono sto je vlasnik trazio: kad se dodje do granice, brise se NAJSTARIJI
-// zapis da bi novi imao mesto. Dan sa turnirom ume da napravi visestruko vise
-// zapisa nego obican, pa granica po starosti sama nije dovoljna.
+// Kad se dodje do granice, brise se najstariji zapis da bi novi imao mesto.
+// Dan sa turnirom ume da napravi visestruko vise zapisa nego obican, pa
+// granica po starosti sama nije dovoljna.
 db.exec("DELETE FROM logs");
 db.exec("BEGIN");
 for (let i = 0; i < 500; i++) upisiLog.run(sad - (500 - i) * 60000, "sistem", "r" + i, "test", "zapis " + i);
@@ -73,9 +68,8 @@ proveri("prezivelo je bas ono iz smene", db.prepare("SELECT action FROM logs").g
 db.exec("DELETE FROM shifts WHERE status='open'");
 
 // ---- 4) REZERVNE KOPIJE SE PROREDJUJU ----
-// Ranije se cuvalo poslednjih 30 kopija. Posto se prave na 15 minuta, to je
-// svega sedam i po sati unazad: greska primecena sledece jutro vise nije imala
-// gde da se vrati.
+// Kopije se prave na 15 minuta; proredjivanjem se cuva i dublja istorija, ne
+// samo poslednjih nekoliko sati.
 const dirKopija = path.join(DATA, "backups");
 fs.rmSync(dirKopija, { recursive: true, force: true });
 fs.mkdirSync(dirKopija, { recursive: true });

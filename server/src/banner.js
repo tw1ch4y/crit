@@ -1,21 +1,8 @@
-// Privremeni baneri dok pravi dizajn ne stigne. Crtaju se kao SVG jer launcher
-// banere prikazuje kao background-image, gde SVG ostaje ostar na svakoj
-// rezoluciji i tezak je par kilobajta. Nije zamena za dizajnera - samo da vrh
-// pocetne i izdvojena igra ne budu prazni.
-//
-// Font se NE oslanja na Chakra Petch: SVG kao pozadina se crta u zasebnom
-// kontekstu koji ne vidi @font-face sa strane. Zato ide sistemski bold, a
-// "gaming" osecaj nose velika slova, razmak medju slovima i d20 znak.
+// Privremeni baneri i pozadine, kao SVG (oštri na svakoj rezoluciji, par KB).
+// SVG kao pozadina ne vidi @font-face stranice, pa se koristi sistemski bold.
 
-// BOJE DOLAZE IZ ZNAKA KUĆE, NE IZ NAVIKE.
-//
-// Ranije je ovde bila crvena na skoro crnom. To je i bilo tačno dok se gledao
-// samo znak: "Crit!" je crvena reč. Ali na znaku crvena stoji na ŽUTOM prasku,
-// a sve to na PLAVOM - i tek zajedno to izgleda kao strip. Izvučena sama, na
-// crno, ista ta crvena izgleda kao horor, i vlasnik je to prvi primetio.
-//
-// Zato podloga sada nosi plavu sa znaka, a crvena se povukla tamo gde nešto
-// ZNAČI: zaključan ekran i vreme koje ističe. Zlatna ostaje nagrada.
+// Paleta iz znaka kuće: plava podloga, zlatna za nagradu, a crvena samo tamo
+// gde nosi značenje (zaključan ekran, vreme ističe).
 const PALETA = {
   bgGore: "#131c3c", bgDole: "#070b1a",
   brend: "#2f6ae8", brendTamna: "#2454c4",
@@ -64,12 +51,8 @@ function podloga(w, h, akcenat) {
   <rect x="0" y="${h - 5}" width="${w}" height="5" fill="${akcenat}" opacity="0.85"/>`;
 }
 
-// BANER IZDVOJENE IGRE (2800 x 400)
-// NAMERNO bez naziva igre. Launcher preko ovog banera, kad je igra izdvojena na
-// vrhu početne, ispisuje ime igre svojim slovima (levo). Kad bi i baner nosio
-// ime, dobila bi se ista reč dvaput jedna preko druge. Zato je ovo samo čista
-// CRIT atmosfera: preliv, d20 znaci gušće desno (gde natpis launchera ne ide),
-// i tanka nit u boji kuce dole. Levo ostaje mirno da natpis bude čitljiv.
+// Baner izdvojene igre (2800 x 400), bez naziva: launcher ime ispisuje sam,
+// levo. Znaci su gušći desno, gde nema teksta.
 export function banerIgre(_naziv) {
   const w = 2800, h = 400;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
@@ -82,33 +65,13 @@ export function banerIgre(_naziv) {
 </svg>`;
 }
 
-// POZADINE EKRANA (2560 x 1440)
-// Bez ovih slika ekran prijave je uzimao baner izdvojene igre (2800x400) i
-// razvlačio ga preko celog ekrana: slika se uvećavala skoro tri puta, mutila, i
-// menjala se kad god bi se katalog osvežio - to je ono "skakanje" pozadine.
-// Ove su u pravom odnosu 16:9 i namerno MIRNE, jer preko njih ide sav sadržaj.
-// Svaki ekran ima svoja svetla, da se ne cine kao ista slika. Zapis jednog
-// svetla: [x%, y%, precnik%, boja, jacina].
-//
-// Ranije su ovde stajale kose hairline linije i tri krupne kockice preko cele
-// slike. Linije su se na ekranu videle kao sitne pruge - izgledale su kao
-// greska u slici, ne kao dubina. Kockice su se bile sa sarom, koja je i sama
-// mreza kockica, pa je isti oblik stajao u dve velicine preko istog ekrana.
-// Sada je pozadina samo SVETLO I SENKA: nema nijedne ivice koja se moze
-// primetiti, a sara odozgo nosi celu figuru.
+// Pozadine ekrana (2560 x 1440), 16:9 i mirne, jer preko njih ide sadržaj.
+// Svaki ekran ima svoja svetla: [x%, y%, prečnik%, boja, jačina]. Pozadina je
+// samo svetlo i senka; šara odozgo nosi oblike.
 const EKRANI = {
-  // Prijava i zakljucan ekran su PRAZNI - preko njih ide samo jedna kartica, pa
-  // svetlo sme da bude jako i tu se i vidi. Ekrani sa sadrzajem (pocetna, shop,
-  // nalog) drze svetlo nisko, da korice i fotografije ostanu glavna stvar.
-  //
-  // DVE BOJE, NE JEDNA. Jedno plavo svetlo daje mirnu podlogu - lepu, ali blagu.
-  // Tek kad mu se sa druge strane suprotstavi ljubicasto ili tirkizno, ekran
-  // dobije dubinu i napetost, a to je ono sto se od igraonice i ocekuje.
-  // Zlatna ulazi samo tamo gde ima razloga (shop).
-  //
-  // `trake` su kose pruge svetla - brzina, isto ono sto u stripu rade linije iza
-  // figure. Sara odozgo nosi tacke i praskove, pa se ovde ne ponavljaju oblici,
-  // nego se dodaje samo pokret.
+  // Prijava i zaključan ekran imaju jedno polje preko sebe, pa svetlo sme da
+  // bude jače; ekrani sa sadržajem ga drže nisko. Dve suprotne boje svetla daju
+  // dubinu; zlatna samo u shopu. `trake` su kose pruge svetla.
   prijava:   { svetla: [[28, 56, 64, "#3d7cf0", 0.38], [80, 14, 52, "#a63fd6", 0.24], [58, 98, 44, "#2fd4e8", 0.13]], trake: 0.055, prelaz: 0.075, vinjeta: 0.62 },
   pocetna:   { svetla: [[18, 14, 54, "#2f6ae8", 0.22], [90, 88, 48, "#8b3fd6", 0.15], [62, 6, 34, "#2fd4e8", 0.07]], trake: 0.030, prelaz: 0.045, vinjeta: 0.52 },
   shop:      { svetla: [[80, 18, 50, "#ffb527", 0.17], [14, 82, 50, "#2f6ae8", 0.17], [46, 8, 34, "#a63fd6", 0.09]], trake: 0.032, prelaz: 0.040, vinjeta: 0.52 },
@@ -129,12 +92,7 @@ export function pozadinaEkrana(kljuc) {
       <stop offset="1" stop-color="${boja}" stop-opacity="0"/>
     </radialGradient>`).join("");
   const slojevi = o.svetla.map((_, i) => `<rect width="${w}" height="${h}" fill="url(#sv${i})"/>`).join("\n  ");
-  // KOSE PRUGE SVETLA - brzina.
-  //
-  // Isto ono sto u stripu rade linije iza figure. Krajevi im se gase, pa se ne
-  // vidi gde pruga pocinje ni gde se zavrsava - inace bi izgledale kao stapici
-  // nalepljeni na ekran. Sirine su razlicite namerno: jednake pruge izgledaju
-  // kao tabela, ne kao pokret.
+  // Kose pruge svetla: krajevi se gase, a širine su različite.
   const trake = !o.trake ? "" : `<g transform="rotate(-19 ${w / 2} ${h / 2})" opacity="${o.trake}" mask="url(#maskaTrake)">
     ${[[-0.06, 190], [0.20, 64], [0.34, 260], [0.61, 40], [0.78, 150]]
       .map(([y, d]) => `<rect x="${-w * 0.3}" y="${h * y}" width="${w * 1.6}" height="${d}" fill="url(#trakaY)"/>`).join("")}
@@ -190,19 +148,13 @@ export function pozadinaEkrana(kljuc) {
 
 export const POZADINE_EKRANI = Object.keys(EKRANI);
 
-// PROMO BANER KUĆE (2800 x 400)
-// Veliko CRIT u crvenom sa sjajem, ispod naziv igraonice i kratka parola. Ovo
-// stoji na vrhu pocetne dok se ne okaci pravi promo materijal.
+// Promo baner kuće (2200 x 200): naziv igraonice iz Podešavanja i kratka
+// poruka, dok se ne okači pravi promo materijal.
 export function promoCrit(nazivKuce) {
-  // 11:1 je odnos trake u vrhu pocetne (levo od nagradnog tocka), pa baner
-  // popuni traku bez tamnih ivica. Ranije je bio 7:1 - to je bio odnos starog
-  // vrha, koji je isao preko cele sirine, pre nego sto je tocak dobio svoje
-  // mesto sa desne strane.
+  // 11:1 je odnos trake na vrhu početne (levo od nagradnog točka).
   const w = 2200, h = 200;
   const kuca = String(nazivKuce || "").trim().toUpperCase().slice(0, 18);
-  // Ime kuce je bilo upisano ("CRIT"), pa bi tudja igraonica na vrhu pocetne
-  // imala tudje ime. Sada dolazi iz Podesavanja - a posto tamo moze da stoji i
-  // dugacko ime, slova se smanjuju da traka ostane cela.
+  // Dugo ime dobija manja slova, da stane u traku.
   const veliko = kuca.length <= 6 ? 104 : Math.max(52, Math.round(104 * 6 / kuca.length));
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
   ${podloga(w, h, PALETA.brend)}

@@ -1,24 +1,9 @@
 import { radniFolder, podigniServer, ucitajWebSocket } from "./_okruzenje.mjs";
 const WebSocket = await ucitajWebSocket();
-// "PROMET DANAS" NA KONTROLNOJ TABLI
+// "Promet danas" na kontrolnoj tabli mora da se poklapa sa Izvestajima:
 //
-// To je jedina brojka koju vlasnik pogleda u prolazu, sa telefona, i po njoj
-// zakljuci kako ide vece. Zato mora da znaci tacno ono sto pise, i mora da se
-// poklapa sa Izvestajima - kad se dva broja na dve strane ne slazu, prestaje da
-// se veruje obojici.
-//
-// Dve stvari su je kvarile, svaka na svoju stranu:
-//
-//  1. NIJE VIDELA NIKOGA KO TRENUTNO IGRA. Trosak sesije se u `transactions`
-//     upisuje tek kad se sesija ZAVRSI. U osam uvece, sa deset zauzetih masina
-//     po dva sata, to je oko 2400 dinara koje vlasnik ne vidi - pa mu puno vece
-//     izgleda slabo. Zarada po racunaru u Izvestajima ih je pri tom videla, jer
-//     cita `sessions.cost`, pa su se dva broja na istoj strani razilazila.
-//
-//  2. BROJALA JE OTKAZANE PORUDZBINE. Kes zato sto se filter po statusu nije ni
-//     pisao, a kupovina sa naloga zato sto se citala iz `transactions`, gde
-//     povracaj ulazi kao zaseban red i original ne ponistava. Obracun smene i
-//     Izvestaji su otkazano oduvek izbacivali - tabla je jedina pokazivala vise.
+//   1. ukljucuje sesije koje su u toku (`sessions.cost`), ne samo zavrsene
+//   2. ne broji otkazane porudzbine, ni kes ni sa naloga
 const BASE = "http://127.0.0.1:8175", WSB = "ws://127.0.0.1:8175";
 await podigniServer(radniFolder("promet-danas-data"), 8175);
 

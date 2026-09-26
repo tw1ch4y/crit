@@ -14,10 +14,8 @@ const OUT = path.join(path.dirname(ROOT), `${IME.toUpperCase().replace(/\s+/g, "
 const SRV = path.join(OUT, "1 - SERVER (glavni racunar)");
 const CLI = path.join(OUT, "2 - LAUNCHER (racunari igraca)");
 
-// Stari paket se brise pre novog. Windows to odbija ako je folder OTVOREN -
-// dovoljno je da stoji u Explorer prozoru, u nekom terminalu ili da ga OneDrive
-// bas sinhronizuje. Ranije je odatle letela EPERM greska sa stack trace-om, a
-// iz nje se nije videlo ni sta je problem ni sta da se uradi.
+// Stari paket se briše pre novog; Windows to odbija ako je folder otvoren
+// (Explorer, terminal, OneDrive), pa se to jasno kaže.
 try {
   fs.rmSync(OUT, { recursive: true, force: true });
 } catch (e) {
@@ -31,10 +29,8 @@ fs.mkdirSync(SRV, { recursive: true });
 fs.mkdirSync(CLI, { recursive: true });
 
 // ---- server ----
-// _proba je alat za doradu izgleda launchera (testovi/pregled-launchera.mjs) -
-// ne sme da ode u igraonicu ako ostane zaboravljen u public/.
-// `crit.db` se ovde NE kopira kao fajl - vidi snimiBazu ispod. Ovaj spisak
-// preskace ono sto u paket ne ide uopste.
+// _proba je alat za doradu izgleda (testovi/pregled-launchera.mjs) i ne ide u
+// paket. crit.db se ne kopira kao fajl (vidi snimiBazu).
 const preskoci = new Set(["backups", "crit.db", "crit.db-wal", "crit.db-shm", "_proba"]);
 function kopiraj(from, to) {
   fs.mkdirSync(to, { recursive: true });
@@ -49,19 +45,8 @@ for (const dir of ["src", "public", "node_modules", "data"]) {
   kopiraj(path.join(ROOT, "server", dir), path.join(SRV, dir));
 }
 
-// BAZA SE SNIMA, NE KOPIRA KAO FAJL.
-//
-// SQLite ovde radi u WAL rezimu: sveze izmene stoje u `crit.db-wal` sve dok se
-// ne prepisu u glavni fajl. Obicno kopiranje uzima samo `crit.db` (a -wal se
-// namerno preskace, jer bi bez svog para bio smece), pa u paket ode baza BEZ
-// poslednjih izmena - i to bez ijedne poruke.
-//
-// Desilo se tacno to: dve igre dodate kroz panel bile su u WAL-u, u paket je
-// otisla baza sa sedam igara umesto devet, a ciscenje orphana je odmah zatim
-// obrisalo i njihove omote jer ih "baza ne koristi".
-//
-// `VACUUM INTO` pravi uredan snimak: jedan fajl, sa svim sto je upisano, bez
-// potrebe da server bude ugasen.
+// Baza se snima sa VACUUM INTO, ne kopira: u WAL režimu sveže izmene stoje u
+// `crit.db-wal`, pa bi kopija samog `crit.db` bila bez njih.
 function snimiBazu() {
   const izvor = path.join(ROOT, "server", "data", "crit.db");
   const cilj = path.join(SRV, "data", "crit.db");
@@ -76,9 +61,8 @@ for (const f of ["package.json", "nadzornik.mjs", "Pokreni server.bat", "Otvori 
   fs.copyFileSync(path.join(ROOT, "server", f), path.join(SRV, f));
 }
 
-// Paket nosi TAČNO slike koje baza koristi (koverice, baneri, promo, shop). Sve
-// ostalo u uploads je orphan (npr. probni baneri ili slika izbačene igre) i
-// samo bi opterećivalo paket - briše se iz kopije, izvor se ne dira.
+// Paket nosi samo slike koje baza koristi; ostale se brišu iz kopije (izvor
+// se ne dira).
 {
   const pkgDb = new DatabaseSync(path.join(SRV, "data", "crit.db"));
   const referencirano = new Set();
@@ -87,22 +71,15 @@ for (const f of ["package.json", "nadzornik.mjs", "Pokreni server.bat", "Otvori 
       if (r.v) referencirano.add(path.basename(r.v));
     }
   }
-  // Pozadine ekrana NISU u tabelama - stoje u settings kao pozadina_prijava,
-  // pozadina_pocetna... Bez ovoga bi ih ciscenje orphana proglasilo za smece i
-  // izbacilo iz paketa, pa bi launcher u igraonici ostao bez ijedne pozadine.
+  // Pozadine ekrana su u settings (pozadina_*), ne u tabelama.
   for (const r of pkgDb.prepare("SELECT value v FROM settings WHERE key LIKE 'pozadina_%' AND value <> ''").all()) {
     if (r.v && r.v.startsWith("/uploads/")) referencirano.add(path.basename(r.v));
   }
   pkgDb.close();
 
-  // SLIKE IDU UZ BAZU, U data/uploads - one su podaci igraonice, a ne deo
-  // programa (vidi UPLOADS u service.js).
-  //
-  // Na razvojnom racunaru mogu da budu na oba mesta: u data/uploads ako je
-  // server ovde vec radio, ili jos uvek u public/uploads ako nije. Paket ih zato
-  // skuplja sa oba i slaze na JEDNO mesto, a staro se prazni do kraja: dve
-  // kopije istih fajlova u paketu su cist visak, a instalacija u igraonici bi
-  // posle prve nadogradnje imala i jedne i druge.
+  // Slike idu u data/uploads (podaci igraonice, vidi UPLOADS u service.js).
+  // Na razvojnom računaru mogu biti i u public/uploads, pa se skupljaju sa oba
+  // mesta na jedno, a staro mesto se prazni.
   const cilj = path.join(SRV, "data", "uploads");
   const staro = path.join(SRV, "public", "uploads");
   fs.mkdirSync(cilj, { recursive: true });
@@ -125,8 +102,7 @@ for (const f of ["package.json", "nadzornik.mjs", "Pokreni server.bat", "Otvori 
   }
   if (orphana) console.log(`  slike: izbaceno ${orphana} orphan (baza ih ne koristi)`);
 
-  // Paket bez slika je paket bez ijednog omota - a to se inace vidi tek u
-  // igraonici, kad je vec na USB-u.
+  // Slike koje baza pominje, a nema ih u paketu, prijavljuju se odmah.
   const uPaketu = fs.readdirSync(cilj).length;
   const fali = [...referencirano].filter((f) => !fs.existsSync(path.join(cilj, f)));
   if (fali.length) {
@@ -139,9 +115,7 @@ for (const f of ["package.json", "nadzornik.mjs", "Pokreni server.bat", "Otvori 
   console.log(`  slike uz bazu: ${uPaketu}${preneto ? ` (${preneto} preneto sa starog mesta)` : ""}`);
 }
 
-// Provera da baza NIJE prazna/nepodesena. Jednom se desilo da je paket otisao
-// sa svim funkcijama u kodu, ali baza bez banera/promo/upaljenog tocka - pa je
-// launcher izgledao isto kao pre. Ovde se to uhvati pre nego sto ode na USB.
+// Provera da baza nije prazna ili nepodešena.
 {
   const pdb = new DatabaseSync(path.join(SRV, "data", "crit.db"));
   const jedan = (sql) => pdb.prepare(sql).get().c;
@@ -155,9 +129,7 @@ for (const f of ["package.json", "nadzornik.mjs", "Pokreni server.bat", "Otvori 
   const tekstura = post("tekstura");
   const tocak = post("tocak_ukljucen");
   pdb.close();
-  // Provera prati ono sto launcher STVARNO prikazuje. Ranije je trazila promo
-  // baner na vrhu pocetne - a vrh sada nosi znak kuce i nagradni tocak, pa je
-  // svaki paket ispisivao upozorenje zbog necega sto je namerno izbaceno.
+  // Provera prati ono što launcher prikazuje.
   const upozorenja = [];
   if (brGames === 0) upozorenja.push("nema nijedne igre");
   if (brAlata === 0) upozorenja.push("nema nijednog internet alata");
@@ -176,13 +148,8 @@ for (const f of ["package.json", "nadzornik.mjs", "Pokreni server.bat", "Otvori 
 
 // ---- paket za nadogradnju servera sa panela ----
 //
-// Ista verzija servera, spakovana u jedan fajl koji se otpremi u panelu
-// (Instalacije > Nadogradnja servera). Pravi se od foldera koji je upravo
-// sklopljen gore, pa nosi tačno ono što ide u igraonicu - bez baze i bez slika
-// igraonice (to paket sam izostavlja, vidi server/src/paket-servera.js).
-//
-// Paket se odmah i pročita: pravi se jednom, a otvara u igraonici, gde je kasno
-// saznati da ne valja.
+// Pravi se od upravo sklopljenog foldera servera, bez baze i slika igraonice
+// (vidi server/src/paket-servera.js), i odmah se proverava čitanjem.
 const NAD = path.join(OUT, "3 - NADOGRADNJA SA PANELA");
 let imePaketaServera = null;
 {
@@ -201,7 +168,7 @@ let imePaketaServera = null;
     `NADOGRADNJA SA PANELA - ${IME} ${provera.verzija}`,
     "",
     "Ovo je za igraonicu u kojoj server VEC radi preko nadzornika (verzija v1.0.0 ili novija).",
-    "Starija verzija se jos jednom nadogradjuje rucno - vidi SLEDECI-KORACI.",
+    "Starija verzija se jos jednom nadogradjuje rucno - vidi UPUTSTVA\\ODRZAVANJE.md.",
     "",
     "SERVER",
     `  1. Panel > Instalacije > Nadogradnja servera > Postavi paket servera > ${imePaketaServera}`,
@@ -218,23 +185,17 @@ let imePaketaServera = null;
 }
 
 // ---- launcher ----
-// dist/ je u samom projektu (client/package.json: output "../dist"). Ranije se
-// do njega islo preko IMENA FOLDERA na disku - preimenuj folder projekta i
-// pakovanje pukne, a poruka o gresci govori o necem trecem.
+// dist/ je u projektu (client/package.json: output "../dist").
 const dist = path.join(ROOT, "dist");
-// U dist-u ostaju i stariji instaleri, pa uzimamo najskorije napravljen -
-// inace bi paket tiho poneo prethodnu verziju launchera.
+// U dist-u ostaju i stariji instaleri; uzima se najskorije napravljen.
 const setup = fs.readdirSync(dist)
   .filter((f) => f.startsWith(`${LAUNCHER} Setup`) && f.endsWith(".exe"))
   .map((f) => ({ f, vreme: fs.statSync(path.join(dist, f)).mtimeMs }))
   .sort((a, b) => b.vreme - a.vreme)[0]?.f;
 if (!setup) { console.error("Nema instalera u dist/ - pokreni prvo build launchera."); process.exit(1); }
 
-// Instaler MORA da bude one verzije koja pise u client/package.json.
-// Ako build pukne (npr. zakljucan fajl dok OneDrive sinhronizuje dist/), u
-// dist/ ostane prethodni instaler - a ovaj bi ga tiho spakovao i poslao u
-// igraonicu. Tako je vec dvaput ispalo da se "nista nije promenilo": paket je
-// nosio staru verziju launchera, a niko to nije video dok se ne instalira.
+// Instaler mora da bude verzije iz client/package.json; ako build pukne, u
+// dist/ ostaje prethodni instaler.
 {
   const verzija = JSON.parse(fs.readFileSync(path.join(ROOT, "client", "package.json"), "utf8")).version;
   const uImenu = new RegExp("^" + LAUNCHER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + " Setup v([\\d.]+)\\.exe$").exec(setup)?.[1];
@@ -249,12 +210,8 @@ if (!setup) { console.error("Nema instalera u dist/ - pokreni prvo build launche
 }
 fs.copyFileSync(path.join(dist, setup), path.join(CLI, setup));
 
-// Stari instaleri se brisu. Svaki je oko 100 MB, a build ih ostavlja sve -
-// posle petnaestak verzija to je vise od gigabajta. Projekat stoji u OneDrive
-// folderu, pa se sve to jos i sinhronizuje u oblak.
-// Cuvaju se poslednja DVA: tekuci i prethodni, da moze da se vrati unazad.
-// Instaleri iz stare numeracije (bez "v" u imenu, vidi server/src/verzije.js)
-// se brišu svi: server ih ne pušta, a ovde bi zauzeli mesto dva poslednja.
+// Čuvaju se dva poslednja instalera (oko 100 MB svaki); instaleri iz stare
+// numeracije (bez "v" u imenu, vidi server/src/verzije.js) brišu se svi.
 const CUVA_SE = 2;
 const jeNov = (f) => / Setup v\d+\.\d+\.\d+\.exe$/.test(f);
 const sviInstaleri = fs.readdirSync(dist)
@@ -274,9 +231,7 @@ for (const f of ["POPRAVI-RACUNAR.bat", "DEINSTALIRAJ-LAUNCHER.bat"]) {
   fs.copyFileSync(path.join(ROOT, f), path.join(CLI, f));
 }
 
-// Sara i animacija se ukljucuju u samom serveru (seed u db.js, samo ako nikad
-// nisu birani), pa ovde nema sta da se dira - vazi i za svezu instalaciju i za
-// vec postojecu bazu koja se nadogradjuje.
+// Šara i animacija se uključuju u serveru (seed u db.js).
 
 // ---- spisak tokena (da se ne prepisuju iz panela jedan po jedan) ----
 const db = new DatabaseSync(path.join(ROOT, "server", "data", "crit.db"));
@@ -298,8 +253,12 @@ const tokeni = [
 fs.writeFileSync(path.join(CLI, "TOKENI.txt"), tokeni, "utf8");
 
 // ---- uputstva ----
-for (const f of ["POKRETANJE.md", "DEPLOY.md", "README.md", "PROVERI.md"]) {
-  fs.copyFileSync(path.join(ROOT, f), path.join(OUT, f));
+fs.copyFileSync(path.join(ROOT, "README.md"), path.join(OUT, "README.md"));
+fs.copyFileSync(path.join(ROOT, "CHANGELOG.md"), path.join(OUT, "CHANGELOG.md"));
+const UPUTSTVA = path.join(OUT, "UPUTSTVA");
+fs.mkdirSync(UPUTSTVA, { recursive: true });
+for (const f of ["INSTALACIJA.md", "ODRZAVANJE.md", "PROVERA.md"]) {
+  fs.copyFileSync(path.join(ROOT, "docs", f), path.join(UPUTSTVA, f));
 }
 
 // ---- sabloni za dizajn slika ----
@@ -361,12 +320,15 @@ const readme = [
   "--------------------------",
   "1. Na svakom racunaru napravi POSEBAN Windows nalog za igrace - STANDARDNI,",
   "   ne administrator. Program se pokrece na tom nalogu.",
-  `2. Instaliraj "${LAUNCHER} Setup".`,
+  `2. Prijavi se na nalog igraca i odatle instaliraj "${LAUNCHER} Setup"`,
+  "   (instalacija ide u profil tog naloga i ne trazi administratora).",
   "3. Pokreni launcher. Adresa servera je vec popunjena - unesi samo TOKEN",
   "   za taj racunar (spisak je u TOKENI.txt).",
   "4. U panelu ce taj racunar preci iz Offline u Standby.",
   "5. Kad sve radi, ukljuci zastitu: u instalacionom folderu, podfolder",
-  "   \"resources\", desni klik na \"zastita-ukljuci.bat\" - Run as administrator.",
+  "   \"resources\", DVOKLIK na \"zastita-ukljuci.bat\", prijavljen kao igrac",
+  "   (NE \"Run as administrator\"). Administratora trazi sama, za deo koji",
+  "   vazi za ceo racunar. Zatim odjava i ponovna prijava.",
   "",
   "",
   "OBAVEZNO PRE OTVARANJA - TRI FABRICKE LOZINKE",
@@ -376,10 +338,10 @@ const readme = [
   "     njega se dopunjuje kredit. Klikni na svoje ime dole levo.",
   "2. PIN osoblja:  1234   (panel > Podesavanja)",
   "     Njime se otkljucava racunar i izlazi iz launchera.",
-  "3. Servisni PIN:  1234   (\"servisniPin\" u podesavanja.json, pored programa)",
+  "3. Servisni PIN:  1234   (panel > Podesavanja > Servisni PIN launchera)",
   "     Trazi se za ulaz u podesavanja launchera i za izlaz KAD SERVER NE RADI.",
-  "     Proverava se lokalno. Bez promene, igrac koji iscupa mrezni kabl moze",
-  "     posle par sekundi da preusmeri racunar na svoj server.",
+  "     Upisuje se jednom u panelu i odmah stize na sve racunare. Bez promene,",
+  "     igrac koji iscupa mrezni kabl moze da preusmeri racunar na svoj server.",
   "",
   "",
   "AKO NESTO ZAPNE",
@@ -394,18 +356,17 @@ const readme = [
   "- Server ne radi, a treba izaci iz launchera",
   "    -> Ctrl+Alt+Shift+Q pa SERVISNI PIN (radi i bez servera)",
   "- Racunar se zakljucao, ne mozes do Windows-a",
-  "    -> POPRAVI-RACUNAR.bat  ili  DEINSTALIRAJ-LAUNCHER.bat (kao administrator)",
+  "    -> POPRAVI-RACUNAR.bat (kao administrator)",
+  "    -> DEINSTALIRAJ-LAUNCHER.bat (dvoklik sa naloga igraca)",
   "",
-  "Detaljno uputstvo: POKRETANJE.md i DEPLOY.md",
-  "Spisak sta da proveris pre otvaranja: PROVERI.md",
+  "Detaljno uputstvo: UPUTSTVA\\INSTALACIJA.md i UPUTSTVA\\ODRZAVANJE.md",
+  "Spisak sta da proveris pre otvaranja: UPUTSTVA\\PROVERA.md",
 ].join("\r\n");
 fs.writeFileSync(path.join(OUT, "PROCITAJ ME.txt"), readme, "utf8");
 
-// ---- folder za probu na jednom racunaru ----
-// Launcher je za igraonicu, pa mu je ciscenje sesije upaljeno: kad se igrac
-// odjavi, odjavljuje Steam, Epic, Riot, Battle.net i pregledace. Na racunaru na
-// kome se samo proba to obrise TUDJE prijave, i to se ne moze vratiti. Zato uz
-// probu ide skripta koja to iskljuci, i druga koja vrati kad proba prodje.
+// ---- folder za probu na jednom računaru ----
+// Uz probu idu skripte koje isključe čišćenje sesije (na računaru za probu bi
+// obrisalo tuđe prijave) i vrate ga posle probe.
 const PROBA = path.join(OUT, "0 - PROBA NA JEDNOM RACUNARU");
 kopiraj(path.join(ROOT, "assets", "proba"), PROBA);
 
@@ -413,8 +374,8 @@ const igre = db.prepare("SELECT name, path, image, banner FROM games ORDER BY id
 const alati = db.prepare("SELECT name, kind, target FROM tools ORDER BY id").all();
 const artikli = db.prepare("SELECT COUNT(*) n FROM shop_items").get().n;
 const igraca = db.prepare("SELECT COUNT(*) n FROM players").get().n;
-// Putanja koja ne pocinje diskom ili protokolom nije putanja - takvu igru
-// launcher nece pokrenuti, a to je najcesci uzrok "ne radi mi nista".
+// Igru cija putanja ne pocinje diskom, UNC putanjom ili protokolom launcher ne
+// moze da pokrene.
 const sumnjive = igre.filter((g) => !/^([a-z]:[\\/]|[a-z][a-z0-9+.-]*:\/\/|\\\\)/i.test(String(g.path || "").trim()));
 
 const uputstvoProbe = [

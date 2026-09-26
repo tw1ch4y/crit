@@ -10,19 +10,10 @@ import { DatabaseSync } from "node:sqlite";
 const DATA = radniFolder("stara-baza");
 const dbPath = path.join(DATA, "crit.db");
 
-// ODAKLE DOLAZI "ZATECENA" BAZA
-//
-// Najbolji izvor je PRAVA baza iz igraonice: stara je godinu dana i puna
-// stvarnih redova, pa je migracija nad njom najverodostojnija proba.
-//
-// Ali ta baza je runtime podatak i namerno NIJE u gitu (u njoj su nalozi,
-// lozinke i promet). Na klonu i na CI-ju je nema - a ovaj test ju je kopirao
-// bezuslovno, pa bi pao na "ENOENT" prvog dana posle postavljanja privatnog
-// repozitorijuma. Crven CI koji je crven zbog sebe niko ne gleda, i tu prestaje
-// da vredi.
-//
-// Zato: kad prave baze nema, napravi se sveza. Put kroz nadogradnju je isti -
-// tabela i kolona se svejedno skidaju nize, pa se glumi starija verzija.
+// Zatecena baza: prava baza iz igraonice ako postoji (server/data/crit.db),
+// inace sveza. Prava baza nije u gitu (nalozi, lozinke, promet), pa je na klonu
+// i na CI-ju nema. Put kroz nadogradnju je isti: tabela i kolona se svejedno
+// skidaju nize.
 const prava = path.join(KOREN, "server", "data", "crit.db");
 if (fs.existsSync(prava)) {
   // Sveza kopija pri svakom pokretanju, da test bude ponovljiv.
@@ -38,9 +29,8 @@ if (fs.existsSync(prava)) {
   console.log("  (zatecena baza: sveza - prave nema, ovo je klon ili CI)");
 }
 
-// Baza u projektu je u medjuvremenu i sama nadogradjena, pa se staro stanje
-// pravi ovde: tabela i indeksi se skidaju. Ranije se test oslanjao na to da
-// crit.db slucajno jos nema tabelu - i pao je onog dana kad je dobije.
+// Staro stanje se pravi ovde (tabela i indeksi se skidaju), jer je baza u
+// projektu vec nadogradjena.
 const stara = new DatabaseSync(dbPath);
 for (const r of stara.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'ix_gl_%'").all())
   stara.exec(`DROP INDEX IF EXISTS ${r.name}`);

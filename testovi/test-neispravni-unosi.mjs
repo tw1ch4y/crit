@@ -96,10 +96,8 @@ if (xss.status === 200) {
 } else proveri("opasno ime odbijeno na ulazu", true);
 
 // ---- podesavanja: u bazu ide provereno, ne sirovo ----
-// Ranije je provera radila nad Number(vrednost) a upisivala se sirova vrednost.
-// ratePerHour: true je tako prolazilo kao ispravno i zavrsavalo kao NULL u bazi,
-// a to tiho gasi naplatu svima - nijedna greska se ne prikaze, samo svi igraju
-// dzabe dok neko ne primeti.
+// U bazu se upisuje ista vrednost koja je proverena. ratePerHour: true ne sme da
+// zavrsi kao NULL, jer to tiho gasi naplatu svima.
 for (const losa of [[120], {}, [], { a: 1 }]) {
   const r = await api("/api/settings", "POST", { ratePerHour: losa });
   proveri(`cena po satu odbija ${JSON.stringify(losa)}`, r.status === 400, JSON.stringify(r.body));
@@ -167,6 +165,25 @@ for (const [sta, put] of [["igre", "/api/games/999999"], ["artikla", "/api/shop/
   proveri(`izmena nepostojece ${sta} javlja gresku`, r.status === 404, `${r.status} ${JSON.stringify(r.body)}`);
 }
 
+// ---- boja precice ----
+// Launcher je upisuje u stil kartice na svih trinaest racunara. Prima se samo
+// heks zapis - navodnik u polju bi ubacio proizvoljan tekst u ekran.
+const alat = await api("/api/tools", "POST", { name: "Sajt", kind: "web", target: "https://example.com", color: "#12abEF" });
+proveri("ispravna boja precice se prima", alat.status === 200, JSON.stringify(alat.body));
+for (const [sta, boja] of [["navodnik", 'red" onmouseover="x'], ["css izraz", "red;background:url(x)"],
+  ["objekat", { a: 1 }], ["bez tarabe", "12abef"]]) {
+  const r = await api("/api/tools", "POST", { name: "Losa", kind: "web", target: "https://example.com", color: boja });
+  proveri(`boja precice "${sta}" se odbija`, r.status === 400, `${r.status} ${JSON.stringify(r.body)}`);
+  const r2 = await api(`/api/tools/${alat.body.id}`, "PUT", { name: "Sajt", kind: "web", target: "https://example.com", color: boja });
+  proveri(`izmena boje u "${sta}" se odbija`, r2.status === 400, `${r2.status} ${JSON.stringify(r2.body)}`);
+}
+const alatSad = async () => (await api("/api/tools")).body.find((x) => x.id === alat.body.id);
+proveri("boja je ostala ona ispravna", (await alatSad())?.color === "#12abEF", JSON.stringify(await alatSad()));
+await api(`/api/tools/${alat.body.id}`, "PUT", { name: "Sajt", kind: "web", target: "https://example.com", available: false });
+proveri("izmena bez boje ne brise boju", (await alatSad())?.color === "#12abEF", JSON.stringify(await alatSad()));
+await api(`/api/tools/${alat.body.id}`, "PUT", { name: "Sajt", kind: "web", target: "https://example.com", color: "" });
+proveri("prazna boja vraca boju po imenu", (await alatSad())?.color === null, JSON.stringify(await alatSad()));
+
 // ---- nijedan odgovor ne sme da bude stack trace ----
 // Express na neuhvacenu gresku podrazumevano vrati HTML sa celim stack trace-om
 // i apsolutnim putanjama fajlova. Panel to prikaze kao nerazumljivu bujicu
@@ -175,6 +192,8 @@ const smece = [
   ["PUT", "/api/games/1", { name: 5, path: [], args: {}, category: null }],
   ["PUT", "/api/shop/1", { name: {}, price: "abc", stock: [] }],
   ["PUT", "/api/tools/1", { name: [], kind: 7, target: {} }],
+  ["POST", "/api/tools", { name: "Alat", kind: "app", target: "C:\\x.exe", args: { a: 1 } }],
+  ["POST", "/api/tools", { name: ["x"], kind: "web", target: { u: 1 } }],
   ["POST", "/api/games", { name: {}, path: {} }],
   ["POST", "/api/shop", { name: [], price: {} }],
   ["POST", "/api/players", { username: {}, password: [] }],

@@ -1,20 +1,10 @@
-// ODRŽAVANJE: da disk nikad ne pukne i da baza ne buja bez kraja.
+// Održavanje: da disk ne stane i da baza ne raste bez granice.
 //
-// Glavni računar u igraonici niko neće održavati. Uključi se ujutru, radi ceo
-// dan i tako godinama. Sve što raste bez granice pre ili kasnije napuni disk, a
-// kad disk stane, server ne može da piše i CELA igraonica staje - niko se ne
-// prijavljuje, kasa ne radi, sesije se ne naplaćuju. To je najskuplji mogući
-// kvar, i jedini koji se sasvim sigurno desi ako se ništa ne uradi.
-//
-// Mereno na napunjenoj bazi (testovi/godina-rada.mjs), igraonica sa 13 računara:
-//
-//   posle godinu dana    baza 35 MB, 228.000 redova u logovima
-//   30 rezervnih kopija  1.06 GB      <- ovo je pravi problem, ne baza
-//
-// Zato ovde stoje tri kočnice:
-//   1. logovi se seku po STAROSTI i po BROJU (šta pre dođe)
-//   2. rezervne kopije se prorede kroz vreme i imaju granicu ukupne veličine
-//   3. pre pravljenja kopije se gleda koliko je diska ostalo
+// Izmereno na punoj bazi za 13 računara (testovi/godina-rada.mjs): posle
+// godinu dana baza 35 MB, a 30 punih rezervnih kopija 1,06 GB. Zato:
+//   1. logovi se seku po starosti i po broju (šta pre dođe);
+//   2. rezervne kopije se proređuju kroz vreme i imaju granicu ukupne veličine;
+//   3. pre pravljenja kopije se proverava slobodan prostor.
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
@@ -72,17 +62,15 @@ function spisakKopija() {
     .sort((a, b) => b.t - a.t); // najnovija prva
 }
 
-// ---- 1) LOGOVI: starost pa količina ----
+// ---- 1) Logovi: starost, pa broj ----
 //
-// Prvo se seče po starosti. Ako i posle toga ima previše redova (dan sa
-// turnirom ume da napravi višestruko više zapisa nego običan), briše se
-// NAJSTARIJI red da bi novi imao mesto - dokle god se ne dođe do granice.
+// Posle sečenja po starosti, ako redova i dalje ima previše, brišu se
+// najstariji dok se ne dođe do granice.
 export function ocistiLogove(o = podesavanja(), aktivnaSmenaId = null) {
   const granica = Date.now() - o.logDana * 86400000;
   let poStarosti = 0, poBroju = 0;
   try {
-    // Logovi smene koja je JOŠ OTVORENA se ne diraju ni ako su stariji: bez njih
-    // obračun te smene ostaje bez podataka.
+    // Logovi otvorene smene se ne diraju (bez njih obračun smene nema podataka).
     poStarosti = Number(
       (aktivnaSmenaId
         ? db.prepare("DELETE FROM logs WHERE ts < ? AND (shift_id IS NULL OR shift_id != ?)").run(granica, aktivnaSmenaId)
@@ -107,18 +95,11 @@ export function ocistiPokretanja(o = podesavanja()) {
   } catch { return 0; }
 }
 
-// ---- 2) REZERVNE KOPIJE: proređivanje kroz vreme ----
+// ---- 2) Rezervne kopije: proređivanje kroz vreme ----
 //
-// Ranije se čuvalo poslednjih 30 kopija. Pošto se prave na 15 minuta, to je
-// svega sedam i po sati unazad: greška primećena sledeće jutro više nije imala
-// gde da se vrati, a 30 punih kopija je posle godinu dana zauzimalo preko
-// gigabajta. Zato se sad čuva gusto blizu, retko daleko:
-//
-//   poslednjih 12          oko 3 sata unazad, na svakih 15 minuta
+//   poslednjih 12          oko 3 sata unazad, na 15 minuta
 //   po jedna dnevno        poslednje dve nedelje
 //   po jedna nedeljno      poslednja dva meseca
-//
-// Isti broj fajlova pokriva dva meseca umesto sedam sati.
 export function srediKopije(o = podesavanja()) {
   const sve = spisakKopija();
   if (!sve.length) return { obrisano: 0, zadrzano: 0, ukupnoMB: 0 };
@@ -145,9 +126,7 @@ export function srediKopije(o = podesavanja()) {
     try { fs.unlinkSync(k.p); obrisano++; } catch {}
   }
 
-  // Gornja granica ukupne veličine. Briše se najstarija dok se ne stane u
-  // granicu, ali se najsvežijih pet ne dira ni po koju cenu - bez ijedne
-  // skorašnje kopije rezervna kopija ne znači ništa.
+  // Granica ukupne veličine: briše se najstarija, ali pet najnovijih ostaje uvek.
   let preostale = spisakKopija();
   let ukupno = preostale.reduce((z, k) => z + k.velicina, 0);
   while (ukupno > o.kopijeMB * MB && preostale.length > 5) {
@@ -167,9 +146,7 @@ export function stanjeSkladista() {
   }
   const kopije = spisakKopija();
   const kopijeBajta = kopije.reduce((z, k) => z + k.velicina, 0);
-  // Slike su obično VIŠESTRUKO veće od same baze: baza igraonice je manja od
-  // megabajta, a devet omota je sedam. Dok se nisu brojale, panel je tvrdio da
-  // program zauzima pola megabajta - pa se prostor na disku nije ni gledao.
+  // Slike se broje posebno; obično zauzimaju više od same baze.
   let slikeBajta = 0, slikaKomada = 0;
   try {
     for (const f of fs.readdirSync(path.join(DATA_DIR, "uploads"))) {
@@ -179,16 +156,14 @@ export function stanjeSkladista() {
   const slobodno = slobodnoNaDisku();
   const red = (t) => { try { return db.prepare(`SELECT COUNT(*) c FROM ${t}`).get().c; } catch { return 0; } };
   return {
-    // I bajtovi, jer nova igraonica ima bazu manju od megabajta - zaokruženo na
-    // MB to je nula i u panelu izgleda kao da nešto ne radi.
+    // I u bajtovima: nova baza je manja od megabajta.
     bazaBajta, kopijeBajta, slikeBajta, slikaKomada,
     bazaMB: Math.round(bazaBajta / MB * 10) / 10,
     slikeMB: Math.round(slikeBajta / MB * 10) / 10,
     kopijaKomada: kopije.length,
     kopijeMB: Math.round(kopijeBajta / MB * 10) / 10,
     najstarijaKopija: kopije.length ? kopije[kopije.length - 1].t : null,
-    // Kopija na istom disku ne pomaže kad disk otkaže - zato stanje odredišta
-    // van računara stoji tu, uz brojke o prostoru, a ne u zasebnom uglu.
+    // Stanje kopije van računara ide uz brojke o prostoru.
     vanRacunara: kopijaVanPodesavanja(),
     slobodnoMB: slobodno === null ? null : Math.round(slobodno / MB),
     maloMesta: slobodno !== null && slobodno < o.diskMB * MB,
@@ -198,29 +173,23 @@ export function stanjeSkladista() {
   };
 }
 
-// ---- 4) PRAVLJENJE KOPIJE ----
+// ---- 4) Pravljenje kopije ----
 //
-// Stoji ovde, a ne u db.js, jer bez proređivanja i provere diska kopija nije
-// zaštita nego način da se disk napuni.
+// Ovde, a ne u db.js, jer ide uz proređivanje i proveru diska.
 export function backupDb() {
   try {
     const dir = folderKopija();
     fs.mkdirSync(dir, { recursive: true });
 
-    // Ako je disk pri kraju, kopija se preskače. Puna kopija baze na disku bez
-    // mesta je najbrži način da stane i sama baza, a tada staje cela igraonica.
+    // Kad je disk pri kraju, kopija se preskače.
     const dozvola = smeKopija();
     if (!dozvola.sme) {
       console.error(`backup preskočen: na disku je ostalo ${dozvola.slobodnoMB} MB`);
       return null;
     }
 
-    // VACUUM INTO ODBIJA da piše preko postojećeg fajla. Dok je ime imalo
-    // tačnost od sekunde, dve kopije u istoj sekundi su davale isto ime i druga
-    // je tiho pucala uz "Backup nije uspeo" - a to se dešava kad vlasnik
-    // pritisne "Napravi kopiju sada" baš dok kreće automatska (na 15 min), ili
-    // dvaput zaredom. Sa milisekundama imena su jedinstvena, iste su dužine, pa
-    // se i ispravno ređaju po vremenu.
+    // Ime sa milisekundama: VACUUM INTO ne piše preko postojećeg fajla, a dve
+    // kopije u istoj sekundi (ručna i automatska) su moguće.
     const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 23);
     let dest = path.join(dir, `crit-${ts}.db`).replace(/\\/g, "/");
     for (let i = 2; fs.existsSync(dest) && i < 100; i++) {
@@ -235,38 +204,21 @@ export function backupDb() {
   }
 }
 
-// ---- 5) KOPIJA VAN RAČUNARA ----
+// ---- 5) Kopija van računara ----
 //
-// Sve iznad pazi da disk ne pukne. Ništa od toga ne pomaže kad disk OTKAŽE -
-// a baza i svih trideset kopija stoje na istom fizičkom disku. Tog dana nestaje
-// sve: nalozi, kredit koji su gosti uplatili, promet, cela evidencija.
-//
-// Zato se najsvežija kopija jednom dnevno prepiše NEGDE DRUGDE: USB koji stalno
-// stoji u računaru, drugi disk, mrežni folder. Panel može da preuzme kopiju i
-// ručno, ali ručno znači da neko mora da se seti - a neće, jer se seti tek kad
-// zatreba.
-//
-// Odredište je prazno dok ga vlasnik ne upiše (Podešavanja > Rezervne kopije).
-// Dok je prazno, ovo ne radi ništa i ne javlja grešku - ali panel stoji žut,
-// da se ne zaboravi.
+// Baza i sve rezervne kopije su na istom disku. Jednom dnevno se najsvežija
+// kopija prepisuje na drugo odredište (USB, drugi disk, mrežni folder).
+// Dok odredište nije upisano, ovo ne radi ništa, a panel stoji žuto.
 const KOPIJA_PUT = "kopija_van_putanja";
 const KOPIJA_KAD = "kopija_van_poslednja";
 const KOPIJA_GRESKA = "kopija_van_greska";
 export const KOPIJA_VAN_ZADRZI = 7;   // koliko dana unazad stoji na odredištu
 const KOPIJA_VAN_ZASTARELA = 2 * 86400000; // starija od ovoga = panel crveni
 
-// ODREDIŠTE NE SME DA ZAUSTAVI SERVER.
-//
-// Odredište je po prirodi nepouzdano: iščupan USB, mrežni folder čiji računar
-// spava. Na Windows-u sinhroni poziv ka mrežnoj putanji koja ne odgovara ume da
-// stoji i po minut - a za to vreme ceo server stoji: naplata, panel, launcheri.
-// Nadzornik takav server posle minut i po proglasi zaglavljenim i ubije, a pri
-// sledećem pokretanju održavanje opet krene od kopije - i krug se zatvara.
-//
-// Zato sve što dira odredište ide asinhrono i sa rokom. Poziv koji pređe rok i
-// dalje zauzima jednu nit za rad sa diskom (ne može da se prekine), a tih niti je
-// malo i dele ih svi fajlovi servera - pa se, dok takav poziv ne završi, novo
-// kopiranje ni ne pokušava.
+// Sve što dira odredište je asinhrono i ima rok: sinhroni poziv ka mrežnoj
+// putanji koja ne odgovara ume da blokira server i po minut. Poziv koji pređe
+// rok i dalje zauzima nit za rad sa diskom, pa novo kopiranje ne kreće dok on
+// ne završi.
 const ROK_ODREDISTA_MS = Number(process.env.ROK_ODREDISTA_MS) || 20000;
 const ROK_KOPIRANJA_MS = 10 * 60 * 1000; // sama baza preko spore mreže
 let zaglavljeno = 0; // pozivi ka odredištu koji su prešli rok, a još nisu završeni
@@ -295,12 +247,8 @@ export function kopijaVanPodesavanja() {
   const putanja = getSetting(KOPIJA_PUT, "") || "";
   const kad = Number(getSetting(KOPIJA_KAD, "")) || null;
   const greska = getSetting(KOPIJA_GRESKA, "") || null;
-  // Stanja umesto "radi / ne radi": svako traži drugačiji potez od vlasnika, pa
-  // panel za svako ima svoju boju i svoj tekst.
-  //
-  // "pala" se gleda PRE starosti, i to je bitno: kopija od jutros je i dalje
-  // sveža, ali ako je poslednji pokušaj pukao, USB je već iščupan i sutra
-  // kopije neće biti. Da se gledala samo starost, upozorenje bi kasnilo dva dana.
+  // Stanja: nepodesena, nikad, uredna, pala, zastarela. "pala" se proverava pre
+  // starosti: sveža kopija uz poslednji neuspeh znači da je odredište nestalo.
   let stanje = "uredna";
   if (!putanja) stanje = "nepodesena";
   else if (greska) stanje = "pala";
@@ -316,9 +264,7 @@ export async function postaviKopijuVan(putanja) {
     setSetting(KOPIJA_GRESKA, "");
     return { ok: true, ...kopijaVanPodesavanja() };
   }
-  // Odredište se proverava ODMAH, dok vlasnik gleda u ekran. Kad bi se prvi put
-  // pisalo tek u ponoć, pogrešno otkucana putanja bi se otkrila tek onog dana
-  // kad kopija zatreba - a tada je kasno.
+  // Odredište se proverava odmah pri čuvanju, dok vlasnik gleda u ekran.
   try {
     await saRokom(fsp.mkdir(p, { recursive: true }), ROK_ODREDISTA_MS, "pravljenje foldera");
     const proba = path.join(p, ".crit-proba");
@@ -333,13 +279,8 @@ export async function postaviKopijuVan(putanja) {
   return { ok: true, ...kopijaVanPodesavanja() };
 }
 
-// Slike uz kopiju baze. Kopira se samo ono čega na odredištu NEMA ili je druge
-// veličine - inače bi svako dnevno pokretanje nanovo pisalo desetine megabajta
-// na USB, a slike se menjaju jednom u par meseci.
-//
-// NIŠTA SE NE BRIŠE sa odredišta. Slika obrisana na serveru (izbačena igra)
-// ostaje u kopiji, i to je namerno: kopija treba da preživi i grešku vlasnika,
-// a nekoliko zaostalih fajlova košta megabajt.
+// Slike uz kopiju baze: kopira se samo ono čega na odredištu nema ili je druge
+// veličine. Sa odredišta se ništa ne briše.
 async function kopirajSlike(cilj) {
   const izvor = path.join(DATA_DIR, "uploads");
   let imena = [];
@@ -363,12 +304,8 @@ async function kopirajSlike(cilj) {
   return { novih, preskoceno };
 }
 
-// Prepiše najsvežiju kopiju na odredište i proredi tamošnje.
-// Nikad ne baca: odredište je po prirodi nepouzdano (iščupan USB, mreža pala),
-// a to ne sme da obori održavanje ni server.
-//
-// Dva poziva odjednom (dnevno održavanje i dugme u panelu) dele isti posao -
-// inače bi dva kopiranja pisala isti fajl.
+// Najsvežija kopija na odredište, uz proređivanje tamošnjih. Ne baca; dva
+// poziva odjednom (dnevno održavanje i dugme u panelu) dele isti posao.
 let kopiranjeUToku = null;
 export function kopirajVanRacunara() {
   if (!kopiranjeUToku) kopiranjeUToku = kopirajSada().finally(() => { kopiranjeUToku = null; });
@@ -387,22 +324,16 @@ async function kopirajSada() {
   if (!sve.length) return { preskoceno: "nema kopija" };
   const izvor = sve[0];
   try {
-    // ODREDIŠTE SE NE PRAVI OVDE, NEGO SAMO PROVERAVA.
-    //
-    // Folder se pravi jednom, kad ga vlasnik upiše i dok gleda u ekran. Ako ga
-    // ovde nema, to znači da je nestao medij - iščupan USB, odjavljen mrežni
-    // disk. Sa `mkdir` bi se u tom trenutku napravio NOV PRAZAN folder na
-    // sistemskom disku, kopija bi se uredno upisala u njega i javilo bi se da
-    // je sve u redu. Vlasnik bi mesecima gledao zeleno stanje, a jedini primerak
-    // baze bi i dalje bio na jednom disku - i to bi se otkrilo tek onog dana kad
-    // kopija zatreba. Zato je nepostojeće odredište GREŠKA, ne posao.
+    // Odredište se ovde samo proverava, ne pravi: ako ga nema, medij je nestao
+    // (izvučen USB, odjavljen mrežni disk), a `mkdir` bi napravio prazan folder
+    // na sistemskom disku i kopija bi "uspela" na istom disku. Nepostojeće
+    // odredište je greška.
     const st = await statIliNista(cilj, "provera odredišta");
     if (!st || !st.isDirectory()) {
       throw Object.assign(new Error("odredište nije dostupno"), { code: "NEMA_ODREDISTA" });
     }
     const dest = path.join(cilj, izvor.f);
-    // Ista kopija se ne prepisuje drugi put - dnevno pokretanje bi inače
-    // svaki put nanovo pisalo isti fajl na USB bez potrebe.
+    // Kopija koja je već na odredištu se ne prepisuje.
     const postojeca = await statIliNista(dest, "provera kopije");
     if (!postojeca || postojeca.size !== izvor.velicina) {
       await saRokom(fsp.copyFile(izvor.p, dest), ROK_KOPIRANJA_MS, "kopiranje baze");
@@ -417,11 +348,7 @@ async function kopirajSada() {
       try { await saRokom(fsp.unlink(k.p), ROK_ODREDISTA_MS, "brisanje stare kopije"); obrisano++; }
       catch (e) { if (e?.code === "ROK") throw e; }
     }
-    // SLIKE IDU ZAJEDNO SA BAZOM.
-    //
-    // Baza bez slika je pola kopije: redovi pokazuju na `/uploads/...`, a tih
-    // fajlova nema - pa se svaki omot, svaka slika pića i svih pet pozadina
-    // kucaju ispočetka. Vlasnik bi pri tom gledao zeleno "kopija uredna".
+    // Slike idu zajedno sa bazom.
     const slike = await kopirajSlike(cilj);
     setSetting(KOPIJA_KAD, String(Date.now()));
     setSetting(KOPIJA_GRESKA, "");
@@ -437,10 +364,8 @@ async function kopirajSada() {
   }
 }
 
-// Sve odjednom: jednom dnevno i pri pokretanju servera.
-//
-// Kopija van računara NIJE deo ovoga: ona je asinhrona (vidi gore) i pozivalac
-// je pokreće posebno, da čekanje na odredište ne zadrži ostatak održavanja.
+// Sve osim kopije van računara, jednom dnevno i pri pokretanju servera.
+// Kopiju van računara pozivalac pokreće posebno (asinhrona je).
 export function odrzavanje(aktivnaSmenaId = null) {
   const o = podesavanja();
   const logovi = ocistiLogove(o, aktivnaSmenaId);
@@ -450,11 +375,8 @@ export function odrzavanje(aktivnaSmenaId = null) {
   return { logovi, pokretanja, kopije, stanje: s };
 }
 
-// Da li uopšte sme da se pravi nova kopija.
-//
-// Ako je disk pri kraju, prvo se pokuša oslobađanje brisanjem starih kopija.
-// Ako ni to ne pomogne, kopija se preskače: bolje ostati bez jedne kopije nego
-// napuniti disk do kraja, jer tada prestaje da radi i sama baza.
+// Da li sme nova kopija. Kad je disk pri kraju, prvo se brišu stare kopije;
+// ako ni to ne pomogne, kopija se preskače.
 export function smeKopija(o = podesavanja()) {
   let slobodno = slobodnoNaDisku();
   if (slobodno === null) return { sme: true };

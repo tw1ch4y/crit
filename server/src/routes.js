@@ -17,20 +17,16 @@ const cName = (id) => db.prepare("SELECT name FROM computers WHERE id=?").get(id
 router.post("/login", (req, res) => {
   const { username, password } = req.body || {};
   const ime = String(username || "").trim();
-  // Kljuc je racunar + ime naloga: jedan racunar ne moze da mlati jedan nalog,
-  // a osoblje sa druge masine i dalje moze da se prijavi dok to traje.
+  // Ključ je računar + nalog: pauza ne blokira osoblje na drugim računarima.
   const kljuc = `panel:${req.ip}|${ime.toLowerCase()}`;
   const pauza = svc.kocnica.ceka(kljuc);
   if (pauza) return res.status(429).json({ error: `Previše pokušaja. Sačekajte ${pauza} s.` });
 
-  // Ugasen nalog se ponasa kao da ne postoji: ista poruka, ista pauza. Kad bi
-  // pisalo "nalog je ugasen", otpusten radnik bi znao da je ime jos ispravno i
-  // da treba samo da ga neko vrati.
+  // Ugašen nalog dobija isti odgovor kao nepostojeći.
   const admin = db.prepare("SELECT * FROM admins WHERE username = ? AND active = 1").get(ime);
   if (!admin || !verifyPassword(password, admin.password_hash)) {
     const cekaj = svc.kocnica.promasaj(kljuc);
-    // Cim se zakljuca, odmah se i kaze - da osoblje ne dobije obicnu gresku pa
-    // ga tek sledeci pokusaj iznenadi pauzom. Isto radi i prijava igraca.
+    // Pauza se javlja odmah, u istom odgovoru.
     if (cekaj) {
       svc.logEvent({ category: "prijava", action: "panel_login_fail", actor: "sistem", target: ime || "(prazno)",
         detail: `Više pogrešnih prijava na panel sa ${req.ip} - pauza ${cekaj} s` });
@@ -205,7 +201,7 @@ router.post("/shifts/:id/napomena", requireOwner, (req, res) => {
 });
 
 // ---------- IGRAČI ----------
-// Bez ?page vraća ceo niz (koristi POS/kasa za izbor igrača); sa ?page vraća stranicu.
+// Bez ?page ceo spisak (kasa), sa ?page jedna strana.
 router.get("/players", (req, res) => {
   if (req.query.page) {
     return res.json(svc.playersPage({ page: req.query.page, per: req.query.per, search: req.query.search }));
@@ -216,8 +212,7 @@ router.get("/players", (req, res) => {
 router.post("/players", (req, res) => {
   const r = svc.createPlayer(req.body || {}, { adminId: req.admin.adminId, adminUsername: req.admin.username });
   if (r.error) return res.status(400).json(r);
-  // Iznos ne ide ovde: početni kredit je već zapisan kao dopuna (createPlayer),
-  // pa bi se inače pojavio dvaput.
+  // Bez iznosa: početni kredit je već zapisan kao dopuna (createPlayer).
   svc.logEvent({ category: "nalozi", action: "player_create", actor: req.admin.username, target: req.body?.username, detail: `Kreiran nalog igrača${Number(req.body?.balance) > 0 ? `, kredit ${Number(req.body.balance)}` : ""}` });
   res.json(r);
 });
@@ -272,8 +267,7 @@ router.delete("/paketi/:id", requireOwner, (req, res) => {
   svc.logEvent({ category: "podesavanja", action: "paket", actor: req.admin.username, target: `#${req.params.id}`, detail: "Obrisan vremenski paket" });
   res.json(r);
 });
-// Prodaja paketa igraču - novac koji uđe se vodi kao dopuna (pazar smene).
-// Zapis u logove pravi sam servis, u istom poslu sa novcem - vidi prodajPaket.
+// Prodaja paketa; zapis u logove je u transakciji u prodajPaket.
 router.post("/players/:id/paket", (req, res) => {
   const id = Number(req.params.id);
   const r = svc.prodajPaket(id, Number(req.body?.paketId), req.admin.adminId, req.admin.username);
@@ -281,15 +275,10 @@ router.post("/players/:id/paket", (req, res) => {
   res.json(r);
 });
 
-// ---------- NAGRADNI TOČAK (podešavanje) ----------
-// ---------- VIP: ČLANARINA KOJA SE KUPUJE ----------
+// ---------- NAGRADNI TOČAK I VIP ----------
 //
-// Rang se zarađuje igranjem i besplatan je; VIP se plaća i nosi pogodnosti.
-// Dok je VIP bio nagrada za peti nivo, bio je trošak - i to baš na najboljim
-// gostima, kojima je kuća davala popust iako bi ionako došli.
-// Cenu i trajanje vidi i radnik: on je taj koji uzima keš preko pulta, pa mu
-// prozor za upis VIP-a mora znati koliko se naplaćuje. Tajna i nije - istu tu
-// cenu launcher piše svakom gostu. Brojke o zaradi ostaju vlasniku.
+// Cenu i trajanje VIP-a vidi i radnik (naplaćuje keš na kasi); launcher istu
+// cenu prikazuje gostima. Brojke o zaradi vidi samo vlasnik.
 router.get("/vip", (req, res) => {
   const v = svc.vipPregled();
   if (req.admin.role !== "owner") { delete v.aktivnih; delete v.prodato30; delete v.prihod30; }
@@ -302,11 +291,8 @@ router.post("/vip", requireOwner, (req, res) => {
     detail: `VIP: ${r.ukljucen ? "u ponudi" : "nije u ponudi"}, ${r.cena} za ${r.dana} dana, x${r.xpMnozilac} XP` });
   res.json(svc.vipPregled());
 });
-// Gost koji plati kešom na kasi - radnik mu upiše dane. Nula oduzima odmah.
-//
-// `naplati` je iznos koji je gost predao preko pulta. Ide u pazar smene, pa
-// kasa uveče očekuje i taj novac; bez njega bi u fioci stajao višak koji obračun
-// ne pominje. Poklonjen VIP (nagrada, ispravka) se šalje bez njega.
+// VIP za gosta koji plaća kešom na kasi; 0 dana oduzima odmah. `naplati` je
+// novac preko pulta i ide u pazar smene; poklonjen VIP ide bez njega.
 router.post("/players/:id/vip", (req, res) => {
   const r = svc.postaviVipIgracu(Number(req.params.id), req.body?.dana, req.admin.username,
     { naplati: req.body?.naplati, adminId: req.admin.adminId });
@@ -460,8 +446,7 @@ router.post("/computers/:id/logout", (req, res) => {
 });
 router.post("/computers/:id/message", (req, res) => {
   const id = Number(req.params.id);
-  // Poruka ide preko ekrana igrača i u Logove - bez granice bi jedan zalepljen
-  // tekst zatrpao i jedno i drugo.
+  // Poruka ide na ekran igrača i u Logove, pa je dužina ograničena.
   const text = String(req.body?.text || "").trim().slice(0, 500);
   if (!text) return res.status(400).json({ error: "Poruka je prazna" });
   const r = svc.sendMessageToComputer(id, text);
@@ -471,14 +456,13 @@ router.post("/computers/:id/message", (req, res) => {
 router.post("/computers/:id/command", (req, res) => {
   const id = Number(req.params.id);
   const cmd = String(req.body?.cmd || "");
-  const r = svc.sendCommand(id, cmd);
+  const r = svc.sendCommand(id, cmd, req.admin.adminId);
   if (r.error) return res.status(400).json(r);
   svc.logEvent({ category: "racunar", action: "command", actor: req.admin.username, target: cName(id), detail: `Komanda: ${cmd}` });
   res.json(r);
 });
 
-// DALJINSKI TASK MANAGER: radnik sa glavnog računara vidi šta radi na izabranoj
-// mašini i gasi zaglavljen program, bez ustajanja od kase.
+// Daljinski spisak procesa na računaru igrača.
 router.get("/computers/:id/procesi", async (req, res) => {
   const r = await svc.procesiRacunara(Number(req.params.id));
   if (r.error) return res.status(400).json(r);
@@ -506,7 +490,7 @@ router.post("/computers/:id/wake", async (req, res) => {
 router.post("/computers-action", (req, res) => {
   const { ids, action } = req.body || {};
   if (!action) return res.status(400).json({ error: "Akcija je obavezna" });
-  const r = svc.bulkAction(ids, action);
+  const r = svc.bulkAction(ids, action, req.admin.adminId);
   svc.logEvent({ category: "racunar", action: "bulk", actor: req.admin.username, detail: `Grupna akcija "${action}" na ${r.sent} računara` });
   res.json(r);
 });
@@ -530,17 +514,15 @@ router.post("/pos", (req, res) => {
 // ---------- SHOP ----------
 router.get("/shop", (req, res) => res.json(svc.shopList()));
 const parseStock = (v) => (v === "" || v == null ? null : Math.max(0, Math.floor(Number(v)) || 0));
-// Artikal sa negativnom cenom bi pri porudžbini DODAVAO kredit igraču, pa se
-// takva cena ne pušta u bazu ni preko kucanja ni preko izmene.
+// Negativna cena bi pri porudžbini dodavala kredit.
 const cenaOk = (v) => svc.ispravanIznos(v) && Number(v) >= 0;
 router.post("/shop", requireOwner, (req, res) => {
   const { category, price, emoji, stock } = req.body || {};
   const name = String(req.body?.name ?? "").trim();
   if (!name || price == null) return res.status(400).json({ error: "Naziv i cena su obavezni" });
   if (!cenaOk(price)) return res.status(400).json({ error: "Cena mora biti broj veći ili jednak nuli" });
-  // Isto ime se ne zabranjuje nego se JAVI: dva reda sa istim imenom su dve iste
-  // pločice na kasi, zaliha podeljena na dve strane i ista stvar brojana dvaput
-  // u izveštaju. Odluka je vlasnikova - ponovi zahtev sa `svejedno`.
+  // Isto ime artikla se javlja, ne zabranjuje; ponovljen zahtev sa `svejedno`
+  // ga prihvata.
   const isti = svc.istoImeArtikla(name);
   if (isti && !req.body?.svejedno) {
     return res.status(409).json({ kod: "duplikat", postojeci: { naziv: isti.name, kategorija: isti.category, cena: isti.price },
@@ -561,8 +543,7 @@ router.put("/shop/:id", requireOwner, (req, res) => {
   if (!name) return res.status(400).json({ error: "Naziv je obavezan" });
   const cena = price == null ? it.price : Number(price);
   if (!cenaOk(cena)) return res.status(400).json({ error: "Cena mora biti broj veći ili jednak nuli" });
-  // Preimenovanje u ime koje već nosi neki drugi artikal - isto pitanje kao i
-  // pri dodavanju. Sam artikal se, naravno, ne poredi sa sobom.
+  // Isto pitanje pri preimenovanju (artikal se ne poredi sa sobom).
   const istiDrugi = svc.istoImeArtikla(name, id);
   if (istiDrugi && !req.body?.svejedno) {
     return res.status(409).json({ kod: "duplikat", postojeci: { naziv: istiDrugi.name, kategorija: istiDrugi.category, cena: istiDrugi.price },
@@ -582,13 +563,8 @@ router.post("/shop/:id/stock", requireOwner, (req, res) => {
   const add = Math.floor(Number(req.body?.add) || 0);
   const it = db.prepare("SELECT name, stock FROM shop_items WHERE id=?").get(id);
   if (!it) return res.status(404).json({ error: "Artikal ne postoji" });
-  // DOPUNA NULOM NE SME DA RASPRODA ARTIKAL.
-  //
-  // Neograničen artikal (stock = NULL) se ovom rutom prvi put stavlja pod
-  // brojanje: base je 0, pa "dopuni +10" daje 10. Ali zahtev bez ispravnog
-  // broja - pogrešno ime polja, prazno polje, tekst umesto broja - daje add = 0,
-  // pa je isti taj artikal postajao 0 komada, to jest RASPRODAT. Piće bi
-  // nestalo iz launchera bez ijedne poruke, a niko ne bi znao zašto.
+  // Dopuna bez ispravnog broja se odbija, inače bi neograničen artikal
+  // (stock = NULL) postao 0 komada, odnosno rasprodat.
   if (!add) return res.status(400).json({ error: "Unesi koliko komada dodaješ (ili oduzimaš)" });
   const base = it.stock == null ? 0 : it.stock;
   const next = Math.max(0, base + add);
@@ -618,16 +594,11 @@ router.delete("/shop/:id", requireOwner, (req, res) => {
 
 // ---------- IGRE ----------
 router.get("/games", (req, res) => res.json(svc.gamesList()));
-// Kopiranje putanje iz Explorera cesto ponese razmak ili navodnike - onda igra
-// "nece da se pokrene" a razlog se ne vidi.
+// Putanja kopirana iz Explorer-a često nosi razmak ili navodnike.
 const ocistiPutanju = (v) => String(v ?? "").trim().replace(/^"|"$/g, "").trim();
-// Razmak ispred imena se ne vidi u polju, a igra zbog njega skoci na pocetak
-// police i postane izdvojena na pocetnoj strani. Tako je " Team Fortress 2"
-// zavrsio kao naslovna igra u igraonici.
+// Razmak ispred imena bi igru poslao na početak police.
 const ocistiIme = (v) => String(v ?? "").trim();
-// Kad polje ne dodje u zahtevu, ostaje ono sto je vec u bazi. Ranije se pisalo
-// undefined, sto SQLite ne prima - server je vracao 500 sa celim stack trace-om
-// umesto poruke koju panel ume da prikaze.
+// Polje koje nije poslato zadržava staru vrednost (undefined SQLite ne prima).
 const iliStaro = (novo, staro, podrazumevano = "") => novo ?? staro ?? podrazumevano;
 const vidljivost = (v, staro) => (v === false ? 0 : v === true ? 1 : staro);
 
@@ -645,8 +616,7 @@ router.post("/games", requireOwner, (req, res) => {
 router.put("/games/:id", requireOwner, (req, res) => {
   const id = Number(req.params.id);
   const g = db.prepare("SELECT * FROM games WHERE id=?").get(id);
-  // Izmena necega sto ne postoji je greska u pozivu, ne uspeh. Kad server na to
-  // kaze "ok", panel javi "Sacuvano" a nista nije sacuvano.
+  // Nepostojeća igra je 404, ne "ok".
   if (!g) return res.status(404).json({ error: "Igra ne postoji" });
   const { args, emoji, category, available } = req.body || {};
   const p = ocistiPutanju(req.body?.path ?? g.path);
@@ -656,9 +626,7 @@ router.put("/games/:id", requireOwner, (req, res) => {
   db.prepare("UPDATE games SET name=?, path=?, args=?, emoji=?, category=?, available=? WHERE id=?")
     .run(name, p, iliStaro(args, g.args), iliStaro(emoji, g.emoji), svc.uskladiKategoriju(iliStaro(category, g.category, "Igre"), svc.kategorije("igre")) || "Igre",
       vidljivost(available, g.available), id);
-  // Promenjena putanja briše oznaku o kvaru: vlasnik je upravo pokušao da ga
-  // popravi, pa oznaka koja i dalje stoji ne kaže ništa o novoj putanji. Ostaje
-  // kad se menja samo naziv ili kategorija - tada kvar i dalje važi.
+  // Promenjena putanja briše oznaku o kvaru; izmena naziva ili kategorije ne.
   if (p !== g.path) svc.ocistiKvar("games", id);
   svc.logEvent({ category: "podesavanja", action: "game_edit", actor: req.admin.username, target: name, detail: `Izmenjena igra${available === false ? " (sakrivena)" : ""}` });
   svc.pushCatalog();
@@ -717,8 +685,7 @@ router.post("/tools", requireOwner, (req, res) => {
 });
 router.put("/tools/:id", requireOwner, (req, res) => {
   const r = svc.updateTool(Number(req.params.id), req.body || {});
-  // "Ne postoji" nije ista greska kao "pogresno popunjeno" - panel na 404 zna
-  // da mu je spisak zastareo i da treba da se osvezi.
+  // 404 kaže panelu da je spisak zastareo.
   if (r.error === "Alat ne postoji") return res.status(404).json(r);
   if (r.error) return res.status(400).json(r);
   svc.logEvent({ category: "podesavanja", action: "tool_edit", actor: req.admin.username, target: req.body?.name, detail: "Izmenjen alat" });
@@ -778,21 +745,16 @@ router.post("/install", requireOwner, (req, res) => {
 // ---------- PODEŠAVANJA ----------
 router.get("/settings", (req, res) => {
   const s = svc.settingsObj();
-  // "Vlasnik jos uvek ima admin/admin" je uputstvo kako da mu se udje u nalog, a
-  // iz tog naloga se kredit upisuje bez ikakve kocnice. Radniku to ne treba.
+  // Podatak o fabričkoj lozinci vlasnika vidi samo vlasnik.
   if (req.admin.role !== "owner") delete s.fabrickaLozinka;
   res.json(s);
 });
 router.post("/settings", requireOwner, (req, res) => {
   const map = { cafeName: "cafe_name", currency: "currency", ratePerHour: "rate_per_hour", unlockPin: "unlock_pin", idleMinutes: "idle_minutes", servisniPin: "servisni_pin" };
-  // Negativna cena po satu bi igračima DODAVALA kredit dok sede, a negativno
-  // mirovanje bi ih odjavljivalo odmah - oba se odbijaju pre upisa.
+  // Negativna cena po satu i negativno mirovanje se odbijaju.
   const brojevi = { ratePerHour: "Cena po satu", idleMinutes: "Odjava zbog mirovanja" };
   const PIN = /^\d{4,8}$/;
-  // U bazu ide PROVERENA vrednost, ne ono što je stiglo u zahtevu. Ranije je
-  // provera radila nad Number(...) a upisivala se sirova vrednost, pa je
-  // ratePerHour: true prolazilo kao ispravno i završavalo kao NULL u bazi -
-  // a to tiho gasi naplatu svima, bez ijedne greške.
+  // U bazu ide proverena vrednost, ne sirova iz zahteva.
   const zaUpis = {};
   for (const [k, dbKey] of Object.entries(map)) {
     const sirovo = req.body?.[k];
@@ -819,9 +781,7 @@ router.post("/settings", requireOwner, (req, res) => {
     if (dbKey in zaUpis) { setSetting(dbKey, zaUpis[dbKey]); changed.push(k); }
   }
   svc.logEvent({ category: "podesavanja", action: "settings", actor: req.admin.username, detail: `Izmenjena podešavanja: ${changed.join(", ")}` });
-  // Nov servisni PIN mora da stigne do launchera ODMAH, dok vlasnik gleda u
-  // ekran - inače bi važio tek posle restarta svakog računara, a niko ne bi
-  // znao kada je to bilo. Strana Računari odmah pokazuje ko ga je primio.
+  // Nov servisni PIN odmah ide svim launcherima.
   if (changed.includes("servisniPin")) svc.posaljiServisniPin();
   res.json({ ok: true, settings: svc.settingsObj() });
 });
@@ -852,13 +812,9 @@ router.post("/backup", requireOwner, (req, res) => {
 });
 
 // ---------- KOPIJA VAN RAČUNARA (vlasnik) ----------
-//
-// Baza i sve rezervne kopije stoje na istom disku. Kad taj disk otkaže, nestaje
-// i jedno i drugo - zato odredište van računara (USB, drugi disk, mrežni
-// folder) nije luksuz nego jedina zaštita od te jedne greške.
 router.get("/kopija-van", requireOwner, (req, res) => res.json(odrz.kopijaVanPodesavanja()));
-// Rute su asinhrone jer odredište ume da ne odgovara - vidi odrzavanje.js.
-// Express 4 grešku iz asinhrone rute ne hvata sam, pa se hvata ovde.
+// Rute su asinhrone jer odredište ume da ne odgovara (odrzavanje.js). Express
+// 4 ne hvata grešku iz asinhrone rute, pa se hvata ovde.
 router.post("/kopija-van", requireOwner, async (req, res) => {
   try {
     const r = await odrz.postaviKopijuVan(req.body?.putanja);
@@ -877,8 +833,7 @@ router.post("/kopija-van/sada", requireOwner, async (req, res) => {
     const r = await odrz.kopirajVanRacunara();
     if (r.error) return res.status(500).json({ error: `Kopiranje nije uspelo (${r.error}). Proveri da li je disk priključen.` });
     if (r.preskoceno) return res.status(400).json({ error: `Preskočeno: ${r.preskoceno}` });
-    // Slike idu zajedno sa bazom, pa i brojka o njima mora nazad: vlasnik koji
-    // vidi samo "kopija napravljena" ne zna da li su omoti i pozadine otišle.
+    // U log ide i broj slika.
     const koliko = (r.slike?.novih || 0) + (r.slike?.preskoceno || 0);
     svc.logEvent({ category: "sistem", action: "kopija_van", actor: req.admin.username,
       detail: `Kopija odneta van računara: ${r.fajl}${koliko ? ` + ${koliko} slika` : ""} -> ${r.cilj}` });
@@ -890,9 +845,8 @@ router.post("/kopija-van/sada", requireOwner, async (req, res) => {
 
 // ---------- NADOGRADNJA LAUNCHERA ----------
 //
-// Vlasnik VIDI stanje i sme da pogura nadogradnju na slobodne racunare.
-// Sta ce se uopste deliti bira SERVISER - on je taj koji je instalater i
-// napravio, i jedini koji moze da zna da li je ispravan.
+// Vlasnik vidi stanje i sme da pošalje nadogradnju slobodnim računarima;
+// instalater postavlja i pušta serviser.
 router.get("/nadogradnja", requireOwner, (req, res) => res.json(svc.nadogradnjaStanje()));
 
 router.post("/nadogradnja/pusti", requireServiser, (req, res) => {
@@ -919,11 +873,7 @@ router.post("/nadogradnja/posalji", requireOwner, (req, res) => {
   res.json({ ...r, ...svc.nadogradnjaStanje() });
 });
 
-// PRENOS INSTALATERA U KOMADIMA, NE U MEMORIJI.
-//
-// Instalater je oko sto megabajta. Da ide kroz express.json, ceo bi se pre
-// upisa skupio u memoriji servera - a taj server u igraonici deli racunar sa
-// bazom i naplatom. Zato telo zahteva ide pravo u fajl, komad po komad.
+// Instalater (oko 100 MB) ide pravo u fajl, komad po komad, ne kroz memoriju.
 router.put("/nadogradnja/fajl", requireServiser, (req, res) => {
   const r = nadg.putanjaZaUpis(req.query?.ime);
   if (r.error) return res.status(400).json(r);
@@ -964,9 +914,8 @@ router.delete("/nadogradnja/fajl", requireServiser, (req, res) => {
 
 // ---------- NADOGRADNJA SERVERA ----------
 //
-// Vlasnik vidi koja verzija radi i da li čeka nova. Paket postavlja i pušta
-// SERVISER - isto pravilo kao za launcher: on je paket napravio i jedini zna da
-// li je ispravan. Ceo tok i zašto je bezbedan: nadogradnja-servera.js.
+// Vlasnik vidi stanje; paket postavlja i pušta serviser. Tok je opisan u
+// nadogradnja-servera.js.
 router.get("/nadogradnja-servera", requireOwner, (req, res) => res.json(nadgServera.stanje()));
 
 // Paket ide kao tok, pravo u fajl - isto kao instalater launchera.
@@ -992,8 +941,7 @@ router.put("/nadogradnja-servera/paket", requireServiser, (req, res) => {
       fs.renameSync(r.privremena, r.konacna);
     } catch (e) { return propalo("Fajl nije sačuvan: " + e.message); }
     const st = nadgServera.stanjePaketa();
-    // Paket koji ne valja se ne čuva: sledeći klik na "Nadogradi" bi ga ionako
-    // odbio, a do tada bi u panelu stajalo kao da nešto čeka.
+    // Neispravan paket se ne čuva.
     if (!st?.ispravan) {
       nadgServera.obrisiPaket();
       return res.status(400).json({ error: st?.greska || "Paket ne može da se pročita" });
@@ -1013,15 +961,15 @@ router.delete("/nadogradnja-servera/paket", requireServiser, (req, res) => {
 router.post("/nadogradnja-servera/pokreni", requireServiser, (req, res) => {
   const r = nadgServera.pripremi();
   if (r.error) return res.status(400).json(r);
-  // Kopija baze PRE zamene: nova verzija prilagođava bazu pri prvom pokretanju,
-  // a vraćanje koda ne vraća izmene u bazi.
+  // Kopija baze pre zamene: nova verzija menja bazu pri prvom pokretanju, a
+  // vraćanje koda ne vraća bazu.
   const kopija = backupDb();
   svc.logEvent({ category: "sistem", action: "nadogradnja_servera", actor: req.admin.username,
     detail: `Nadogradnja servera na ${r.verzija} - server se gasi na dvadesetak sekundi` +
       (kopija ? `, kopija baze: ${kopija}` : "") });
   res.json({ ok: true, verzija: r.verzija });
-  // Odgovor prvo stigne do panela, pa se tek onda zamoli nadzornik. On gasi
-  // server uredno (baza se upiše) i menja kod.
+  // Odgovor prvo stiže panelu, pa se poziva nadzornik (gasi server uredno i
+  // menja kod).
   setTimeout(() => { try { process.send({ t: "nadogradi", verzija: r.verzija }); } catch {} }, 300);
 });
 
@@ -1059,27 +1007,14 @@ router.get("/report", (req, res) => {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   const from = start.getTime();
-  // PROMET DANAS MORA DA VIDI I ONE KOJI TRENUTNO IGRAJU.
-  //
-  // Trošak sesije se u `transactions` upisuje tek kad se sesija ZAVRŠI. Dok se
-  // gledalo samo tamo, kontrolna tabla u osam uveče nije brojala nikoga ko je za
-  // računarom: sa deset zauzetih mašina po dva sata to je oko 2400 dinara koje
-  // vlasnik ne vidi, pa mu veče izgleda slabo dok je u stvari puno.
-  //
-  // Zato se dodaje i ono što je do sada nateklo aktivnim sesijama. Kad se takva
-  // sesija završi, njen zapis stigne sa PUNIM iznosom i istim datumom, pa brojka
-  // ne poskoči - ovo je isto ono što bi ionako ušlo, samo ranije.
+  // Promet danas uključuje i ono što je nateklo aktivnim sesijama (trošak
+  // sesije se u `transactions` upisuje tek na kraju). Završena sesija posle
+  // upisuje pun iznos sa istim datumom, pa se broj ne udvostručuje.
   const zavrsene = db.prepare("SELECT COALESCE(SUM(-amount),0) s FROM transactions WHERE type='session' AND created_at>=?").get(from).s;
   const uToku = db.prepare("SELECT COALESCE(SUM(cost),0) s FROM sessions WHERE status='active'").get().s;
   const sessionRevenue = zavrsene + uToku;
 
-  // OTKAZANO NIJE PRODATO.
-  //
-  // Ovde se ranije brojalo sve, pa je otkazana porudžbina ostajala u prometu
-  // zauvek: keš zato što se filter po statusu nije ni pisao, a kupovina sa
-  // naloga zato što se čitala iz `transactions`, gde povraćaj ulazi kao zaseban
-  // red tipa `refund` i original ne poništava. Obračun smene i Izveštaji su
-  // otkazano oduvek izbacivali - kontrolna tabla je jedina pokazivala više.
+  // Otkazane porudžbine se ne broje.
   const shopRevenue = db.prepare("SELECT COALESCE(SUM(total),0) s FROM orders WHERE payment='credit' AND status!='cancelled' AND created_at>=?").get(from).s;
   const cashRevenue = db.prepare("SELECT COALESCE(SUM(total),0) s FROM orders WHERE payment='cash' AND status!='cancelled' AND created_at>=?").get(from).s;
   const topups = db.prepare("SELECT COALESCE(SUM(amount),0) s FROM transactions WHERE type='topup' AND created_at>=?").get(from).s;
@@ -1095,21 +1030,10 @@ router.get("/report", (req, res) => {
   });
 });
 
-// ---------- BREND: LOGO I BOJA (vlasnik) ----------
-//
-// Svaka igraonica ima svoje ime, svoj znak i svoju boju. Dok su logo i crvena
-// stajali usiveni u fajlove, druga igraonica je morala da dobije prepravljenu
-// kopiju programa - pa bi svaka nadogradnja morala da se pravi posebno za
-// svakoga. Ovako se program izdaje jedan, a izgled se podesava odavde.
+// ---------- BREND: ZNAK I BOJA (vlasnik) ----------
 router.get("/brend", (req, res) => res.json(svc.brendObj()));
-// Zamerke na boju racuna SERVER, i to je namerno: pravilo (koja boja se mesa sa
-// kojim znacenjem, sta je pretamno, sta presvetlo) sme da postoji samo na jednom
-// mestu. Da panel racuna sam, dve kopije bi se razisle - a razisle bi se tiho,
-// jer obe "rade".
-//
-// Uz zamerke idu i izvedene nijanse (svetlija, tamnija, providne) - iste one
-// koje ce dobiti launcher. Da ih panel racuna sam, proba bi pokazivala jednu
-// boju a trinaest masina drugu.
+// Zamerke i izvedene nijanse računa server, iste koje dobija launcher; panel
+// ih ne računa sam.
 router.get("/brend/provera", requireOwner, (req, res) =>
   res.json({ zamerke: svc.zamerkeNaBoju(req.query?.heks), nijanse: svc.nijanse(req.query?.heks) }));
 router.post("/brend/logo", requireOwner, (req, res) => {

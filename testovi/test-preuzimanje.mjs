@@ -4,16 +4,11 @@ import path from "node:path";
 import os from "node:os";
 import { createRequire } from "node:module";
 import { citajIzvor } from "./_okruzenje.mjs";
-// PREUZIMANJE DALJINSKE INSTALACIJE.
+// Preuzimanje daljinske instalacije.
 //
-// Ono sto se ovde skine BICE POKRENUTO na racunaru igraca. Jedina stvar koja se
-// ne sme desiti je da nedovrsen fajl prodje kao gotov: pola .exe-a Windows
-// uredno pokrene, a ono pukne uz poruku koju niko ne ume da protumaci - i to na
-// masini do koje radnik mora da ustane i ode.
-//
-// Ovde se PRAVI HTTP server namerno lose ponasa: seca vezu nasred, vraca prazan
-// odgovor, vraca 404. Trazi se da svaki od tih slucajeva zavrsi kao GRESKA, i
-// to tacno jednom.
+// Nedovrsen fajl ne sme da prodje kao gotov, jer se pokrece na racunaru igraca.
+// HTTP server se ovde namerno lose ponasa (prekinuta veza, prazan odgovor, 404),
+// a svaki slucaj mora da zavrsi kao greska, tacno jednom.
 let pao = 0, prosao = 0;
 const proveri = (n, u, d = "") => { if (u) { prosao++; console.log("  OK   " + n); } else { pao++; console.log("  PAO  " + n + (d ? "  -> " + d : "")); } };
 
@@ -76,8 +71,7 @@ proveri("fajl je cele velicine", ok.postoji && fs.statSync(ok.dest).size === SAD
   ok.postoji ? String(fs.statSync(ok.dest).size) : "nema fajla");
 
 // ---- 2) PREKINUTO PREUZIMANJE MORA DA BUDE GRESKA ----
-// Ovo je cela poenta: bez poredjenja sa najavljenom velicinom, pola instalacije
-// prolazi kao gotova i biva pokrenuto.
+// Velicina se poredi sa najavljenom, pa pola instalacije ne prolazi kao gotova.
 const pola = await skini("/pukne-nasred", "pola.exe");
 proveri("prekinuto preuzimanje je greska", !!pola.greska, "proslo bi kao gotovo i bilo bi POKRENUTO");
 proveri("greska kaze da je veza pukla", /pukla|bajtova|socket|ECONN|aborted|prekinut/i.test(pola.greska?.message || ""), pola.greska?.message);

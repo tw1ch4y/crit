@@ -1,13 +1,9 @@
 import { radniFolder, podigniServer, ucitajWebSocket } from "./_okruzenje.mjs";
 const WebSocket = await ucitajWebSocket();
-// Server ne sme da veruje da je launcher onakav kakvim ga mi pravimo. Igrac
-// sedi za tim racunarom i klijent se moze izmeniti, pa sve sto stigne kroz
-// WebSocket mora da prodje kroz proveru na serveru.
+// Server ne veruje klijentu: sve sto stigne kroz WebSocket prolazi proveru.
 //
-// Konkretno: provera zaliha je isla po STAVCI. Klijent koji posalje isti
-// artikal u pet redova po 20 komada prosao bi je pet puta - svaki red se merio
-// zasebno prema istoj zalihi - pa bi se prodalo sto komada iako ih na stanju
-// ima dvadeset. Radnik bi tek kod frizidera video da pica nema.
+// Zaliha se proverava po artiklu, ne po stavci: isti artikal u pet redova po 20
+// komada mora da se sabere i uporedi sa zalihom.
 const BASE = "http://127.0.0.1:8131", WSB = "ws://127.0.0.1:8131";
 const DATA = radniFolder("zloupotreba-data");
 await podigniServer(DATA, 8131);

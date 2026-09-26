@@ -3,23 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <!--
-    Ubacena skripta ne sme da se pokrene ni ovde.
-
-    Ovaj ekran prikazuje ono sto stize sa servera: nazive igara, imena igraca,
-    artikle iz shopa. Sve to prolazi kroz `esc()`, i to je prva brana; ovo je
-    druga - pregledac izvrsava samo `js/launcher.js`, nista drugo.
-
-    `img-src` je namerno siroko: korice igara stizu sa servera cija se adresa
-    upisuje pri postavljanju (pa se ne moze unapred upisati ovde), a ikone
-    programa dolaze kao `data:` adrese iz samog Windows-a. Slike se ne izvrsavaju,
-    pa to nista ne otvara.
-
-    `style-src` mora da dozvoli inline: police i kartice se sklapaju sa
-    `style="..."`, a sara pozadine se postavlja kao `background-image`.
-
-    overlay.html i backdrop.html nemaju ovo pravilo jer imaju skriptu u samoj
-    strani, a ne prikazuju nista sto stize spolja kao HTML - poruka osoblja se
-    upisuje preko `textContent`, ne `innerHTML`.
+    CSP: izvršava se samo js/launcher.js (sve što stiže sa servera prolazi i
+    kroz `esc()`). `img-src` dozvoljava http(s) jer adresa servera nije poznata
+    unapred, i `data:` za ikone programa. `style-src` dozvoljava inline stilove
+    (kartice, šara). overlay.html i backdrop.html tekst upisuju preko
+    `textContent`.
   -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'" />
   <title>Launcher</title>
@@ -61,10 +49,7 @@
   <!-- LOGIN -->
   <div class="screen center" id="loginScreen">
     <div class="login-fon" id="loginFon" aria-hidden="true"></div>
-    <!-- Prazan racunar stoji na ovom ekranu satima i to je izlog igraonice.
-         Zato levo stoji znak kuce sa podacima koje gost sa ulice stvarno trazi
-         (cena po satu, koji je ovo racunar), a desno forma. Ranije je preko
-         celog ekrana stajala samo mala kartica u sredini. -->
+    <!-- Levo znak kuće sa cenom po satu i oznakom računara, desno forma. -->
     <div class="login-sadrzaj">
       <div class="login-brend">
         <img class="lb-logo" src="img/crit-logo.png" alt="Crit" />
@@ -112,9 +97,7 @@
       <span class="sb-item" id="sbCpu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></svg><span class="sb-txt">CPU -</span></span>
       <span class="sb-item" id="sbRam"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="10" rx="1.5"/><path d="M6 17v3M10 17v3M14 17v3M18 17v3"/></svg><span class="sb-txt">RAM -</span></span>
       <span class="sb-item" id="sbTemp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.8V4a2 2 0 0 0-4 0v10.8a4 4 0 1 0 4 0Z"/></svg><span class="sb-txt">temp -</span></span>
-      <!-- Verzija stoji desno, odvojena. Kad se jedan racunar ponasa drugacije
-           od ostalih, ovo je prvo sto treba pogledati - a bez toga se nigde
-           nije videlo koji je launcher gde instaliran. -->
+      <!-- Verzija launchera, desno. -->
       <span class="sb-item sb-verzija" id="sbVerzija"><span class="sb-txt"></span></span>
     </div>
   </div>

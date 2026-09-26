@@ -1,19 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-// NIJEDAN TEST NE SME DA DIRA PRAVU BAZU
+// Nijedan test ne sme da dira pravu bazu.
 //
-// Serverski moduli uzimaju folder sa podacima iz CRIT_DATA_DIR, a ako ga nema,
-// padaju na server/data - pravu bazu igraonice. Test koji uveze db.js ili
-// odrzavanje.js bez toga radi nad pravim podacima: pravi rezervne kopije,
-// brise stare, upisuje redove. To se ne vidi u ispisu testa, jer test i dalje
-// prolazi - vidi se tek kad neko otvori pravi panel i nadje tudje podatke.
-//
-// Desilo se tacno to: test za rezervne kopije je uvezao odrzavanje.js da bi
-// proverio sredjivanje, a posto je server bio u ZASEBNOM procesu, ovaj proces
-// nije imao CRIT_DATA_DIR. Napravio je kopiju u pravom server/data/backups.
-//
-// Zato se ovde cita svaki test i proverava da izolacija dolazi PRE uvoza.
+// Serverski moduli bez CRIT_DATA_DIR rade nad server/data. Proverava se da
+// svaki test postavi izolaciju pre uvoza serverskih modula.
 const OVDE = path.dirname(fileURLToPath(import.meta.url));
 
 let pao = 0, prosao = 0;
@@ -78,11 +69,8 @@ proveri("nijedan test ne uvozi serverski modul nad pravom bazom", problemi.lengt
 
 // ---- PROBE MORAJU DA POKRIJU SVAKI IPC KANAL ----
 //
-// Probe koje ne pustaju pravi main.js same odgovaraju na IPC pozive iz
-// launchera. Kanal koji nedostaje ne pukne odmah nego odbije obecanje, a to
-// pada u "unhandledRejection" i gasi probu porukom koja nema veze sa onim sto
-// se merilo. Desilo se sa kanalom "verzija": proba za animacije se nekad gasila
-// u cetvrtoj sekundi, a izgledalo je kao da animacije ne rade.
+// Probe koje ne pustaju pravi main.js same odgovaraju na IPC. Kanal koji
+// nedostaje odbije obecanje i ugasi probu kroz "unhandledRejection".
 const preload = fs.readFileSync(path.join(OVDE, "..", "client", "preload.js"), "utf8");
 const kanali = [...preload.matchAll(/ipcRenderer\.invoke\("([^"]+)"/g)].map((m) => m[1]);
 proveri("preload nudi kanale koji se mogu proveriti", kanali.length > 5, String(kanali.length));
@@ -109,16 +97,11 @@ proveri("svaka proba odgovara na sve kanale iz preload-a", nepokriveni.length ==
 const pokretac = fs.readFileSync(path.join(OVDE, "pokreni-sve.mjs"), "utf8");
 proveri("pokretač briše samo svoj radni folder", /\.radno/.test(pokretac) && !/server[\/\\]data/.test(pokretac));
 
-// ---- ALAT KOJI BRISE MORA DA SME DA SE PREUSMERI ----
+// ---- ALAT KOJI MENJA BAZU MORA DA SME DA SE PREUSMERI ----
 //
-// `postavi-bazu.mjs` radi DELETE nad igrama, alatima, promo banerima i
-// nagradama - a pisao je PRAVO u server/data, mimo CRIT_DATA_DIR koji postuje
-// sve ostalo. Ko ga pokrene misleci da radi nad probnom bazom, obrise prave
-// igre i alate iz razvojne. Skripta pri tom radi tacno ono sto treba, samo nad
-// pogresnim fajlom, pa greska ne izgleda kao greska nego kao uspeh.
-//
-// `napravi-paket.mjs` se NE trazi ovde: on bazu samo cita, i to bas onu pravu -
-// nju i pakuje.
+// `postavi-bazu.mjs` upisuje igre, alate, banere i nagrade, pa mora da postuje
+// CRIT_DATA_DIR. `napravi-paket.mjs` bazu samo cita (i pakuje pravu), pa nije
+// na spisku.
 for (const alat of ["postavi-bazu.mjs"]) {
   const t = fs.readFileSync(path.join(OVDE, "..", alat), "utf8");
   const brise = t.includes("DELETE FROM");
@@ -129,20 +112,10 @@ for (const alat of ["postavi-bazu.mjs"]) {
 
 // ---- OTPREMLJENE SLIKE SU PODACI, NE DEO PROGRAMA ----
 //
-// Stajale su u server/public/uploads - unutar samog programa. Odatle je
-// sledilo troje, i sve troje je bila prava greska:
-//
-//   1. NISU SE CUVALE. Rezervna kopija je jedan crit.db i nista vise. Kad disk
-//      otkaze, baza se vrati sa USB-a i u njoj stoje redovi koji pokazuju na
-//      /uploads/... - a tih fajlova nema. Svaki omot, svaka slika pica i svih
-//      pet pozadina se kucaju iznova, rucno.
-//   2. IZOLACIJA JE IMALA RUPU. CRIT_DATA_DIR odvaja bazu, ali ne i slike, pa
-//      je svaki test koji otpremi sliku pisao u sam projekat. Testovi su to
-//      resavali tako sto sami brisu za sobom - a test koji pukne na pola ne
-//      stigne da pocisti.
-//   3. NADOGRADNJA SERVERA IH JE MESALA. Uputstvo kaze da se prepisu server/src
-//      i server/public, pa su se slike iz paketa mesale sa onima koje je
-//      igraonica sama otpremila.
+// Slike stoje u data/uploads, uz bazu:
+//   1. idu u rezervnu kopiju zajedno sa bazom
+//   2. CRIT_DATA_DIR izoluje i njih, pa test ne pise u projekat
+//   3. nadogradnja servera (src, public) ih ne mesa sa slikama iz paketa
 for (const modul of fs.readdirSync(SRC).filter((f) => f.endsWith(".js"))) {
   const t = fs.readFileSync(path.join(SRC, modul), "utf8");
   // Selidba sa starog mesta sme da ga pomene - ona ga bas zato i cita. Zato se

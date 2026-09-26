@@ -1,22 +1,12 @@
 import { radniFolder, podigniServer, ucitajWebSocket, brojac } from "./_okruzenje.mjs";
 const WebSocket = await ucitajWebSocket();
-// RANG SE ZARADJUJE, VIP SE KUPUJE
+// Rang se zaradjuje, VIP se kupuje.
 //
-// Dok je VIP bio nagrada za peti nivo, bio je TROSAK - i to bas na najboljim
-// gostima, kojima je kuca pravila popust iako bi ionako dosli. Sada su to dve
-// odvojene stvari: rang dolazi od igranja i besplatan je (status), a VIP se
-// placa i nosi pogodnosti (prihod).
-//
-// Ovde se cuva ono sto se ne vidi iz koda:
-//
-//   1. da se VIP stvarno NAPLATI, i to u jednom poslu sa upisom roka - da pad
-//      izmedju ne ostavi gosta bez kredita i bez VIP-a, ni obrnuto
-//   2. da obnova PRODUZI postojeci rok umesto da krene ispocetka - inace bi
-//      gost koji obnovi dan ranije izgubio taj dan i naucio da CEKA da mu
-//      istekne, a cekanje je tacno ono sto se ne zeli
-//   3. da pogodnosti stvarno rade: dvostruk XP i nizi prag za tocak
-//   4. da se VIP izgled NE MOZE uzeti mimo launchera
-//   5. da istekla clanarina prestane da vazi sama, bez ijednog poslabi posla
+//   1. VIP se naplacuje u istom poslu sa upisom roka
+//   2. obnova produzava postojeci rok
+//   3. pogodnosti rade: dvostruk XP i nizi prag za tocak
+//   4. VIP izgled se ne moze uzeti mimo launchera
+//   5. istekla clanarina prestaje da vazi sama
 const BASE = "http://127.0.0.1:8195", WSB = "ws://127.0.0.1:8195";
 await podigniServer(radniFolder("vip-data"), 8195);
 const { proveri, kraj } = brojac();
@@ -142,12 +132,8 @@ proveri("besmislen broj dana se odbija",
 
 // ---- 5b) KES ZA VIP MORA DA ZAVRSI U PAZARU ----
 //
-// Gost preda 1500 dinara preko pulta i radnik mu klikne VIP. Dok se taj novac
-// nigde nije zapisivao, uvece je u fioci stajalo 1500 viska koje obracun ne
-// pominje - a neobjasnjen visak se gleda isto kao i manjak.
-//
-// Vodi se kao ono sto jeste: dopuna pa odmah naplata clanarine. Stanje na
-// nalogu ostaje isto (ne dobija gost i kredit i VIP), ali oba koraka postoje.
+// Placanje kesom se vodi kao dopuna pa odmah naplata clanarine: stanje na nalogu
+// ostaje isto, a oba koraka su u obracunu.
 await api("/api/shift/open", "POST", { openingCash: 1000 });
 const preKesa = (await api("/api/players")).body.find((p) => p.id === obican.id).balance;
 const kes = await api(`/api/players/${obican.id}/vip`, "POST", { dana: 30, naplati: 1500 });

@@ -8,9 +8,7 @@ const OVDE = import.meta.dirname;
 const IZLAZ = path.join(OVDE, "sabloni");
 fs.mkdirSync(IZLAZ, { recursive: true });
 
-// Iste boje koje nosi launcher (client/renderer/css/launcher.css). Dok je ovde
-// stajala stara crvena podloga, dizajner je crtao sliku za jedan program a
-// ubacivao je u drugi - pa se tek na ekranu videlo da se ne uklapa.
+// Iste boje kao u launcheru (client/renderer/css/launcher.css).
 const BOJA = {
   papir: "#070c1c",
   ivica: "#1f2d54",
@@ -174,8 +172,8 @@ function napravi(s) {
     mreza += `<line x1="0" y1="${py(p)}" x2="${w}" y2="${py(p)}" stroke="${BOJA.ivica}" stroke-width="${f(1)}" stroke-opacity="0.7"/>`;
   }
 
-  // Natpisi idu na svoje neprozirne trake, gore i dole - inace bi se sudarali
-  // sa oznakama zona i sablon bi bio necitljiv.
+  // Natpisi idu na neprozirne trake gore i dole, da se ne preklapaju sa
+  // oznakama zona.
   const trakaG = f(96), trakaD = f(62);
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
@@ -197,9 +195,8 @@ ${telo}
 `;
 }
 
-// Ime fajla nosi dimenziju, pa se pri promeni mere pravi NOVI fajl a stari
-// ostaje. Tako su u folderu jednom stajala dva promo sablona sa razlicitim
-// odnosom i nije se znalo koji vazi. Zato se stari brisu pre pisanja.
+// Ime fajla nosi dimenziju; stari sabloni se brisu pre pisanja, da ne ostanu
+// dva sa razlicitim odnosom.
 for (const f of fs.readdirSync(IZLAZ)) {
   if (f.endsWith(".svg")) fs.rmSync(path.join(IZLAZ, f), { force: true });
 }

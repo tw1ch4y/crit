@@ -5,7 +5,7 @@
 // Pokreće se preko "3 - DEMO PODACI.bat" dok server radi. Ništa ne dira na
 // pravoj igraonici - radi samo na lokalnom serveru na ovom računaru.
 //
-// NAPOMENA: ovo je ZA PROBU. Kad kreneš pravo postavljanje, iskopiraj svež
+// NAPOMENA: ovo je za probu. Kad kreneš pravo postavljanje, iskopiraj svež
 // folder "1 - SERVER" pa da baza bude čista.
 
 const BASE = process.env.CRIT_BASE || "http://127.0.0.1:8095";
@@ -36,7 +36,7 @@ async function main() {
   console.log("\n  Punim demo podatke...\n");
 
   // Baza koja ide u paketu je vec podesena (baneri, promo, shop, tocak). Ovi
-  // koraci to samo OSIGURAJU - ako se pokrene na praznoj bazi, sve nameste; ako
+  // koraci to samo osiguraju: ako se pokrene na praznoj bazi, sve nameste; ako
   // je vec podeseno, ne diraju nista (ne prave duplikate).
   korak("Proveravam banere");
   const bg = await api("/api/games/banneri-auto", "POST", {});

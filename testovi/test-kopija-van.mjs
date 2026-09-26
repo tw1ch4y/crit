@@ -1,16 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { radniFolder, podigniServer, citajIzvor } from "./_okruzenje.mjs";
-// KOPIJA VAN RAČUNARA.
+// Kopija baze van računara (drugi disk, USB, mrežni folder).
 //
-// Baza i svih tridesetak rezervnih kopija stoje na istom fizičkom disku. Sve
-// ostalo u održavanju pazi da disk ne PUKNE od punoće - ništa od toga ne pomaže
-// kad disk OTKAŽE. Tog dana nestaje sve odjednom: nalozi, kredit koji su gosti
-// uplatili, promet, cela evidencija.
-//
-// Ovde se proverava ono što se u toj zaštiti najlakše pokvari: da ćutanje nikad
-// ne prođe kao uspeh. Kopija koja "radi", a zapravo piše u prazan folder na
-// istom disku, gora je od nikakve - vlasnik gleda zeleno stanje i ne radi ništa.
+// Neuspeh ne sme da prođe kao uspeh: kopija u prazan folder na istom disku nije
+// kopija.
 const BASE = "http://127.0.0.1:8173";
 const DATA = radniFolder("kopija-van-data");
 // Kratak rok za odredište koje ne odgovara - vidi odeljak 11.
@@ -59,11 +53,8 @@ kopija.close();
 
 // ---- 4) ISCUPAN USB NE SME DA PRODJE KAO USPEH ----
 //
-// Ovo je cela poenta. Dok se odrediste pravilo pri kopiranju (`mkdir -p`),
-// nestanak medija je znacio da se napravi NOV PRAZAN folder na sistemskom
-// disku, kopija se uredno upise u njega i javi se da je sve u redu. Vlasnik bi
-// mesecima gledao zeleno stanje, a jedini primerak baze bi i dalje bio na
-// jednom disku.
+// Odrediste koje ne postoji je greska; ne pravi se nov folder na sistemskom
+// disku.
 fs.rmSync(ODREDISTE, { recursive: true, force: true });
 const pao1 = await api("/api/kopija-van/sada", "POST");
 proveri("iscupan USB javlja gresku", pao1.status === 500, `status ${pao1.status}: ${JSON.stringify(pao1.body)}`);

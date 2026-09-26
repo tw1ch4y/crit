@@ -1,11 +1,6 @@
-// KOLIKO BAZA NARASTE POSLE GODINU DANA RADA
-//
-// Igraonica radi svaki dan i niko je nece odrzavati. Pitanje nije da li baza
-// raste nego koliko, i sta se pokvari kad naraste: koliko traje otvaranje
-// Logova, koliko zauzmu rezervne kopije, da li izvestaj jos radi.
-//
-// Ovo se ne moze proceniti iz koda. Zato se puni PRAVA baza kroz pravu semu,
-// pravim redosledom, u kolicini koja odgovara igraonici od trinaest racunara.
+// Koliko baza naraste za godinu dana rada igraonice od trinaest racunara:
+// velicina baze i kopija, brzina Logova i izvestaja. Puni pravu bazu kroz pravu
+// semu, istim redosledom kao igraonica.
 //
 //   node godina-rada.mjs            365 dana
 //   node godina-rada.mjs --dana 90

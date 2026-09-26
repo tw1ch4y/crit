@@ -1,23 +1,11 @@
 import { radniFolder, podigniServer, ucitajWebSocket } from "./_okruzenje.mjs";
 const WebSocket = await ucitajWebSocket();
-// PODELA SHOPA U OBRAČUNU SMENE: keš, sa naloga, ukupno.
+// Podela shopa u obračunu smene: keš, sa naloga, ukupno.
 //
-// Piće se prodaje na četiri načina - igrač poruči iz launchera kešom ili sa
-// naloga, radnik ukuca na kasi kešom ili sa naloga - a obračun smene ih vodi
-// kroz DVA razna izvora: "ukupno" se sabira iz logova, "keš" iz tabele
-// porudžbina, a "sa naloga" je razlika ta dva. Dok se ti izvori ne slažu,
-// razlika ispada besmislena.
-//
-// Tako je i bilo: keš porudžbina IZ LAUNCHERA jedina nije upisivala iznos u
-// log, pa je gost koji kolu od 130 plati kešom radniku u obračun upisivao
-// "Shop ukupno 0, sa naloga −130". Posle otkazivanja je i ukupno postajalo −130,
-// jer je poništenje iznos imalo a original nije.
-//
-// Pazar je pri tom bio tačan (on keš čita iz porudžbina), pa se greška videla
-// samo u podeli - tamo gde radnik proverava sebe pred prebrojavanje kase.
-//
-// Zato se ovde prolazi CELA matrica i posle svakog koraka traži isto: ukupno =
-// keš + sa naloga, i nijedan od tri broja nije negativan.
+// Piće se prodaje na četiri načina (launcher ili kasa, keš ili nalog). "Ukupno"
+// se sabira iz logova, "keš" iz porudžbina, a "sa naloga" je razlika. Posle
+// svakog koraka cele matrice mora da važi ukupno = keš + sa naloga, i nijedan
+// broj nije negativan.
 const BASE = "http://127.0.0.1:8172", WSB = "ws://127.0.0.1:8172";
 const DATA = radniFolder("obracun-shopa-data");
 await podigniServer(DATA, 8172);

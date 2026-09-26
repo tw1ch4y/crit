@@ -1,12 +1,6 @@
-# Testovi na svaku izmenu.
-#
-# CRIT ima preko 1400 automatskih provera, ali su do sada zavisile od toga da se
-# neko seti da otkuca komandu. Sve sto zavisi od pamcenja je bag u procesu:
-# proba se preskoci bas onog dana kad je najpotrebnija, pred izdavanje nove
-# verzije, kad se zuri.
-#
-# Suite dizu svoje servere na lokalnim portovima i svoje prazne baze, pa im ne
-# treba nista spolja - ni baza, ni servis, ni mreza.
+# Svi testovi na svaki push i pull request. Testovi dizu svoje servere na
+# lokalnim portovima i rade nad svojim praznim bazama; spoljni servisi nisu
+# potrebni.
 name: Provera sistema
 
 on:
@@ -17,14 +11,13 @@ on:
 
 jobs:
   testovi:
-    runs-on: windows-latest    # launcher je Windows program; isto okruzenje kao u igraonici
+    runs-on: windows-latest    # isto okruzenje kao u igraonici
     timeout-minutes: 25
 
     steps:
       - uses: actions/checkout@v4
 
-      # node:sqlite je ugradjen u Node, pa serveru ne treba build korak.
-      # Verzija mora da prati onu na glavnom racunaru u igraonici.
+      # Ista glavna verzija kao na serveru u igraonici (node:sqlite).
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -36,9 +29,7 @@ jobs:
       - name: Verzija se poklapa na svim mestima
         run: node verzija.mjs
 
-      # Ime igraonice stoji na desetak mesta (instaler, precice, alati za
-      # oporavak). Alat bez argumenta samo proverava da se svuda slaze i vraca
-      # gresku ako ne - jeftinije ovde nego da se otkrije na instaleru.
+      # Bez argumenta alat samo proverava da je ime isto na svim mestima.
       - name: Ime igraonice se poklapa na svim mestima
         run: node igraonica.mjs
 
@@ -46,9 +37,7 @@ jobs:
         working-directory: testovi
         run: node pokreni-sve.mjs
 
-      # Kad nesto padne, radne baze su jedino iz cega se vidi STA je bilo u njima
-      # u tom trenutku. Bez ovoga se kvar koji se javlja samo na CI-ju ne moze
-      # ispitati.
+      # Radne baze testova, za ispitivanje greske koja se javlja samo na CI-ju.
       - name: Sacuvaj radne baze ako je palo
         if: failure()
         uses: actions/upload-artifact@v4

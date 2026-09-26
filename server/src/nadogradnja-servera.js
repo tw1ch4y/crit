@@ -7,24 +7,15 @@ import { uporediVerzije } from "./nadogradnja.js";
 
 // ---------- NADOGRADNJA SERVERA SA PANELA ----------
 //
-// Launcher se odavno nadograđuje sam; server je ostajao jedini deo koji se
-// nadograđivao rukom - ugasi, prekopiraj src\ i public\, pokreni. To se radi
-// pored šanka, za vreme rada, i jedan pogrešan folder (data\ umesto src\) briše
-// igraonicu.
+//   1. serviser otpremi paket (pravi ga napravi-paket.mjs);
+//   2. server proveri svaki fajl i putanju (paket-servera.js);
+//   3. na "Nadogradi" server pravi kopiju baze, raspakuje paket, javi
+//      nadzorniku i ugasi se;
+//   4. nadzornik menja kod i diže novu verziju; ako se ne javi svojim brojem
+//      za minut i po, vraća staru (zamena-servera.js).
 //
-// Sada:
-//   1. serviser otpremi paket (napravi-paket.mjs ga pravi uz instaler)
-//   2. server ga proveri - svaki fajl i svaku putanju (paket-servera.js)
-//   3. na "Nadogradi" server napravi kopiju baze, raspakuje paket sa strane,
-//      javi nadzorniku i ugasi se uredno
-//   4. nadzornik zameni kod i podigne novu verziju; ako se ne javi sa svojim
-//      brojem za minut i po, vraća staru (zamena-servera.js)
-//
-// Dok server ne radi - dvadesetak sekundi - launcheri rade bez njega i sve se
-// obračuna kad se vrati. Zato ovo sme da se radi i usred smene.
-//
-// Radi SAMO kad server drži nadzornik. Server pokrenut na stari način nema
-// kome da preda zamenu, i to se kaže u panelu umesto da se ugasi i ostane ugašen.
+// Launcheri za to vreme rade bez servera. Radi samo kad server drži
+// nadzornik; inače panel to kaže.
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const FOLDER = path.join(DATA_DIR, "nadogradnja-servera");
@@ -64,10 +55,8 @@ export function procitajIshod() {
   try { return JSON.parse(fs.readFileSync(ISHOD, "utf8")); } catch { return null; }
 }
 
-// Ishod koji je nadzornik upisao posle neuspele nadogradnje. Čita ga server
-// koji se podigne posle toga (stara verzija) i upisuje u Logove JEDNOM - ali se
-// ne briše: panel ga pokazuje dok se ne postavi sledeći paket ili dok sledeća
-// nadogradnja ne uspe. Obrisan odmah, neuspeh bi video samo onaj ko baš otvori Logove.
+// Ishod neuspele nadogradnje (upisao ga nadzornik). Stara verzija ga upisuje
+// u Logove jednom, a panel ga prikazuje dok se ne postavi sledeći paket.
 export function preuzmiIshod() {
   const i = procitajIshod();
   if (!i || i.zabelezeno) return null;

@@ -1,22 +1,11 @@
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { KOREN, radniFolder, podigniServer, citajIzvor } from "./_okruzenje.mjs";
-// SERVISER JE ODVOJEN OD VLASNIKA
+// Serviser je odvojen od vlasnika.
 //
-// Tri uloge, odozdo nagore: radnik < vlasnik < serviser. Visa uvek sme sve sto
-// sme niza, ali NIKO ne dira sebi ravnog ni viseg.
-//
-// Serviser postoji zbog dve stvari koje dolaze sa izdavanjem programa drugim
-// igraonicama:
-//   1. PODRSKA - kad vlasnik zaboravi lozinku ili se sam zakljuca, mora
-//      postojati neko ko to razresi a da se baza ne dira rucno.
-//   2. LICENCIRANJE (kasnije) - uslovi pod kojima program radi ne mogu da stoje
-//      pod nalogom onoga na koga se odnose.
-//
-// Ovde se proverava ono sto se lako pokvari pri sledecoj izmeni: da vlasnik NE
-// MOZE da ukloni servisera, da ne moze sebi da napravi nadredjenog, i - obrnuto
-// - da serviser i dalje sme sve sto sme vlasnik. Prestroga podela je isto tako
-// kvar: podrska koja ne moze da udje ne vredi nista.
+// Uloge: radnik < vlasnik < serviser. Visa sme sve sto sme niza, ali niko ne
+// dira sebi ravnog ni viseg. Vlasnik ne moze da ukloni servisera ni da sebi
+// napravi nadredjenog, a serviser sme sve sto sme vlasnik.
 const BASE = "http://127.0.0.1:8176";
 const DATA = radniFolder("serviser-data");
 await podigniServer(DATA, 8176);
@@ -67,8 +56,7 @@ proveri("serviser vidi rezervne kopije", (await S("/api/kopije")).status === 200
 proveri("serviser menja cenu", (await S("/api/settings", "POST", { ratePerHour: 150 })).status === 200);
 
 // ---- 3) VLASNIK NE DIRA SERVISERA ----
-// Ovo je cela poenta. Kad bi vlasnik mogao da ukloni serviserski nalog, podrska
-// nema kako da udje onog dana kad se on sam zakljuca.
+// Bez serviserskog naloga podrska ne moze da udje kad se vlasnik zakljuca.
 const spisak = (await V("/api/admins")).body;
 const servis = spisak.find((a) => a.username === "servis");
 proveri("vlasnik VIDI serviserski nalog", !!servis && servis.role === "serviser",

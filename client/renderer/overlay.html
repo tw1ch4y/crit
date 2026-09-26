@@ -3,9 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Crit</title>
-  <!-- Isti font kao u launcheru. Ovo iskace PREKO IGRE i igrac to vidi vise
-       nego bilo koji ekran launchera - da je u drugom fontu, bilo bi jedino
-       mesto koje ispada iz celine. -->
+  <!-- Isti font kao u launcheru. -->
   <link rel="stylesheet" href="css/font.css" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
@@ -56,9 +54,8 @@
       document.getElementById("opis").textContent = opis || "";
       const ik = document.getElementById("ikona");
       ik.innerHTML = IKONE[vrsta] || IKONE.vreme;
-      // Boja kuce stize uz poruku (main.js je pamti iz "welcome"). Obavestenje
-      // je zaseban prozor i ne vidi CSS launchera, pa bi bez ovoga svaka
-      // igraonica imala istu plavu - bas na mestu gde se boja najvise vidi.
+      // Boja kuće stiže uz poruku (main.js je pamti iz "welcome"); ovaj prozor
+      // ne vidi CSS launchera.
       if (kuca) document.documentElement.style.setProperty("--kuca", kuca);
       ik.setAttribute("stroke", boja === "zuta" ? "#ffb527" : boja === "plava" ? (kuca || "#2f6ae8") : "#ff3b3b");
       const k = document.getElementById("kartica");

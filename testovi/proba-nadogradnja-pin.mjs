@@ -2,18 +2,12 @@ import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
 import { KOREN, radniFolder, putanjaElektrona } from "./_okruzenje.mjs";
-// SERVISNI PIN PREZIVLJAVA NADOGRADNJU
+// Servisni PIN prezivljava nadogradnju.
 //
-// podesavanja.json stoji u resources/ pored programa i instaler ga pri
-// nadogradnji PREPISUJE fabrickim. Servisni PIN je bas tu - onaj koji cuva
-// ulaz u podesavanja i izlaz iz launchera kad server ne radi. Ako se cita samo
-// iz tog fajla, svaka nova verzija ga tiho vrati na 1234 na svih trinaest
-// masina i niko ne primeti dok neko ne proba.
-//
-// Ovo se NE MOZE proveriti citanjem koda. Zato ovde tri puta pokrecemo PRAVI
-// launcher preko istog korisnickog naloga, izmedju pokretanja prepisujemo
-// podesavanja.json onako kako to radi instaler, i svaki put pitamo pravi IPC
-// koji PIN prihvata.
+// Instaler pri nadogradnji prepisuje resources/podesavanja.json fabrickim, a
+// servisni PIN ne sme da se vrati na 1234. Launcher se pokrece tri puta pod istim
+// nalogom, izmedju pokretanja se podesavanja.json prepisuje kao u instaleru, i
+// svaki put se preko IPC-a proverava koji PIN vazi.
 //
 //   node proba-nadogradnja-pin.mjs
 const PORT = 8161;

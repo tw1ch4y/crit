@@ -37,6 +37,6 @@ echo.
 echo  Gotovo. Adresa i ciscenje su vraceni na rezim za igraonicu.
 echo.
 echo  Ako je launcher ranije zapamtio drugu adresu, obrisi je sa:
-echo    Program Files\Crit Launcher\resources\resetuj-launcher.bat
+echo    %%LOCALAPPDATA%%\Programs\Crit Launcher\resources\resetuj-launcher.bat
 echo.
 pause

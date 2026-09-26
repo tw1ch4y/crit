@@ -65,16 +65,8 @@ const veza = async (comp) => {
   poruke.length = 0;
   return { w, poruke };
 };
-// CEKA ODGOVOR, NE FIKSNIH 250 ms.
-//
-// Dok je stajala pauza, test je povremeno padao na "drugi racunar radi
-// normalno" - ne zato sto kocnica ne radi, nego zato sto odgovor nije stigao za
-// to vreme. Suite pusta vise servera uporedo, pa je 250 ms na opterecenom
-// racunaru ponekad premalo.
-//
-// Test koji padne svaki deseti put je gori od nikakvog: nauci se da se ponovo
-// pusti, pa se tako preskoci i pravi pad. Ovako je i brze - odgovor obicno
-// stigne za desetak milisekundi.
+// Ceka se odgovor, ne fiksna pauza: suite rade uporedo, pa na opterecenom
+// racunaru 250 ms ume da ne bude dovoljno.
 const probaj = async (v, username, password) => {
   v.poruke.length = 0;
   v.w.send(JSON.stringify({ t: "login", username, password }));
@@ -121,9 +113,8 @@ const app = citajIzvor("server/public/js/app.js");
 const service = citajIzvor("server/src/service.js");
 const routes = citajIzvor("server/src/routes.js");
 
-// Pogresna lozinka na panelu je ranije zvala doLogout(), koji zove /logout,
-// koji bez tokena opet vraca 401 - petlja od nekoliko hiljada zahteva u sekundi
-// koja je stajala tek kad se strana osvezi, i gutala pravu poruku o gresci.
+// Pogresna lozinka na panelu ne sme da zove doLogout(): /logout bez tokena
+// vraca 401, pa bi nastala petlja zahteva koja guta poruku o gresci.
 proveri("sama odjava ne gadja prijavu i odjavu",
   /path !== "\/login" && path !== "\/logout"/.test(app), "api() bi opet mogao da udje u petlju");
 proveri("sama odjava trazi da token uopste postoji", /res\.status === 401 && state\.token/.test(app));

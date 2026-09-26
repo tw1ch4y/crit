@@ -1,18 +1,7 @@
 import { citajIzvor, brojac } from "./_okruzenje.mjs";
-// LAUNCHER NE SME DA UMRE OD GRESKE KOJU NISMO PREDVIDELI
-//
-// Kod servera pad znaci da igraonica stane i to se odmah vidi. Kod launchera je
-// gore, jer se NE vidi: neobradjeno odbijanje obecanja u glavnom procesu
-// Electrona gasi ceo program, a racunar ostaje na GOLOM WINDOWSU - bez kioska,
-// bez zakljucavanja, bez naplate. Gost sedne i igra besplatno, a osoblje to
-// primeti samo ako slucajno prodje pored te masine.
-//
-// Server je globalno hvatanje imao od pocetka; launcher nije.
-//
-// Uz to, jedno konkretno mesto je bilo bez `.catch`, i to bas na najtoplijoj
-// putanji: `shell.openPath` kojim se pokrece SVAKA precica (.lnk). Obicno vraca
-// poruku o gresci umesto da odbije, pa je izgledalo da nema sta da se hvata -
-// ali kad odbije (pokvarena precica, disk koji je otpao), pada ceo launcher.
+// Launcher ne sme da se ugasi od neobradjene greske: pad glavnog procesa
+// ostavlja racunar na golom Windows-u, bez kioska i naplate. Proverava se
+// globalno hvatanje gresaka i `.catch` na `shell.openPath` (pokretanje precica).
 const { proveri, kraj } = brojac();
 const main = citajIzvor("client/main.js");
 

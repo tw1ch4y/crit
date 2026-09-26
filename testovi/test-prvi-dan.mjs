@@ -1,14 +1,7 @@
 import { radniFolder, podigniServer, ucitajWebSocket } from "./_okruzenje.mjs";
 const WebSocket = await ucitajWebSocket();
-// PRVI DAN U IGRAONICI
-//
-// Radnik ujutru radi korake redom, i svaki od njih ima svoju zamku. Ovde se
-// prolazi tacno taj redosled i gleda sta se desi kad se negde omane - jer prvog
-// dana ce se omanuti.
-//
-// Najveca zamka: SMENA NIJE OTVORENA. Uputstvo za otvaranje je ni ne pominje,
-// pa je sasvim ocekivano da radnik pocne da radi bez nje. Pitanje je gde onda
-// zavrsi novac koji je naplatio.
+// Prvi dan u igraonici: koraci radnika redom, i sta se desi kad se negde omane.
+// Najvaznije: sta biva sa novcem naplacenim pre otvaranja smene.
 const PORT = 8193;
 const BASE = `http://127.0.0.1:${PORT}`;
 const WSB = `ws://127.0.0.1:${PORT}`;

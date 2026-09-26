@@ -1,21 +1,9 @@
 import { citajIzvor, brojac } from "./_okruzenje.mjs";
-// DA LI IGRAONICA IMA INTERNET
+// Da li igraonica ima internet (traka na dnu launchera).
 //
-// Traku na dnu launchera gleda igrac: ako mu pregledac ne radi, hoce da vidi je
-// li do njega ili do interneta.
-//
-// Svaki launcher je to proveravao sam, ucitavanjem google.com/favicon.ico na
-// svakih 30 sekundi. Trinaest masina, oko 37.000 poziva dnevno ka Google-u iz
-// jedne igraonice - a odgovor je isti za sve njih. I lagao je: kad je bas Google
-// nedostupan (filter na ruteru, odvojena gostinska mreza, ispad kod jednog
-// provajdera), internet radi a na svih trinaest ekrana pise da ga nema.
-//
-// Ovde se cuva:
-//   1. da provera zaista ide sa SERVERA, jednom, i da klijent nema svoju
-//   2. da se javlja samo na PROMENU (poruka svakih minut, uvek ista, je
-//      saobracaj bez sadrzaja)
-//   3. da nepoznato stanje ostane NEPOZNATO - izmisljen odgovor salje igraca da
-//      trazi kvar tamo gde ga nema
+//   1. proverava server, jednom za sve racunare; klijent nema svoju proveru
+//   2. javlja se samo promena stanja
+//   3. nepoznato stanje ostaje nepoznato, ne prijavljuje se kao "nema interneta"
 const { proveri, kraj } = brojac();
 const net = await import("../server/src/internet.js");
 // Komentari objasnjavaju sta je BILO, pa moraju da smeju da pominju ono cega
@@ -70,11 +58,8 @@ proveri("server je pokrece pri startu", /internet\.pokreni\(/.test(idx));
 
 // ---- 4) STVARNA PROVERA ----
 //
-// Provera se ovde ZAISTA pokrece - citanjem koda se ne vidi da li adresa jos
-// postoji, da li je odgovor i dalje onaj tekst i da li stigne na vreme.
-//
-// Racunar bez interneta nije kvar u programu, pa se tada preskace: crven test
-// zbog tudje mreze uci covek da crveno ne znaci nista.
+// Provera se zaista pokrece (adresa, odgovor, rok). Racunar bez interneta se
+// preskace, jer to nije kvar u programu.
 const imaMrezu = await (async () => {
   try {
     const { promises: dns } = await import("node:dns");

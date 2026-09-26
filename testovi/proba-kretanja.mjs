@@ -37,14 +37,9 @@ if (process.env.CRIT_REDUCED) app.commandLine.appendSwitch("force-prefers-reduce
 ipcMain.handle("program-icon", async () => null);
 ipcMain.handle("get-config", () => ({ host: BAZA, token: "x", configured: true }));
 ipcMain.handle("sys-stats", () => ({ cpu: 23, ramUsedPct: 46, ramGb: "16", temp: 41, uptime: 7200 }));
-// Svaki kanal koji preload nudi mora da ima odgovor.
-//
-// Kanal koji nedostaje ne pukne odmah nego se odbije obecanje, a to ovde pada
-// u "unhandledRejection" i gasi probu sa porukom koja ne kaze nista o
-// animacijama. Bas se to desavalo sa kanalom "verzija": proba je nekad prolazila
-// a nekad se gasila u cetvrtoj sekundi, zavisno od toga sta launcher stigne da
-// pozove. Spisak je preuzet iz preload.js - ako se tamo doda novi kanal, dodaje
-// se i ovde.
+// Svaki kanal iz preload.js mora da ima odgovor: kanal koji nedostaje odbije
+// obecanje i ugasi probu kroz "unhandledRejection". Novi kanal u preload.js se
+// dodaje i ovde.
 for (const k of ["save-config", "reset-config", "to-server", "launch-game", "open-browser",
   "focus-launcher", "admin-exit", "renderer-ready", "podesavanja-citaj", "podesavanja-primeni", "verzija", "proveri-servisni-pin", "otkljucaj-bez-servera"])
   ipcMain.handle(k, () => true);

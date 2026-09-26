@@ -1,25 +1,15 @@
-// Postavlja ili menja SERVISERSKI nalog.
+// Serviserski nalog.
 //
-//   node alati/serviser.mjs                    pokaže ko su serviseri
+//   node alati/serviser.mjs                    spisak servisera
 //   node alati/serviser.mjs <ime> <lozinka>    napravi ili promeni lozinku
-//   node alati/serviser.mjs --ukloni <ime>     ukloni serviserski nalog
+//   node alati/serviser.mjs --ukloni <ime>     ukloni nalog
 //
-// ZAŠTO SE OVO RADI SKRIPTOM, A NE IZ PANELA
+// Serviser je iznad vlasnika, pa prvi takav nalog ne može da nastane kroz
+// panel. Pravi se na glavnom računaru; ko može da pokrene ovu skriptu ionako
+// ima pristup bazi. Uloge služe jasnoj podeli i zapisu svakog poteza, ne
+// zaključavanju vlasnika na sopstvenom računaru.
 //
-// Serviserski nalog stoji IZNAD vlasnika: vlasnik ga ne pravi i ne uklanja. Zato
-// prvi takav nalog ne može da nastane kroz panel - neko bi morao da bude
-// serviser da bi ga napravio, a na svežoj instalaciji servisera nema.
-//
-// Koren poverenja je pristup samom računaru na kom server radi. Ko može da
-// pokrene ovu skriptu, taj već ima i bazu i sve u njoj - ništa se novo ne
-// otvara. Zato je ovo i jedino pošteno mesto za takav nalog.
-//
-// Budimo iskreni do kraja: na računaru koji vlasnik fizički drži nijedna uloga
-// nije neprobojna. Vlasnik može da otvori bazu i doda šta hoće. Ova podela
-// postoji da bi uloge bile JASNE i da bi svaki potez bio ZAPISAN - ne da bi
-// vlasnika zaključala iz sopstvenog računara.
-//
-// Pokreće se na glavnom računaru, iz korena projekta. Server sme da radi.
+// Pokreće se iz korena projekta; server sme da radi.
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
