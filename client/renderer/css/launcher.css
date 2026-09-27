@@ -927,13 +927,6 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));
   box-shadow: inset 0 0 0 1px var(--line-2);
 }
-.acc-avatar {
-  width: 82px; height: 82px; flex-shrink: 0; display: grid; place-items: center;
-  font-family: var(--font-display); font-weight: 700; font-size: 36px; color: #fff;
-  background: linear-gradient(135deg, var(--brend), var(--brend-deep));
-  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
-  box-shadow: 0 0 30px -6px var(--brend-glow);
-}
 .acc-id { min-width: 0; }
 .acc-name { font-family: var(--font-display); font-size: 26px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; }
 .acc-user { color: var(--text-3); font-size: 14px; margin-top: 3px; }
@@ -1835,110 +1828,238 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
 }
 
 /* ---------- Profil igrača ---------- */
-.pf { display: flex; flex-direction: column; gap: 22px; }
 
-.pf-glava { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+/* ZNAK: slovo, okvir koji je igrač izabrao, prsten iskustva oko njega i broj
+   nivoa u uglu. Isti se crta u glavi naloga (veliki) i kao uzorak okvira. */
 .pf-znak {
-  flex: none; width: 84px; height: 84px; border-radius: 50%;
+  --vel: 64px;
+  flex: none; width: var(--vel); height: var(--vel); border-radius: 50%;
+  display: grid; place-items: center; position: relative;
+  background: radial-gradient(circle at 30% 25%, var(--panel-3), var(--panel) 75%);
+  font-family: var(--font-display); font-size: calc(var(--vel) * 0.44); font-weight: 700; color: var(--text);
+}
+.pf-znak.veliki { --vel: 82px; }
+.pf-znak > span { position: relative; z-index: 1; }
+/* Prsten iskustva: koliko je pređeno do sledećeg nivoa, oko samog znaka. */
+.pf-prsten {
+  position: absolute; inset: -9px; border-radius: 50%; pointer-events: none;
+  background: conic-gradient(var(--gold) var(--xp), rgba(255, 255, 255, 0.07) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
+  filter: drop-shadow(0 0 6px rgba(255, 181, 39, 0.35));
+}
+.pf-znak-nivo {
+  position: absolute; right: -8px; bottom: -6px; z-index: 2;
+  min-width: 26px; height: 26px; padding: 0 6px; border-radius: 13px;
   display: grid; place-items: center;
-  background: linear-gradient(150deg, var(--panel-3), var(--panel));
-  font-family: var(--font-display); font-size: 36px; font-weight: 700; color: var(--text);
-  position: relative;
+  background: var(--gold); color: #1a1204; font-size: 13px; font-weight: 800; font-style: normal;
+  box-shadow: 0 0 0 3px var(--panel), 0 0 14px -2px var(--gold-glow);
 }
 /* Okviri se razlikuju OBLIKOM, ne samo bojom: igrač koji ih bira mora da vidi
    razliku i na malom znaku, a ne da pogađa koja je nijansa koja. */
-.pf-znak.okvir-tanki { box-shadow: 0 0 0 2px var(--brend); }
-.pf-znak.okvir-dvojni { box-shadow: 0 0 0 2px var(--brend), 0 0 0 6px rgba(var(--brend-rgb), 0.28); }
-.pf-znak.okvir-zlatni { box-shadow: 0 0 0 3px var(--gold), 0 0 26px -6px var(--gold-glow); }
-.pf-znak.okvir-puls { box-shadow: 0 0 0 2px var(--brend); animation: pf-puls 2.4s ease-in-out infinite; }
+.okvir-tanki { box-shadow: 0 0 0 2px var(--brend); }
+.okvir-dvojni { box-shadow: 0 0 0 2px var(--brend), 0 0 0 6px rgba(var(--brend-rgb), 0.28); }
+.okvir-zlatni { box-shadow: 0 0 0 3px var(--gold), 0 0 26px -6px var(--gold-glow); }
+.okvir-puls { box-shadow: 0 0 0 2px var(--brend); animation: pf-puls 2.4s ease-in-out infinite; }
 @keyframes pf-puls {
   50% { box-shadow: 0 0 0 2px var(--brend), 0 0 30px -4px var(--brend-glow); }
 }
-.pf-ko { min-width: 0; flex: 1; }
-.pf-ime {
-  font-family: var(--font-display); font-size: 30px; font-weight: 700; line-height: 1.1;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.acc-titula {
+  display: inline-block; margin-left: 12px; padding: 2px 10px; vertical-align: 1px;
+  font-family: var(--font-ui); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--gold); background: rgba(255, 181, 39, 0.12); clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
 }
-.pf-titula {
-  font-family: var(--font-ui); font-size: 13px; font-weight: 700; margin-top: 3px;
-  text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold);
+.acc-hero .pf-znak { margin: 6px 6px 6px 4px; }
+
+.pf { display: flex; flex-direction: column; gap: 16px; }
+
+/* NAPREDAK: grb nivoa, iskustvo, traka, i šta je sledeće. */
+.pf-napredak {
+  display: flex; align-items: center; gap: 20px; padding: 16px 20px;
+  background: linear-gradient(120deg, rgba(255, 181, 39, 0.09), transparent 55%), var(--panel-2);
+  box-shadow: inset 0 0 0 1px rgba(255, 181, 39, 0.22);
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
 }
-.pf-xp { flex: none; width: 260px; max-width: 100%; }
-.pf-xp-broj { font-family: var(--font-display); font-size: 22px; font-weight: 700; }
-.pf-xp-broj span { font-size: 12px; color: var(--text-3); letter-spacing: 0.1em; }
+.pf-grb { flex: none; position: relative; width: 58px; height: 66px; display: grid; place-items: center; }
+.pf-grb svg { position: absolute; inset: 0; width: 100%; height: 100%; fill: rgba(255, 181, 39, 0.14); stroke: var(--gold); stroke-width: 2; filter: drop-shadow(0 0 10px rgba(255, 181, 39, 0.35)); }
+.pf-grb span { position: relative; font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--gold); margin-top: -4px; }
+.pf-np-telo { flex: 1; min-width: 0; }
+.pf-np-red { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
+.pf-np-naziv { font-family: var(--font-display); font-size: 22px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
+.pf-np-naziv span { color: var(--gold); margin-right: 10px; font-size: 14px; letter-spacing: 0.1em; }
+.pf-np-xp { font-family: var(--font-display); font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pf-np-xp i { font-style: normal; font-size: 12px; color: var(--text-3); letter-spacing: 0.1em; }
 .pf-xp-traka {
-  height: 9px; border-radius: 3px; margin: 7px 0 5px; overflow: hidden;
+  height: 10px; margin: 9px 0 7px; overflow: hidden;
   background: rgba(var(--bg-rgb), 0.7); box-shadow: inset 0 0 0 1px var(--line-2);
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 100%, 6px 100%);
 }
 .pf-xp-traka i {
-  display: block; height: 100%; border-radius: 2px;
+  display: block; height: 100%;
   background: linear-gradient(90deg, var(--gold), #ffd97a);
   box-shadow: 0 0 16px -2px var(--gold-glow);
   transition: width 0.6s var(--tr);
 }
-.pf-xp-pod { font-size: 12px; color: var(--text-3); }
-
-.pf-brojke { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr)); gap: 10px; }
-.pf-brojka {
-  background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--cut);
-  padding: 12px 14px; min-width: 0;
+.pf-np-pod { font-size: 13px; color: var(--text-2); align-items: center; }
+.pf-np-pod b { color: var(--text); font-weight: 700; }
+.pf-kako { display: inline-flex; align-items: center; gap: 5px; color: var(--text-3); font-size: 12px; white-space: nowrap; cursor: help; }
+.pf-sledece {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 9px; padding: 5px 12px;
+  background: rgba(var(--brend-rgb), 0.12); box-shadow: inset 0 0 0 1px rgba(var(--brend-rgb), 0.35);
+  font-size: 13px; color: var(--text-2);
 }
-.pf-bl { font-family: var(--font-ui); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+.pf-sledece svg { color: var(--gold); flex: none; }
+.pf-sledece b { color: var(--text); }
+.pf-sledece.gotovo svg { color: var(--green); }
+
+/* PUT KROZ NIVOE: vodoravna traka od prvog do poslednjeg. Pređeni zlatni,
+   trenutni svetli, a nivoi sa nagradom nose njenu ikonu iznad sebe. */
+.pf-put {
+  position: relative; display: grid; grid-template-columns: repeat(var(--n), 1fr);
+  padding: 20px 6px 2px;
+}
+.pf-put-linija {
+  position: absolute; left: calc(100% / var(--n) / 2 + 6px); right: calc(100% / var(--n) / 2 + 6px); top: 36px;
+  height: 3px; background: rgba(255, 255, 255, 0.08);
+}
+.pf-put-linija i { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), #ffd97a); box-shadow: 0 0 10px var(--gold-glow); }
+.pf-cvor { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; cursor: default; }
+.pf-cvor-krug {
+  position: relative; z-index: 1; width: 32px; height: 32px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--font-display); font-size: 14px; font-weight: 700; color: var(--text-3);
+  background: var(--panel); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.12);
+}
+.pf-cvor.predjen .pf-cvor-krug { background: var(--gold); color: #1a1204; box-shadow: none; }
+.pf-cvor.sada .pf-cvor-krug {
+  width: 38px; height: 38px; margin: -3px 0; color: var(--gold); background: var(--panel-2);
+  box-shadow: inset 0 0 0 2px var(--gold), 0 0 18px -2px var(--gold-glow);
+}
+.pf-cvor-ime {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-ui); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3);
+}
+.pf-cvor.predjen .pf-cvor-ime { color: var(--text-2); }
+.pf-cvor.sada .pf-cvor-ime { color: var(--gold); }
+.pf-cvor-nag {
+  position: absolute; top: -19px; width: 20px; height: 20px; border-radius: 6px;
+  display: grid; place-items: center; color: var(--text-3); background: rgba(255, 255, 255, 0.06);
+}
+.pf-cvor.predjen .pf-cvor-nag, .pf-cvor.sada .pf-cvor-nag { color: var(--gold); background: rgba(255, 181, 39, 0.14); }
+
+/* BROJKE: šta je igrač sam napravio. */
+.pf-brojke { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); gap: 10px; }
+.pf-brojka {
+  display: flex; align-items: center; gap: 11px; min-width: 0;
+  background: var(--panel-2); border: 1px solid var(--line); padding: 11px 13px;
+}
+.pf-b-ik {
+  flex: none; width: 32px; height: 32px; display: grid; place-items: center;
+  color: var(--brend-bright, #7fb0ff); background: rgba(var(--brend-rgb), 0.14);
+}
+.pf-b-t { min-width: 0; }
+.pf-bl { font-family: var(--font-ui); font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-3); }
 .pf-bv {
-  font-family: var(--font-display); font-size: 20px; font-weight: 700; margin-top: 3px;
+  font-family: var(--font-display); font-size: 19px; font-weight: 700; margin-top: 1px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.pf-bv i { font-style: normal; font-size: 12px; color: var(--text-3); margin-left: 2px; }
 
-.pf-odeljak { display: flex; flex-direction: column; gap: 10px; }
-.pf-naslov {
-  font-family: var(--font-ui); font-size: 12.5px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-2);
-  display: flex; align-items: center; gap: 10px;
+/* IZGLED: boja imena i okvir, jedno pored drugog. */
+.pf-izgled { display: grid; grid-template-columns: 1fr 1.25fr; gap: 12px; }
+.pf-odeljak {
+  display: flex; flex-direction: column; gap: 11px; padding: 13px 15px;
+  background: var(--panel-2); border: 1px solid var(--line);
 }
-/* Brava kaže NA KOM NIVOU stvar dolazi, ne samo da je zaključana - "još malo"
-   je poziv, a "zaključano" je zid. */
+.pf-naslov {
+  font-family: var(--font-ui); font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-2);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+/* Brava kaže NA KOM NIVOU stvar dolazi i koliko fali, ne samo da je
+   zaključana - "još malo" je poziv, a "zaključano" je zid. */
 .pf-brava {
   display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px;
-  border-radius: 20px; background: var(--gold-soft, rgba(255, 181, 39, 0.12));
-  color: var(--gold); font-size: 11px; letter-spacing: 0.06em;
+  background: rgba(255, 181, 39, 0.12); color: var(--gold);
+  font-size: 11px; letter-spacing: 0.04em; text-transform: none; white-space: nowrap;
 }
 .pf-boje, .pf-okviri { display: flex; flex-wrap: wrap; gap: 9px; }
-.pf-boje.zakljucano, .pf-okviri.zakljucano { opacity: 0.4; cursor: not-allowed; }
+.pf-boje.zakljucano, .pf-okviri.zakljucano { opacity: 0.38; filter: grayscale(0.4); cursor: not-allowed; }
 .pf-boje.zakljucano > *, .pf-okviri.zakljucano > * { pointer-events: none; }
 .pf-boja {
-  width: 34px; height: 34px; border-radius: 50%; cursor: pointer;
+  width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
   background: var(--pf-c); border: 2px solid transparent;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
-  transition: transform var(--tr), border-color var(--tr);
+  transition: transform var(--tr), border-color var(--tr), box-shadow var(--tr);
 }
 .pf-boja:hover { transform: scale(1.12); }
-.pf-boja.aktivna { border-color: var(--text); transform: scale(1.12); }
+.pf-boja.aktivna { border-color: var(--text); transform: scale(1.12); box-shadow: 0 0 14px -2px var(--pf-c); }
 .pf-okvir {
-  padding: 8px 15px; border-radius: var(--cut); cursor: pointer;
-  background: var(--panel-2); border: 1px solid var(--line-2); color: var(--text-2);
-  font-family: var(--font-ui); font-size: 13px; font-weight: 700;
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 11px 6px 7px; cursor: pointer;
+  background: rgba(var(--bg-rgb), 0.45); border: 1px solid var(--line-2); color: var(--text-2);
+  font-family: var(--font-ui); font-size: 12.5px; font-weight: 700;
   transition: all var(--tr);
 }
 .pf-okvir:hover { color: var(--text); border-color: var(--brend); }
 .pf-okvir.aktivna { background: var(--brend-soft); border-color: var(--brend); color: var(--text); }
+/* Uzorak pokazuje kako okvir izgleda, pre nego što se izabere. */
+.pf-okvir-uzorak { width: 18px; height: 18px; border-radius: 50%; background: var(--panel-3); flex: none; }
 
-.pf-nagrade { display: flex; flex-direction: column; gap: 7px; }
-.pf-nagrada {
-  display: flex; align-items: center; gap: 13px; padding: 11px 14px;
-  background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--cut);
-  opacity: 0.6;
+/* TVOJE IGRE: tri najigranije, sa brojem pokretanja. */
+.pf-igre { display: flex; flex-direction: column; gap: 10px; }
+.pf-igre-red { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.pf-igra {
+  display: flex; align-items: center; gap: 12px; min-width: 0; padding: 10px 12px;
+  background: var(--panel-2); border: 1px solid var(--line);
 }
-.pf-nagrada.ima { opacity: 1; border-color: rgba(255, 181, 39, 0.35); }
-.pf-n-nivo {
-  flex: none; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
-  background: rgba(var(--bg-rgb), 0.6); color: var(--text-2);
-  font-family: var(--font-display); font-size: 14px; font-weight: 700;
+.pf-igra.prva { border-color: rgba(255, 181, 39, 0.35); background: linear-gradient(120deg, rgba(255, 181, 39, 0.07), transparent 60%), var(--panel-2); }
+.pf-igra-slika {
+  flex: none; width: 42px; height: 56px; display: grid; place-items: center;
+  background: var(--panel-3) center / cover no-repeat;
+  font-family: var(--font-display); font-weight: 700; font-size: 14px; color: var(--text-3);
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%);
 }
-.pf-nagrada.ima .pf-n-nivo { background: rgba(255, 181, 39, 0.16); color: var(--gold); }
-.pf-n-tekst { min-width: 0; flex: 1; font-size: 13px; color: var(--text-3); }
-.pf-n-tekst b { display: block; color: var(--text); font-size: 14px; font-weight: 600; }
-.pf-n-stanje { flex: none; color: var(--text-3); display: flex; }
-.pf-nagrada.ima .pf-n-stanje { color: var(--green); }
+.pf-igra-t { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.pf-igra-t b { font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-igra-traka { height: 5px; background: rgba(255, 255, 255, 0.07); }
+.pf-igra-traka i { display: block; height: 100%; background: var(--brend); }
+.pf-igra.prva .pf-igra-traka i { background: var(--gold); }
+.pf-igra-puta { font-size: 11.5px; color: var(--text-3); }
+
+/* Niski ekrani (1366x768): isto, samo zbijenije - sve mora da stane bez
+   skrolovanja, jer igrač ne zna da ispod ima još. */
+@media (max-height: 820px) {
+  .acc-hero { padding: 14px 24px; }
+  .acc-sadrzaj { padding: 16px 20px; }
+  .pf-znak.veliki { --vel: 62px; }
+  .acc-name { font-size: 22px; }
+  .as-v { font-size: 20px; }
+  .pf { gap: 9px; }
+  .pf-napredak { padding: 11px 16px; gap: 16px; }
+  .pf-grb { width: 46px; height: 52px; }
+  .pf-grb span { font-size: 21px; }
+  .pf-np-naziv { font-size: 19px; }
+  .pf-xp-traka { margin: 6px 0 5px; }
+  .pf-sledece { margin-top: 6px; padding: 4px 10px; font-size: 12.5px; }
+  .pf-put { padding-top: 18px; }
+  .pf-put-linija { top: 34px; }
+  .pf-cvor-krug { width: 28px; height: 28px; font-size: 13px; }
+  .pf-cvor.sada .pf-cvor-krug { width: 34px; height: 34px; }
+  .pf-brojka { padding: 8px 11px; }
+  .pf-b-ik { width: 28px; height: 28px; }
+  .pf-bv { font-size: 17px; }
+  .pf-odeljak { padding: 10px 13px; gap: 9px; }
+  .pf-boja { width: 26px; height: 26px; }
+  .pf-okvir { padding: 4px 9px 4px 5px; }
+  .pf-igre > .pf-naslov, .pf-igra-slika { display: none; }
+  .pf-igra { padding: 7px 11px; }
+  .pf-igra-t { gap: 4px; }
+}
+/* Ako ni zbijeno ne staje, igre se sklanjaju - one su dodatak, a napredak i
+   izgled su ono zbog čega se odeljak otvara. */
+@media (max-height: 740px) {
+  .pf-igre { display: none; }
+}
 
 /* Nov nivo: traka bljesne jednom. Bez toga bi se promenila tiho, a igrač bi je
    primetio tek slučajno - i otključana stvar bi stajala neiskorišćena. */

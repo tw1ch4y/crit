@@ -79,6 +79,15 @@ const ICONS = {
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
   mis: '<rect x="6" y="2" width="12" height="20" rx="6"/><path d="M12 6v4"/>',
   zvuk: '<path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/>',
+  // Za profil: sati, posete, član od, zaključano, nagrade na putu kroz nivoe.
+  sat: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  vrata: '<path d="M4 21h16M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17"/><path d="M14 12h.01"/>',
+  kalendar: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  brava: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  kap: '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z"/>',
+  okvir: '<rect x="3" y="3" width="18" height="18" rx="3"/><rect x="7.5" y="7.5" width="9" height="9" rx="1.5"/>',
+  zvezda: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9Z"/>',
+  munja: '<path d="M13 2 4 14h7l-1 8 9-12h-7Z"/>',
 };
 const icon = (name, size = 16) =>
   `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ""}</svg>`;
@@ -673,6 +682,7 @@ function handleMsg(m) {
       break;
     case "profil":
       S.profil = m.profil || null;
+      updateHud(); // boja imena u gornjoj traci
       if (S.tab === "account") renderContent();
       break;
     case "profil_err":
@@ -811,6 +821,9 @@ function applyTimerState() {
 }
 function updateHud() {
   $("#hudName").textContent = S.player?.displayName || S.player?.username || "-";
+  // Boja imena koju je igrač zaradio vidi se i gore, na svakom ekranu - inače
+  // bi nagrada postojala samo na strani na koju retko ko ulazi.
+  $("#hudName").style.color = bojaImena(S.profil);
   const balEl = $("#hudBal");
   const prev = Number(balEl.dataset.val || 0);
   const now = Math.round(S.balance);
@@ -1693,17 +1706,40 @@ function osveziZnackuNaloga() {
   z.textContent = String(cekaju);
 }
 
+// GLAVA NALOGA JE IDENTITET IGRAČA.
+//
+// Ranije je ovde stajao plavi kvadrat sa slovom i ime, a odmah ispod, u
+// odeljku Profil, JOŠ JEDNOM znak i ime - sa bojom, okvirom i nivoom. Dve glave
+// jedna ispod druge trošile su skoro dvesta piksela, a na 1366x768 trećina
+// profila je zato ostajala ispod ivice ekrana.
+//
+// Sada je glava jedna i nosi sve što je igrač zaradio: okvir oko znaka, prsten
+// iskustva oko njega, ime u boji koju je izabrao, nivo i titulu. Vidi se na
+// svakom odeljku naloga, ne samo na Profilu.
+function znakIgraca(p, ime, velicina = "") {
+  const okvir = p?.izgled?.okvir || "nema";
+  const naKraju = !!p?.poslednji;
+  const xp = !p ? 0 : naKraju ? 100 : p.zaSledeci > 0 ? Math.max(0, Math.min(100, (p.uNivou / p.zaSledeci) * 100)) : 0;
+  return `<div class="pf-znak ${velicina} okvir-${esc(okvir)}" style="--xp:${xp.toFixed(1)}%">
+    ${p ? `<i class="pf-prsten" aria-hidden="true"></i>` : ""}
+    <span>${esc((ime || "?").charAt(0).toUpperCase())}</span>
+    ${p ? `<b class="pf-znak-nivo" title="Nivo ${p.nivo}">${p.nivo}</b>` : ""}
+  </div>`;
+}
+const bojaImena = (p) => (p?.boje?.[p?.izgled?.boja] || {}).heks || "";
+
 function renderAccount() {
   const uname = S.player?.username || "";
   const dname = S.player?.displayName || uname;
-  const initial = (dname || "?").charAt(0).toUpperCase();
   const rate = S.settings.ratePerHour || 0;
+  const p = S.profil;
+  const boja = bojaImena(p);
   return `<div class="account">
     <div class="acc-hero">
-      <div class="acc-avatar">${esc(initial)}</div>
+      ${znakIgraca(p, dname, "veliki")}
       <div class="acc-id">
-        <div class="acc-name">${esc(dname)}</div>
-        <div class="acc-user">@${esc(uname)}</div>
+        <div class="acc-name" ${boja ? `style="color:${esc(boja)}"` : ""}>${esc(dname)}</div>
+        <div class="acc-user">@${esc(uname)}${p ? `<span class="acc-titula">${esc(p.naziv)}</span>` : ""}</div>
       </div>
       <div class="acc-stats">
         <div class="acc-stat"><div class="as-l">Kredit</div><div class="as-v pos">${money(S.balance)}</div></div>
@@ -1772,16 +1808,19 @@ function sadrzajSekcije() {
   }
 }
 
-// PROFIL: KO SI, DOKLE SI STIGAO, ŠTA SI OSTAVIO ZA SOBOM
+// PROFIL: DOKLE SI STIGAO, ŠTA TE ČEKA, ŠTA SI OSTAVIO ZA SOBOM
 //
-// Nalog je do sada bio spisak radnji - poruči, promeni lozinku, izaberi
-// pozadinu. Nigde nije pisalo KO je igrač ni šta je odigrao, pa nalog nije bio
-// njegov nego samo šalter.
-//
-// Ovde stoji sve što je njegovo: znak, ime u boji koju je izabrao, nivo i
-// traka, brojke koje je sam napravio, i spisak onoga što ga tek čeka. Poslednje
-// je namerno: nagrada koja se ne vidi unapred nije nagrada nego iznenađenje, a
+// Ko je igrač stoji u glavi naloga (znak, ime, nivo). Ovde je ono što ga vuče
+// da dođe opet: koliko mu fali, šta sledeće dobija, i put kroz svih deset
+// nivoa. Nagrada koja se ne vidi unapred nije nagrada nego iznenađenje, a
 // iznenađenje ne motiviše da se dođe ponovo.
+//
+// Ranije su nagrade stajale kao četiri visoka reda jedan ispod drugog, bez
+// ostalih nivoa i bez "koliko još". Na 1366x768 je trećina strane bila ispod
+// ivice. Put je sada jedna vodoravna traka, a izgled dve kolone.
+const IKONA_NAGRADE = { sara: "image", boja: "kap", okvir: "okvir", vip: "zvezda" };
+const hiljade = (n) => Math.round(Number(n) || 0).toLocaleString("sr-Latn-RS");
+
 function sekcijaProfil() {
   const p = S.profil;
   if (!p) {
@@ -1790,66 +1829,109 @@ function sekcijaProfil() {
   const naKraju = !!p.poslednji;
   const postotak = naKraju ? 100
     : p.zaSledeci > 0 ? Math.max(0, Math.min(100, (p.uNivou / p.zaSledeci) * 100)) : 0;
+  const otk = p.otkljucano || [];
+  const nivoi = Array.isArray(p.nivoi) && p.nivoi.length ? p.nivoi : null;
+  const sledece = otk.filter((o) => !o.otkljucano).sort((a, b) => a.nivo - b.nivo)[0] || null;
+  const pragZa = (nivo) => (nivoi || []).find((n) => n.nivo === nivo)?.prag;
+  const doSledeceg = sledece && pragZa(sledece.nivo) != null ? Math.max(0, pragZa(sledece.nivo) - p.xp) : null;
 
-  const brojke = [
-    ["Sati igre", p.sati >= 10 ? Math.round(p.sati) : p.sati.toFixed(1)],
-    ["Poseta", p.poseta],
-    ["Poručeno", p.porudzbina],
-    ["Omiljena igra", p.omiljenaIgra || "-"],
-  ].map(([l, v]) => `<div class="pf-brojka"><div class="pf-bl">${l}</div><div class="pf-bv">${esc(String(v))}</div></div>`).join("");
-
-  const boje = Object.entries(p.boje || {}).map(([k, o]) => `
-    <button class="pf-boja ${p.izgled.boja === k ? "aktivna" : ""}" data-pf-boja="${k}"
-      style="--pf-c:${o.heks}" title="${esc(o.naziv)}" aria-label="${esc(o.naziv)}"></button>`).join("");
-  const okviri = Object.entries(p.okviri || {}).map(([k, o]) => `
-    <button class="pf-okvir ${p.izgled.okvir === k ? "aktivna" : ""}" data-pf-okvir="${k}">${esc(o.naziv)}</button>`).join("");
-
-  const sme = (sta) => (p.otkljucano || []).find((o) => o.kljuc === sta)?.otkljucano;
-  const zakljucaj = (sta) => {
-    const o = (p.otkljucano || []).find((x) => x.kljuc === sta);
-    return o && !o.otkljucano ? `<span class="pf-brava">${icon("key", 13)} nivo ${o.nivo}</span>` : "";
-  };
-
-  const nagrade = (p.otkljucano || []).map((o) => `
-    <div class="pf-nagrada ${o.otkljucano ? "ima" : ""}">
-      <span class="pf-n-nivo">${o.nivo}</span>
-      <span class="pf-n-tekst"><b>${esc(o.naziv)}</b>${esc(o.opis)}</span>
-      <span class="pf-n-stanje">${o.otkljucano ? icon("check", 15) : icon("key", 14)}</span>
-    </div>`).join("");
-
-  return `<div class="pf">
-    <div class="pf-glava">
-      <div class="pf-znak okvir-${esc(p.izgled.okvir)}">
-        <span>${esc((p.ime || "?").charAt(0).toUpperCase())}</span>
+  // ---- napredak ----
+  const napredak = `<div class="pf-napredak">
+    <div class="pf-grb" aria-hidden="true"><svg viewBox="0 0 48 54"><path d="M24 2 45 9v17c0 13-9 22-21 26C12 48 3 39 3 26V9Z"/></svg><span>${p.nivo}</span></div>
+    <div class="pf-np-telo">
+      <div class="pf-np-red">
+        <div class="pf-np-naziv"><span>Nivo ${p.nivo}</span>${esc(p.naziv)}</div>
+        <div class="pf-np-xp">${hiljade(p.xp)} <i>XP</i></div>
       </div>
-      <div class="pf-ko">
-        <div class="pf-ime" style="color:${esc((p.boje[p.izgled.boja] || {}).heks || "#eef1f8")}">${esc(p.ime)}</div>
-        <div class="pf-titula">${esc(p.naziv)} &middot; nivo ${p.nivo}</div>
+      <div class="pf-xp-traka"><i style="width:${postotak.toFixed(1)}%"></i></div>
+      <div class="pf-np-red pf-np-pod">
+        <span>${naKraju ? "Najviši nivo - svaka čast!" : `Još <b>${hiljade(p.doSledeceg)} XP</b> do nivoa ${esc(p.sledeciNaziv || "")}`}</span>
+        <span class="pf-kako" title="Iskustvo stiže od potrošenog kredita: sat igre ili piće plaćeno sa naloga. Dopuna i pokloni ne donose XP.">${icon("info", 13)} 1 potrošen dinar = 1 XP</span>
       </div>
-      <div class="pf-xp">
-        <div class="pf-xp-broj">${Math.round(p.xp).toLocaleString("sr-Latn-RS")} <span>XP</span></div>
-        <div class="pf-xp-traka"><i style="width:${postotak.toFixed(1)}%"></i></div>
-        <div class="pf-xp-pod">${naKraju ? "Najviši nivo" : `još ${Math.round(p.doSledeceg).toLocaleString("sr-Latn-RS")} XP do nivoa ${esc(p.sledeciNaziv || "")}`}</div>
-      </div>
-    </div>
-
-    <div class="pf-brojke">${brojke}</div>
-
-    <div class="pf-odeljak">
-      <div class="pf-naslov">Boja imena ${zakljucaj("boja")}</div>
-      <div class="pf-boje ${sme("boja") ? "" : "zakljucano"}">${boje}</div>
-    </div>
-
-    <div class="pf-odeljak">
-      <div class="pf-naslov">Okvir oko znaka ${zakljucaj("okvir")}</div>
-      <div class="pf-okviri ${sme("okvir") ? "" : "zakljucano"}">${okviri}</div>
-    </div>
-
-    <div class="pf-odeljak">
-      <div class="pf-naslov">Šta te čeka</div>
-      <div class="pf-nagrade">${nagrade}</div>
+      ${sledece ? `<div class="pf-sledece">${icon(IKONA_NAGRADE[sledece.kljuc] || "gift", 15)}
+        <span>Sledeće otključavaš: <b>${esc(sledece.naziv)}</b> na nivou ${sledece.nivo}${doSledeceg != null ? `, još ${hiljade(doSledeceg)} XP` : ""}</span></div>`
+      : `<div class="pf-sledece gotovo">${icon("check", 15)}<span>Sve nagrade su otključane</span></div>`}
     </div>
   </div>`;
+
+  // ---- put kroz nivoe ----
+  const put = nivoi ? `<div class="pf-put" style="--n:${nivoi.length}">
+    <div class="pf-put-linija"><i style="width:${Math.max(0, Math.min(100, ((p.nivo - 1 + (naKraju ? 0 : postotak / 100)) / (nivoi.length - 1)) * 100)).toFixed(1)}%"></i></div>
+    ${nivoi.map((n) => {
+      const stanje = n.nivo < p.nivo ? "predjen" : n.nivo === p.nivo ? "sada" : "";
+      const nag = n.otkljucava ? otk.find((o) => o.kljuc === n.otkljucava) : null;
+      const opis = `Nivo ${n.nivo} - ${n.naziv} (${hiljade(n.prag)} XP)${nag ? `: ${nag.naziv}` : ""}`;
+      return `<div class="pf-cvor ${stanje} ${nag ? "nagrada" : ""}" title="${esc(opis)}">
+        ${nag ? `<span class="pf-cvor-nag">${icon(IKONA_NAGRADE[n.otkljucava] || "gift", 12)}</span>` : ""}
+        <span class="pf-cvor-krug">${n.nivo}</span>
+        <span class="pf-cvor-ime">${esc(n.naziv)}</span>
+      </div>`;
+    }).join("")}
+  </div>` : "";
+
+  // ---- brojke ----
+  const clanOd = p.clanOd ? new Date(p.clanOd).toLocaleDateString("sr-Latn-RS", { month: "short", year: "numeric" }) : "-";
+  const satiTekst = (h) => (h >= 10 ? Math.round(h) : Number(h || 0).toFixed(1).replace(".0", ""));
+  const brojke = [
+    ["sat", "Sati igre", `${satiTekst(p.sati)} <i>h</i>`],
+    ["munja", "Ove nedelje", `${satiTekst(p.satiNedelja || 0)} <i>h</i>`],
+    ["vrata", "Poseta", hiljade(p.poseta)],
+    ["cup", "Poručeno", hiljade(p.porudzbina)],
+    ["kalendar", "Član od", esc(clanOd)],
+  ].map(([ik, l, v]) => `<div class="pf-brojka"><span class="pf-b-ik">${icon(ik, 16)}</span>
+    <div class="pf-b-t"><div class="pf-bl">${l}</div><div class="pf-bv">${v}</div></div></div>`).join("");
+
+  // ---- izgled ----
+  const sme = (sta) => otk.find((o) => o.kljuc === sta)?.otkljucano;
+  const brava = (sta) => {
+    const o = otk.find((x) => x.kljuc === sta);
+    if (!o || o.otkljucano) return "";
+    const fali = pragZa(o.nivo) != null ? Math.max(0, pragZa(o.nivo) - p.xp) : null;
+    return `<span class="pf-brava">${icon("brava", 12)} nivo ${o.nivo}${fali != null ? `, još ${hiljade(fali)} XP` : ""}</span>`;
+  };
+  const boje = Object.entries(p.boje || {}).map(([k, o]) => `
+    <button class="pf-boja ${p.izgled.boja === k ? "aktivna" : ""}" data-pf-boja="${k}"
+      style="--pf-c:${esc(o.heks)}" title="${esc(o.naziv)}" aria-label="${esc(o.naziv)}"></button>`).join("");
+  const okviri = Object.entries(p.okviri || {}).map(([k, o]) => `
+    <button class="pf-okvir ${p.izgled.okvir === k ? "aktivna" : ""}" data-pf-okvir="${k}" title="${esc(o.naziv)}">
+      <span class="pf-okvir-uzorak okvir-${esc(k)}"></span><span>${esc(o.naziv)}</span></button>`).join("");
+
+  // ---- tvoje igre ----
+  // Tri najigranije sa brojem pokretanja. Traka je u odnosu na prvu, da se
+  // vidi koliko je omiljena ispred ostalih.
+  const igre = Array.isArray(p.igre) ? p.igre : [];
+  const najvise = Math.max(1, ...igre.map((g) => g.puta || 0));
+  const tvojeIgre = igre.length ? `<div class="pf-igre">
+    <div class="pf-naslov">Tvoje igre</div>
+    <div class="pf-igre-red">${igre.map((g, i) => `<div class="pf-igra ${i === 0 ? "prva" : ""}">
+      <span class="pf-igra-slika" ${g.slika ? `style="background-image:url('${esc(S.host + g.slika)}')"` : ""}>${g.slika ? "" : esc(String(g.ime || "?").slice(0, 2).toUpperCase())}</span>
+      <span class="pf-igra-t"><b title="${esc(g.ime)}">${esc(g.ime)}</b>
+        <span class="pf-igra-traka"><i style="width:${Math.round(((g.puta || 0) / najvise) * 100)}%"></i></span>
+        <span class="pf-igra-puta">${i === 0 ? "Omiljena, " : ""}${hiljade(g.puta)} ${oblikPuta(g.puta)}</span></span>
+    </div>`).join("")}</div>
+  </div>` : "";
+
+  return `<div class="pf">
+    ${napredak}
+    ${put}
+    <div class="pf-brojke">${brojke}</div>
+    <div class="pf-izgled">
+      <div class="pf-odeljak ${sme("boja") ? "" : "zakljucan"}">
+        <div class="pf-naslov">Boja imena ${brava("boja")}</div>
+        <div class="pf-boje ${sme("boja") ? "" : "zakljucano"}">${boje}</div>
+      </div>
+      <div class="pf-odeljak ${sme("okvir") ? "" : "zakljucan"}">
+        <div class="pf-naslov">Okvir oko znaka ${brava("okvir")}</div>
+        <div class="pf-okviri ${sme("okvir") ? "" : "zakljucano"}">${okviri}</div>
+      </div>
+    </div>
+    ${tvojeIgre}
+  </div>`;
+}
+// 1 put, 2-4 puta, 5+ puta; 11-14 idu uz "puta" iako se završavaju na 1-4.
+function oblikPuta(n) {
+  n = Math.abs(Math.round(Number(n) || 0));
+  return n % 10 === 1 && n % 100 !== 11 ? "put" : "puta";
 }
 
 // NAGRADE.

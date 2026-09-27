@@ -9,7 +9,7 @@ import { verifyPassword, hashPassword, rang } from "./auth.js";
 import { broadcastPanels, broadcastClients, sendClient, isClientOnline, izbaciPanel, izbaciKlijenta } from "./hub.js";
 import { banerIgre, promoCrit } from "./banner.js";
 import * as nad from "./nadogradnja.js";
-import { nivoZa, smeDa, otkljucanoZa, OTKLJUCAVANJA } from "./nivoi.js";
+import { nivoZa, smeDa, otkljucanoZa, OTKLJUCAVANJA, NIVOI } from "./nivoi.js";
 import * as rez from "./rezervacije.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -3267,9 +3267,14 @@ export function profilIgraca(playerId) {
   const ukupno = jedan("SELECT COALESCE(SUM(cost),0) c, COUNT(*) n FROM sessions WHERE player_id=?", playerId);
   const cena = rate();
   const porudzbina = jedan("SELECT COUNT(*) n FROM orders WHERE player_id=? AND status<>'cancelled'", playerId);
-  const omiljena = jedan(
-    `SELECT g.name ime, COUNT(*) n FROM game_launches gl JOIN games g ON g.id=gl.game_id
-     WHERE gl.player_id=? GROUP BY gl.game_id ORDER BY n DESC LIMIT 1`, playerId);
+  // Tri najigranije: prva je "omiljena", a sve tri idu na profil sa brojem
+  // pokretanja - igrač voli da vidi svoju statistiku, ne samo jedno ime.
+  const igre = db.prepare(
+    `SELECT g.name ime, g.image slika, COUNT(*) n FROM game_launches gl JOIN games g ON g.id=gl.game_id
+     WHERE gl.player_id=? GROUP BY gl.game_id ORDER BY n DESC, MAX(gl.at) DESC LIMIT 3`).all(playerId);
+  const omiljena = igre[0] || {};
+  const nedelja = jedan("SELECT COALESCE(SUM(cost),0) c FROM sessions WHERE player_id=? AND started_at>=?",
+    playerId, Date.now() - 7 * 86400000);
 
   return {
     username: p.username,
@@ -3283,9 +3288,14 @@ export function profilIgraca(playerId) {
     porudzbina: porudzbina.n || 0,
     omiljenaIgra: omiljena.ime || null,
     omiljenaPuta: omiljena.n || 0,
+    igre: igre.map((g) => ({ ime: g.ime, slika: g.slika || null, puta: g.n })),
+    satiNedelja: cena > 0 ? round2(nedelja.c / cena) : 0,
     izgled: profilIzBaze(p),
     otkljucano: otkljucanoZa(p.xp),
     boje: BOJE_IMENA, okviri: OKVIRI,
+    // Ceo put kroz nivoe, da launcher nacrta mapu od prvog do poslednjeg:
+    // cilj koji se ne vidi ne vuče napred. Uz svaki nivo ide i šta otključava.
+    nivoi: NIVOI.map((x) => ({ nivo: x.nivo, naziv: x.naziv, prag: x.prag, otkljucava: x.otkljucava || null })),
   };
 }
 

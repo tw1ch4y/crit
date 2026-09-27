@@ -473,6 +473,33 @@ Svaka stavka je dokazana na živom serveru pre ispravke; sve ih čuva
   crtao kod 19h, a podrazumevani početak je bio 17:00 (dan ima 23/25 sati, a
   računalo se "ponoć + 18 × 3.600.000"). Sada po lokalnom satu
 
+### Revizija 2.50 - profil igrača
+
+Izmereno i slikano na PRAVOM launcheru (`pregled-profila.mjs`: igrač sa
+istorijom, 3 nivoa x 2 rezolucije, pa klik na boju i okvir).
+
+- [x] **Na 1366x768 trećina profila je bila ispod ivice** - odeljak je imao 448
+  px, a sadržaj je tražio oko 735. Sada staje na obe rezolucije, za svaki nivo
+  (proverava alat)
+- [x] **Dupla glava.** Nalog je imao plavi kvadrat sa imenom, a odmah ispod, u
+  Profilu, još jednom znak i ime. Sada je glava jedna i nosi sve što je igrač
+  zaradio: okvir oko znaka, **prsten iskustva oko znaka**, broj nivoa, ime u
+  izabranoj boji i titulu. Vidi se na svakom odeljku naloga
+- [x] **Kartica napretka**: grb nivoa, XP i traka, "još X XP do nivoa ...",
+  **"Sledeće otključavaš: ... na nivou N, još X XP"**, i kako se XP skuplja
+  (1 potrošen dinar = 1 XP; dopuna i pokloni ne donose)
+- [x] **Put kroz svih 10 nivoa** umesto četiri visoka reda "Šta te čeka":
+  pređeni nivoi zlatni, trenutni svetli, nivoi sa nagradom nose njenu ikonu
+- [x] **Brojke sa ikonama i jedinicama**, uz nove "Ove nedelje" i "Član od"
+- [x] **Tvoje igre**: tri najigranije sa brojem igranja i trakom (ranije je
+  omiljena bila samo ime, odsečeno "Counter-Strike 2 ...")
+- [x] **Izgled u dve kolone** (boja imena | okvir), a okviri imaju uzorak - vidi
+  se kako izgleda pre izbora. Zaključano kaže nivo i koliko XP fali
+- [x] **Boja imena se vidi i u gornjoj traci**, na svakom ekranu - nagrada koja
+  postoji samo na strani na koju retko ko ulazi ne vredi mnogo
+- [x] Server uz profil šalje ceo spisak nivoa, tri najigranije igre i sate ove
+  nedelje (`test-xp` čuva polja)
+
 ---
 
 ## Šta ostaje pred otvaranje

@@ -81,6 +81,13 @@ const prijava = poruke.find((m) => m.t === "login_ok");
 proveri("uz prijavu stize nivo i iskustvo", !!prijava?.vip && Number.isFinite(prijava.vip.nivo),
   JSON.stringify(prijava?.vip));
 proveri("uz prijavu stize i profil", !!prijava?.profil?.otkljucano, JSON.stringify(Object.keys(prijava?.profil || {})));
+// Profil crta ceo put kroz nivoe i igraceve igre - bez ovih polja bi launcher
+// ostao na staroj, dvostrukoj glavi.
+proveri("profil nosi ceo put kroz nivoe", Array.isArray(prijava?.profil?.nivoi) && prijava.profil.nivoi.length === 10
+  && prijava.profil.nivoi.every((n) => Number.isFinite(n.prag) && n.naziv), JSON.stringify(prijava?.profil?.nivoi?.[0]));
+proveri("uz nivo ide i sta otkljucava", prijava?.profil?.nivoi?.find((n) => n.nivo === 3)?.otkljucava === "boja");
+proveri("profil nosi najigranije igre", Array.isArray(prijava?.profil?.igre));
+proveri("profil nosi sate ove nedelje", Number.isFinite(prijava?.profil?.satiNedelja));
 
 poruke.length = 0;
 w.send(JSON.stringify({ t: "moj_profil", boja: "zlatna" }));

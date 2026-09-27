@@ -39,6 +39,7 @@ const ALATI = [
   { ime: "proba-nadogradnja-pin", args: [], opis: "servisni PIN preživljava nadogradnju launchera", sam: true },
   { ime: "proba-servisni-pin-server", args: [], opis: "servisni PIN se upisuje jednom u panelu i vazi na svim masinama, i bez servera", sam: true },
   { ime: "proba-veza", args: [], opis: "launcher preživljava otkucaj servera i sam se vraća", sam: true },
+  { ime: "pregled-profila", args: [], opis: "profil igrača: 3 nivoa x 2 rezolucije, staje bez skrola, izbor boje i okvira klikom", sam: true },
   { ime: "proba-povratak-veze", args: [], opis: "restart servera usred igre: bez novog pozdrava, korpa i ekran ostaju", sam: true },
   { ime: "proba-pokretanje-igre", args: [], opis: "klik na igru stiže do baze, izveštaja i logova", sam: true },
   { ime: "proba-pokretanje-van-kataloga", args: [], opis: "most odbija pokretanje van kataloga (cmd.exe, powershell)", sam: true },
