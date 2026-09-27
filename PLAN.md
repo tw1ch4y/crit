@@ -500,6 +500,20 @@ istorijom, 3 nivoa x 2 rezolucije, pa klik na boju i okvir).
 - [x] Server uz profil šalje ceo spisak nivoa, tri najigranije igre i sate ove
   nedelje (`test-xp` čuva polja)
 
+### Revizija 2.51 - meni naloga
+
+- [x] **Meni sa leve strane u Nalogu bio je golo ime preko šare** - iza teksta
+  se čitalo "CRIT", a donja polovina kolone je bila prazna. Sada je kartica
+  istog stila kao sadržaj, sa dve grupe ("Moj nalog", "Podešavanja")
+- [x] **Svaka stavka kaže stanje, ne samo ime**: "Nivo 3, Srebro", "1 se
+  sprema", "Spin te čeka!", "Još 300 RSD do spina", "Otključava se na nivou 2".
+  Ono što čeka igrača (piće, spin) je zlatno sa tačkom - vidi se bez klikanja
+- [x] Ikona u pločici, a aktivna stavka ima punu plavu pločicu i traku sa strane
+- [x] Na dnu menija: za kojim računarom igrač sedi i od kada igra - to osoblje
+  prvo pita kad igrač traži pomoć
+- [x] Staje na 1366x768; proveren na pravom launcheru (`pregled-profila`,
+  `proba-klikova`, `pregled-electron`)
+
 ---
 
 ## Šta ostaje pred otvaranje

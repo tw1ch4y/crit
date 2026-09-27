@@ -41,6 +41,8 @@ for (const [ime, kat] of [["Counter-Strike 2", "Pucačine"], ["Valorant", "Puca�
   await api("/api/games", "POST", { name: ime, path: "C:\\igre\\" + ime + ".exe", category: kat });
 }
 const pc = (await api("/api/computers"))[0];
+// Točak upaljen sa pragom 0 - u meniju Nalog mora da piše "Spin te čeka!".
+await api("/api/tocak", "POST", { ukljucen: true, prag: 0 });
 await api("/api/players", "POST", { username: "stefan", password: "stefan1234", displayName: "Stefan", balance: 1500 });
 const igrac = (await api("/api/players")).find((p) => p.username === "stefan");
 const igre = await api("/api/games");
@@ -57,6 +59,8 @@ const igre = await api("/api/games");
   const o = db.prepare("INSERT INTO orders (player_id, computer_id, total, status, payment, source, created_at) VALUES (?,?,?,?,?,?,?)");
   for (let i = 0; i < 17; i++) o.run(igrac.id, pc.id, 130, "delivered", "credit", "client", sad - i * D);
   db.prepare("UPDATE players SET created_at=? WHERE id=?").run(sad - 70 * D, igrac.id);
+  // Jedna porudžbina u pripremi - da se u meniju vidi istaknuto stanje.
+  o.run(igrac.id, pc.id, 250, "preparing", "credit", "client", sad - 60000);
   db.close();
 }
 

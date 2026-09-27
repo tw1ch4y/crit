@@ -521,6 +521,7 @@ function handleMsg(m) {
       // svakog prekida dobijao "Dobrodošao" usred meča i gubio korpu.
       const istaSesija = !!S.player && S.sesijaId != null && m.session?.id === S.sesijaId;
       S.sesijaId = m.session?.id ?? null;
+      S.sesijaOd = m.session?.startedAt || null;
       if (istaSesija) {
         S.player = m.player; S.balance = m.balance; S.remaining = m.remainingSeconds;
         if (m.vip) S.vip = m.vip;
@@ -1748,7 +1749,7 @@ function renderAccount() {
       </div>
     </div>
     <div class="acc-telo">
-      <nav class="acc-meni">${ACC_SEKCIJE.map(stavkaMenija).join("")}</nav>
+      ${meniNaloga()}
       <div class="acc-sadrzaj">${sadrzajSekcije()}</div>
     </div>
   </div>`;
@@ -1764,22 +1765,66 @@ function renderAccount() {
 // ima mesta koliko mu treba, a dodavanje novog ne kvari raspored.
 const ACC_SEKCIJE = [
   // Profil je prvi: nalog pocinje od toga KO si, pa tek onda od toga sta radis.
-  { kljuc: "profil", naziv: "Profil", ikona: "user" },
-  { kljuc: "porudzbine", naziv: "Porudžbine", ikona: "cup" },
-  { kljuc: "nagrade", naziv: "Nagrade", ikona: "gift" },
-  { kljuc: "podesavanja", naziv: "Miš i zvuk", ikona: "mis" },
-  { kljuc: "pozadina", naziv: "Pozadina", ikona: "image" },
-  { kljuc: "lozinka", naziv: "Lozinka", ikona: "key" },
+  { kljuc: "profil", naziv: "Profil", ikona: "user", grupa: "Moj nalog" },
+  { kljuc: "porudzbine", naziv: "Porudžbine", ikona: "cup", grupa: "Moj nalog" },
+  { kljuc: "nagrade", naziv: "Nagrade", ikona: "gift", grupa: "Moj nalog" },
+  { kljuc: "podesavanja", naziv: "Miš i zvuk", ikona: "mis", grupa: "Podešavanja" },
+  { kljuc: "pozadina", naziv: "Pozadina", ikona: "image", grupa: "Podešavanja" },
+  { kljuc: "lozinka", naziv: "Lozinka", ikona: "key", grupa: "Podešavanja" },
 ];
+
+// MENI KAŽE STANJE, NE SAMO IME.
+//
+// Stavke su ranije bile golo ime preko šare pozadine, a pola kolone je ostajalo
+// prazno. Igrač nije znao ni da li ga čeka spin ni da li mu piće stiže dok ne
+// uđe u odeljak. Sada svaka stavka u jednom redu kaže šta je unutra - tako se
+// i nalazi ono što je bitno, bez klikanja redom.
+function stanjeStavke(kljuc) {
+  const p = S.profil;
+  switch (kljuc) {
+    case "profil":
+      return p ? { tekst: `Nivo ${p.nivo}, ${p.naziv}` } : { tekst: "Nivo i napredak" };
+    case "porudzbine": {
+      const n = aktivnePorudzbine().length;
+      return n ? { tekst: `${n} ${n === 1 ? "se sprema" : "se spremaju"}`, vazno: true } : { tekst: "Nema aktivnih" };
+    }
+    case "nagrade": {
+      const t = S.tocak;
+      if (!t || !t.ukljucen) return { tekst: "Točak nije aktivan" };
+      if (t.moze) return { tekst: "Spin te čeka!", vazno: true };
+      if (t.sledeciSpin) return { tekst: "Sledeći spin uskoro" };
+      return { tekst: `Još ${money(Math.max(0, t.prag - t.potroseno))} do spina` };
+    }
+    case "podesavanja": return { tekst: "Brzina miša i jačina" };
+    case "pozadina": {
+      const o = (p?.otkljucano || []).find((x) => x.kljuc === "sara");
+      return o && !o.otkljucano ? { tekst: `Otključava se na nivou ${o.nivo}`, zakljucano: true } : { tekst: "Tvoja šara" };
+    }
+    case "lozinka": return { tekst: "Promena lozinke" };
+    default: return { tekst: "" };
+  }
+}
 function stavkaMenija(s) {
   const aktivna = (S.accSekcija || "profil") === s.kljuc;
+  const st = stanjeStavke(s.kljuc);
   // Broj aktivnih porudžbina stoji uz stavku: igrač koji čeka piće ne mora da
   // ulazi u odeljak da bi video da li je stiglo.
   const cek = s.kljuc === "porudzbine" ? aktivnePorudzbine().length : 0;
-  return `<button class="acc-mi ${aktivna ? "aktivna" : ""}" data-acc-sekcija="${s.kljuc}">
-    ${icon(s.ikona, 17)}<span>${s.naziv}</span>
-    ${cek ? `<i class="acc-mi-broj">${cek}</i>` : ""}
+  return `<button class="acc-mi ${aktivna ? "aktivna" : ""} ${st.vazno ? "vazno" : ""}" data-acc-sekcija="${s.kljuc}">
+    <span class="acc-mi-ik">${icon(s.ikona, 17)}</span>
+    <span class="acc-mi-t"><b>${s.naziv}</b><small>${st.zakljucano ? icon("brava", 11) : ""}${esc(st.tekst)}</small></span>
+    ${cek ? `<i class="acc-mi-broj">${cek}</i>` : st.vazno ? `<i class="acc-mi-tacka"></i>` : ""}
   </button>`;
+}
+function meniNaloga() {
+  const grupe = [...new Set(ACC_SEKCIJE.map((s) => s.grupa))];
+  const od = S.sesijaOd ? new Date(S.sesijaOd).toLocaleTimeString("sr-Latn-RS", { hour: "2-digit", minute: "2-digit" }) : null;
+  return `<nav class="acc-meni">
+    ${grupe.map((g) => `<div class="acc-grupa"><div class="acc-grupa-ime">${esc(g)}</div>
+      ${ACC_SEKCIJE.filter((s) => s.grupa === g).map(stavkaMenija).join("")}</div>`).join("")}
+    <div class="acc-meni-dno">${icon("gamepad", 15)}
+      <span><b>${esc(S.computer?.name || "Računar")}</b>${od ? `Igraš od ${od}` : "Prijavljen"}</span></div>
+  </nav>`;
 }
 const aktivnePorudzbine = () =>
   (S.porudzbine || []).filter((o) => o.status === "pending" || o.status === "preparing");

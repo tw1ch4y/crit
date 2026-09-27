@@ -87,9 +87,12 @@ proveri("slika precice prati velicinu logotipa", /\.site-card\.cover \.site-cove
 // ekranu. Sve se videlo odjednom, nista nije imalo prednost, strana je izgledala
 // pretrpano i rasla je sa svakom novom stvari. Sada je levo meni, desno jedan
 // odeljak.
-proveri("nalog ima meni i sadrzaj", /\.acc-telo \{[^}]*grid-template-columns: 216px minmax\(0, 1fr\)/.test(jedanRed));
+proveri("nalog ima meni i sadrzaj", /\.acc-telo \{[^}]*grid-template-columns: \d+px minmax\(0, 1fr\)/.test(jedanRed));
 proveri("meni ima svoje stavke", /\.acc-mi \{/.test(jedanRed));
-proveri("izabrana stavka se jasno vidi", /\.acc-mi\.aktivna \{[^}]*box-shadow: inset 2px 0 0 var\(--brend\)/.test(jedanRed),
+// Meni je kartica, ne tekst preko šare: iza golih stavki se čitalo "CRIT".
+proveri("meni je kartica sa pozadinom", /\.acc-meni \{[^}]*background: linear-gradient/.test(jedanRed));
+proveri("svaka stavka kaže i stanje, ne samo ime", /function stanjeStavke\(kljuc\)/.test(citajIzvor("client/renderer/js/launcher.js")));
+proveri("izabrana stavka se jasno vidi", /\.acc-mi\.aktivna \{[^}]*box-shadow: inset \dpx 0 0 var\(--brend\)/.test(jedanRed),
   "bez oznake igrac ne zna gde je");
 proveri("skroluje se SADRZAJ, ne cela strana", /\.acc-sadrzaj \{[^}]*overflow-y: auto/.test(jedanRed) && !/\.account \{[^}]*overflow-y: auto/.test(jedanRed),
   "kad skroluje cela strana, zaglavlje sa kreditom odlazi sa ekrana");
