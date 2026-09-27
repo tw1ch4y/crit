@@ -31,7 +31,7 @@ const danasnji = await api("/api/players/guests", "POST", { count: 2, balance: 0
 proveri("nalog otvoren danas se ne nudi za brisanje", (await spremniZa()).length === 0, JSON.stringify(await spremniZa()));
 
 // --- ostarimo ih rucno, kao da je proslo dva dana ---
-const dbPath = DATA + "\\crit.db";
+const dbPath = path.join(DATA, "crit.db");
 const ostari = (username) => {
   const d = new DatabaseSync(dbPath);
   d.prepare("UPDATE players SET created_at = created_at - ? WHERE username = ?").run(2 * 86400000, username);

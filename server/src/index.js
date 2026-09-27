@@ -171,6 +171,11 @@ setInterval(() => {
   try { svc.billingTick(); } catch (e) { console.error("billing:", e); }
 }, 5000);
 
+// ---- Rezervacije: oslobađanje propalih termina i podsetnik (30s) ----
+setInterval(() => {
+  try { svc.rezervacijeTick(); } catch (e) { console.error("rezervacije:", e.message); }
+}, 30 * 1000);
+
 // ---- Zaštita: WAL checkpoint (2 min) + backup baze (15 min + na startu) ----
 // Racunari se nadograde sami cim se oslobode - vidi nadogradnjaTick.
 setInterval(() => {

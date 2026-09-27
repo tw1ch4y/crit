@@ -26,7 +26,8 @@ const state = {
   nadogradnja: null,
   shift: null,
   reportPeriod: "today",
-  plPage: 1, plSearch: "", playersPage: null,
+  plPage: 1, plSearch: "", playersPage: null, plSort: "ime", plFilter: "svi",
+  rezDan: null, rezSpisak: [],
   lgPage: 1, lgSearch: "", logsPage: null,
 };
 
@@ -497,7 +498,7 @@ async function renderReports() {
       <div class="stat"><div class="k">Ukupan promet</div><div class="v money">${money(r.total || 0)}</div></div>
       <div class="stat"><div class="k">Vreme (sesije)</div><div class="v">${money(r.session || 0)}</div></div>
       <div class="stat"><div class="k">Shop</div><div class="v">${money(r.shop || 0)}</div>
-        <div class="stat-split">${icon("cash")} keš ${money(r.shopCash || 0)}, kredit ${money(r.shopCredit || 0)}</div></div>
+        <div class="stat-split">${icon("cash")}<span>keš ${money(r.shopCash || 0)}</span><span>kredit ${money(r.shopCredit || 0)}</span></div></div>
       <div class="stat"><div class="k">Dopune</div><div class="v">${money(r.topups || 0)}</div>
         ${r.poklonjeno ? `<div class="stat-split">${icon("gift")} poklonjeno ${money(r.poklonjeno)}</div>` : ""}</div>
       <div class="stat"><div class="k">Sesije</div><div class="v">${s.count || 0} <small>${fmtMinutes(s.minutes || 0)}</small></div></div>
@@ -583,7 +584,7 @@ function barChart(data) {
 }
 function fmtMinutes(m) {
   const h = Math.floor(m / 60), mm = Math.round(m % 60);
-  return h > 0 ? `${h}č ${mm}min` : `${mm}min`;
+  return h > 0 ? `${h} h ${mm} min` : `${mm} min`;
 }
 
 async function renderShifts() {
@@ -686,7 +687,7 @@ function connectWs() {
   ws.onmessage = (ev) => {
     let m; try { m = JSON.parse(ev.data); } catch { return; }
     if (m.t === "snapshot") { state.computers = m.computers; state.orders = m.orders; state.settings = m.settings; refreshView(["dashboard", "orders"]); updateCounts(); }
-    else if (m.t === "computers") { state.computers = m.computers; osveziIstice(); refreshView(["dashboard", "computers"]); }
+    else if (m.t === "computers") { state.computers = m.computers; osveziIstice(); updateCounts(); refreshView(["dashboard", "computers"]); }
     else if (m.t === "brend") primeniBrend(m.brend);
     else if (m.t === "orders") { state.orders = m.orders; refreshView(["orders", "dashboard"]); updateCounts(); }
     else if (m.t === "log") { state.logs.unshift(m.log); if (state.view === "logs") prependLog(m.log); }
@@ -707,6 +708,7 @@ function connectWs() {
         ding();
         osveziZalihe();
       }
+      else if (m.kind === "rezervacija") { toast(m.text, "error"); ding(); }
       else if (m.kind === "login") toast(m.text, "info");
     }
   };
@@ -716,6 +718,12 @@ function updateCounts() {
   const n = state.orders.filter((o) => o.status === "pending" || o.status === "preparing").length;
   const b = $("#ordersCount");
   b.textContent = n; b.classList.toggle("hidden", n === 0);
+  // Broj na "Rezervacije" = termini koji počinju u narednih sat vremena, a gost
+  // još nije stigao. To je ono na šta radnik treba da misli SADA.
+  const r = state.computers.filter((c) => c.rezervacija && c.rezervacija.status === "aktivna"
+    && c.rezervacija.pocetak - Date.now() < 3600000).length;
+  const rb = $("#rezCount");
+  if (rb) { rb.textContent = r; rb.classList.toggle("hidden", r === 0); }
 }
 function ding() {
   try {
@@ -754,7 +762,7 @@ function render() {
     clearTimeout(render._t);
     render._t = setTimeout(() => main.classList.remove("view-in"), 500);
   }
-  ({ dashboard: renderDashboard, players: renderPlayers, orders: renderOrders, pos: renderPos, shop: renderShop, games: renderGames, tools: renderTools, izgled: renderIzgled, computers: renderComputers, install: renderInstall, reports: renderReports, shifts: renderShifts, staff: renderStaff, logs: renderLogs, settings: renderSettings }[state.view] || renderDashboard)();
+  ({ dashboard: renderDashboard, players: renderPlayers, orders: renderOrders, pos: renderPos, rezervacije: renderRezervacije, shop: renderShop, games: renderGames, tools: renderTools, izgled: renderIzgled, computers: renderComputers, install: renderInstall, reports: renderReports, shifts: renderShifts, staff: renderStaff, logs: renderLogs, settings: renderSettings }[state.view] || renderDashboard)();
 }
 
 // Profil meni
@@ -1072,6 +1080,18 @@ function stationCard(c) {
     acts.push(`<button class="btn btn-sm icon" data-act="detail" data-id="${c.id}" title="Više opcija">${icon("more")}</button>`);
   }
 
+  // Termin koji čeka ovaj računar. Radnik koji posađuje gosta mora to da vidi
+  // NA kartici - inače posadi nekoga na mašinu koju za pola sata treba predati.
+  const rz = c.rezervacija;
+  let rezHtml = "";
+  if (rz) {
+    const uToku = rz.pocetak <= Date.now();
+    const tudji = c.player && (!rz.playerId || rz.playerId !== c.player.id) && rz.status === "aktivna";
+    rezHtml = `<button class="st-rez ${uToku ? "u-toku" : ""} ${tudji ? "sudar" : ""} ${rz.status}" data-act="rez" data-id="${c.id}"
+      title="${esc(`${rz.ime} ${clock(rz.pocetak)}-${clock(rz.kraj)}${tudji ? " - za računarom sedi neko drugi" : ""}`)}">
+      ${icon("calendar")}<span>${rz.status === "stigao" ? "Rezervacija u toku" : uToku ? "Rezervisan sada" : `Rezervisan ${clock(rz.pocetak)}`}</span><b>${esc(rz.ime)}</b></button>`;
+  }
+
   const sel = state.selection.has(c.id);
   return `<div class="station ${si.cls} ${sel ? "selected" : ""} ${istaknutRacunar === c.id ? "istaknut" : ""}" data-id="${c.id}">
     <div class="st-head">
@@ -1080,6 +1100,7 @@ function stationCard(c) {
       <span class="st-status ${si.cls}"><span class="d"></span>${si.label}</span>
     </div>
     <div class="st-body">${body}</div>
+    ${rezHtml}
     <div class="st-actions">${acts.join("")}</div></div>`;
 }
 
@@ -1182,6 +1203,17 @@ document.addEventListener("click", async (e) => {
     else if (act === "unlock") { await api(`/computers/${id}/unlock`, "POST"); toast("Računar je otključan", "success"); }
     else if (act === "wake") { await api(`/computers/${id}/wake`, "POST"); toast("Signal za paljenje je poslat", "success"); }
     else if (act === "detail") pcDetail(id);
+    else if (act === "rez") {
+      // Klik na oznaku rezervacije vodi na taj dan u Rezervacijama i otvara termin.
+      const rz = state.computers.find((x) => x.id === id)?.rezervacija;
+      if (!rz) return;
+      state.rezDan = ponoc(rz.pocetak);
+      state.view = "rezervacije";
+      $$(".nav-item").forEach((x) => x.classList.toggle("active", x.dataset.view === "rezervacije"));
+      state.selection.clear(); updateBulkBar();
+      await renderRezervacije();
+      rezervacijaDetalj(rz.id);
+    }
     else if (act === "dopuni") {
       const c = state.computers.find((x) => x.id === id);
       if (!c?.player) return toast("Za ovim računarom nema prijavljenog igrača", "error");
@@ -1401,6 +1433,10 @@ setInterval(() => {
 }, 1000);
 
 // Igrači
+const PL_FILTERI = { svi: "Svi", kredit: "Sa kreditom", stalni: "Stalni", gosti: "Gosti", blokirani: "Blokirani" };
+const PL_REDOSLED = { ime: "Po imenu", kredit: "Najviše kredita", nivo: "Najviši nivo", prijava: "Skoro dolazili", novi: "Najnoviji nalozi" };
+// Naslov kolone je i dugme za redosled - to je mesto gde ga svako prvo potraži.
+const plTh = (naziv, kljuc) => `<th class="th-sort ${state.plSort === kljuc ? "aktivan" : ""}" data-pls="${kljuc}" title="Poređaj: ${PL_REDOSLED[kljuc]}">${naziv}${state.plSort === kljuc ? " ↓" : ""}</th>`;
 async function renderPlayers() {
   $("#main").innerHTML = `
     <div class="page-head"><div><h1>Igrači</h1><div class="sub" id="plCount">učitavam...</div></div>
@@ -1409,12 +1445,24 @@ async function renderPlayers() {
         <button class="btn" id="addGuests">${icon("user")} Brzi gost</button>
         <button class="btn btn-primary" id="addPlayer">${icon("plus")} Novi nalog</button>
       </div></div>
-    <div class="toolbar hidden" id="plTraka"><div class="search">${icon("search")}<input id="playerSearch" placeholder="Pretraži igrače..." value="${esc(state.plSearch)}" /></div></div>
+    <div class="toolbar hidden" id="plTraka"><div class="search">${icon("search")}<input id="playerSearch" placeholder="Pretraži igrače..." value="${esc(state.plSearch)}" /></div>
+      <div class="filters" id="plFilteri">${Object.entries(PL_FILTERI).map(([k, v]) =>
+        `<button class="chip ${state.plFilter === k ? "active" : ""}" data-plf="${k}">${v}</button>`).join("")}</div>
+      <div class="spacer"></div>
+      <label class="pl-sort">${icon("sort")}<select id="plSort" aria-label="Redosled">${Object.entries(PL_REDOSLED).map(([k, v]) =>
+        `<option value="${k}" ${state.plSort === k ? "selected" : ""}>${v}</option>`).join("")}</select></label></div>
     <div class="card"><div class="table-wrap"><table>
-      <thead><tr><th>Korisnik</th><th>Nivo</th><th>Kredit</th><th>Status</th><th>Poslednja prijava</th><th></th></tr></thead>
+      <thead><tr>${plTh("Korisnik", "ime")}${plTh("Nivo", "nivo")}${plTh("Kredit", "kredit")}<th>Status</th>${plTh("Poslednja prijava", "prijava")}<th></th></tr></thead>
       <tbody id="playerRows"></tbody></table></div><div id="plPager"></div></div>`;
   $("#addPlayer").addEventListener("click", playerModal);
   $("#addGuests").addEventListener("click", guestsModal);
+  $$("[data-plf]").forEach((b) => b.addEventListener("click", () => {
+    state.plFilter = b.dataset.plf; state.plPage = 1;
+    $$("[data-plf]").forEach((x) => x.classList.toggle("active", x === b));
+    refreshPlayers();
+  }));
+  $("#plSort").addEventListener("change", (e) => { state.plSort = e.target.value; state.plPage = 1; renderPlayers(); });
+  $$("[data-pls]").forEach((th) => th.addEventListener("click", () => { state.plSort = th.dataset.pls; state.plPage = 1; renderPlayers(); }));
   osveziCiscenjeGostiju();
   let t;
   $("#playerSearch").addEventListener("input", (e) => {
@@ -1427,7 +1475,7 @@ async function renderPlayers() {
 async function refreshPlayers() {
   let d = { items: [], total: 0, page: 1, pages: 1, per: 25 };
   let pukla = false;
-  try { d = await api(`/players?page=${state.plPage}&per=25&search=${encodeURIComponent(state.plSearch)}`); }
+  try { d = await api(`/players?page=${state.plPage}&per=25&search=${encodeURIComponent(state.plSearch)}&sort=${state.plSort}&filter=${state.plFilter}`); }
   catch (e) { toast(e.message, "error"); pukla = !!e.veza; }
   // Kad podaci NISU stigli, spisak ne sme da kaze "jos nema naloga" - radnik bi
   // pomislio da nalog ne postoji i napravio isti jos jednom.
@@ -1451,20 +1499,32 @@ async function refreshPlayers() {
          vidi se odavde, bez otvaranja ijedne strane. */ ""}
     <td class="nivo-c"><span class="nivo-znak">${p.nivo || 1}</span><span class="faint">${esc(p.nivoNaziv || "")}</span></td>
     <td class="mono ${p.balance > 0 ? "pos" : "zero"}">${money(p.balance)}</td>
-    <td>${p.banned ? '<span class="pill red">Blokiran</span>' : '<span class="pill green">Aktivan</span>'}</td>
+    <td>${plStatus(p)}</td>
     <td class="mono faint">${p.lastLogin ? timeAgo(p.lastLogin) : "-"}</td>
     <td style="text-align:right;white-space:nowrap">
       <button class="btn btn-sm btn-primary" data-p="topup" data-id="${p.id}">${icon("wallet")} Dopuni</button>
       <button class="btn btn-sm" data-p="edit" data-id="${p.id}">${icon("more")}</button></td></tr>`).join("");
   const tb = $("#playerRows");
-  if (tb) tb.innerHTML = rows || (state.plSearch
+  if (tb) tb.innerHTML = rows || (state.plFilter !== "svi" && !state.plSearch
+    ? praznaTabela(5, "user", `Nema naloga u grupi „${PL_FILTERI[state.plFilter]}“`, "Izaberi „Svi“ gore da vidiš sve naloge.")
+    : state.plSearch
     ? praznaTabela(5, "search", "Nema rezultata za tu pretragu", `Ni jedan nalog se ne poklapa sa „${esc(state.plSearch)}“. Probaj deo imena ili korisničkog imena.`)
     : praznaTabela(5, "user", "Još nema naloga", "Nalog se pravi dugmetom gore desno. Igrač se tim imenom prijavljuje na svakom računaru."));
-  const c = $("#plCount"); if (c) c.textContent = `${d.total} ${oblik(d.total, "nalog", "naloga", "naloga")}`;
+  const c = $("#plCount");
+  if (c) c.innerHTML = `${d.total} ${oblik(d.total, "nalog", "naloga", "naloga")}${d.ukupnoKredita > 0
+    ? ` &middot; <span title="Kredit koji su gosti platili a još nisu potrošili">neiskorišćen kredit ${money(d.ukupnoKredita)}</span>` : ""}`;
   // Polje za pretragu nad praznim spiskom samo zbunjuje - nema sta da se trazi.
-  const tr = $("#plTraka"); if (tr) tr.classList.toggle("hidden", !d.total && !state.plSearch);
+  const tr = $("#plTraka"); if (tr) tr.classList.toggle("hidden", !d.total && !state.plSearch && state.plFilter === "svi");
   const pg = $("#plPager");
   if (pg) { pg.innerHTML = pagerHtml(d); bindPager(pg, d, (p) => { state.plPage = p; refreshPlayers(); }); }
+}
+// Ko je trenutno za računarom vidi se na spisku - radnik koji traži gosta da
+// mu dopuni kredit odmah zna i gde sedi.
+function plStatus(p) {
+  if (p.banned) return '<span class="pill red">Blokiran</span>';
+  const c = state.computers.find((x) => x.player && x.player.id === p.id);
+  if (c) return `<span class="pill blue">${icon("monitor")} ${esc(c.name)}</span>`;
+  return '<span class="pill gray">Nije tu</span>';
 }
 document.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-p]");
@@ -1895,6 +1955,295 @@ function mountPlayerCombo(root, players, onPick) {
     list.classList.remove("hidden");
     $$("[data-pick]", list).forEach((b) => b.addEventListener("click", () => onPick(players.find((p) => p.id === Number(b.dataset.pick)) || null)));
   });
+}
+
+// Rezervacije
+//
+// Telefon zvoni za kasom: "sutra u 18h, pet mašina". Strana je napravljena za
+// taj trenutak - dan se bira strelicama, a slobodno mesto na vremenskoj liniji
+// se klikne i odmah otvara upis sa tim računarom i tim satom. Ispod linije je
+// spisak termina, jer se sa linije ne vide telefon i napomena.
+const REZ_STATUS = {
+  aktivna: ["Čeka", "blue"],
+  stigao: ["Stigli", "green"],
+  otkazana: ["Otkazana", "gray"],
+  nije_dosao: ["Nisu došli", "amber"],
+};
+const ponoc = (ts = Date.now()) => { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); };
+const DAN_MS = 86400000;
+function danNaziv(ts) {
+  const d = Math.round((ponoc(ts) - ponoc()) / DAN_MS);
+  const datum = new Date(ts).toLocaleDateString("sr-Latn-RS", { weekday: "long", day: "numeric", month: "long" });
+  return d === 0 ? `Danas, ${datum}` : d === 1 ? `Sutra, ${datum}` : d === -1 ? `Juče, ${datum}` : datum.charAt(0).toUpperCase() + datum.slice(1);
+}
+const zaInputDatum = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+const zaInputVreme = (ts) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+const trajanjeTekst = (min) => { const h = Math.floor(min / 60), m = min % 60; return h ? `${h} h${m ? ` ${m} min` : ""}` : `${m} min`; };
+const zive = (r) => r.status === "aktivna" || r.status === "stigao";
+
+async function renderRezervacije() {
+  const dan = state.rezDan != null ? state.rezDan : (state.rezDan = ponoc());
+  let spisak = [];
+  try { spisak = await api(`/rezervacije?od=${dan}&do=${dan + DAN_MS}`); }
+  catch (e) { toast(e.message, "error"); }
+  if (state.view !== "rezervacije") return;
+  state.rezSpisak = spisak;
+
+  // Linija pokriva radno vreme, a širi se ako termin ili sadašnji trenutak
+  // ispadaju van njega - igraonica koja radi do 2 ujutru ne sme da dobije
+  // odsečen termin.
+  let od = 10, doSata = 24;
+  for (const r of spisak) {
+    od = Math.min(od, Math.max(0, Math.floor((r.pocetak - dan) / 3600000)));
+    doSata = Math.max(doSata, Math.min(30, Math.ceil((r.kraj - dan) / 3600000)));
+  }
+  const sad = Date.now();
+  const danas = ponoc() === dan;
+  if (danas) od = Math.min(od, new Date(sad).getHours());
+  const sati = doSata - od;
+  const poz = (ts) => ((ts - dan) / 3600000 - od) / sati * 100;
+
+  const zivih = spisak.filter(zive);
+  const redovi = state.computers.map((c) => {
+    const blokovi = spisak.filter((r) => r.computerId === c.id && zive(r)).map((r) => {
+      const l = Math.max(0, poz(r.pocetak)), w = Math.max(1.2, Math.min(100, poz(r.kraj)) - l);
+      const [lbl] = REZ_STATUS[r.status] || [r.status];
+      return `<button class="rez-blok ${r.status}" data-rez="${r.id}" style="left:${l}%;width:${w}%"
+        title="${esc(`${r.ime} - ${clock(r.pocetak)}-${clock(r.kraj)} (${lbl})${r.napomena ? "\n" + r.napomena : ""}`)}">
+        <b>${esc(r.ime)}</b><span>${clock(r.pocetak)}-${clock(r.kraj)}</span></button>`;
+    }).join("");
+    return `<div class="rez-red"><div class="rez-pc ${c.online ? "" : "off"}">${esc(c.name)}</div>
+      <div class="rez-traka" data-rez-pc="${c.id}">${blokovi}</div></div>`;
+  }).join("");
+  const oznake = Array.from({ length: sati + 1 }, (_, i) => {
+    const h = (od + i) % 24;
+    return `<span style="left:${(i / sati) * 100}%">${String(h).padStart(2, "0")}</span>`;
+  }).join("");
+  const linijaSad = danas ? `<div class="rez-sad" style="left:${poz(sad)}%"></div>` : "";
+
+  // Spisak: grupa ide u jedan red, jer je to jedan poziv telefonom i jedan gost.
+  const grupe = new Map();
+  for (const r of spisak) {
+    const k = r.grupa || `r${r.id}`;
+    if (!grupe.has(k)) grupe.set(k, []);
+    grupe.get(k).push(r);
+  }
+  const redoviSpiska = [...grupe.values()].map((g) => {
+    const r = g[0];
+    const [lbl, boja] = REZ_STATUS[r.status] || [r.status, "gray"];
+    const uskoro = r.status === "aktivna" && r.pocetak - sad < 30 * 60000 && r.kraj > sad;
+    return `<tr class="${zive(r) ? "" : "rez-gotova"}">
+      <td class="mono" style="white-space:nowrap"><b>${clock(r.pocetak)}</b><span class="faint"> - ${clock(r.kraj)}</span></td>
+      <td><b>${esc(r.ime)}</b>${r.username ? ` <span class="faint">@${esc(r.username)}</span>` : ""}
+        ${r.napomena ? `<div class="faint" style="font-size:12px">${esc(r.napomena)}</div>` : ""}</td>
+      <td>${g.map((x) => `<span class="rez-pc-oznaka">${esc(x.computerName || "?")}</span>`).join("")}</td>
+      <td class="mono faint">${esc(r.telefon || "-")}</td>
+      <td><span class="pill ${boja} ${uskoro ? "pulse" : ""}">${uskoro ? "Uskoro" : lbl}</span></td>
+      <td style="text-align:right;white-space:nowrap">
+        ${r.status === "aktivna" ? `<button class="btn btn-sm" data-rez-stigli="${r.id}" data-grupa="${g.length > 1 ? 1 : ""}">${icon("check")} Stigli</button>` : ""}
+        ${zive(r) ? `<button class="btn btn-sm icon" data-rez-izmeni="${r.id}" title="Izmeni">${icon("edit")}</button>
+          <button class="btn btn-sm icon btn-danger" data-rez-otkazi="${r.id}" data-grupa="${g.length > 1 ? 1 : ""}" title="Otkaži">${icon("x")}</button>` : ""}
+      </td></tr>`;
+  }).join("");
+
+  $("#main").innerHTML = `
+    <div class="page-head"><div><h1>Rezervacije</h1>
+      <div class="sub">${zivih.length ? `${zivih.length} ${oblik(zivih.length, "rezervisan računar", "rezervisana računara", "rezervisanih računara")} ovog dana` : "Nema rezervacija za ovaj dan"}</div></div>
+      <div class="head-actions">
+        <div class="rez-dan">
+          <button class="btn icon" id="rezPre" title="Prethodni dan">${icon("chevLeft")}</button>
+          <label class="rez-dan-naziv">${icon("calendar")}<span>${esc(danNaziv(dan))}</span>
+            <input type="date" id="rezDatum" value="${zaInputDatum(dan)}" aria-label="Izaberi dan" /></label>
+          <button class="btn icon" id="rezPosle" title="Sledeći dan">${icon("chevRight")}</button>
+          ${danas ? "" : `<button class="btn" id="rezDanas">Danas</button>`}
+        </div>
+        <button class="btn btn-primary" id="rezNova">${icon("plus")} Nova rezervacija</button>
+      </div></div>
+    <div class="card rez-linija">
+      <div class="card-head"><h2>Raspored po računarima</h2><span class="faint" style="font-size:12.5px">Klikni prazno mesto da upišeš termin</span></div>
+      <div class="rez-okvir">
+        <div class="rez-red rez-sati"><div class="rez-pc"></div><div class="rez-traka">${oznake}</div></div>
+        <div class="rez-telo">${redovi}<div class="rez-mreza" style="--sati:${sati}">${linijaSad}</div></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px"><div class="card-head"><h2>Termini</h2></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Vreme</th><th>Na koga glasi</th><th>Računari</th><th>Telefon</th><th>Status</th><th></th></tr></thead>
+        <tbody>${redoviSpiska || praznaTabela(6, "calendar", "Nema rezervacija za ovaj dan",
+          "Kad grupa javi da dolazi, upiši termin ovde. Računari se čuvaju 15 minuta pre početka, a ako niko ne dođe, sami se oslobađaju posle 20 minuta.")}</tbody>
+      </table></div></div>`;
+
+  const idiNa = (ts) => { state.rezDan = ponoc(ts); renderRezervacije(); };
+  $("#rezPre").addEventListener("click", () => idiNa(dan - DAN_MS / 2));
+  $("#rezPosle").addEventListener("click", () => idiNa(dan + DAN_MS * 1.5));
+  $("#rezDanas")?.addEventListener("click", () => idiNa(Date.now()));
+  $("#rezDatum").addEventListener("change", (e) => { if (e.target.value) idiNa(new Date(e.target.value + "T12:00").getTime()); });
+  $("#rezNova").addEventListener("click", () => rezervacijaModal({ dan }));
+  $$("[data-rez-pc]").forEach((t) => t.addEventListener("click", (e) => {
+    if (e.target.closest("[data-rez]")) return;
+    const b = t.getBoundingClientRect();
+    const sat = od + ((e.clientX - b.left) / b.width) * sati;
+    // Zaokruži na pola sata - niko ne rezerviše u 17:43.
+    let pocetak = dan + Math.round(sat * 2) / 2 * 3600000;
+    if (pocetak < Date.now()) pocetak = Math.ceil(Date.now() / 900000) * 900000;
+    rezervacijaModal({ dan, pocetak, racunari: [Number(t.dataset.rezPc)] });
+  }));
+  $$("[data-rez]").forEach((b) => b.addEventListener("click", () => rezervacijaDetalj(Number(b.dataset.rez))));
+}
+
+document.addEventListener("click", async (e) => {
+  const st = e.target.closest("[data-rez-stigli]");
+  const ot = e.target.closest("[data-rez-otkazi]");
+  const iz = e.target.closest("[data-rez-izmeni]");
+  if (st) rezAkcija("stigli", Number(st.dataset.rezStigli), !!st.dataset.grupa, st);
+  else if (ot) rezAkcija("otkazi", Number(ot.dataset.rezOtkazi), !!ot.dataset.grupa, ot);
+  else if (iz) {
+    const r = (state.rezSpisak || []).find((x) => x.id === Number(iz.dataset.rezIzmeni));
+    if (r) rezervacijaModal({ izmena: r });
+  }
+});
+
+async function rezAkcija(sta, id, grupa, btn) {
+  const r = (state.rezSpisak || []).find((x) => x.id === id);
+  if (sta === "otkazi") {
+    const ok = await confirmDialog(
+      r ? `Rezervacija "${r.ime}" (${clock(r.pocetak)}-${clock(r.kraj)}) biće otkazana${grupa ? " za sve računare iz grupe" : ""}. Računari postaju slobodni za druge.` : "Rezervacija će biti otkazana.",
+      { title: "Otkazivanje rezervacije", ok: "Otkaži rezervaciju", danger: true });
+    if (!ok) return false;
+  }
+  try {
+    const res = await jednomKlik(btn, () => api(`/rezervacije/${id}/${sta}`, "POST", { grupa }), "...");
+    if (!res) return false;
+    toast(sta === "stigli" ? `Označeno da su stigli${res.broj > 1 ? ` (${res.broj} računara)` : ""} - računari su otvoreni za prijavu` : "Rezervacija je otkazana", "success");
+    if (state.view === "rezervacije") renderRezervacije();
+    return true;
+  } catch (err) { toast(err.message, "error"); return false; }
+}
+
+function rezervacijaDetalj(id) {
+  const r = (state.rezSpisak || []).find((x) => x.id === id);
+  if (!r) return;
+  const grupa = r.grupa ? state.rezSpisak.filter((x) => x.grupa === r.grupa && zive(x)) : [r];
+  const [lbl, boja] = REZ_STATUS[r.status] || [r.status, "gray"];
+  const kv = (k, v) => `<div class="kv-red"><span class="muted">${k}</span><span>${v}</span></div>`;
+  modal(`Rezervacija - ${r.ime}`, `
+    ${kv("Status", `<span class="pill ${boja}">${lbl}</span>`)}
+    ${kv("Termin", `<b>${clock(r.pocetak)} - ${clock(r.kraj)}</b> <span class="faint">(${trajanjeTekst(Math.round((r.kraj - r.pocetak) / 60000))})</span>`)}
+    ${kv("Računari", grupa.map((x) => `<span class="rez-pc-oznaka">${esc(x.computerName)}</span>`).join(""))}
+    ${r.username ? kv("Nalog", `@${esc(r.username)} <span class="faint">- prijavljuje se sam</span>`) : ""}
+    ${r.telefon ? kv("Telefon", `<span class="mono">${esc(r.telefon)}</span>`) : ""}
+    ${r.napomena ? kv("Napomena", esc(r.napomena)) : ""}
+    ${kv("Upisao", esc(r.kreirao || "-"))}
+    <div class="modal-dugmad">
+      ${r.status === "aktivna" ? `<button class="btn btn-primary" id="rdStigli">${icon("check")} Stigli${grupa.length > 1 ? ` (${grupa.length})` : ""}</button>` : ""}
+      <button class="btn" id="rdIzmeni">${icon("edit")} Izmeni</button>
+      <button class="btn btn-danger" id="rdOtkazi">${icon("x")} Otkaži${grupa.length > 1 ? " sve" : ""}</button>
+    </div>`, (root, close) => {
+    $("#rdStigli", root)?.addEventListener("click", async (e) => { if (await rezAkcija("stigli", r.id, grupa.length > 1, e.currentTarget)) close(); });
+    $("#rdOtkazi", root).addEventListener("click", async (e) => { if (await rezAkcija("otkazi", r.id, grupa.length > 1, e.currentTarget)) close(); });
+    $("#rdIzmeni", root).addEventListener("click", () => { close(); setTimeout(() => rezervacijaModal({ izmena: r }), 180); });
+  });
+}
+
+// Upis i izmena. Računari se biraju pločicama, a oni koji su u izabranom
+// terminu već zauzeti tuđom rezervacijom se sive odmah dok radnik kuca vreme -
+// da ne sazna tek posle klika na "Sačuvaj".
+function rezervacijaModal({ dan, pocetak, racunari = [], izmena = null } = {}) {
+  const sada = Date.now();
+  const p0 = izmena ? izmena.pocetak : pocetak || Math.max(ponoc(dan ?? sada) + 18 * 3600000, Math.ceil(sada / 1800000) * 1800000);
+  const t0 = izmena ? Math.round((izmena.kraj - izmena.pocetak) / 60000) : 120;
+  const izabrani = new Set(izmena ? [izmena.computerId] : racunari);
+  let igrac = null;
+  const pc = (c) => `<button type="button" class="rez-izbor ${izabrani.has(c.id) ? "on" : ""}" data-rez-izbor="${c.id}" ${izmena ? "disabled" : ""}>${esc(c.name)}</button>`;
+  modal(izmena ? "Izmena rezervacije" : "Nova rezervacija", `
+    <div class="form-row">
+      <div class="field"><label>Na koga glasi</label><input id="rmIme" maxlength="60" placeholder="npr. Marko + drugari" value="${esc(izmena?.ime || "")}" /></div>
+      <div class="field"><label>Telefon <span class="faint">(nije obavezno)</span></label><input id="rmTel" maxlength="30" placeholder="06x ..." value="${esc(izmena?.telefon || "")}" /></div>
+    </div>
+    ${izmena ? "" : `<div class="field" style="margin-top:12px"><label>Nalog igrača <span class="faint">(nije obavezno - ako ga ima, prijavljuje se sam bez osoblja)</span></label><div id="rmIgrac">${playerComboHtml(null)}</div></div>`}
+    <div class="form-row rez-vreme" style="margin-top:12px">
+      <div class="field"><label>Dan</label><input id="rmDan" type="date" value="${zaInputDatum(p0)}" /></div>
+      <div class="field"><label>Od</label><input id="rmOd" type="time" step="900" value="${zaInputVreme(p0)}" /></div>
+    </div>
+    <div class="field" style="margin-top:12px"><label>Trajanje</label>
+      <div class="rez-trajanja">${[60, 90, 120, 180, 240, 300].map((m) => `<button type="button" class="chip ${m === t0 ? "active" : ""}" data-traj="${m}">${trajanjeTekst(m)}</button>`).join("")}
+        <input id="rmTraj" type="number" min="15" max="720" step="15" value="${t0}" title="Trajanje u minutima" /><span class="faint">min</span></div>
+      <div class="faint" id="rmKraj" style="font-size:12.5px;margin-top:6px"></div>
+    </div>
+    <div class="field" style="margin-top:12px"><label>Računari ${izmena ? "" : `<span class="faint" id="rmBroj"></span>`}</label>
+      <div class="rez-izbori">${state.computers.map(pc).join("")}</div>
+      ${izmena ? `<div class="faint" style="font-size:12px;margin-top:6px">Računar se ne menja - za drugi računar otkaži ovu i upiši novu.</div>` : ""}
+    </div>
+    <div class="field" style="margin-top:12px"><label>Napomena</label><input id="rmNap" maxlength="200" placeholder="npr. rođendan, platili unapred 1000" value="${esc(izmena?.napomena || "")}" /></div>
+    <div class="err-msg" id="rmErr"></div>
+    <button class="btn btn-primary btn-block" id="rmSacuvaj" style="margin-top:6px">${izmena ? "Sačuvaj izmene" : "Rezerviši"}</button>`,
+    async (root, close) => {
+      let tudje = [];
+      const ucitajDan = async () => {
+        const d = new Date($("#rmDan", root).value + "T00:00").getTime();
+        try { tudje = await api(`/rezervacije?od=${d - DAN_MS}&do=${d + 2 * DAN_MS}`); } catch { tudje = []; }
+        osvezi();
+      };
+      const pocetakIzForme = () => new Date(`${$("#rmDan", root).value}T${$("#rmOd", root).value || "00:00"}`).getTime();
+      const osvezi = () => {
+        const p = pocetakIzForme(), t = Number($("#rmTraj", root).value) || 0, k = p + t * 60000;
+        $("#rmKraj", root).textContent = Number.isFinite(p) && t ? `Do ${clock(k)}${ponoc(k) !== ponoc(p) ? " (sledećeg dana)" : ""}` : "";
+        $$("[data-traj]", root).forEach((b) => b.classList.toggle("active", Number(b.dataset.traj) === t));
+        $$("[data-rez-izbor]", root).forEach((b) => {
+          const id = Number(b.dataset.rezIzbor);
+          const sudar = tudje.find((r) => r.computerId === id && zive(r) && r.id !== izmena?.id && r.pocetak < k && r.kraj > p);
+          b.classList.toggle("zauzet", !!sudar);
+          b.title = sudar ? `Zauzet: ${sudar.ime} ${clock(sudar.pocetak)}-${clock(sudar.kraj)}` : "";
+          if (sudar && !izmena) { izabrani.delete(id); b.classList.remove("on"); }
+        });
+        const n = $("#rmBroj", root);
+        if (n) n.textContent = izabrani.size ? `- izabrano ${izabrani.size}` : "";
+      };
+      if (!izmena) {
+        const mountIgrac = () => {
+          const el = $("#rmIgrac", root);
+          el.innerHTML = playerComboHtml(igrac);
+          mountPlayerCombo(el, state.players, (p) => {
+            igrac = p;
+            if (p && !$("#rmIme", root).value.trim()) $("#rmIme", root).value = p.displayName || p.username;
+            mountIgrac();
+          });
+        };
+        mountIgrac();
+      }
+      $$("[data-rez-izbor]", root).forEach((b) => b.addEventListener("click", () => {
+        if (b.classList.contains("zauzet")) return toast(b.title, "error");
+        const id = Number(b.dataset.rezIzbor);
+        if (izabrani.has(id)) izabrani.delete(id); else izabrani.add(id);
+        b.classList.toggle("on", izabrani.has(id));
+        osvezi();
+      }));
+      $$("[data-traj]", root).forEach((b) => b.addEventListener("click", () => { $("#rmTraj", root).value = b.dataset.traj; osvezi(); }));
+      $("#rmTraj", root).addEventListener("input", osvezi);
+      $("#rmOd", root).addEventListener("input", osvezi);
+      $("#rmDan", root).addEventListener("change", ucitajDan);
+      $("#rmSacuvaj", root).addEventListener("click", (ev) => jednomKlik(ev.currentTarget, async () => {
+        const telo = {
+          ime: $("#rmIme", root).value, telefon: $("#rmTel", root).value, napomena: $("#rmNap", root).value,
+          pocetak: pocetakIzForme(), trajanjeMin: Number($("#rmTraj", root).value),
+        };
+        try {
+          if (izmena) {
+            await api(`/rezervacije/${izmena.id}`, "PUT", telo);
+            toast("Rezervacija je izmenjena", "success");
+          } else {
+            if (!izabrani.size) throw new Error("Izaberi bar jedan računar");
+            const r = await api("/rezervacije", "POST", { ...telo, computerIds: [...izabrani], playerId: igrac?.id || null });
+            toast(`Rezervisano: ${r.racunari.join(", ")} - ${clock(r.pocetak)}`, "success");
+          }
+          state.rezDan = ponoc(telo.pocetak);
+          close();
+          if (state.view === "rezervacije") renderRezervacije();
+        } catch (e) { $("#rmErr", root).textContent = e.message; }
+      }, "Čuvam..."));
+      await ucitajDan();
+      if (!izmena && !$("#rmIme", root).value) $("#rmIme", root).focus();
+    }, true);
 }
 
 // Kasa (pos)

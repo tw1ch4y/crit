@@ -69,7 +69,7 @@
 ### Faza 5 - Dodatni meniji i opcije u panelu *(izabrano)*
 - [x] **Izveštaji i statistika** - grafikon prometa (po satu/danu), KPI (promet/sesije/shop/dopune), najaktivniji igrači, zarada po računaru, period Danas/7/30 dana
 - [x] **Smene i pazar** - tabela `shifts`, logovi (NOVAC/SHOP) vezani za `shift_id`, obavezni modal "Otvaranje smene" za radnika, zatvaranje sa obračunom prometa i usklađivanjem kase (razlika višak/manjak)
-- [ ] **Rezervacije računara** - JEDINA veća funkcija koja nije urađena. Nije potrebna za otvaranje; radi se kad se ukaže potreba
+- [x] **Rezervacije računara** - vremenska linija po računarima, grupa odjednom, zaštita prijave 15 min pre termina, "Stigli" za goste bez naloga, samooslobađanje posle 20 min, poruka onome ko sedi za računarom (ne izbacuje se). Detalji u *Reviziji 2.47* ispod
 - [x] **Vremenski paketi** - ipak urađeni: unapred plaćeno vreme jeftinije od cene na sat (fabrički 5h za 500), prodaju se jednim klikom pri dopuni kredita
 
 ### Faza 6 - Launcher (program za igrače) - UI polish
@@ -335,6 +335,40 @@ igraonicu". Prvo sve mora da radi kako treba; licence dolaze posle.
 - [x] **Instalacija po korisniku** (`perMachine: false`) - bez toga bi nadogradnja stigla do mašine pa čekala UAC prozor koji za kasom niko neće odobriti, a razlog se ne bi video ni u jednoj poruci. Launcheru administrator ionako nije trebao: politike piše u `HKCU`, `powercfg` menja korisnikov plan, autostart je prečica u njegovom `Startup` folderu. `Program Files` je čuvao samo sam fajl launchera - a igrač koji ume da pokrene svoj program pod svojim nalogom i danas može da ugasi launcher i obriše prečicu, pa kiosk pada i bez toga; prava brana je spisak dozvoljenog za pokretanje. Traži **jedan poslednji ručni obilazak** svih 13 mašina (deinstalacija stare, pa instalacija sa naloga igrača), postupak u DEPLOY.md §5.1
 - [ ] **Program Files uz zakazani zadatak** - *sledeće na redu, kad bude sertifikata*. Vraća launcher u `Program Files` a nadogradnju i dalje pušta samu: instaler pri postavljanju napravi zakazani zadatak sa punim pravima i zapiše adresu servera tamo gde igrač ne može da piše. Ne radi se sada jer se NSIS skripta, ACL-ovi i `schtasks` **ne mogu isprobati sa razvojnog računara** (ovde se ništa ne instalira), a neisprobana instalaciona skripta na 13 mašina je veći rizik od onoga što rešava. Sertifikat za potpisivanje koda treba nabaviti ionako, zbog SmartScreen upozorenja pred prodaju
 
+### Revizija 2.47 - rezervacije i dorada panela
+
+- [x] **REZERVACIJE RAČUNARA** (`server/src/rezervacije.js`, strana *Rezervacije*).
+  Dosad je termin stajao na papiru pored kase: radnik iz druge smene ga nije
+  video, gost koji sedne pola sata ranije igrao je preko tuđeg termina, i niko
+  nije podsećao kad termin dođe.
+  - Jedan red = jedan računar; grupa se upisuje **cela ili nikako** (pola grupe
+    na rezervaciji je gore od nijedne, jer radnik veruje da je sve upisano)
+  - Dva termina se na istom računaru ne preklapaju - i pri izmeni
+  - Od 15 min pre početka za računar se ne prijavljuje niko drugi. Rezervacija
+    na nalog: taj igrač ulazi sam i time potvrđuje dolazak. Na ime (gost bez
+    naloga): računar se otvara kad osoblje klikne **Stigli** (važi za celu grupu)
+  - Ko ne dođe za 20 min, termin se sam oslobađa i to ide u Logove
+  - Ko već sedi za računarom **ne izbacuje se** - program ne sme sam da prekine
+    plaćeno vreme. 10 min pre termina dobija poruku na ekranu, osoblje zvuk i
+    obaveštenje, a oznaka na kartici računara pocrveni
+  - Radnik sme da upisuje koliko i vlasnik: telefon zvoni za kasom
+  - Provera: `test-rezervacije.mjs` (38 tvrdnji, prava WebSocket prijava)
+- [x] **Bočni meni se sekao na 1440x900** - kompaktni raspored se palio tek ispod
+  860px visine, pa su na čestom laptopu "Podešavanja" bila ispod dugmeta za
+  smenu. Prag je sada 980px, a meni se skroluje umesto da se preliva
+- [x] **Igrači: redosled i filteri** - Svi / Sa kreditom / Stalni / Gosti /
+  Blokirani, i redosled po imenu, kreditu, nivou, poslednjem dolasku ili
+  najnovijem nalogu (i klikom na naslov kolone). Uz broj naloga stoji
+  **neiskorišćen kredit** - koliko su gosti platili a nisu odigrali. Kolona
+  *Status* pokazuje za kojim računarom igrač trenutno sedi. Nepoznata vrednost
+  filtera/redosleda ne ulazi u SQL (`test-igraci-spisak.mjs`)
+- [x] **Izveštaji: "keš ... kredit ..." je izlazio iz kartice** Shop čim iznos
+  pređe četiri cifre - sada se prelama u dva reda
+- [x] **Ugašeni računari na tabli** zauzimali su isto mesto kao zauzeti - pri
+  zatvorenoj igraonici ekran i po praznih kartica; sada su niži
+- [x] `test-ciscenje-gostiju.mjs` je gradio putanju baze sa `\\`, pa je van
+  Windows-a padao pre prve provere
+
 ---
 
 ## Šta ostaje pred otvaranje
@@ -348,8 +382,7 @@ ostalo je pokriveno testovima (`testovi/README.md`).
   ali ne i kako izgleda na staklu u ruci.
 - **UPS na server i mrežnu opremu** (preporuka, nije softver).
 
-Nije urađeno namerno, sa razlogom zapisanim uz svaku stavku: rezervacije
-računara (Faza 5), gašenje bloatware-a i odlaganje Windows Update-a (DEPLOY.md
+Nije urađeno namerno, sa razlogom zapisanim uz svaku stavku: gašenje bloatware-a i odlaganje Windows Update-a (DEPLOY.md
 §3.2), profili optimizacije po igri.
 
 ## Napomene

@@ -6,6 +6,7 @@ import fs from "node:fs";
 import { verifyPassword, issueAdminToken, revokeAdminToken, requireAdmin, requireOwner, requireServiser } from "./auth.js";
 import * as nadg from "./nadogradnja.js";
 import * as svc from "./service.js";
+import * as rez from "./rezervacije.js";
 
 export const router = express.Router();
 
@@ -119,6 +120,43 @@ router.get("/snapshot", (req, res) => {
 
 router.get("/zalihe", (req, res) => res.json(svc.zaliheNaIzmaku()));
 
+// ---------- REZERVACIJE ----------
+// Radnik ih pravi koliko i vlasnik: telefon zvoni za kasom, ne u kancelariji.
+const vremeRez = (ts) => new Date(ts).toLocaleString("sr-Latn-RS", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+router.get("/rezervacije", (req, res) => res.json(rez.lista({ od: req.query.od, do: req.query.do })));
+router.post("/rezervacije", (req, res) => {
+  const r = rez.kreiraj(req.body || {}, req.admin.username);
+  if (r.error) return res.status(400).json(r);
+  svc.logEvent({ category: "racunar", action: "rez_nova", actor: req.admin.username, target: r.racunari.join(", "),
+    detail: `Rezervacija "${r.ime}" ${vremeRez(r.pocetak)} - ${Math.round((r.kraj - r.pocetak) / 60000)} min` });
+  svc.pushRacunare();
+  res.json(r);
+});
+router.put("/rezervacije/:id", (req, res) => {
+  const r = rez.izmeni(Number(req.params.id), req.body || {});
+  if (r.error) return res.status(400).json(r);
+  svc.logEvent({ category: "racunar", action: "rez_izmena", actor: req.admin.username, target: r.rezervacija.computerName,
+    detail: `Izmenjena rezervacija "${r.rezervacija.ime}" - sada ${vremeRez(r.rezervacija.pocetak)}` });
+  svc.pushRacunare();
+  res.json(r);
+});
+router.post("/rezervacije/:id/otkazi", (req, res) => {
+  const r = rez.otkazi(Number(req.params.id), !!req.body?.grupa);
+  if (r.error) return res.status(400).json(r);
+  svc.logEvent({ category: "racunar", action: "rez_otkazana", actor: req.admin.username, target: r.rezervacija.computerName,
+    detail: `Otkazana rezervacija "${r.rezervacija.ime}"${r.broj > 1 ? ` (${r.broj} računara)` : ""}` });
+  svc.pushRacunare();
+  res.json(r);
+});
+router.post("/rezervacije/:id/stigli", (req, res) => {
+  const r = rez.stigli(Number(req.params.id), !!req.body?.grupa);
+  if (r.error) return res.status(400).json(r);
+  svc.logEvent({ category: "racunar", action: "rez_stigao", actor: req.admin.username, target: r.rezervacija.computerName,
+    detail: `Stigli na rezervaciju "${r.rezervacija.ime}"${r.broj > 1 ? ` (${r.broj} računara)` : ""}` });
+  svc.pushRacunare();
+  res.json(r);
+});
+
 // ---------- POZADINE EKRANA U LAUNCHERU ----------
 router.get("/pozadine", requireOwner, (req, res) => res.json({ spisak: svc.POZADINE, slike: svc.pozadineObj() }));
 router.post("/pozadine/:kljuc", requireOwner, (req, res) => {
@@ -207,7 +245,7 @@ router.post("/shifts/:id/napomena", requireOwner, (req, res) => {
 // Bez ?page vraća ceo niz (koristi POS/kasa za izbor igrača); sa ?page vraća stranicu.
 router.get("/players", (req, res) => {
   if (req.query.page) {
-    return res.json(svc.playersPage({ page: req.query.page, per: req.query.per, search: req.query.search }));
+    return res.json(svc.playersPage({ page: req.query.page, per: req.query.per, search: req.query.search, sort: req.query.sort, filter: req.query.filter }));
   }
   res.json(svc.playersSnapshot());
 });

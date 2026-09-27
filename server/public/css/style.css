@@ -181,7 +181,7 @@ label.lbl, .field label { display: block; font-size: 12px; color: var(--text-2);
 .side-logo-img { width: 92px; max-width: 100%; height: auto; display: block; }
 .topbar .side-logo-img { width: 74px; }
 
-.nav { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+.nav { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; margin: 0 -4px; padding: 0 4px; flex: 0 1 auto; min-height: 0; }
 .nav-sec {
   font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--text-3); padding: 16px 12px 6px; user-select: none;
@@ -207,7 +207,10 @@ label.lbl, .field label { display: block; font-size: 12px; color: var(--text-2);
    se do "Radnika" i "Podešavanja" stizalo samo skrolovanjem bocne trake, a to
    se ne primeti dok se ne potrazi. Na niskim ekranima naslovi grupa postaju
    tanka crta: podela ostaje, imena stavki se ne smanjuju. */
-@media (max-height: 860px) {
+/* Prag je 980px, ne 860: na čestom laptopu 1440x900 (i na 1920x1080 sa
+   trakom zadataka i trakom pregledača, gde ostane ~950px) "Podešavanja" su
+   ispadala ispod dugmeta za smenu i videla se samo polovina "Radnika". */
+@media (max-height: 980px) {
   .sidebar { padding-top: 10px; }
   .side-logo { padding: 0 10px 10px; }
   .side-logo-img { width: 68px; }
@@ -317,7 +320,10 @@ label.lbl, .field label { display: block; font-size: 12px; color: var(--text-2);
 .stat .v.online { color: var(--online); }
 .stat .v.money { color: var(--text); }
 /* Keš/kredit podela ispod Shop prometa - vlasnik odmah vidi koliko je u kasi. */
-.stat-split { display: flex; align-items: center; gap: 6px; margin-top: 7px; font-size: 12px; color: var(--text-3); white-space: nowrap; }
+/* Keš i kredit idu kao dva dela koja smeju u drugi red. U jednom redu bez
+   prelamanja tekst je izlazio iz kartice čim iznos pređe četiri cifre. */
+.stat-split { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 8px; margin-top: 7px; font-size: 12px; color: var(--text-3); }
+.stat-split span { white-space: nowrap; }
 .stat-split svg { width: 13px; height: 13px; color: var(--text-3); flex-shrink: 0; }
 .stat-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
 
@@ -358,6 +364,11 @@ label.lbl, .field label { display: block; font-size: 12px; color: var(--text-2);
 .station.standby::before { background: var(--standby); }
 .station.locked::before { background: var(--locked); }
 .station.offline { opacity: 0.55; }
+/* Ugašen računar nema šta da pokaže osim imena i dugmeta, a zauzimao je isto
+   mesto kao onaj za kojim se igra - pri zatvorenoj igraonici tabla je bila
+   ekran i po praznih kartica. */
+.station.offline .st-body { min-height: 0; padding-bottom: 4px; }
+.station.offline .st-actions { margin-top: 6px; padding-top: 8px; padding-bottom: 10px; }
 .station.offline:hover { opacity: 0.85; }
 .station.offline .st-name { color: var(--text-2); }
 .station.selected {
@@ -453,6 +464,14 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .search { position: relative; flex: 1; min-width: 200px; max-width: 340px; }
 .search input { padding-left: 35px; }
 .search svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--text-3); pointer-events: none; }
+.toolbar .spacer { flex: 1; }
+.pill svg { display: inline-block; width: 11px; height: 11px; vertical-align: -1px; margin-right: 3px; }
+.pl-sort { position: relative; display: inline-flex; align-items: center; }
+.pl-sort svg { position: absolute; left: 10px; width: 14px; height: 14px; color: var(--text-3); pointer-events: none; }
+.pl-sort select { padding: 8px 32px 8px 31px; width: auto; min-width: 170px; }
+th.th-sort { cursor: pointer; user-select: none; transition: color var(--tr); }
+th.th-sort:hover { color: var(--text); }
+th.th-sort.aktivan { color: var(--accent-hover); }
 
 .empty { text-align: center; padding: 52px 20px; color: var(--text-3); font-size: 13.5px; }
 .empty svg { width: 36px; height: 36px; margin: 0 auto 12px; color: var(--text-3); opacity: 0.5; stroke-width: 1.5; }
@@ -1287,8 +1306,100 @@ tbody tr:hover .btn.btn-sm:not(.btn-primary) { color: var(--text-2); }
 .bulkbar .btn-ghost { background: transparent; border-color: transparent; }
 .bulkbar .btn-ghost:hover { background: rgba(255, 255, 255, 0.08); }
 
+
+/* ---------- Rezervacije ---------- */
+.rez-dan { display: flex; align-items: center; gap: 6px; }
+.rez-dan .btn.icon { padding: 8px 9px; }
+.rez-dan-naziv {
+  position: relative; display: inline-flex; align-items: center; gap: 8px; min-width: 230px; justify-content: center;
+  padding: 8px 14px; border-radius: var(--r-sm); background: var(--surface); border: 1px solid var(--line-2);
+  font-weight: 600; font-size: 13px; cursor: pointer; white-space: nowrap;
+}
+.rez-dan-naziv svg { color: var(--accent); }
+/* Pravi izbor datuma leži providan preko naziva: klik na naziv otvara
+   kalendar pregledača, a na ekranu stoji čitljivo "Sutra, subota 28. septembar". */
+.rez-dan-naziv input { position: absolute; inset: 0; opacity: 0; cursor: pointer; padding: 0; border: 0; }
+.rez-dan-naziv input::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+
+.rez-okvir { padding: 6px 16px 14px; overflow-x: auto; }
+.rez-okvir > * { min-width: 720px; }
+.rez-red { display: grid; grid-template-columns: 78px 1fr; align-items: center; height: 38px; }
+.rez-red + .rez-red { border-top: 1px solid var(--hair); }
+.rez-pc { font-weight: 650; font-size: 12.5px; }
+.rez-pc.off { color: var(--text-3); }
+.rez-traka { position: relative; height: 100%; cursor: copy; }
+.rez-traka:hover { background: rgba(255, 255, 255, 0.02); }
+.rez-sati { height: 26px; }
+.rez-sati .rez-traka { cursor: default; }
+.rez-sati .rez-traka:hover { background: none; }
+.rez-sati span { position: absolute; top: 5px; transform: translateX(-50%); font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.rez-sati span:first-child { transform: none; }
+.rez-sati span:last-child { transform: translateX(-100%); }
+.rez-telo { position: relative; }
+.rez-mreza {
+  position: absolute; top: 0; bottom: 0; left: 78px; right: 0; pointer-events: none;
+  background-image: linear-gradient(90deg, var(--hair) 1px, transparent 1px);
+  background-size: calc(100% / var(--sati)) 100%;
+}
+.rez-sad { position: absolute; top: -4px; bottom: 0; width: 2px; margin-left: -1px; background: var(--danger); box-shadow: 0 0 8px rgba(229, 72, 77, 0.6); }
+.rez-sad::before { content: ""; position: absolute; top: -3px; left: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
+.rez-blok {
+  position: absolute; top: 5px; bottom: 5px; z-index: 1; min-width: 6px;
+  display: flex; align-items: center; gap: 6px; padding: 0 8px; overflow: hidden; white-space: nowrap;
+  border-radius: 6px; font-size: 11.5px; text-align: left;
+  background: var(--accent-soft); border: 1px solid var(--accent-line); color: var(--text);
+  transition: filter var(--tr), transform 0.08s ease;
+}
+.rez-blok:hover { filter: brightness(1.25); }
+/* Ime je ono što se traži pogledom; kad je termin uzak, seče se vreme, ne ime. */
+.rez-blok b { font-weight: 650; flex-shrink: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.rez-blok span { color: var(--text-2); font-variant-numeric: tabular-nums; min-width: 0; overflow: hidden; }
+.rez-blok.stigao { background: var(--online-soft); border-color: rgba(61, 201, 126, 0.45); }
+.rez-pc-oznaka {
+  display: inline-block; padding: 2px 7px; margin: 1px 4px 1px 0; border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06); font-size: 11.5px; font-weight: 600; white-space: nowrap;
+}
+tr.rez-gotova td { opacity: 0.5; }
+
+.rez-trajanja { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rez-trajanja .chip { border: 1px solid var(--line-2); }
+.rez-trajanja input { width: 76px; padding: 6px 9px; }
+.rez-izbori { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(72px, 100%), 1fr)); gap: 6px; }
+.rez-izbor {
+  padding: 8px 6px; border-radius: var(--r-sm); font-weight: 600; font-size: 12.5px;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line-2); color: var(--text-2);
+  transition: background var(--tr), border-color var(--tr), color var(--tr);
+}
+.rez-izbor:hover:not(:disabled) { border-color: var(--line-3); color: var(--text); }
+.rez-izbor.on { background: var(--accent-soft); border-color: var(--accent); color: #fff; }
+.rez-izbor.zauzet { opacity: 0.4; text-decoration: line-through; cursor: not-allowed; }
+.rez-izbor:disabled { cursor: default; }
+.kv-red { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 8px 0; border-bottom: 1px solid var(--hair); }
+.kv-red > span:last-child { text-align: right; }
+.modal-dugmad { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.modal-dugmad .btn { flex: 1; }
+
+/* Oznaka rezervacije na kartici računara */
+.st-rez {
+  display: flex; align-items: center; gap: 7px; width: calc(100% - 26px); margin: 0 13px;
+  padding: 6px 9px; border-radius: 7px; font-size: 12px; text-align: left;
+  background: var(--accent-soft); color: var(--text-2); border: 1px solid transparent;
+}
+.st-rez svg { width: 14px; height: 14px; color: var(--accent); flex-shrink: 0; }
+.st-rez b { margin-left: auto; color: var(--text); font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 50%; }
+.st-rez:hover { border-color: var(--accent-line); }
+.st-rez.stigao { background: var(--online-soft); }
+.st-rez.stigao svg { color: var(--online); }
+.st-rez.u-toku:not(.stigao) { border-color: var(--accent-line); }
+/* Termin počinje a za računarom sedi neko drugi - to radnik mora da reši. */
+.st-rez.sudar { background: var(--danger-soft); border-color: rgba(229, 72, 77, 0.4); animation: pill-pulse 1.6s ease-in-out infinite; }
+.st-rez.sudar svg { color: var(--danger); }
+
 /* Responsive */
 @media (max-width: 860px) {
+  .rez-dan { width: 100%; }
+  .rez-dan-naziv { flex: 1; min-width: 0; }
+
   /* na telefonu upozorenja idu dole (iznad trake sa ikonama), da ne pokriju naslov */
   .istice-lista { top: auto; bottom: 76px; left: 12px; right: 12px; max-width: none; }
 

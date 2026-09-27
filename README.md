@@ -54,6 +54,7 @@ Za pravi rad na računarima igrača koristi `npm start` (kiosk preko celog ekran
 
 - **Nalozi** - praviš ih u panelu (Igrači > Novi nalog). Svaki igrač ima korisničko ime, lozinku i **kredit u dinarima**.
 - **Brzi gost** - za grupu koja uđe sa ulice bez naloga. Otvara do deset naloga odjednom (`gost-01`, `gost-02`...) sa četvorocifrenom lozinkom koja se izdiktira gostima. Kad se potroše, vlasnik ih čisti jednim dugmetom; briše samo one bez kredita, starije od dan, koji nisu za računarom.
+- **Rezervacije** - grupa javi telefonom "sutra u 18h, pet mašina": radnik ili vlasnik je upiše u panelu (**Rezervacije**), na vremenskoj liniji po računarima, klikom na slobodno mesto. Od 15 minuta pre termina za taj računar ne može da se prijavi niko drugi. Ako rezervacija glasi na nalog, taj igrač se prijavljuje sam; ako glasi na ime, osoblje klikne **Stigli**. Ko ne dođe za 20 minuta, računar se sam oslobađa. Ko u tom trenutku već sedi za računarom **ne izbacuje se** - dobija poruku na ekranu, a osoblje obaveštenje u panelu. Kartica računara na kontrolnoj tabli pokazuje "Rezervisan 18:00".
 - **Naplata** - dok je igrač prijavljen, kredit se troši po ceni na sat (Podešavanja > Cena po satu). Kad kredit padne na nulu, računar se **automatski zaključa**.
 
 ### Šta igrač sme da menja

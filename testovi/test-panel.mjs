@@ -151,12 +151,14 @@ proveri("skupljeno uputstvo ima svoj izgled", /\.poz-pomoc > summary \{/.test(je
 // Na 1366x768 je 184px menija ispadalo ispod ivice. Do "Radnika" i
 // "Podešavanja" se stizalo samo skrolovanjem bocne trake, sto se ne primeti
 // dok se ne potrazi - a 1366x768 je sasvim obican ekran za pult.
-proveri("meni ima poseban raspored za niske ekrane", /@media \(max-height: 860px\)/.test(jedanRed));
+// Prag je 980px: na 1440x900 (i 1920x1080 umanjeno trakama) "Podešavanja"
+// su ispadala ispod dugmeta za smenu.
+proveri("meni ima poseban raspored za niske ekrane", /@media \(max-height: 980px\)/.test(jedanRed));
 proveri("naslovi grupa postaju crta kad je tesno",
-  /@media \(max-height: 860px\) \{[^@]*\.nav-sec \{[^}]*height: 1px/.test(jedanRed),
+  /@media \(max-height: 980px\) \{[^@]*\.nav-sec \{[^}]*height: 1px/.test(jedanRed),
   "cetiri naslova grupa trose 140px koje meni nema");
 proveri("imena stavki se ne smanjuju",
-  !/@media \(max-height: 860px\) \{[^@]*\.nav-item \{[^}]*font-size/.test(jedanRed),
+  !/@media \(max-height: 980px\) \{[^@]*\.nav-item \{[^}]*font-size/.test(jedanRed),
   "sitniji tekst se tesko cita u zurbi, bolje uzeti razmak");
 
 // ---- SITNICE KOJE SE VIDE SVAKI DAN ----

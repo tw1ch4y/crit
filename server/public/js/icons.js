@@ -40,6 +40,10 @@ const ICONS = {
   // Isti oblik kao stavka "Igre" u bocnom meniju, da se red u logovima prepozna
   // po ikoni bez citanja.
   igre: '<path d="M6 12h4M8 10v4M15 11h.01M18 13h.01"/><rect x="2" y="6" width="20" height="12" rx="4"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  chevLeft: '<polyline points="15 18 9 12 15 6"/>',
+  chevRight: '<polyline points="9 18 15 12 9 6"/>',
+  sort: '<path d="m7 15 5 5 5-5M7 9l5-5 5 5"/>',
 };
 
 function icon(name, cls = "") {

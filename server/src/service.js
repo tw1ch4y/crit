@@ -10,6 +10,7 @@ import { broadcastPanels, broadcastClients, sendClient, isClientOnline, izbaciPa
 import { banerIgre, promoCrit } from "./banner.js";
 import * as nad from "./nadogradnja.js";
 import { nivoZa, smeDa, otkljucanoZa, OTKLJUCAVANJA } from "./nivoi.js";
+import * as rez from "./rezervacije.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -419,6 +420,10 @@ export function shiftDetail(id) {
 // Snapshoti za panel
 export function computersSnapshot() {
   const rows = db.prepare("SELECT * FROM computers ORDER BY name").all();
+  // Najbliži termin po računaru (u toku ili u naredna 3 sata) - kartica na
+  // kontrolnoj tabli tako sama kaže "rezervisan u 18:00", bez odlaska na stranu.
+  let rezervacije = new Map();
+  try { rezervacije = rez.najblizePoRacunaru(180); } catch {}
   return rows.map((c) => {
     const online = isClientOnline(c.id);
     let player = null;
@@ -449,6 +454,7 @@ export function computersSnapshot() {
       connectedAt: connectedSince.get(c.id) || null,
       player,
       session,
+      rezervacija: rezervacije.get(c.id) || null,
     };
   });
 }
@@ -478,18 +484,44 @@ export function playersSnapshot() {
 }
 
 // stranična lista igrača (za tabelu - ne učitava celu bazu)
-export function playersPage({ page = 1, per = 25, search = "" } = {}) {
-  const cond = search ? "WHERE username LIKE ? OR display_name LIKE ?" : "";
-  const args = search ? [`%${search}%`, `%${search}%`] : [];
-  const total = db.prepare(`SELECT COUNT(*) c FROM players ${cond}`).get(...args).c;
+//
+// Redosled i filter su tu zbog pitanja koja osoblje stvarno postavlja: "ko nam
+// je najbolji gost" (nivo), "ko ima najviše kredita" (dug kuće prema gostima),
+// "ko je bio skoro", "koji su nalozi blokirani". Po imenu samo, sve to se
+// tražilo listanjem strana.
+const PL_REDOSLED = {
+  ime: "username COLLATE NOCASE ASC",
+  kredit: "balance DESC, username COLLATE NOCASE",
+  nivo: "xp DESC, username COLLATE NOCASE",
+  prijava: "last_login IS NULL, last_login DESC, username COLLATE NOCASE",
+  novi: "created_at DESC",
+};
+const PL_FILTER = {
+  svi: "",
+  kredit: "balance > 0",
+  bez: "balance <= 0",
+  blokirani: "banned = 1",
+  gosti: "username LIKE 'gost-%'",
+  stalni: "username NOT LIKE 'gost-%'",
+};
+export function playersPage({ page = 1, per = 25, search = "", sort = "ime", filter = "svi" } = {}) {
+  const cond = [], args = [];
+  if (search) { cond.push("(username LIKE ? OR display_name LIKE ?)"); args.push(`%${search}%`, `%${search}%`); }
+  if (PL_FILTER[filter]) cond.push(PL_FILTER[filter]);
+  const where = cond.length ? "WHERE " + cond.join(" AND ") : "";
+  const order = PL_REDOSLED[sort] || PL_REDOSLED.ime;
+  const total = db.prepare(`SELECT COUNT(*) c FROM players ${where}`).get(...args).c;
   per = Math.min(100, Math.max(5, Number(per) || 25));
   const pages = Math.max(1, Math.ceil(total / per));
   page = Math.min(Math.max(1, Number(page) || 1), pages);
   const items = db
-    .prepare(`SELECT id, username, display_name, balance, banned, note, created_at, last_login, xp FROM players ${cond} ORDER BY username LIMIT ? OFFSET ?`)
+    .prepare(`SELECT id, username, display_name, balance, banned, note, created_at, last_login, xp FROM players ${where} ORDER BY ${order} LIMIT ? OFFSET ?`)
     .all(...args, per, (page - 1) * per)
     .map(mapPlayer);
-  return { items, total, page, pages, per };
+  // Zbir kredita u filteru: koliko kuća "duguje" gostima u vremenu koje su
+  // platili a nisu odigrali. Vlasniku bitna brojka, a nigde se nije videla.
+  const kredit = db.prepare(`SELECT COALESCE(SUM(CASE WHEN balance > 0 THEN balance ELSE 0 END), 0) s FROM players ${where}`).get(...args).s;
+  return { items, total, page, pages, per, sort: PL_REDOSLED[sort] ? sort : "ime", filter: PL_FILTER[filter] != null ? filter : "svi", ukupnoKredita: round2(kredit) };
 }
 
 export function ordersSnapshot(includeDone = false) {
@@ -742,6 +774,39 @@ export function fullSnapshot() {
 
 function pushComputers() {
   broadcastPanels({ t: "computers", computers: computersSnapshot() });
+}
+export const pushRacunare = pushComputers;
+
+// REZERVACIJE - periodična provera (poziva index.js svakih 30 s).
+// Termin na koji niko nije došao se oslobađa, a onome ko sedi za računarom koji
+// uskoro treba predati stiže poruka - i osoblju isto, jer ono treba da ga
+// premesti, program to ne sme sam.
+let rezPotpis = "";
+export function rezervacijeTick(sada = Date.now()) {
+  const zauzeti = new Map(db.prepare("SELECT id, current_player_id FROM computers WHERE current_player_id IS NOT NULL").all()
+    .map((c) => [c.id, c.current_player_id]));
+  const { nisuDosli, podsetnici } = rez.tick(zauzeti, sada);
+  const vreme = (ts) => new Date(ts).toLocaleTimeString("sr-Latn-RS", { hour: "2-digit", minute: "2-digit" });
+  for (const r of nisuDosli) {
+    logEvent({ category: "racunar", action: "rez_nije_dosao", actor: "sistem", target: r.computerName,
+      detail: `Rezervacija "${r.ime}" (${vreme(r.pocetak)}) oslobođena - niko nije došao ${rez.NIJE_DOSAO_MIN} min` });
+  }
+  for (const r of podsetnici) {
+    sendMessageToComputer(r.computerId,
+      `Ovaj računar je rezervisan od ${vreme(r.pocetak)}. Sačuvaj igru - osoblje će te premestiti na drugi računar.`);
+    broadcastPanels({ t: "event", kind: "rezervacija",
+      text: `${r.computerName} je rezervisan od ${vreme(r.pocetak)} (${r.ime}), a za njim neko sedi` });
+    logEvent({ category: "racunar", action: "rez_podsetnik", actor: "sistem", target: r.computerName,
+      detail: `Termin "${r.ime}" počinje u ${vreme(r.pocetak)}, računar je zauzet - igrač i osoblje obavešteni` });
+  }
+  // Kartice na tabli prate termine: kad jedan uđe u prozor od 3 sata ili istekne,
+  // panel mora da sazna iako se ništa drugo nije promenilo.
+  let potpis = "";
+  try { potpis = JSON.stringify([...rez.najblizePoRacunaru(180, sada)].map(([k, v]) => [k, v.id, v.status])); } catch {}
+  if (nisuDosli.length || potpis !== rezPotpis) {
+    rezPotpis = potpis;
+    pushComputers();
+  }
 }
 function pushOrders() {
   broadcastPanels({ t: "orders", orders: ordersSnapshot() });
@@ -1091,6 +1156,12 @@ function clientLogin(computerId, username, password) {
   if (p.banned) {
     return sendClient(computerId, { t: "login_err", message: "Nalog je blokiran. Pozovite osoblje." });
   }
+  // Računar čuva rezervaciju: niko osim onoga na koga glasi ne seda pred termin.
+  // Ne broji se kao promašaj - lozinka je bila tačna.
+  const rezervisano = rez.proveriPrijavu(computerId, p.id);
+  if (rezervisano) {
+    return sendClient(computerId, { t: "login_err", message: rezervisano });
+  }
   if (rate() > 0 && p.balance <= 0) {
     return sendClient(computerId, { t: "login_err", message: "Nemate kredita. Dopunite na kasi." });
   }
@@ -1111,6 +1182,11 @@ function clientLogin(computerId, username, password) {
     .run(p.id, sessionId, computerId);
   db.prepare("UPDATE players SET last_login=? WHERE id=?").run(now, p.id);
   tickState.set(Number(sessionId), { last: now });
+  try {
+    const potvrdjena = rez.potvrdiDolazak(computerId, p.id, now);
+    if (potvrdjena) logEvent({ category: "racunar", action: "rez_stigao", actor: p.username, target: comp.name,
+      detail: `Stigao na rezervaciju (${p.username})` });
+  } catch {}
 
   const session = db.prepare("SELECT * FROM sessions WHERE id=?").get(sessionId);
   sendClient(computerId, loginOkPayload(p, session));

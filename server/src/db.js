@@ -249,6 +249,27 @@ CREATE TABLE IF NOT EXISTS tocak_nagrade (
   tezina INTEGER NOT NULL DEFAULT 1,               -- veći broj = češće pada
   sort   INTEGER DEFAULT 0
 );
+
+-- Rezervacije računara. Grupa zove telefonom "sutra u 18h, pet mašina" - dosad
+-- je to stajalo na papiru pored kase, pa radnik u drugoj smeni nije znao da
+-- mašine treba da čuvaju, i gost koji sedne pola sata ranije ostajao je da igra
+-- preko tuđeg termina. Jedan red = jedan računar; grupa je više redova sa
+-- istim 'grupa' ključem, da se može otkazati odjednom.
+CREATE TABLE IF NOT EXISTS rezervacije (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  computer_id INTEGER NOT NULL REFERENCES computers(id) ON DELETE CASCADE,
+  player_id   INTEGER REFERENCES players(id) ON DELETE SET NULL, -- NULL = gost bez naloga
+  ime         TEXT NOT NULL,                     -- na koga glasi (ime ili nadimak)
+  telefon     TEXT,
+  napomena    TEXT,
+  pocetak     INTEGER NOT NULL,
+  kraj        INTEGER NOT NULL,
+  grupa       TEXT,
+  status      TEXT NOT NULL DEFAULT 'aktivna',   -- aktivna | stigao | otkazana | nije_dosao
+  kreirao     TEXT,
+  created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_rez_vreme ON rezervacije (pocetak, kraj);
 `);
 
 // ---- Migracije (dodavanje kolona na postojeću bazu bez brisanja) ----
