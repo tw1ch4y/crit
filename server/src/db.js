@@ -313,6 +313,14 @@ function migrate() {
   // dva sitna izbora koja se ne pretrazuju. Odvojeno od `tema` (sara) da se
   // citanje sare ne kvari kad se doda jos nesto na profil.
   if (!columnExists("players", "profil")) db.exec("ALTER TABLE players ADD COLUMN profil TEXT");
+  // Obrisan računar koji ima istoriju (sesije, porudžbine) ne sme stvarno da
+  // nestane iz baze: promet po računaru bi izgubio svoje redove, a brisanje je
+  // ionako padalo na stranom ključu. Ostaje kao arhiviran - van svih spiskova,
+  // sa tokenom koji više ne važi.
+  if (!columnExists("computers", "obrisan")) db.exec("ALTER TABLE computers ADD COLUMN obrisan INTEGER NOT NULL DEFAULT 0");
+  // Isto za artikal iz shopa koji je bar jednom prodat: stavke porudžbina
+  // pokazuju na njega. Arhiviran se ne vidi ni u panelu ni u launcheru.
+  if (!columnExists("shop_items", "obrisan")) db.exec("ALTER TABLE shop_items ADD COLUMN obrisan INTEGER NOT NULL DEFAULT 0");
 }
 migrate();
 
@@ -354,7 +362,7 @@ function seed() {
     console.log("Kreiran vlasnik nalog: admin / admin (OBAVEZNO promeniti sifru!)");
   }
 
-  const compCount = db.prepare("SELECT COUNT(*) c FROM computers").get().c;
+  const compCount = db.prepare("SELECT COUNT(*) c FROM computers").get().c; // i arhivirani: sveža baza je ona bez ijednog
   if (compCount === 0) {
     const insert = db.prepare(
       "INSERT INTO computers (name, token, status, pos_x, pos_y) VALUES (?, ?, 'offline', ?, ?)"

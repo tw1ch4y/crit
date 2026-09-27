@@ -36,8 +36,10 @@ const artikli = await api("/api/shop");
 const kola = artikli.find((i) => i.name.startsWith("Coca-Cola")); // 130
 const voda = artikli.find((i) => i.name.startsWith("Voda"));      // 80
 
-await api("/api/shift/open", "POST", { openingCash: 0 });
+// Nalog sa kreditom se otvara PRE smene: početni kredit je dopuna (novac preko
+// pulta) i ušao bi u pazar smene, a ovde se meri samo podela shopa.
 const igrac = await api("/api/players", "POST", { username: "pera", password: "pera1234", balance: 5000 });
+await api("/api/shift/open", "POST", { openingCash: 0 });
 
 // launcher jednog racunara
 const comps = await api("/api/computers");

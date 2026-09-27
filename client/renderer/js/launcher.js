@@ -495,13 +495,37 @@ function handleMsg(m) {
       if (S.tab === "shop" || S.tab === "home") renderContent();
       break;
     }
-    case "to_login":
-      S.player = null; stopTimer(); document.body.classList.remove("desktop-active");
-      $("#pPass").value = ""; $("#pUser").value = ""; $("#loginErr").textContent = "";
-      show("loginScreen"); $("#pUser").focus(); resetIdle();
+    case "to_login": {
+      // to_login stiže i na svako ponovno povezivanje dok niko ne igra. Ako je
+      // gost baš tada kucao ime i lozinku, ne sme da mu se obriše.
+      const bioIgrac = !!S.player || !$("#loginScreen")?.classList.contains("active");
+      S.player = null; S.sesijaId = null; stopTimer(); document.body.classList.remove("desktop-active");
+      if (bioIgrac) { $("#pPass").value = ""; $("#pUser").value = ""; $("#loginErr").textContent = ""; }
+      show("loginScreen"); if (bioIgrac) $("#pUser").focus(); resetIdle();
       break;
-    case "login_ok":
+    }
+    case "login_ok": {
       clearLoginPending();
+      // Povratak veze usred igre (restart servera, prekid mreže) šalje login_ok
+      // za ISTU sesiju. Tada se samo osvežava stanje - bez pozdravne animacije,
+      // bez pražnjenja korpe i bez vraćanja na početnu. Ranije je igrač posle
+      // svakog prekida dobijao "Dobrodošao" usred meča i gubio korpu.
+      const istaSesija = !!S.player && S.sesijaId != null && m.session?.id === S.sesijaId;
+      S.sesijaId = m.session?.id ?? null;
+      if (istaSesija) {
+        S.player = m.player; S.balance = m.balance; S.remaining = m.remainingSeconds;
+        if (m.vip) S.vip = m.vip;
+        if (m.profil) S.profil = m.profil;
+        if (Array.isArray(m.porudzbine)) S.porudzbine = m.porudzbine;
+        S.tocak = m.tocak || S.tocak;
+        // Sa ekrana "Povezivanje..." nazad na isti ekran i istu karticu, a
+        // odbrojavanje kreće ponovo (stalo je kad je veza pukla).
+        show("desktopScreen");
+        document.body.classList.add("desktop-active");
+        updateHud(); osveziVip(); osveziZnackuNaloga();
+        startTimer();
+        break;
+      }
       S.player = m.player; S.balance = m.balance; S.remaining = m.remainingSeconds;
       S.skoroIgrane = Array.isArray(m.skoroIgrane) ? m.skoroIgrane : [];
       S.porudzbine = Array.isArray(m.porudzbine) ? m.porudzbine : [];
@@ -519,6 +543,7 @@ function handleMsg(m) {
       playBoot(S.player?.displayName || S.player?.username);
       enterDesktop();
       break;
+    }
     case "login_err":
       clearLoginPending();
       $("#loginErr").textContent = m.message; $("#pPass").value = "";
@@ -554,7 +579,7 @@ function handleMsg(m) {
       otpustiTocak(m.message);
       break;
     case "locked":
-      stopTimer(); S.player = null; document.body.classList.remove("desktop-active");
+      stopTimer(); S.player = null; S.sesijaId = null; document.body.classList.remove("desktop-active");
       sfx.alert();
       $("#lockTitle").textContent = m.reason === "time" ? "Vreme je isteklo" : "Računar je zaključan";
       $("#lockSub").textContent = m.reason === "time" ? "Kredit je potrošen. Dopuni na kasi pa nastavi gde si stao." : "Pozovite osoblje da otključa računar.";

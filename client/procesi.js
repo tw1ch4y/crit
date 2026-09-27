@@ -103,9 +103,9 @@ function zabranjenaPutanja(putanja, env) {
   // teksta.
   const uz = (s) => (s.endsWith("\\") ? s : s + "\\");
   const mesta = [
-    HOME && uz(path.join(HOME, "downloads").toLowerCase()),
+    HOME && uz(path.win32.join(HOME, "downloads").toLowerCase()), // uvek Windows putanje, i kad se proverava sa drugog sistema
     TEMP && uz(TEMP),
-    HOME && uz(path.join(HOME, "desktop").toLowerCase()),
+    HOME && uz(path.win32.join(HOME, "desktop").toLowerCase()),
   ].filter(Boolean);
   return mesta.some((m) => p.startsWith(m));
 }

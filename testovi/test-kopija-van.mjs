@@ -36,7 +36,12 @@ proveri("na pocetku stoji da nije podeseno", s.stanje === "nepodesena" && !s.ukl
 // Kad bi se prvi put pisalo tek u ponoc, pogresna putanja bi se otkrila tek
 // onog dana kad kopija zatreba - a tada je kasno.
 const los = await api("/api/kopija-van", "POST", { putanja: "Z:\\ovoga-diska-nema\\nikako" });
-proveri("nepostojeci disk se odbija odmah", los.status === 400 && /Ne mogu da pišem/.test(los.body.error || ""), JSON.stringify(los.body));
+// Na Windows-u je "Z:\..." puna putanja pa pada na pisanju; drugde nije puna
+// putanja uopste. Oba odbijanja su ispravna - bitno je da se NE PRIHVATI.
+proveri("nepostojeci disk se odbija odmah", los.status === 400 && /Ne mogu da pišem|nije puna putanja/.test(los.body.error || ""), JSON.stringify(los.body));
+// Relativna putanja bi se napravila pored servera, na istom disku sa bazom.
+const relativna = await api("/api/kopija-van", "POST", { putanja: "kopije-pored-servera" });
+proveri("relativna putanja se odbija", relativna.status === 400 && /nije puna putanja/.test(relativna.body.error || ""), JSON.stringify(relativna.body));
 proveri("odbijeno odrediste se NE pamti", (await api("/api/kopija-van")).body.stanje === "nepodesena");
 
 // ---- 3) ispravno odrediste: kopija odlazi odmah ----

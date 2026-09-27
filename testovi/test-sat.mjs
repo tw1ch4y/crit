@@ -52,7 +52,7 @@ proveri("skok sata se zapisuje u logove", /action: "skok_sata"/.test(src),
   "vlasnik mora negde da vidi da mu je sat pomeren, inace trazi kvar na pogresnom mestu");
 proveri("poruka kaze sta da se proveri", src.includes("Proveri podešavanje vremena na glavnom računaru"));
 proveri("jedan pomeren sat ne puni log", /skokJavljen/.test(src) && /60000/.test(src));
-proveri("naplata i dalje preskace negativnu razliku", /proteklo <= 0\) continue/.test(src));
+proveri("naplata i dalje preskace negativnu razliku", /proteklo <= 0\) (continue|return)/.test(src));
 proveri("naplata staje kad racunar nije na vezi", /isClientOnline\(s\.computer_id\)\) \{ st\.last = now/.test(src),
   "inace bi se po povratku veze naplatilo sve unazad");
 

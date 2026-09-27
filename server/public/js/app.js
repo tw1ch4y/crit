@@ -762,7 +762,23 @@ function render() {
     clearTimeout(render._t);
     render._t = setTimeout(() => main.classList.remove("view-in"), 500);
   }
-  ({ dashboard: renderDashboard, players: renderPlayers, orders: renderOrders, pos: renderPos, rezervacije: renderRezervacije, shop: renderShop, games: renderGames, tools: renderTools, izgled: renderIzgled, computers: renderComputers, install: renderInstall, reports: renderReports, shifts: renderShifts, staff: renderStaff, logs: renderLogs, settings: renderSettings }[state.view] || renderDashboard)();
+  const fn = { dashboard: renderDashboard, players: renderPlayers, orders: renderOrders, pos: renderPos, rezervacije: renderRezervacije, shop: renderShop, games: renderGames, tools: renderTools, izgled: renderIzgled, computers: renderComputers, install: renderInstall, reports: renderReports, shifts: renderShifts, staff: renderStaff, logs: renderLogs, settings: renderSettings }[state.view] || renderDashboard;
+  // STRANA KOJA NE MOŽE DA SE UČITA MORA TO DA KAŽE.
+  //
+  // Više strana čita podatke sa servera pre crtanja. Kad veza pukne baš tada,
+  // greška je ostajala neuhvaćena: radnik je gledao praznu stranu ili sadržaj
+  // PRETHODNE strane pod novim naslovom u meniju - i nije znao ni da nešto
+  // fali ni šta da radi.
+  const zaStranu = state.view;
+  Promise.resolve().then(fn).catch((e) => {
+    if (state.view !== zaStranu) return;
+    console.warn("strana", zaStranu, e);
+    $("#main").innerHTML = `<div class="ucitavanje-palo">${icon("alert")}
+      <b>Strana nije mogla da se učita</b>
+      <span>${esc(e?.veza ? "Nema veze sa serverom. Podaci nisu izgubljeni - pokušaj ponovo kad se veza vrati." : (e?.message || "Nepoznata greška"))}</span>
+      <button class="btn btn-sm" id="stranaPonovo">${icon("refresh")} Pokušaj ponovo</button></div>`;
+    $("#stranaPonovo")?.addEventListener("click", () => render());
+  });
 }
 
 // Profil meni
@@ -1138,8 +1154,13 @@ async function bulkClick(action) {
     modal(`Poruka za ${ids.length} računara`, `<div class="field"><label>Tekst poruke</label><textarea id="bmText" rows="3" autofocus></textarea></div><button class="btn btn-primary btn-block" id="bmSend">Pošalji</button>`, (root, close) => {
       $("#bmSend", root).addEventListener("click", async () => {
         const text = $("#bmText", root).value.trim(); if (!text) return;
-        for (const id of ids) await api(`/computers/${id}/message`, "POST", { text }).catch(() => {});
-        toast("Poruka je poslata", "success"); close();
+        // Broji se koliko je stvarno stiglo: ugašen računar poruku ne prima,
+        // a radnik mora da zna da je nekoliko ostalo bez nje.
+        let stiglo = 0;
+        for (const id of ids) { try { await api(`/computers/${id}/message`, "POST", { text }); stiglo++; } catch {} }
+        if (stiglo === ids.length) toast("Poruka je poslata", "success");
+        else toast(`Poruka je stigla na ${stiglo} od ${ids.length} računara - ostali nisu povezani`, stiglo ? "info" : "error");
+        close();
       });
     });
     return;
@@ -1822,7 +1843,7 @@ async function editPlayerModal(p) {
     const del = $("#epDel", root);
     if (del) del.addEventListener("click", async () => {
       const extra = p.balance > 0 ? ` Na nalogu je ostalo ${money(p.balance)} kredita.` : "";
-      if (!(await confirmDialog(`Nalog "${p.username}" i njegova istorija sesija i transakcija biće trajno obrisani.${extra}`, { title: "Brisanje naloga", ok: "Obriši nalog", danger: true }))) return;
+      if (!(await confirmDialog(`Nalog "${p.username}" biće trajno obrisan. Promet koji je napravio ostaje u Izveštajima.${extra}`, { title: "Brisanje naloga", ok: "Obriši nalog", danger: true }))) return;
       try { await api(`/players/${p.id}`, "DELETE"); toast("Nalog je obrisan", "success"); close(); renderPlayers(); }
       catch (e) { toast(e.message, "error"); }
     });

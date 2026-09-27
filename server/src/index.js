@@ -94,7 +94,7 @@ app.use("/api", (req, res) => res.status(404).json({ error: `Nepoznata adresa: $
 //     pokrene.
 app.get("/nadogradnja/launcher.exe", (req, res) => {
   const token = String(req.query.token || "");
-  const comp = token ? db.prepare("SELECT id FROM computers WHERE token = ?").get(token) : null;
+  const comp = token ? db.prepare("SELECT id FROM computers WHERE token = ? AND obrisan = 0").get(token) : null;
   if (!comp) return res.status(403).type("text").send("Nevažeći token računara");
 
   const st = nadg.stanje();
@@ -152,7 +152,7 @@ const server = http.createServer(app);
 
 // ---- WebSocket ----
 initWs(server, {
-  authComputer: (token) => (token ? db.prepare("SELECT * FROM computers WHERE token = ?").get(token) : null),
+  authComputer: (token) => (token ? db.prepare("SELECT * FROM computers WHERE token = ? AND obrisan = 0").get(token) : null),
   authAdmin: (token) => getAdmin(token),
 });
 

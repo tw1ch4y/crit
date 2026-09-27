@@ -369,6 +369,76 @@ igraonicu". Prvo sve mora da radi kako treba; licence dolaze posle.
 - [x] `test-ciscenje-gostiju.mjs` je gradio putanju baze sa `\\`, pa je van
   Windows-a padao pre prve provere
 
+### Revizija 2.48 - stabilnost
+
+Svaka stavka je dokazana na živom serveru pre ispravke; sve ih čuva
+`test-stabilnost.mjs` (47 tvrdnji).
+
+**Novac**
+- [x] **POČETNI KREDIT NIJE ULAZIO U OBRAČUN SMENE.** Nalog otvoren sa kreditom
+  (i "Brzi gost" sa kreditom) upisivao je novac samo pod "nalozi", a obračun
+  broji "novac". Radnik uzme keš, a na kraju smene ima višak koji obračun ne
+  pominje. Izveštaji i "Dopune danas" su ga pri tom brojali - dve strane su se
+  razilazile. Sada ide kao dopuna, u istom poslu sa nalogom; grupa gostiju se
+  otvara cela ili nikako
+- [x] **Zapis porudžbine i računa na kasi u Logove bio je VAN posla sa novcem**
+  (i gutao grešku) - a iz njega se računa "Shop" u obračunu smene. Sada je u
+  istom poslu, kao kod dopune
+- [x] **Otkazana porudžbina je mogla da se vrati** u "na čekanju/dostavljeno":
+  kredit ostaje vraćen, a piće i iznos se opet broje u pazaru. Otkazana je sada
+  zatvorena zauvek
+- [x] **Otkazivanje nije vraćalo iskustvo (XP)** - "poruči pa otkaži" je bila
+  besplatna prečica do nivoa; a otkazano se brojalo i u prag nagradnog točka i
+  u "najaktivnije igrače"
+- [x] **Smena je primala negativno ili besmisleno početno stanje kase**, a tekst
+  kao prebrojana kasa je tiho prolazio kao "nije brojano"
+
+**Brisanje**
+- [x] **Brisanje artikla koji je bar jednom prodat → greška 500** (strani ključ),
+  i to POSLE brisanja slike. Sada se takav artikal arhivira: nestaje iz panela,
+  launchera i kase, a stare porudžbine ostaju ispravne
+- [x] **Brisanje računara na kom je bar jednom igrano → greška 500.** Sada se
+  arhivira: nestaje sa spiskova, token mu odmah prestaje da važi (povezan
+  launcher se odseca), ime je slobodno za nov, a promet po računaru ostaje u
+  Izveštajima. Računar za kojim neko igra se ne uklanja
+- [x] **Brisanje naloga (i rutinsko "Očisti goste") menjalo je prošle
+  Izveštaje** - brisalo je i sesije i transakcije, pa su promet od vremena i
+  zarada po računaru padali naknadno. Istorija sada prelazi na skriveni
+  arhivski nalog, koji se nigde ne vidi i u koji se ne može ući
+
+**Launcher**
+- [x] **POVRATAK VEZE USRED IGRE SE PONAŠAO KAO NOVA PRIJAVA.** Posle restarta
+  servera ili prekida mreže launcher je ponovo snimao "stanje pre sesije" - sa
+  već pokrenutom igrom i igračevim mišem. Na odjavi se igra nije gasila, a
+  sledeći gost je nasleđivao tuđa podešavanja miša i zvuka. Uz to je igrač
+  dobijao pozdravnu animaciju usred meča i gubio korpu
+- [x] `to_login` pri svakom ponovnom povezivanju je pokretao čišćenje sesije
+  (gašenje programa, brisanje profila pregledača) i kad niko nije igrao, i
+  brisao ime/lozinku koje gost upravo kuca
+- [x] Gašenje zatečenih procesa je u trci sa sledećom prijavom brisalo spisak
+  NOVOG igrača
+- [x] Ime fajla daljinske instalacije iz adrese moglo je da izađe iz Temp
+  fascikle (`%2F..%2F`)
+
+**Server i panel**
+- [x] **PIN za otključavanje je mogao da se sačuva prazan** - tada samo Enter na
+  zaključanom ekranu otključava računar. Sada 4-8 cifara; isto za servisni PIN,
+  a naziv igraonice i valuta ne mogu biti prazni
+- [x] **Kopija van računara je prihvatala relativnu putanju** - fascikla se
+  pravila pored servera, na istom disku sa bazom, a panel je javljao zeleno
+- [x] Poruka na ugašen računar javljala je "Poruka je poslata"; grupna poruka
+  sada kaže na koliko je stvarno stigla
+- [x] Strana panela koja ne može da se učita (prekid veze) ostajala je prazna ili
+  sa sadržajem prethodne strane - sada kaže šta je i nudi "Pokušaj ponovo"
+- [x] Stara WebSocket veza koju je zamenila nova brisala je vreme povezivanja
+  nove, pa je panel pokazivao računar kao nepovezan
+- [x] Greška na jednoj sesiji je zaustavljala naplatu i upozorenja za sve ostale
+- [x] Čišćenje logova po broju moglo je da obriše zapise OTVORENE smene
+- [x] Zaključavanje/otključavanje nepostojećeg računara i blokiranje
+  nepostojećeg igrača javljali su uspeh
+- [x] `kiosk-beg`, `kopija-van` i `ciscenje-gostiju` sada prolaze i van
+  Windows-a (putanje su se gradile po sistemu na kom se test pušta)
+
 ---
 
 ## Šta ostaje pred otvaranje

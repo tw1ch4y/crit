@@ -91,9 +91,11 @@ export function ocistiLogove(o = podesavanja(), aktivnaSmenaId = null) {
     const ukupno = db.prepare("SELECT COUNT(*) c FROM logs").get().c;
     if (ukupno > o.logNajvise) {
       const visak = ukupno - o.logNajvise;
-      poBroju = Number(db.prepare(
-        "DELETE FROM logs WHERE id IN (SELECT id FROM logs ORDER BY ts ASC, id ASC LIMIT ?)"
-      ).run(visak).changes) || 0;
+      // Ni ovde se ne diraju zapisi otvorene smene - isto pravilo kao gore.
+      poBroju = Number((aktivnaSmenaId
+        ? db.prepare("DELETE FROM logs WHERE id IN (SELECT id FROM logs WHERE shift_id IS NULL OR shift_id != ? ORDER BY ts ASC, id ASC LIMIT ?)").run(aktivnaSmenaId, visak)
+        : db.prepare("DELETE FROM logs WHERE id IN (SELECT id FROM logs ORDER BY ts ASC, id ASC LIMIT ?)").run(visak)
+      ).changes) || 0;
     }
   } catch (e) { console.error("čišćenje logova:", e.message); }
   return { poStarosti, poBroju };
@@ -268,6 +270,12 @@ export function postaviKopijuVan(putanja) {
     setSetting(KOPIJA_PUT, "");
     setSetting(KOPIJA_GRESKA, "");
     return { ok: true, ...kopijaVanPodesavanja() };
+  }
+  // Samo puna putanja. Relativna ("kopije") bi se napravila pored servera -
+  // dakle na ISTOM disku sa bazom, a panel bi javljao da je kopija van
+  // računara uredna.
+  if (!path.isAbsolute(p)) {
+    return { error: `"${p}" nije puna putanja. Upiši celu, npr. E:\\crit-kopije ili \\\\server\\kopije.` };
   }
   // Odredište se proverava ODMAH, dok vlasnik gleda u ekran. Kad bi se prvi put
   // pisalo tek u ponoć, pogrešno otkucana putanja bi se otkrila tek onog dana

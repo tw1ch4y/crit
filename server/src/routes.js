@@ -251,20 +251,21 @@ router.get("/players", (req, res) => {
 });
 
 router.post("/players", (req, res) => {
-  const r = svc.createPlayer(req.body || {});
+  const r = svc.createPlayer(req.body || {}, { adminId: req.admin.adminId, actor: req.admin.username });
   if (r.error) return res.status(400).json(r);
-  svc.logEvent({ category: "nalozi", action: "player_create", actor: req.admin.username, target: req.body?.username, detail: `Kreiran nalog igrača${Number(req.body?.balance) > 0 ? `, kredit ${Number(req.body.balance)}` : ""}`, amount: Number(req.body?.balance) || null });
+  // Početni kredit je već upisan kao dopuna (kategorija "novac") - ovde samo
+  // otvaranje naloga, bez iznosa, da se isti dinar ne pojavi dvaput.
+  svc.logEvent({ category: "nalozi", action: "player_create", actor: req.admin.username, target: req.body?.username, detail: `Kreiran nalog igrača${Number(req.body?.balance) > 0 ? `, kredit ${Number(req.body.balance)}` : ""}` });
   res.json(r);
 });
 
 router.post("/players/guests", (req, res) => {
-  const r = svc.createGuests(req.body?.count, req.body?.balance);
+  const r = svc.createGuests(req.body?.count, req.body?.balance, { adminId: req.admin.adminId, actor: req.admin.username });
   if (r.error) return res.status(400).json(r);
   const imena = r.players.map((p) => p.username).join(", ");
   svc.logEvent({
     category: "nalozi", action: "player_create", actor: req.admin.username, target: imena,
     detail: `Otvoreni gostujući nalozi (${r.players.length})${Number(req.body?.balance) > 0 ? `, kredit ${Number(req.body.balance)} po nalogu` : ""}`,
-    amount: Number(req.body?.balance) > 0 ? Number(req.body.balance) * r.players.length : null,
   });
   res.json(r);
 });
@@ -355,6 +356,7 @@ router.post("/players/:id/ban", (req, res) => {
   const id = Number(req.params.id);
   const banned = !!req.body?.banned;
   const r = svc.setPlayerBanned(id, banned);
+  if (r.error) return res.status(400).json(r);
   svc.logEvent({ category: "nalozi", action: banned ? "ban" : "unban", actor: req.admin.username, target: pName(id), detail: banned ? "Blokiran nalog" : "Odblokiran nalog" });
   res.json(r);
 });
@@ -386,7 +388,7 @@ router.get("/players/:id/transactions", (req, res) => {
 // ---------- RAČUNARI ----------
 router.get("/computers", (req, res) => {
   // status iz snapshota (offline se računa po živoj konekciji, ne po koloni u bazi)
-  const tokens = new Map(db.prepare("SELECT id, token FROM computers").all().map((r) => [r.id, r.token]));
+  const tokens = new Map(db.prepare("SELECT id, token FROM computers WHERE obrisan = 0").all().map((r) => [r.id, r.token]));
   res.json(svc.computersSnapshot().map((c) => ({
     id: c.id, name: c.name, status: c.status, online: c.online,
     ip: c.ip, mac: c.mac, verzija: c.verzija, pinFabricki: c.pinFabricki, lastSeen: c.lastSeen, token: tokens.get(c.id),
@@ -399,6 +401,7 @@ router.post("/computers", requireOwner, (req, res) => {
   try {
     const info = db.prepare("INSERT INTO computers (name, token, status) VALUES (?,?, 'offline')").run(name, "pc-" + randomToken());
     svc.logEvent({ category: "racunar", action: "add", actor: req.admin.username, target: name, detail: "Dodat računar" });
+    svc.pushRacunare();
     res.json({ ok: true, id: info.lastInsertRowid });
   } catch {
     res.status(400).json({ error: "Naziv već postoji" });
@@ -417,23 +420,31 @@ router.post("/computers/bulk", requireOwner, (req, res) => {
       added++;
     }
   }
-  if (added) svc.logEvent({ category: "racunar", action: "bulk_add", actor: req.admin.username, detail: `Dodato ${added} računara` });
+  if (added) {
+    svc.logEvent({ category: "racunar", action: "bulk_add", actor: req.admin.username, detail: `Dodato ${added} računara` });
+    svc.pushRacunare();
+  }
   res.json({ ok: true, added });
 });
 
 router.delete("/computers/:id", requireOwner, (req, res) => {
-  const nm = cName(Number(req.params.id));
-  db.prepare("DELETE FROM computers WHERE id=?").run(Number(req.params.id));
-  svc.logEvent({ category: "racunar", action: "delete", actor: req.admin.username, target: nm, detail: "Obrisan računar" });
-  res.json({ ok: true });
+  const r = svc.obrisiRacunar(Number(req.params.id));
+  if (r.error) return res.status(400).json(r);
+  svc.logEvent({ category: "racunar", action: "delete", actor: req.admin.username, target: r.name,
+    detail: r.arhiviran ? "Uklonjen računar (istorija prometa ostaje u Izveštajima)" : "Obrisan računar" });
+  svc.pushRacunare();
+  res.json(r);
 });
 
 router.put("/computers/:id", requireOwner, (req, res) => {
   const name = String(req.body?.name || "").trim();
   if (!name) return res.status(400).json({ error: "Naziv je obavezan" });
   try {
-    db.prepare("UPDATE computers SET name=? WHERE id=?").run(name, Number(req.params.id));
+    if (name.length > 30) return res.status(400).json({ error: "Naziv računara: najviše 30 znakova" });
+    const r = db.prepare("UPDATE computers SET name=? WHERE id=? AND obrisan = 0").run(name, Number(req.params.id));
+    if (!r.changes) return res.status(404).json({ error: "Računar ne postoji" });
     svc.logEvent({ category: "racunar", action: "rename", actor: req.admin.username, target: name, detail: "Preimenovan računar" });
+    svc.pushRacunare();
     res.json({ ok: true });
   } catch {
     res.status(400).json({ error: "Naziv već postoji" });
@@ -443,12 +454,14 @@ router.put("/computers/:id", requireOwner, (req, res) => {
 router.post("/computers/:id/lock", (req, res) => {
   const id = Number(req.params.id);
   const r = svc.lockComputer(id, req.admin.adminId);
+  if (r.error) return res.status(400).json(r);
   svc.logEvent({ category: "racunar", action: "lock", actor: req.admin.username, target: cName(id), detail: "Zaključan računar" });
   res.json(r);
 });
 router.post("/computers/:id/unlock", (req, res) => {
   const id = Number(req.params.id);
   const r = svc.unlockComputer(id, req.admin.adminId);
+  if (r.error) return res.status(400).json(r);
   svc.logEvent({ category: "racunar", action: "unlock", actor: req.admin.username, target: cName(id), detail: "Otključan računar" });
   res.json(r);
 });
@@ -460,8 +473,13 @@ router.post("/computers/:id/logout", (req, res) => {
 });
 router.post("/computers/:id/message", (req, res) => {
   const id = Number(req.params.id);
-  const text = String(req.body?.text || "");
+  const text = String(req.body?.text || "").trim().slice(0, 500);
+  if (!text) return res.status(400).json({ error: "Poruka je prazna" });
   const r = svc.sendMessageToComputer(id, text);
+  // Ugašen računar poruku ne može da primi. Ranije je odgovor ipak bio "u
+  // redu", pa je panel javljao "Poruka je poslata" za poruku koju niko nije
+  // video.
+  if (!r.ok) return res.status(400).json({ error: "Računar nije povezan - poruka nije isporučena" });
   svc.logEvent({ category: "racunar", action: "message", actor: req.admin.username, target: cName(id), detail: `Poruka: ${text}` });
   res.json(r);
 });
@@ -543,7 +561,7 @@ router.post("/shop", requireOwner, (req, res) => {
 });
 router.put("/shop/:id", requireOwner, (req, res) => {
   const id = Number(req.params.id);
-  const it = db.prepare("SELECT * FROM shop_items WHERE id=?").get(id);
+  const it = db.prepare("SELECT * FROM shop_items WHERE id=? AND obrisan = 0").get(id);
   if (!it) return res.status(404).json({ error: "Artikal ne postoji" });
   const { category, price, emoji, available, stock } = req.body || {};
   const name = String(req.body?.name ?? it.name).trim();
@@ -562,7 +580,7 @@ router.put("/shop/:id", requireOwner, (req, res) => {
 router.post("/shop/:id/stock", requireOwner, (req, res) => {
   const id = Number(req.params.id);
   const add = Math.floor(Number(req.body?.add) || 0);
-  const it = db.prepare("SELECT name, stock FROM shop_items WHERE id=?").get(id);
+  const it = db.prepare("SELECT name, stock FROM shop_items WHERE id=? AND obrisan = 0").get(id);
   if (!it) return res.status(404).json({ error: "Artikal ne postoji" });
   // DOPUNA NULOM NE SME DA RASPRODA ARTIKAL.
   //
@@ -591,10 +609,11 @@ router.delete("/shop/:id/image", requireOwner, (req, res) => {
   res.json(r);
 });
 router.delete("/shop/:id", requireOwner, (req, res) => {
-  svc.deleteShopItem(Number(req.params.id));
-  svc.logEvent({ category: "podesavanja", action: "shop_delete", actor: req.admin.username, detail: "Obrisan artikal iz shopa" });
+  const r = svc.deleteShopItem(Number(req.params.id));
+  if (r.error) return res.status(400).json(r);
+  svc.logEvent({ category: "podesavanja", action: "shop_delete", actor: req.admin.username, target: r.name, detail: "Obrisan artikal iz shopa" });
   svc.pushCatalog();
-  res.json({ ok: true });
+  res.json(r);
 });
 
 // ---------- IGRE ----------
@@ -775,6 +794,21 @@ router.post("/settings", requireOwner, (req, res) => {
     } else {
       zaUpis[dbKey] = String(sirovo).trim();
     }
+  }
+  // PIN za otključavanje ne sme da bude prazan: tada bi prazan unos (samo
+  // Enter na zaključanom ekranu) otključavao računar - igrač bi sam sebi
+  // skinuo bravu posle isteklog vremena.
+  if ("unlock_pin" in zaUpis && !/^\d{4,8}$/.test(zaUpis.unlock_pin)) {
+    return res.status(400).json({ error: "PIN za otključavanje: 4 do 8 cifara" });
+  }
+  if ("servisni_pin" in zaUpis && zaUpis.servisni_pin !== "" && !/^\d{4,8}$/.test(zaUpis.servisni_pin)) {
+    return res.status(400).json({ error: "Servisni PIN: 4 do 8 cifara (ili prazno da se ne koristi)" });
+  }
+  if ("cafe_name" in zaUpis && (!zaUpis.cafe_name || zaUpis.cafe_name.length > 40)) {
+    return res.status(400).json({ error: "Naziv igraonice: od 1 do 40 znakova" });
+  }
+  if ("currency" in zaUpis && (!zaUpis.currency || zaUpis.currency.length > 6)) {
+    return res.status(400).json({ error: "Valuta: od 1 do 6 znakova (npr. RSD)" });
   }
   const changed = [];
   for (const [k, dbKey] of Object.entries(map)) {
@@ -970,7 +1004,7 @@ router.get("/report", (req, res) => {
   const cashRevenue = db.prepare("SELECT COALESCE(SUM(total),0) s FROM orders WHERE payment='cash' AND status!='cancelled' AND created_at>=?").get(from).s;
   const topups = db.prepare("SELECT COALESCE(SUM(amount),0) s FROM transactions WHERE type='topup' AND created_at>=?").get(from).s;
   const activeSessions = db.prepare("SELECT COUNT(*) c FROM sessions WHERE status='active'").get().c;
-  const playersCount = db.prepare("SELECT COUNT(*) c FROM players").get().c;
+  const playersCount = db.prepare("SELECT COUNT(*) c FROM players WHERE username != ?").get(svc.ARHIVA_IGRACA).c;
   res.json({
     sessionRevenue: svc.round2(sessionRevenue),
     shopRevenue: svc.round2(shopRevenue),

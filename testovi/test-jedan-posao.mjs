@@ -103,7 +103,7 @@ for (const [gde, sablon] of [
   // Uz orderId i stanje, isti posao vraca i prelazak nivoa (XP se dodaje u
   // ISTOM upisu kao kredit) - zato se ne trazi tacan spisak polja.
   ["porudzbina igraca", /orderId, newBal[^}]*\} = uJednomPoslu/],
-  ["racun na kasi", /orderId, javiIgracu \} = uJednomPoslu/],
+  ["racun na kasi", /orderId, javiIgracu, zapis \} = uJednomPoslu/],
   ["nagradni tocak", /bal = uJednomPoslu/],
   // Ove cetiri su bile propustene: svaka je pomerala novac u dva ili tri
   // odvojena upisa. Dopuna je najskuplja - kroz nju prolazi svaki dinar koji

@@ -6,7 +6,7 @@ import { scryptSync, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { db, getSetting, setSetting, DATA_DIR, uJednomPoslu } from "./db.js";
 import { verifyPassword, hashPassword, rang } from "./auth.js";
-import { broadcastPanels, broadcastClients, sendClient, isClientOnline, izbaciPanel } from "./hub.js";
+import { broadcastPanels, broadcastClients, sendClient, isClientOnline, izbaciPanel, izbaciKlijenta } from "./hub.js";
 import { banerIgre, promoCrit } from "./banner.js";
 import * as nad from "./nadogradnja.js";
 import { nivoZa, smeDa, otkljucanoZa, OTKLJUCAVANJA } from "./nivoi.js";
@@ -228,9 +228,16 @@ export function activeShiftInfo() {
 
 export function openShift(adminId, username, openingCash) {
   if (getActiveShift()) return { error: "Smena je već otvorena" };
+  // Početno stanje ulazi u "očekivano u kasi" pri zatvaranju. Minus ili
+  // besmislen broj bi ceo obračun smene pretvorio u manjak/višak koji ne postoji.
+  const pocetno = openingCash === "" || openingCash == null ? 0 : Number(openingCash);
+  if (!Number.isFinite(pocetno) || pocetno < 0 || pocetno > MAX_IZNOS) {
+    return { error: "Početno stanje kase: unesi broj od 0 naviše" };
+  }
+  openingCash = round2(pocetno);
   const now = Date.now();
   const info = db.prepare("INSERT INTO shifts (admin_id, admin_username, opened_at, opening_cash, status) VALUES (?,?,?,?, 'open')")
-    .run(adminId, username, now, Number(openingCash) || 0);
+    .run(adminId, username, now, openingCash);
   activeShiftId = Number(info.lastInsertRowid);
   logEvent({ category: "sistem", action: "shift_open", actor: username, detail: `Otvorena smena - početno stanje kase ${round2(openingCash)}`, amount: Number(openingCash) || 0 });
   broadcastPanels({ t: "shift", shift: activeShiftInfo() });
@@ -243,7 +250,12 @@ export function closeShift(username, closingCash) {
   const now = Date.now();
   const t = shiftTotals(s.id, s.opened_at, now);
   const expectedCash = round2(s.opening_cash + t.topups - t.deducts + t.shopCash);
-  const closing = closingCash === null || closingCash === undefined || closingCash === "" ? null : Number(closingCash);
+  const closing = closingCash === null || closingCash === undefined || String(closingCash).trim() === "" ? null : Number(closingCash);
+  // Tekst ili minus ne sme tiho da prođe kao "nije prebrojano" - radnik bi
+  // mislio da je upisao kasu, a obračun ne bi imao razliku.
+  if (closing != null && (!Number.isFinite(closing) || closing < 0 || closing > MAX_IZNOS)) {
+    return { error: "Prebrojano stanje kase: unesi broj od 0 naviše (ili ostavi prazno)" };
+  }
   const diff = closing == null ? null : round2(closing - expectedCash);
   db.prepare("UPDATE shifts SET status='closed', closed_at=?, closing_cash=?, total_topups=?, total_deducts=?, total_shop=?, total_revenue=?, total_shop_cash=?, total_sessions=? WHERE id=?")
     .run(now, closing, t.topups, t.deducts, t.shop, t.revenue, t.shopCash, t.sessions, s.id);
@@ -362,13 +374,14 @@ export function stats(from, to) {
   const hourMap = merge(sByHour, oByHour);
   const byHour = Array.from({ length: 24 }, (_, h) => ({ label: String(h).padStart(2, "0"), revenue: round2(hourMap[h] || 0) }));
 
-  const topPlayers = db.prepare("SELECT p.username u, COALESCE(SUM(-t.amount),0) spent FROM transactions t JOIN players p ON p.id=t.player_id WHERE t.type IN ('session','shop') AND t.created_at BETWEEN ? AND ? GROUP BY p.id ORDER BY spent DESC LIMIT 8")
+  // Povraćaj otkazane porudžbine se oduzima - otkazano nije potrošeno.
+  const topPlayers = db.prepare(`SELECT CASE WHEN p.username='${ARHIVA_IGRACA}' THEN p.display_name ELSE p.username END u, COALESCE(SUM(-t.amount),0) spent FROM transactions t JOIN players p ON p.id=t.player_id WHERE t.type IN ('session','shop','refund') AND t.created_at BETWEEN ? AND ? GROUP BY p.id HAVING spent > 0 ORDER BY spent DESC LIMIT 8`)
     .all(from, to).map((r) => ({ username: r.u, spent: round2(r.spent) }));
   const byComputer = db.prepare("SELECT c.name n, COALESCE(SUM(s.cost),0) rev, COUNT(*) cnt FROM sessions s JOIN computers c ON c.id=s.computer_id WHERE s.started_at BETWEEN ? AND ? GROUP BY c.id ORDER BY rev DESC")
     .all(from, to).map((r) => ({ name: r.n, revenue: round2(r.rev), sessions: r.cnt }));
 
   // Novi igrači u periodu - vlasniku pokazuje da li mesto raste.
-  const newPlayers = db.prepare("SELECT COUNT(*) c FROM players WHERE created_at BETWEEN ? AND ?").get(from, to).c;
+  const newPlayers = db.prepare(`SELECT COUNT(*) c FROM players WHERE created_at BETWEEN ? AND ? AND username != '${ARHIVA_IGRACA}'`).get(from, to).c;
   // Najprometniji sat (danas) ili dan (nedelja/mesec) - kad je najveća gužva.
   const vrhSat = byHour.reduce((a, h) => (h.revenue > a.revenue ? h : a), { label: "", revenue: 0 });
   const vrhDan = byDay.reduce((a, h) => (h.revenue > a.revenue ? h : a), { label: "", revenue: 0 });
@@ -419,7 +432,7 @@ export function shiftDetail(id) {
 
 // Snapshoti za panel
 export function computersSnapshot() {
-  const rows = db.prepare("SELECT * FROM computers ORDER BY name").all();
+  const rows = db.prepare("SELECT * FROM computers WHERE obrisan = 0 ORDER BY name").all();
   // Najbliži termin po računaru (u toku ili u naredna 3 sata) - kartica na
   // kontrolnoj tabli tako sama kaže "rezervisan u 18:00", bez odlaska na stranu.
   let rezervacije = new Map();
@@ -478,7 +491,7 @@ const mapPlayer = (p) => ({
 
 export function playersSnapshot() {
   return db
-    .prepare("SELECT id, username, display_name, balance, banned, note, created_at, last_login, xp FROM players ORDER BY username")
+    .prepare(`SELECT id, username, display_name, balance, banned, note, created_at, last_login, xp FROM players WHERE username != '${ARHIVA_IGRACA}' ORDER BY username`)
     .all()
     .map(mapPlayer);
 }
@@ -505,7 +518,7 @@ const PL_FILTER = {
   stalni: "username NOT LIKE 'gost-%'",
 };
 export function playersPage({ page = 1, per = 25, search = "", sort = "ime", filter = "svi" } = {}) {
-  const cond = [], args = [];
+  const cond = [`username != '${ARHIVA_IGRACA}'`], args = [];
   if (search) { cond.push("(username LIKE ? OR display_name LIKE ?)"); args.push(`%${search}%`, `%${search}%`); }
   if (PL_FILTER[filter]) cond.push(PL_FILTER[filter]);
   const where = cond.length ? "WHERE " + cond.join(" AND ") : "";
@@ -597,7 +610,7 @@ export function putanjaKopije(fajl) {
 }
 
 export function shopList() {
-  return db.prepare("SELECT * FROM shop_items ORDER BY sort, name").all();
+  return db.prepare("SELECT * FROM shop_items WHERE obrisan = 0 ORDER BY sort, name").all();
 }
 export function gamesList() {
   return db.prepare("SELECT * FROM games ORDER BY sort, name").all();
@@ -649,9 +662,41 @@ export function deleteTool(id) {
 // su to radili od pocetka, shop nije - pa je svaka obrisana limenka ostavljala
 // sliku na disku zauvek.
 export function deleteShopItem(id) {
+  const it = db.prepare("SELECT id, name FROM shop_items WHERE id=? AND obrisan = 0").get(id);
+  if (!it) return { error: "Artikal ne postoji" };
+  // Artikal koji je bar jednom prodat ostaje u bazi kao arhiviran: stavke
+  // porudžbina pokazuju na njega (strani ključ), pa je brisanje padalo sa
+  // greškom 500 - i to POSLE brisanja slike, pa je artikal ostajao bez nje.
+  const prodavan = db.prepare("SELECT 1 FROM order_items WHERE item_id=? LIMIT 1").get(id);
   removeImage("shop_items", id);
-  db.prepare("DELETE FROM shop_items WHERE id=?").run(id);
-  return { ok: true };
+  if (prodavan) db.prepare("UPDATE shop_items SET obrisan = 1, available = 0, stock = NULL WHERE id=?").run(id);
+  else db.prepare("DELETE FROM shop_items WHERE id=?").run(id);
+  return { ok: true, name: it.name, arhiviran: !!prodavan };
+}
+
+// Uklanjanje računara. Ne dira se računar za kojim neko sedi (sesija bi ostala
+// bez računara i naplata bi pukla). Računar bez istorije se briše; onaj sa
+// istorijom se arhivira: nestaje sa svih spiskova, token mu prestaje da važi,
+// ime se oslobađa za novi, a promet po računaru u Izveštajima ostaje tačan.
+export function obrisiRacunar(id) {
+  const c = db.prepare("SELECT * FROM computers WHERE id=? AND obrisan = 0").get(id);
+  if (!c) return { error: "Računar ne postoji" };
+  if (c.current_player_id || activeSessionForComputer(id)) return { error: `Za računarom ${c.name} neko igra - prvo ga odjavi` };
+  const imaIstoriju = db.prepare("SELECT 1 FROM sessions WHERE computer_id=? LIMIT 1").get(id)
+    || db.prepare("SELECT 1 FROM orders WHERE computer_id=? LIMIT 1").get(id);
+  uJednomPoslu(() => {
+    db.prepare("DELETE FROM rezervacije WHERE computer_id=?").run(id);
+    if (imaIstoriju) {
+      db.prepare("UPDATE computers SET obrisan = 1, status = 'offline', token = ?, name = ?, mac = NULL WHERE id=?")
+        .run(`obrisan-${id}-${randomBytes(12).toString("hex")}`, `${c.name} (uklonjen #${id})`, id);
+    } else {
+      db.prepare("DELETE FROM computers WHERE id=?").run(id);
+    }
+  });
+  // Launcher koji je još povezan starim tokenom se odseca odmah.
+  try { izbaciKlijenta(id); } catch {}
+  connectedSince.delete(id);
+  return { ok: true, name: c.name, arhiviran: !!imaIstoriju };
 }
 export function reorderTools(ids) {
   const upd = db.prepare("UPDATE tools SET sort=? WHERE id=?");
@@ -674,8 +719,8 @@ export function spojiStavke(items, { najviseVrsta = 40, najviseKomada = 20, samo
   // Radnik na kasi sme i skriven artikal (npr. nešto što se ne nudi igračima
   // kroz launcher), igrač ne sme - zato razlika u upitu.
   const upit = samoDostupne
-    ? "SELECT * FROM shop_items WHERE id = ? AND available = 1"
-    : "SELECT * FROM shop_items WHERE id = ?";
+    ? "SELECT * FROM shop_items WHERE id = ? AND available = 1 AND obrisan = 0"
+    : "SELECT * FROM shop_items WHERE id = ? AND obrisan = 0";
   for (const it of Array.isArray(items) ? items.slice(0, najviseVrsta * 4) : []) {
     const id = Number(it?.id);
     if (!Number.isInteger(id) || id <= 0) continue;
@@ -1293,8 +1338,11 @@ function clientOrder(computerId, items, note, payment = "credit", poId = null) {
   const ranije = ranijiOdgovor(poId);
   if (ranije) return sendClient(computerId, ranije);
   const comp = computerById(computerId);
-  if (!comp.current_player_id) return sendClient(computerId, { t: "error", message: "Niste prijavljeni." });
+  if (!comp?.current_player_id) return sendClient(computerId, { t: "error", message: "Niste prijavljeni." });
   const p = playerById(comp.current_player_id);
+  if (!p) return sendClient(computerId, { t: "error", message: "Niste prijavljeni." });
+  // Napomena stiže od igrača: samo tekst, i ne roman.
+  note = typeof note === "string" ? note.trim().slice(0, 200) : "";
   // Kes placa radnik pri donosenju, pa se kredit ne dira. Sve ostalo je isto.
   const kes = payment === "cash";
 
@@ -1316,9 +1364,9 @@ function clientOrder(computerId, items, note, payment = "credit", poId = null) {
   // Porudžbina, stavke, zaliha i naplata su JEDAN posao. Nestanak struje između
   // skidanja zalihe i naplate bi ostavio piće skinuto sa stanja, a kredit
   // nenaplaćen - i to bi se otkrilo tek pri obračunu smene.
-  let orderId, newBal, prelaz;
+  let orderId, newBal, prelaz, zapis;
   try {
-    ({ orderId, newBal, prelaz } = uJednomPoslu(() => {
+    ({ orderId, newBal, prelaz, zapis } = uJednomPoslu(() => {
       const info = db
         .prepare("INSERT INTO orders (player_id, computer_id, total, status, note, payment, source, created_at) VALUES (?,?,?, 'pending', ?,?, 'client', ?)")
         .run(p.id, computerId, total, note, kes ? "cash" : "credit", now);
@@ -1340,7 +1388,13 @@ function clientOrder(computerId, items, note, payment = "credit", poId = null) {
         const a = nivoZa(p.xp), b = nivoZa(noviXp);
         if (b.nivo > a.nivo) prelaz = { nivoPre: a, nivoPosle: b };
       }
-      return { orderId: id, newBal: bal, prelaz };
+      // Zapis u logu je deo istog posla: iz njega se računa "Shop" u obračunu
+      // smene (vidi upisiLog). Van posla bi pad između ta dva upisa ostavio
+      // naplaćenu porudžbinu koju obračun ne vidi.
+      const zapis = upisiLog({ category: "shop", action: "order", actor: p.username, target: comp.name,
+        detail: `Porudžbina #${id} (${kes ? "keš" : "kredit"}): ` + resolved.map((r) => `${r.qty}x ${r.item.name}`).join(", "),
+        amount: -total });
+      return { orderId: id, newBal: bal, prelaz, zapis };
     }));
   } catch (e) {
     logEvent({ category: "sistem", action: "greska", actor: "server",
@@ -1377,9 +1431,7 @@ function clientOrder(computerId, items, note, payment = "credit", poId = null) {
   //
   // Pazar je i ranije bio tačan - on keš čita iz porudžbina - pa se greška
   // videla samo u podeli, tamo gde radnik proverava sebe.
-  logEvent({ category: "shop", action: "order", actor: p.username, target: comp.name,
-    detail: `Porudžbina #${orderId} (${kes ? "keš" : "kredit"}): ` + resolved.map((r) => `${r.qty}x ${r.item.name}`).join(", "),
-    amount: -total });
+  javiLog(zapis);
 }
 
 function clientChangePassword(computerId, oldPassword, newPassword) {
@@ -1481,19 +1533,29 @@ export function billingTick() {
   const now = Date.now();
   const active = db.prepare("SELECT * FROM sessions WHERE status='active'").all();
   for (const s of active) {
+    // Greška na jednoj sesiji (zaključana baza, pokvaren red) ne sme da
+    // zaustavi naplatu i upozorenja za ostalih dvanaest računara.
+    try { naplatiSesiju(s, r, now); }
+    catch (e) { console.error(`naplata sesije #${s.id}:`, e?.message || e); }
+  }
+  if (active.length) pushComputers();
+}
+
+function naplatiSesiju(s, r, now) {
+  {
     const st = tickState.get(s.id) || { last: now };
     // Pauziraj naplatu ako klijent tog računara nije povezan (nestanak struje/mreže) -
     // resetuj vreme da nema "catch-up" naplate kad se ponovo poveže.
-    if (!isClientOnline(s.computer_id)) { st.last = now; tickState.set(s.id, st); continue; }
+    if (!isClientOnline(s.computer_id)) { st.last = now; tickState.set(s.id, st); return; }
     const proteklo = (now - st.last) / 1000;
     st.last = now;
     tickState.set(s.id, st);
-    if (r <= 0 || proteklo <= 0) continue;
+    if (r <= 0 || proteklo <= 0) return;
     if (proteklo > NAJVISE_PO_PROLAZU) javiSkokSata(proteklo);
     const elapsed = sekundeZaNaplatu(proteklo);
 
     const p = playerById(s.player_id);
-    if (!p) continue;
+    if (!p) return;
     // Ne naplaćuj više nego što igrač ima - inače bi sesija zabeležila veći
     // trošak nego što je stvarno skinuto i promet bi bio naduvan.
     const cost = (elapsed / 3600) * r;
@@ -1512,7 +1574,7 @@ export function billingTick() {
       db.prepare("UPDATE sessions SET cost=? WHERE id=?").run(newCost, s.id);
       endSession(s.computer_id, { lock: true, reason: "time" });
       broadcastPanels({ t: "event", kind: "timeup", text: `${p.username} - isteklo vreme (${db.prepare("SELECT name FROM computers WHERE id=?").get(s.computer_id)?.name})` });
-      continue;
+      return;
     }
     // Stanje na nalogu i cena sesije moraju da se pomere zajedno: ako se skine
     // kredit a cena ne upiše, taj novac nestaje iz izveštaja i iz obračuna.
@@ -1534,7 +1596,6 @@ export function billingTick() {
     sendClient(s.computer_id, { t: "balance", balance: round2(newBal), remainingSeconds: preostalo, vip: vipOd(noviXp) });
     javiOsobljuPredIstek(s, p, preostalo);
   }
-  if (active.length) pushComputers();
 }
 
 // Igrač koji ustane i zaboravi da se odjavi plaća prazan sto, a računar stoji
@@ -1645,42 +1706,79 @@ export function sendMessageToComputer(computerId, text) {
   return { ok };
 }
 
-export function createPlayer({ username, password, displayName, balance, note }) {
+// POČETNI KREDIT JE DOPUNA.
+//
+// Radnik koji otvori nalog sa 500 kredita je uzeo 500 dinara preko pulta. Taj
+// novac se ranije upisivao samo u istoriju naloga i u log kategorije "nalozi" -
+// a obračun smene broji dopune iz kategorije "novac". Na kraju smene je u kasi
+// stajao višak koji obračun ne pominje, i to najčešće baš kod "Brzog gosta"
+// sa kreditom, dakle u gužvi. Sada nalog, istorija i zapis za pazar idu kao
+// jedan posao, isto kao kod obične dopune.
+export function createPlayer({ username, password, displayName, balance, note }, { adminId = null, actor = "sistem" } = {}) {
   username = String(username || "").trim();
   if (!username || !password) return { error: "Korisničko ime i lozinka su obavezni" };
+  if (username.length > 32) return { error: "Korisničko ime može imati najviše 32 znaka" };
+  if (username.startsWith("__")) return { error: "Korisničko ime ne može počinjati sa __" };
+  if (String(password).length > 200) return { error: "Lozinka je predugačka" };
   const exists = db.prepare("SELECT id FROM players WHERE username = ?").get(username);
   if (exists) return { error: "Korisničko ime već postoji" };
   if (balance && !ispravanIznos(balance)) return { error: "Neispravan početni kredit" };
   if (Number(balance) < 0) return { error: "Početni kredit ne može biti negativan" };
+  const kredit = round2(Number(balance) || 0);
   const now = Date.now();
-  const info = db
-    .prepare("INSERT INTO players (username, password_hash, display_name, balance, note, created_at) VALUES (?,?,?,?,?,?)")
-    .run(username, hashPassword(password), displayName || username, Number(balance) || 0, note || null, now);
-  if (Number(balance) > 0) addTransaction(info.lastInsertRowid, "topup", Number(balance), Number(balance), null, "Početni kredit");
+  let id, log = null;
+  try {
+    ({ id, log } = uJednomPoslu(() => {
+      const info = db
+        .prepare("INSERT INTO players (username, password_hash, display_name, balance, note, created_at) VALUES (?,?,?,?,?,?)")
+        .run(username, hashPassword(password), String(displayName || "").trim().slice(0, 40) || username, kredit,
+          note ? String(note).slice(0, 500) : null, now);
+      const noviId = Number(info.lastInsertRowid);
+      let l = null;
+      if (kredit > 0) {
+        addTransaction(noviId, "topup", kredit, kredit, adminId, "Početni kredit");
+        l = upisiLog({ category: "novac", action: "topup", actor, target: username,
+          detail: "Početni kredit pri otvaranju naloga", amount: kredit });
+      }
+      return { id: noviId, log: l };
+    }));
+  } catch (e) {
+    return { error: "Nalog nije otvoren: " + String(e?.message || e).slice(0, 120) };
+  }
+  javiLog(log);
   pushComputers();
-  return { ok: true, id: info.lastInsertRowid };
+  return { ok: true, id };
 }
 
 // Grupa od pet ljudi uđe sa ulice i niko nema nalog. Kucanje pet imena i pet
 // lozinki drži red na kasi, pa ih panel otvara odjednom: imena idu redom
 // gost-01, gost-02..., lozinka je četvorocifrena da može da se izdiktira.
-export function createGuests(count, balance) {
+export function createGuests(count, balance, ko = {}) {
   count = Math.min(10, Math.max(1, Math.floor(Number(count) || 1)));
   balance = Math.max(0, Number(balance) || 0);
   const zauzeta = new Set(
     db.prepare("SELECT username FROM players WHERE username LIKE 'gost-%'").all().map((r) => r.username)
   );
+  if (!ispravanIznos(balance)) return { error: "Neispravan kredit" };
   const datum = new Date().toLocaleDateString("sr-Latn-RS");
   const napravljeni = [];
   let broj = 1;
-  for (let i = 0; i < count; i++) {
-    while (zauzeta.has(`gost-${String(broj).padStart(2, "0")}`)) broj++;
-    const username = `gost-${String(broj).padStart(2, "0")}`;
-    zauzeta.add(username);
-    const password = String(Math.floor(1000 + Math.random() * 9000));
-    const r = createPlayer({ username, password, displayName: username, balance, note: `Brzi gost, ${datum}` });
-    if (r.error) return { error: r.error };
-    napravljeni.push({ id: r.id, username, password, balance });
+  // Svi ili nijedan: pola grupe sa nalozima (i pola naplaćenog kredita) je gore
+  // od greške - radnik ne bi znao kome je šta izdiktirao.
+  try {
+    uJednomPoslu(() => {
+      for (let i = 0; i < count; i++) {
+        while (zauzeta.has(`gost-${String(broj).padStart(2, "0")}`)) broj++;
+        const username = `gost-${String(broj).padStart(2, "0")}`;
+        zauzeta.add(username);
+        const password = String(Math.floor(1000 + Math.random() * 9000));
+        const r = createPlayer({ username, password, displayName: username, balance, note: `Brzi gost, ${datum}` }, ko);
+        if (r.error) throw new Error(r.error);
+        napravljeni.push({ id: r.id, username, password, balance });
+      }
+    });
+  } catch (e) {
+    return { error: String(e?.message || e) };
   }
   return { ok: true, players: napravljeni };
 }
@@ -1842,7 +1940,9 @@ const NEDELJA = 7 * 86400000;
 function potrosnjaNedelja(playerId) {
   const od = Date.now() - NEDELJA;
   return round2(db.prepare(
-    "SELECT COALESCE(SUM(-amount),0) s FROM transactions WHERE player_id=? AND type IN ('session','shop') AND created_at>=?"
+    // Povraćaj za otkazanu porudžbinu (refund, pozitivan iznos) se oduzima -
+    // inače "poruči pa otkaži" puni prag točka bez ijednog potrošenog dinara.
+    "SELECT COALESCE(SUM(-amount),0) s FROM transactions WHERE player_id=? AND type IN ('session','shop','refund') AND created_at>=?"
   ).get(playerId, od).s);
 }
 
@@ -2007,9 +2107,11 @@ export function createPosOrder({ items, playerId, computerId, payment = "cash", 
 
   const now = Date.now();
   // Račun, stavke, zaliha i naplata su JEDAN posao - vidi clientOrder.
-  let orderId, javiIgracu = null;
+  note = typeof note === "string" ? note.trim().slice(0, 200) : "";
+  const who = player ? player.username : "keš";
+  let orderId, javiIgracu = null, zapis = null;
   try {
-    ({ orderId, javiIgracu } = uJednomPoslu(() => {
+    ({ orderId, javiIgracu, zapis } = uJednomPoslu(() => {
       const info = db.prepare(
         "INSERT INTO orders (player_id, computer_id, total, status, payment, source, note, created_at) VALUES (?,?,?,?,?,?,?,?)"
       ).run(player ? player.id : null, computerId || null, total, "pending", payment, "pos", note || null, now);
@@ -2028,7 +2130,10 @@ export function createPosOrder({ items, playerId, computerId, payment = "cash", 
         const a = nivoZa(player.xp), b = nivoZa(noviXp);
         javi = { newBal, playerId: player.id, prelaz: b.nivo > a.nivo ? { nivoPre: a, nivoPosle: b } : null };
       }
-      return { orderId: id, javiIgracu: javi };
+      // Zapis ulazi u obračun smene - mora u isti posao (vidi clientOrder).
+      const zapis = upisiLog({ category: "shop", action: "pos", actor, target: who,
+        detail: `POS #${id} (${payment === "cash" ? "keš" : "kredit"}): ` + resolved.map((r) => `${r.qty}x ${r.item.name}`).join(", "), amount: -total });
+      return { orderId: id, javiIgracu: javi, zapis };
     }));
   } catch (e) {
     logEvent({ category: "sistem", action: "greska", actor: "server",
@@ -2045,8 +2150,7 @@ export function createPosOrder({ items, playerId, computerId, payment = "cash", 
 
   pushOrders();
   pushComputers();
-  const who = player ? player.username : "keš";
-  logEvent({ category: "shop", action: "pos", actor, target: who, detail: `POS #${orderId} (${payment === "cash" ? "keš" : "kredit"}): ` + resolved.map((r) => `${r.qty}x ${r.item.name}`).join(", "), amount: -total });
+  javiLog(zapis);
   broadcastPanels({ t: "event", kind: "order", text: `Nova porudžbina #${orderId} (${payment === "cash" ? "keš" : who})` });
   return zapamtiOdgovor(poId, { ok: true, orderId, total: round2(total) });
 }
@@ -2059,6 +2163,10 @@ export function setOrderStatus(orderId, status, actor = "osoblje") {
   const o = db.prepare("SELECT * FROM orders WHERE id=?").get(orderId);
   if (!o) return { error: "Nepostojeća porudžbina" };
   if (o.status === status) return { ok: true }; // ništa se nije promenilo
+  // Otkazana porudžbina je zatvorena zauvek. Vraćanje u "na čekanju" ili
+  // "dostavljeno" bi je opet ubrojalo u pazar i skinulo piće, a kredit je gostu
+  // već vraćen - novac bi se razišao sa evidencijom. Ko se predomisli, kuca novu.
+  if (o.status === "cancelled") return { error: "Otkazana porudžbina se ne može vratiti - napravi novu" };
 
   const cancelling = status === "cancelled" && o.status !== "cancelled";
 
@@ -2079,7 +2187,11 @@ export function setOrderStatus(orderId, status, actor = "osoblje") {
         const p = playerById(o.player_id);
         if (p) {
           const newBal = round2(p.balance + o.total);
-          db.prepare("UPDATE players SET balance=? WHERE id=?").run(newBal, p.id);
+          // Iskustvo je stiglo sa potrošnjom; vraćen novac nije potrošen, pa
+          // se i iskustvo vraća. Inače bi "poruči pa otkaži" bila besplatna
+          // prečica do nivoa.
+          const noviXp = Math.max(0, round2((Number(p.xp) || 0) - o.total));
+          db.prepare("UPDATE players SET balance=?, xp=? WHERE id=?").run(newBal, noviXp, p.id);
           addTransaction(p.id, "refund", o.total, newBal, null, `Otkazana porudžbina #${orderId}`);
           v = { playerId: p.id, newBal };
         }
@@ -2117,6 +2229,7 @@ export function setOrderStatus(orderId, status, actor = "osoblje") {
 }
 
 export function setPlayerBanned(playerId, banned) {
+  if (!playerById(playerId)) return { error: "Igrač ne postoji" };
   db.prepare("UPDATE players SET banned=? WHERE id=?").run(banned ? 1 : 0, playerId);
   if (banned) {
     const comp = db.prepare("SELECT * FROM computers WHERE current_player_id = ?").get(playerId);
@@ -2136,6 +2249,8 @@ export function updatePlayer(id, { username, displayName, note }) {
   if (!p) return { error: "Igrač ne postoji" };
   username = String(username ?? p.username).trim();
   if (!username) return { error: "Korisničko ime je obavezno" };
+  if (username !== p.username && (username.startsWith("__") || username.length > 32))
+    return { error: "Korisničko ime: do 32 znaka, ne sme počinjati sa __" };
   if (username !== p.username) {
     if (db.prepare("SELECT id FROM computers WHERE current_player_id=?").get(id))
       return { error: "Igrač je trenutno prijavljen - korisničko ime ne može da se menja dok igra" };
@@ -2149,22 +2264,39 @@ export function updatePlayer(id, { username, displayName, note }) {
   return { ok: true };
 }
 
-// Trajno brisanje naloga: čisti sesije i transakcije, porudžbine ostaju bez vlasnika.
-// Finansijski trag ostaje u logovima.
+// BRISANJE NALOGA NE SME DA MENJA PROŠLOST.
+//
+// Ranije je brisanje naloga brisalo i njegove sesije i transakcije. Posledica:
+// Izveštaji za prošle dane su se menjali naknadno - "promet od vremena" i
+// "zarada po računaru" su padali onog trenutka kad vlasnik počisti potrošene
+// goste, a to se radi rutinski. Ono što je jednom naplaćeno mora da ostane.
+//
+// Sesije i istorija naloga zato prelaze na jedan skriveni arhivski nalog. On se
+// ne vidi ni na jednom spisku, blokiran je i nema upotrebljivu lozinku; u
+// "najaktivnijim igračima" se vidi kao "(obrisani nalozi)".
+export const ARHIVA_IGRACA = "__obrisani__";
+function arhivskiNalog() {
+  const r = db.prepare("SELECT id FROM players WHERE username=?").get(ARHIVA_IGRACA);
+  if (r) return r.id;
+  return Number(db.prepare(
+    "INSERT INTO players (username, password_hash, display_name, balance, banned, note, created_at) VALUES (?,?,?,0,1,?,?)")
+    .run(ARHIVA_IGRACA, hashPassword(randomBytes(24).toString("hex")), "(obrisani nalozi)",
+      "Skriveni nalog: istorija obrisanih naloga, da Izveštaji ostanu tačni", 0).lastInsertRowid);
+}
+
 export function deletePlayer(id) {
   const p = playerById(id);
   if (!p) return { error: "Igrač ne postoji" };
+  if (p.username === ARHIVA_IGRACA) return { error: "Ovaj nalog se ne briše" };
   if (db.prepare("SELECT id FROM computers WHERE current_player_id=?").get(id))
     return { error: "Igrač je trenutno prijavljen - prvo ga odjavi" };
-  // Sirov BEGIN je zamenjen zajedničkim `uJednomPoslu`: on broji dubinu i
-  // koristi SAVEPOINT kad je već u poslu. Sa sirovim BEGIN-om bi ovo puklo
-  // ("cannot start a transaction within a transaction") čim bi se brisanje
-  // pozvalo iz nekog šireg posla - a čišćenje gostiju već briše u petlji.
   try {
     uJednomPoslu(() => {
+      const arhiva = arhivskiNalog();
       db.prepare("UPDATE orders SET player_id=NULL WHERE player_id=?").run(id);
-      db.prepare("DELETE FROM transactions WHERE player_id=?").run(id);
-      db.prepare("DELETE FROM sessions WHERE player_id=?").run(id);
+      db.prepare("UPDATE transactions SET player_id=? WHERE player_id=?").run(arhiva, id);
+      db.prepare("UPDATE sessions SET player_id=? WHERE player_id=?").run(arhiva, id);
+      db.prepare("UPDATE rezervacije SET player_id=NULL WHERE player_id=?").run(id);
       db.prepare("DELETE FROM players WHERE id=?").run(id);
     });
   } catch (e) {
@@ -2238,7 +2370,7 @@ export function sendCommand(computerId, cmd) {
 }
 
 export function bulkAction(ids, action) {
-  const targets = ids && ids.length ? ids : db.prepare("SELECT id FROM computers").all().map((r) => r.id);
+  const targets = ids && ids.length ? ids : db.prepare("SELECT id FROM computers WHERE obrisan = 0").all().map((r) => r.id);
   let sent = 0;
   for (const id of targets) {
     if (action === "lock") { lockComputer(id, null); sent++; }
@@ -2995,7 +3127,7 @@ export function clearInstallStatus() {
 }
 
 export function sendInstall(ids, prog, actor = "vlasnik") {
-  const targets = ids && ids.length ? ids : db.prepare("SELECT id FROM computers").all().map((r) => r.id);
+  const targets = ids && ids.length ? ids : db.prepare("SELECT id FROM computers WHERE obrisan = 0").all().map((r) => r.id);
   let sent = 0, offline = 0;
   for (const id of targets) {
     const ok = sendClient(id, { t: "install", name: prog.name, url: prog.url, args: prog.args || "" });
@@ -3212,7 +3344,7 @@ const nadogradnjaStatus = new Map(); // computerId -> { verzija, state, message,
 
 export function nadogradnjaStanje() {
   const st = nad.stanje();
-  const racunari = db.prepare("SELECT * FROM computers ORDER BY id").all().map((c) => {
+  const racunari = db.prepare("SELECT * FROM computers WHERE obrisan = 0 ORDER BY id").all().map((c) => {
     const v = c.launcher_version || null;
     return {
       id: c.id,
@@ -3244,7 +3376,7 @@ export function posaljiNadogradnju(ids, actor = "vlasnik", automatski = false) {
   if (!st.ima) return { error: "Nema instalatera na serveru" };
   if (!st.pusteno) return { error: "Ta verzija nije puštena u rad" };
 
-  const svi = db.prepare("SELECT * FROM computers ORDER BY id").all();
+  const svi = db.prepare("SELECT * FROM computers WHERE obrisan = 0 ORDER BY id").all();
   const trazeni = ids && ids.length ? svi.filter((c) => ids.includes(c.id)) : svi;
   let poslato = 0, zauzeto = 0, vecImaju = 0;
   for (const c of trazeni) {
@@ -3389,7 +3521,7 @@ export async function wakeComputer(id, actor) {
   return ok ? { ok: true } : { error: "Slanje signala nije uspelo" };
 }
 export async function wakeAll(actor) {
-  const rows = db.prepare("SELECT * FROM computers WHERE mac IS NOT NULL AND mac <> '' ORDER BY name").all();
+  const rows = db.prepare("SELECT * FROM computers WHERE obrisan = 0 AND mac IS NOT NULL AND mac <> '' ORDER BY name").all();
   let sent = 0;
   for (const c of rows) if (await sendWol(c.mac)) sent++;
   logEvent({ category: "racunar", action: "wake_all", actor: actor || "sistem", detail: `Signal za paljenje poslat na ${sent}/${rows.length} računara` });

@@ -86,7 +86,12 @@ export function initWs(server, { authComputer, authAdmin }) {
         catch (e) { console.error(`poruka sa ${comp.name}:`, e.message); }
       });
       ws.on("close", () => {
-        if (clients.get(comp.id) === ws) clients.delete(comp.id);
+        // Stara veza koju je zamenila nova (launcher se ponovo povezao pre nego
+        // što je server primetio da je prva pukla) ne sme da javi "računar je
+        // otišao": to bi obrisalo vreme povezivanja NOVE veze i panel bi
+        // pokazivao računar kao da nije povezan od kad je stigao.
+        if (clients.get(comp.id) !== ws) return;
+        clients.delete(comp.id);
         handlers.onClientClose(comp.id);
       });
     } else if (kind === "panel") {
@@ -122,6 +127,15 @@ export function izbaciPanel(adminId) {
     izbaceno++;
   }
   return izbaceno;
+}
+
+// Računar je uklonjen iz panela: njegova veza se zatvara, a token mu više ne
+// važi pa se ne može ni vratiti.
+export function izbaciKlijenta(computerId) {
+  const ws = clients.get(computerId);
+  if (!ws) return false;
+  try { ws.close(4001, "uklonjen"); } catch {}
+  return true;
 }
 
 export function broadcastPanels(obj) {

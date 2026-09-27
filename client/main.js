@@ -404,14 +404,26 @@ function handleServerMsg(msg) {
   // Igrač se prijavio - zapamti šta je radilo pre njega, da na kraju sesije
   // znamo šta je tačno on pokrenuo (igre preko Steam-a rade pod drugim imenom).
   if (msg.t === "login_ok") {
+    // ISTA SESIJA POSLE PREKIDA VEZE NIJE NOVA SESIJA.
+    //
+    // Server šalje login_ok i kad se veza vrati usred igre (restart servera,
+    // kratak prekid mreže). Ranije se tada "stanje pre sesije" snimalo ponovo -
+    // ali to više nije stanje PRE igrača nego stanje SA njim: njegova igra je
+    // ulazila u spisak zatečenih procesa (pa se na kraju sesije nije gasila), a
+    // njegov miš i zvuk u ono što se "vraća" (pa ih je nasleđivao sledeći gost).
+    const sesijaId = msg.session?.id ?? null;
+    const nova = !sesijaAktivna || sesijaId !== trenutnaSesija;
     sesijaAktivna = true;
-    javljeniPragovi = new Set();
+    trenutnaSesija = sesijaId;
     showBackdrop(); // od sada zastor pokriva desktop dok god traje sesija
-    proveriVreme(msg.remainingSeconds, true); // pri prijavi samo zapamti stanje
-    if (!NO_LOCK) snimiStanje().then((s) => { procesiPreSesije = s; }).catch(() => {});
-    // Zapamti kako je miš i zvuk bio pre ovog igrača, da se na kraju sesije
-    // vrati. Bez toga bi sledeći gost zatekao tuđa podešavanja.
-    winPod.procitajSve().then((s) => { podesavanjaPreSesije = s; }).catch(() => {});
+    if (nova) {
+      javljeniPragovi = new Set();
+      proveriVreme(msg.remainingSeconds, true); // pri prijavi samo zapamti stanje
+      if (!NO_LOCK) snimiStanje().then((s) => { procesiPreSesije = s; }).catch(() => {});
+      // Zapamti kako je miš i zvuk bio pre ovog igrača, da se na kraju sesije
+      // vrati. Bez toga bi sledeći gost zatekao tuđa podešavanja.
+      winPod.procitajSve().then((s) => { podesavanjaPreSesije = s; }).catch(() => {});
+    }
   }
   // Server šalje novo stanje na svakih par sekundi - odatle znamo koliko je ostalo.
   if (msg.t === "balance") proveriVreme(msg.remainingSeconds);
@@ -422,13 +434,19 @@ function handleServerMsg(msg) {
   }
   if (msg.t === "mirovanje") odbrojMirovanje(msg.preostalo);
   if (msg.t === "locked" || msg.t === "to_login") {
+    // to_login stiže i na svako ponovno povezivanje dok niko ne igra. Tada nema
+    // šta da se završava - a "završavanje" gasi programe i briše profile
+    // pregledača, pa se ne radi bez razloga na svaki prekid veze.
+    const biloJe = sesijaAktivna;
     sesijaAktivna = false;
-    zavrsiSesiju();
+    trenutnaSesija = null;
+    if (biloJe || msg.t === "locked") zavrsiSesiju();
     setPolicies(true); // vrati zaključavanje ako ga je osoblje privremeno skinulo
     focusLauncher();
   }
   if (msg.t === "force_logout") {
     sesijaAktivna = false;
+    trenutnaSesija = null;
     zavrsiSesiju();
     focusLauncher();
   }
@@ -560,6 +578,7 @@ function proveriVreme(preostaloSek, tiho = false) {
 
 // Kraj sesije: ugasi sve što je igrač pokrenuo, pa obriši njegove tragove.
 let procesiPreSesije = null;
+let trenutnaSesija = null; // id sesije sa servera - razlikuje novu prijavu od povratka veze
 
 // PODEŠAVANJA SE VRAĆAJU NA ZATEČENO.
 //
@@ -584,9 +603,12 @@ function zavrsiSesiju() {
   killAllGames();
   closeBrowser();
   if (!NO_LOCK && procesiPreSesije) {
-    ugasiNoveProcese(procesiPreSesije, { log: (m) => console.log(m) })
-      .catch(() => {})
-      .finally(() => { procesiPreSesije = null; });
+    // Spisak se preuzima odmah. Ranije se brisao tek kad gašenje završi - a ako
+    // se sledeći igrač prijavio u međuvremenu, brisanje je odnosilo NJEGOV
+    // tek snimljen spisak, pa se na kraju njegove sesije ništa nije gasilo.
+    const zatecen = procesiPreSesije;
+    procesiPreSesije = null;
+    ugasiNoveProcese(zatecen, { log: (m) => console.log(m) }).catch(() => {});
   }
   ocistiTragove(); // sledeći igrač ne sme da zatekne tuđe prijave
 }
@@ -687,6 +709,9 @@ function runInstall({ name, url, args }) {
     fs.mkdirSync(dir, { recursive: true });
     let base = "setup.exe";
     try { base = decodeURIComponent(new URL(url).pathname.split("/").pop()) || base; } catch {}
+    // Ime iz adrese ide u putanju na disku: "%2F..%2F" bi izašlo iz fascikle
+    // za instalacije. Ostaju samo slova, brojevi, tačka, crta i donja crta.
+    base = base.replace(/[^\w.\-]/g, "_").replace(/^\.+/, "").slice(0, 80) || "setup.exe";
     if (!/\.(exe|msi)$/i.test(base)) base += ".exe";
     const dest = path.join(dir, Date.now() + "-" + base);
     downloadFile(url, dest, (err) => {

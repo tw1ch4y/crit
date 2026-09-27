@@ -146,7 +146,7 @@ export function kreiraj({ computerIds, playerId, ime, telefon, napomena, pocetak
   }
   if (!naIme) return { error: "Upiši na koga glasi rezervacija" };
 
-  const racunari = ids.map((id) => db.prepare("SELECT id, name FROM computers WHERE id=?").get(id));
+  const racunari = ids.map((id) => db.prepare("SELECT id, name FROM computers WHERE id=? AND obrisan = 0").get(id));
   if (racunari.some((c) => !c)) return { error: "Računar ne postoji" };
 
   const sudar = racunari.filter((c) => db.prepare(
