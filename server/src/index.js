@@ -166,66 +166,96 @@ setHandlers({
   },
 });
 
-// ---- Naplata svakih 5s ----
-setInterval(() => {
-  try { svc.billingTick(); } catch (e) { console.error("billing:", e); }
-}, 5000);
-
-// ---- Rezervacije: oslobađanje propalih termina i podsetnik (30s) ----
-setInterval(() => {
-  try { svc.rezervacijeTick(); } catch (e) { console.error("rezervacije:", e.message); }
-}, 30 * 1000);
-
-// ---- Zaštita: WAL checkpoint (2 min) + backup baze (15 min + na startu) ----
-// Racunari se nadograde sami cim se oslobode - vidi nadogradnjaTick.
-setInterval(() => {
-  try { svc.nadogradnjaTick(); } catch (e) { console.error("nadogradnja:", e.message); }
-}, 60 * 1000);
-
-setInterval(() => checkpoint(), 2 * 60 * 1000);
-setInterval(() => backupDb(), 15 * 60 * 1000);
-backupDb();
-
-// ---- Održavanje: na startu i jednom dnevno ----
+// POSLOVI KREĆU TEK KAD JE PORT NAŠ.
 //
-// Seče logove po starosti i po broju, proređuje rezervne kopije i pazi na
-// slobodan prostor. Objašnjenje granica i izmerene brojke su u odrzavanje.js.
-function odrzavanjeSada(razlog) {
-  const r = odrzavanje(svc.getActiveShift()?.id ?? null);
-  const obrisano = r.logovi.poStarosti + r.logovi.poBroju + r.pokretanja + r.kopije.obrisano;
-  if (obrisano) {
-    console.log(`održavanje (${razlog}): logovi -${r.logovi.poStarosti + r.logovi.poBroju}, ` +
-      `pokretanja igara -${r.pokretanja}, kopije -${r.kopije.obrisano} ` +
-      `(ostalo ${r.kopije.zadrzano} kopija, ${r.kopije.ukupnoMB} MB)`);
-  }
-  if (r.stanje.maloMesta) {
-    console.error(`PAŽNJA: na disku je ostalo samo ${r.stanje.slobodnoMB} MB. ` +
-      `Kad disk stane, server ne može da piše i igraonica staje.`);
-    svc.logEvent({ category: "sistem", action: "disk_malo", actor: "sistem",
-      detail: `Malo mesta na disku: ${r.stanje.slobodnoMB} MB slobodno` });
-  }
-  // KOPIJA VAN RAČUNARA - jedina zaštita od otkaza diska.
+// Naplata, kopije, održavanje i rezervacije rade nad bazom. Primerak servera
+// koji ne može da zauzme port (drugi već radi) ne sme ni jedan od njih da
+// pokrene - inače bi svaki pokušaj iz start-server.bat petlje pravio novu
+// rezervnu kopiju i pokretao održavanje nad bazom koju koristi pravi server.
+function pokreniPoslove() {
+  // ---- Naplata svakih 5s ----
+  setInterval(() => {
+    try { svc.billingTick(); } catch (e) { console.error("billing:", e); }
+  }, 5000);
+
+  // ---- Rezervacije: oslobađanje propalih termina i podsetnik (30s) ----
+  setInterval(() => {
+    try { svc.rezervacijeTick(); } catch (e) { console.error("rezervacije:", e.message); }
+  }, 30 * 1000);
+
+  // ---- Zaštita: WAL checkpoint (2 min) + backup baze (15 min + na startu) ----
+  // Racunari se nadograde sami cim se oslobode - vidi nadogradnjaTick.
+  setInterval(() => {
+    try { svc.nadogradnjaTick(); } catch (e) { console.error("nadogradnja:", e.message); }
+  }, 60 * 1000);
+
+  setInterval(() => checkpoint(), 2 * 60 * 1000);
+  setInterval(() => backupDb(), 15 * 60 * 1000);
+  backupDb();
+
+  // ---- Održavanje: na startu i jednom dnevno ----
   //
-  // Neuspeh mora da se čuje. USB se iščupa, mrežni disk se odjavi, a kopija
-  // tiho prestane da izlazi napolje - i to se otkrije tek onog dana kad zatreba.
-  // Zato zapis ide u Logove, gde vlasnik gleda, a ne samo u konzolu koju niko
-  // ne otvara.
-  const van = r.vanRacunara;
-  if (van?.ok) {
-    console.log(`kopija van računara: ${van.fajl} -> ${van.cilj}`);
-  } else if (van?.error) {
-    console.error(`PAŽNJA: kopija van računara nije uspela (${van.error}) - odredište ${van.cilj}`);
-    svc.logEvent({ category: "sistem", action: "kopija_van_pala", actor: "sistem",
-      detail: `Kopija van računara nije uspela: ${van.error}. Odredište: ${van.cilj}. ` +
-        `Dok ovo stoji, baza postoji samo na jednom disku.` });
+  // Seče logove po starosti i po broju, proređuje rezervne kopije i pazi na
+  // slobodan prostor. Objašnjenje granica i izmerene brojke su u odrzavanje.js.
+  function odrzavanjeSada(razlog) {
+    const r = odrzavanje(svc.getActiveShift()?.id ?? null);
+    const obrisano = r.logovi.poStarosti + r.logovi.poBroju + r.pokretanja + r.kopije.obrisano;
+    if (obrisano) {
+      console.log(`održavanje (${razlog}): logovi -${r.logovi.poStarosti + r.logovi.poBroju}, ` +
+        `pokretanja igara -${r.pokretanja}, kopije -${r.kopije.obrisano} ` +
+        `(ostalo ${r.kopije.zadrzano} kopija, ${r.kopije.ukupnoMB} MB)`);
+    }
+    if (r.stanje.maloMesta) {
+      console.error(`PAŽNJA: na disku je ostalo samo ${r.stanje.slobodnoMB} MB. ` +
+        `Kad disk stane, server ne može da piše i igraonica staje.`);
+      svc.logEvent({ category: "sistem", action: "disk_malo", actor: "sistem",
+        detail: `Malo mesta na disku: ${r.stanje.slobodnoMB} MB slobodno` });
+    }
+    // KOPIJA VAN RAČUNARA - jedina zaštita od otkaza diska.
+    //
+    // Neuspeh mora da se čuje. USB se iščupa, mrežni disk se odjavi, a kopija
+    // tiho prestane da izlazi napolje - i to se otkrije tek onog dana kad zatreba.
+    // Zato zapis ide u Logove, gde vlasnik gleda, a ne samo u konzolu koju niko
+    // ne otvara.
+    const van = r.vanRacunara;
+    if (van?.ok) {
+      console.log(`kopija van računara: ${van.fajl} -> ${van.cilj}`);
+    } else if (van?.error) {
+      console.error(`PAŽNJA: kopija van računara nije uspela (${van.error}) - odredište ${van.cilj}`);
+      svc.logEvent({ category: "sistem", action: "kopija_van_pala", actor: "sistem",
+        detail: `Kopija van računara nije uspela: ${van.error}. Odredište: ${van.cilj}. ` +
+          `Dok ovo stoji, baza postoji samo na jednom disku.` });
+    }
+    return r;
   }
-  return r;
+  setInterval(() => odrzavanjeSada("dnevno"), 24 * 60 * 60 * 1000);
+  odrzavanjeSada("start");
 }
-setInterval(() => odrzavanjeSada("dnevno"), 24 * 60 * 60 * 1000);
-odrzavanjeSada("start");
+
 
 // ---- Start ----
+// PORT ZAUZET = IZLAZ, NE SERVER U SENCI.
+//
+// Kad se server pokrene dvaput (autostart pa još jednom rukom), drugi primerak
+// ne može da zauzme port. Ranije je ta greška završavala u opštem hvataču
+// grešaka, a proces je NASTAVLJAO da radi bez porta: bez ijednog računara i
+// panela, ali sa svim tajmerima - održavanjem, kopijama, rezervacijama - nad
+// istom bazom kao pravi server. Takav proces niko ne vidi i niko ne gasi.
+// "prepend": WebSocket biblioteka je na istom serveru i grešku bi inače prva
+// primila i bacila dalje, pa ovaj hvatač ne bi ni došao na red.
+server.prependListener("error", (e) => {
+  if (e?.code === "EADDRINUSE") {
+    console.error(`\nPORT ${PORT} JE ZAUZET - server verovatno već radi (proveri drugi prozor).`);
+    console.error("Ovaj primerak se gasi da ne bi radio nad istom bazom.\n");
+    // Poseban kod: start-server.bat po njemu zna da ne treba da vrti restart
+    // na svake 3 sekunde, nego da sačeka.
+    process.exit(3);
+  }
+  console.error("Server ne može da krene:", e?.message || e);
+  process.exit(1);
+});
 server.listen(PORT, () => {
+  pokreniPoslove();
   const ips = localIps();
   console.log(`\nCrit server radi na portu ${PORT}`);
   console.log(`  ovaj racunar:  http://localhost:${PORT}`);

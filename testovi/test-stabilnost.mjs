@@ -170,5 +170,19 @@ proveri("ekran launchera ne ponavlja pozdrav pri povratku veze", /const istaSesi
 const app = citajIzvor("server/public/js/app.js");
 proveri("strana koja ne može da se učita to kaže", /Strana nije mogla da se učita/.test(app));
 
+// ---- 11) INDEKSI (izmereno na bazi posle godinu dana) ----
+const { db } = await import(pathToFileURL(path.join(KOREN, "server", "src", "db.js")).href);
+const indeksi = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='index'").all().map((r) => r.name));
+for (const ime of ["ix_oi_order", "ix_logs_shift", "ix_logs_cat", "ix_orders_status", "ix_orders_player", "ix_tx_player", "ix_tx_type", "ix_sess_status"]) {
+  proveri(`indeks ${ime} postoji`, indeksi.has(ime));
+}
+const plan = (q, ...a) => db.prepare("EXPLAIN QUERY PLAN " + q).all(...a).map((r) => r.detail).join(" | ");
+proveri("stavke porudžbine se traže po indeksu (ne kroz celu tabelu)",
+  /USING INDEX ix_oi_order/.test(plan("SELECT name, price, qty FROM order_items WHERE order_id = ?", 1)));
+proveri("obračun smene ide po indeksu smene",
+  /ix_logs_shift/.test(plan("SELECT COALESCE(SUM(amount),0) s FROM logs WHERE shift_id=? AND category='novac' AND amount>0", 1)));
+proveri("novac van smene ide po vremenu (ne kroz sve stare zapise bez smene)",
+  /idx_logs_ts/.test(plan("SELECT COALESCE(SUM(amount),0) s FROM logs WHERE +shift_id IS NULL AND ts>=? AND +category='novac' AND amount>0", 0)));
+
 for (const k of [k1, k2, k3, staraVeza, novaVeza]) { try { k.ws.close(); } catch {} }
 await kraj();

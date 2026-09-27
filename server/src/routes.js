@@ -10,6 +10,10 @@ import * as rez from "./rezervacije.js";
 
 export const router = express.Router();
 
+// Express 4 ne hvata grešku iz async rute: zahtev bi ostao bez odgovora dok
+// panel ne odustane, a radnik bi gledao dugme koje "radi" u nedogled.
+const asinhrono = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
 const pName = (id) => db.prepare("SELECT username FROM players WHERE id=?").get(id)?.username || `#${id}`;
 const cName = (id) => db.prepare("SELECT name FROM computers WHERE id=?").get(id)?.name || `#${id}`;
 
@@ -494,28 +498,28 @@ router.post("/computers/:id/command", (req, res) => {
 
 // DALJINSKI TASK MANAGER: radnik sa glavnog računara vidi šta radi na izabranoj
 // mašini i gasi zaglavljen program, bez ustajanja od kase.
-router.get("/computers/:id/procesi", async (req, res) => {
+router.get("/computers/:id/procesi", asinhrono(async (req, res) => {
   const r = await svc.procesiRacunara(Number(req.params.id));
   if (r.error) return res.status(400).json(r);
   res.json(r);
-});
-router.post("/computers/:id/procesi/:pid/ugasi", async (req, res) => {
+}));
+router.post("/computers/:id/procesi/:pid/ugasi", asinhrono(async (req, res) => {
   const id = Number(req.params.id);
   const r = await svc.ugasiProcesNaRacunaru(id, req.params.pid, req.admin.username);
   if (r.error) return res.status(400).json(r);
   res.json(r);
-});
+}));
 
 // Wake-on-LAN: paljenje računara preko mreže (magic packet)
-router.post("/computers/wake-all", async (req, res) => {
+router.post("/computers/wake-all", asinhrono(async (req, res) => {
   const r = await svc.wakeAll(req.admin.username);
   res.json(r);
-});
-router.post("/computers/:id/wake", async (req, res) => {
+}));
+router.post("/computers/:id/wake", asinhrono(async (req, res) => {
   const r = await svc.wakeComputer(Number(req.params.id), req.admin.username);
   if (r.error) return res.status(400).json(r);
   res.json(r);
-});
+}));
 
 // grupna akcija
 router.post("/computers-action", (req, res) => {

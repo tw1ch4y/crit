@@ -2001,6 +2001,14 @@ const zaInputDatum = (ts) => { const d = new Date(ts); return `${d.getFullYear()
 const zaInputVreme = (ts) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
 const trajanjeTekst = (min) => { const h = Math.floor(min / 60), m = min % 60; return h ? `${h} h${m ? ` ${m} min` : ""}` : `${m} min`; };
 const zive = (r) => r.status === "aktivna" || r.status === "stigao";
+// Sati od ponoći izabranog dana PO LOKALNOM SATU. Deljenje razlike sa 3.600.000
+// greši na dan promene letnjeg/zimskog vremena (dan tada ima 23 ili 25 sati),
+// pa bi termin od 18:00 stajao na liniji kod 17 ili 19.
+const satiOd = (dan, ts) => {
+  const d = new Date(ts);
+  return Math.round((ponoc(ts) - dan) / DAN_MS) * 24 + d.getHours() + d.getMinutes() / 60;
+};
+const uSat = (dan, sat) => { const d = new Date(dan); d.setHours(0, 0, 0, 0); d.setMinutes(Math.round(sat * 60)); return d.getTime(); };
 
 async function renderRezervacije() {
   const dan = state.rezDan != null ? state.rezDan : (state.rezDan = ponoc());
@@ -2015,14 +2023,14 @@ async function renderRezervacije() {
   // odsečen termin.
   let od = 10, doSata = 24;
   for (const r of spisak) {
-    od = Math.min(od, Math.max(0, Math.floor((r.pocetak - dan) / 3600000)));
-    doSata = Math.max(doSata, Math.min(30, Math.ceil((r.kraj - dan) / 3600000)));
+    od = Math.min(od, Math.max(0, Math.floor(satiOd(dan, r.pocetak))));
+    doSata = Math.max(doSata, Math.min(30, Math.ceil(satiOd(dan, r.kraj))));
   }
   const sad = Date.now();
   const danas = ponoc() === dan;
   if (danas) od = Math.min(od, new Date(sad).getHours());
   const sati = doSata - od;
-  const poz = (ts) => ((ts - dan) / 3600000 - od) / sati * 100;
+  const poz = (ts) => (satiOd(dan, ts) - od) / sati * 100;
 
   const zivih = spisak.filter(zive);
   const redovi = state.computers.map((c) => {
@@ -2105,7 +2113,7 @@ async function renderRezervacije() {
     const b = t.getBoundingClientRect();
     const sat = od + ((e.clientX - b.left) / b.width) * sati;
     // Zaokruži na pola sata - niko ne rezerviše u 17:43.
-    let pocetak = dan + Math.round(sat * 2) / 2 * 3600000;
+    let pocetak = uSat(dan, Math.round(sat * 2) / 2);
     if (pocetak < Date.now()) pocetak = Math.ceil(Date.now() / 900000) * 900000;
     rezervacijaModal({ dan, pocetak, racunari: [Number(t.dataset.rezPc)] });
   }));
@@ -2171,7 +2179,7 @@ function rezervacijaDetalj(id) {
 // da ne sazna tek posle klika na "Sačuvaj".
 function rezervacijaModal({ dan, pocetak, racunari = [], izmena = null } = {}) {
   const sada = Date.now();
-  const p0 = izmena ? izmena.pocetak : pocetak || Math.max(ponoc(dan ?? sada) + 18 * 3600000, Math.ceil(sada / 1800000) * 1800000);
+  const p0 = izmena ? izmena.pocetak : pocetak || Math.max(uSat(ponoc(dan ?? sada), 18), Math.ceil(sada / 1800000) * 1800000);
   const t0 = izmena ? Math.round((izmena.kraj - izmena.pocetak) / 60000) : 120;
   const izabrani = new Set(izmena ? [izmena.computerId] : racunari);
   let igrac = null;

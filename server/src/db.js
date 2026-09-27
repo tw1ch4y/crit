@@ -321,6 +321,33 @@ function migrate() {
   // Isto za artikal iz shopa koji je bar jednom prodat: stavke porudžbina
   // pokazuju na njega. Arhiviran se ne vidi ni u panelu ni u launcheru.
   if (!columnExists("shop_items", "obrisan")) db.exec("ALTER TABLE shop_items ADD COLUMN obrisan INTEGER NOT NULL DEFAULT 0");
+  indeksi();
+}
+
+// INDEKSI ZA ONO ŠTO SE ČITA STALNO.
+//
+// Izmereno na bazi posle godinu dana rada (godina-rada.mjs): istorija
+// porudžbina 125 ms jer se stavke svake od 100 porudžbina traže kroz celu
+// tabelu stavki, a obračun smene 65 ms jer četiri upita prolaze kroz svih
+// 230.000 logova tražeći jednu smenu. Oba rastu sa svakim danom rada - za tri
+// godine bi bila trostruko sporija, a obračun se čita pri svakom otvaranju
+// table i na svaku promenu smene.
+//
+// Pravi se POSLE migracija: `logs.shift_id` na staroj bazi nastaje tek u njima.
+// IF NOT EXISTS - na postojećoj bazi indeks nastaje jednom, pri prvom startu.
+function indeksi() {
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS ix_oi_order ON order_items (order_id);
+    CREATE INDEX IF NOT EXISTS ix_orders_status ON orders (status, created_at);
+    CREATE INDEX IF NOT EXISTS ix_orders_created ON orders (created_at);
+    CREATE INDEX IF NOT EXISTS ix_orders_player ON orders (player_id, created_at);
+    CREATE INDEX IF NOT EXISTS ix_logs_shift ON logs (shift_id, category);
+    CREATE INDEX IF NOT EXISTS ix_logs_cat ON logs (category, ts);
+    CREATE INDEX IF NOT EXISTS ix_tx_player ON transactions (player_id, created_at);
+    CREATE INDEX IF NOT EXISTS ix_tx_type ON transactions (type, created_at);
+    CREATE INDEX IF NOT EXISTS ix_sess_status ON sessions (status, computer_id);
+    CREATE INDEX IF NOT EXISTS ix_sess_started ON sessions (started_at);
+  `);
 }
 migrate();
 

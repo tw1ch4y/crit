@@ -212,7 +212,9 @@ export function novacVanSmene(odKada = null) {
   const pocetakDana = odKada ?? new Date().setHours(0, 0, 0, 0);
   try {
     const dopune = db.prepare(
-      "SELECT COALESCE(SUM(amount),0) s FROM logs WHERE shift_id IS NULL AND ts>=? AND category='novac' AND amount>0").get(pocetakDana).s;
+      // "+" ispred kolona tera bazu na indeks po vremenu: van smene je
+      // mnogo starih zapisa, pa bi indeks po smeni prelazio kroz sve njih.
+      "SELECT COALESCE(SUM(amount),0) s FROM logs WHERE +shift_id IS NULL AND ts>=? AND +category='novac' AND amount>0").get(pocetakDana).s;
     const kesUShopu = db.prepare(
       "SELECT COALESCE(SUM(total),0) s FROM orders WHERE payment='cash' AND status!='cancelled' AND created_at>=? " +
       "AND NOT EXISTS (SELECT 1 FROM shifts sh WHERE orders.created_at>=sh.opened_at AND orders.created_at<=COALESCE(sh.closed_at, 9e18))").get(pocetakDana).s;
@@ -3496,21 +3498,53 @@ function magicPacket(mac) {
   for (let i = 0; i < 16; i++) for (let j = 0; j < 6; j++) packet[6 + i * 6 + j] = bytes[j];
   return packet;
 }
-function sendWol(mac) {
+// KUDA IDE SIGNAL ZA PALJENJE.
+//
+// Samo "255.255.255.255" nije dovoljno: na Windows-u sa više mrežnih kartica
+// (WiFi pored LAN-a, VirtualBox, VPN) takav paket izlazi kroz JEDNU karticu -
+// onu sa najnižom metrikom, a to je često WiFi, ne kabl ka switchu. Paket tada
+// nikad ne stigne do računara, a slanje javlja uspeh.
+//
+// Zato se šalje i na broadcast adresu SVAKE kartice servera (npr.
+// 192.168.0.255), sa soketa vezanog baš za tu karticu. Dovoljno je da bilo
+// koji put prođe.
+export function adreseZaBudjenje() {
+  const ciljevi = [{ adresa: "255.255.255.255", izvor: null }];
+  for (const lista of Object.values(os.networkInterfaces())) {
+    for (const k of lista || []) {
+      if (k.family !== "IPv4" || k.internal || !k.netmask) continue;
+      const ip = k.address.split(".").map(Number);
+      const maska = k.netmask.split(".").map(Number);
+      if (ip.length !== 4 || maska.length !== 4) continue;
+      const bc = ip.map((b, i) => (b | (~maska[i] & 255)) & 255).join(".");
+      if (!ciljevi.some((c) => c.adresa === bc)) ciljevi.push({ adresa: bc, izvor: k.address });
+    }
+  }
+  return ciljevi;
+}
+function posaljiNa(packet, adresa, izvor) {
   return new Promise((resolve) => {
-    let packet;
-    try { packet = magicPacket(mac); } catch { return resolve(false); }
     const sock = dgram.createSocket("udp4");
-    sock.once("error", () => { try { sock.close(); } catch {} resolve(false); });
-    sock.bind(() => {
+    let gotovo = false;
+    const kraj = (ok) => { if (gotovo) return; gotovo = true; try { sock.close(); } catch {} resolve(ok); };
+    sock.once("error", () => kraj(false));
+    const posle = () => {
       try { sock.setBroadcast(true); } catch {}
       let pending = 2, ok = false;
-      const done = (err) => { if (!err) ok = true; if (--pending === 0) { try { sock.close(); } catch {} resolve(ok); } };
-      // klasični WoL portovi 9 i 7, na broadcast adresu
-      sock.send(packet, 0, packet.length, 9, "255.255.255.255", done);
-      sock.send(packet, 0, packet.length, 7, "255.255.255.255", done);
-    });
+      const done = (err) => { if (!err) ok = true; if (--pending === 0) kraj(ok); };
+      // klasični WoL portovi 9 i 7
+      sock.send(packet, 0, packet.length, 9, adresa, done);
+      sock.send(packet, 0, packet.length, 7, adresa, done);
+    };
+    try { izvor ? sock.bind({ address: izvor, port: 0 }, posle) : sock.bind(posle); }
+    catch { kraj(false); }
   });
+}
+async function sendWol(mac) {
+  let packet;
+  try { packet = magicPacket(mac); } catch { return false; }
+  const rez = await Promise.all(adreseZaBudjenje().map((c) => posaljiNa(packet, c.adresa, c.izvor)));
+  return rez.some(Boolean);
 }
 export async function wakeComputer(id, actor) {
   const c = db.prepare("SELECT * FROM computers WHERE id=?").get(id);

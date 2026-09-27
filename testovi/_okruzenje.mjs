@@ -52,9 +52,20 @@ export function radniFolder(ime) {
 // Gasi se ISKLJUCIVO electron.exe pokrenut iz node_modules ovog projekta.
 // Na radnom racunaru Electron koriste i pravi programi i njih ovo ne dodiruje.
 export function ugasiLaunchere() {
-  if (process.platform !== "win32") return 0;
   const nas = path.join(KOREN, "client", "node_modules", "electron").toLowerCase();
   let ugaseno = 0;
+  // Van Windows-a (CI na Linuxu, xvfb) isto pravilo: samo nas Electron.
+  if (process.platform !== "win32") {
+    try {
+      const izlaz = execFileSync("ps", ["-eo", "pid=,args="], { encoding: "utf8" });
+      for (const red of izlaz.split("\n")) {
+        const m = /^\s*(\d+)\s+(.*)$/.exec(red);
+        if (!m || Number(m[1]) === process.pid || !m[2].toLowerCase().includes(nas)) continue;
+        try { process.kill(Number(m[1]), "SIGKILL"); ugaseno++; } catch {}
+      }
+    } catch {}
+    return ugaseno;
+  }
   try {
     const izlaz = execFileSync("powershell", ["-NoProfile", "-Command",
       "Get-CimInstance Win32_Process -Filter \"Name='electron.exe'\" | " +

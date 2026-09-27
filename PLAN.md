@@ -439,6 +439,40 @@ Svaka stavka je dokazana na živom serveru pre ispravke; sve ih čuva
 - [x] `kiosk-beg`, `kopija-van` i `ciscenje-gostiju` sada prolaze i van
   Windows-a (putanje su se gradile po sistemu na kom se test pušta)
 
+### Revizija 2.49 - pravi launcher, brzina posle godinu dana, dupli server
+
+- [x] **Probe na PRAVOM launcheru rade i van Windows-a** (Linux + virtuelni
+  ekran, `xvfb-run node pokreni-probe.mjs`). Prošlo 16 od 18; dve preostale
+  (`proba-procesa`, `proba-podesavanja`) po prirodi traže Windows. Usput
+  ispravljeno: `ugasiLaunchere()` nije gasio launcher van Windows-a, pa su se
+  dva launchera sa istim tokenom otimala o vezu i proba je lažno padala
+- [x] **Nova proba `proba-povratak-veze`** - server se ugasi i vrati usred
+  sesije, na pravom launcheru. Dokazano da hvata grešku iz 2.47: stara verzija
+  pada na 4 od 11 tvrdnji (pozdrav dvaput, vraćen na početnu, prazna korpa,
+  izgubljen način plaćanja), nova prolazi sve
+- [x] **Brzina posle godinu dana rada** - izmereno nad bazom iz
+  `godina-rada.mjs` (230.000 logova, 15.000 porudžbina). Bez indeksa:
+  istorija porudžbina 125 ms, obračun smene 65 ms, Logovi po retkoj kategoriji
+  74 ms - i sve raste linearno sa danima rada. Sa indeksima: 2 ms, 0,1 ms,
+  0,04 ms. Jedan upit (novac van smene) je planer posle toga vodio pogrešnim
+  indeksom (2 -> 17 ms) - usmeren nazad, 0,5 ms. Indeksi i planovi upita su
+  čuvani u `test-stabilnost`
+- [x] **SERVER POKRENUT DVAPUT OSTAJAO JE DA RADI U SENCI.** Drugi primerak ne
+  može da zauzme port, ali je greška završavala u opštem hvataču i proces je
+  nastavljao - bez porta, ali sa održavanjem, kopijama i rezervacijama nad
+  istom bazom. `start-server.bat` bi ga uz to pokretao iznova na svake 3
+  sekunde, i svaki put pravio novu rezervnu kopiju. Sada: poslovi kreću tek kad
+  je port zauzet, drugi primerak izlazi sa kodom 3 i porukom "PORT JE ZAUZET",
+  a `.bat` tada čeka 30 s umesto da vrti restart (`test-dva-servera.mjs`)
+- [x] **Buđenje računara (Wake-on-LAN) samo na 255.255.255.255** - na Windows-u
+  sa više mrežnih kartica taj paket izlazi kroz jednu, često WiFi, pa "Upali"
+  ne radi, a javlja uspeh. Sada se šalje i na broadcast adresu svake kartice
+- [x] Async rute (daljinski procesi, buđenje) su na grešku ostavljale zahtev bez
+  odgovora; sada vraćaju grešku kao i ostale
+- [x] Rezervacije na dan promene letnjeg/zimskog vremena: termin od 18:00 se
+  crtao kod 19h, a podrazumevani početak je bio 17:00 (dan ima 23/25 sati, a
+  računalo se "ponoć + 18 × 3.600.000"). Sada po lokalnom satu
+
 ---
 
 ## Šta ostaje pred otvaranje
