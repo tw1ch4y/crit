@@ -550,6 +550,11 @@ istorijom, 3 nivoa x 2 rezolucije, pa klik na boju i okvir).
   zarezima i tačkama ("Nivo 10, Mit", "Najviši nivo. Svaka čast!")
 - [x] Validacija izbora (tema, boja, okvir, pokret) više ne prima nizove ni
   imena iz prototipa (`constructor`), a ne samo nepoznata imena
+- [x] **Klik u sadržaju je hvatao `<body>`**: launcher stavlja `data-tema` na
+  body, pa je obrada klika za izbor teme hvatala svaki klik (korpa, pokretanje
+  igre) i slala ga kao izbor teme. Našla ga je `proba-porudzbine` na pravom
+  launcheru; sada se hvata samo dugme, a `test-teme` proverava da nijedan
+  klik ne traži golo ime atributa koji stoji na body-ju
 - [x] Novo: `test-teme`, `test-dostignuca`, `proba-teme`; `pregled-profila`
   sada slika i meri i Dostignuća i Teme i proverava pozdrav i čestitke
 

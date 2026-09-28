@@ -2627,7 +2627,10 @@ $("#content").addEventListener("click", (e) => {
   // Tema: izbor se odmah šalje serveru, on proveri nivo i vrati profil, pa se
   // launcher promeni pred igračem - bez dugmeta "sačuvaj". Zaključana se ni ne
   // šalje; server bi je svejedno odbio.
-  const tema = e.target.closest("[data-tema]");
+  // SAMO DUGME. <body> nosi data-tema (tekuća tema), pa bi goli
+  // closest bez "button" uhvatio SVAKI klik u sadržaju - dodavanje u korpu,
+  // pokretanje igre - i poslao ga kao izbor teme.
+  const tema = e.target.closest("button[data-tema]");
   if (tema) {
     if (tema.classList.contains("zakljucana")) { sfx.error(); return; }
     window.crit.toServer({ t: "moj_profil", tema: tema.dataset.tema || null });

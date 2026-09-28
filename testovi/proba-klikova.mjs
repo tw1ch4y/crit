@@ -90,7 +90,7 @@ const posalji = (w, m) => w.webContents.send("server-msg", m);
 const KLIKABILNO = [
   "button", "a[href]", "[data-game]", "[data-tool]", "[data-add]", "[data-inc]",
   "[data-dec]", "[data-kat]", "[data-nacin]", "[data-arr]", "[data-promo-idi]",
-  "[data-tema]", "[data-acc-sekcija]", ".tab", ".tile",
+  "button[data-tema]", "[data-acc-sekcija]", ".tab", ".tile",
   ".site-card", ".pice", ".shop-cip",
 ].join(", ");
 

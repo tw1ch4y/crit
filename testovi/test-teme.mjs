@@ -69,6 +69,17 @@ const app = citajIzvor("server/public/js/app.js");
 proveri("panel crta teme iz spiska sa servera", /\/izgled-kuce/.test(app) && /data-kucna-tema/.test(app));
 proveri("panel vise ne zna za sare", !/\/tekstura|tex-kartica|tekstura_|data-tex/.test(app));
 
+// <body> nosi data-tema i data-pokret. Klik koji trazi closest("[data-tema]")
+// bi se popeo do body-ja i svaki klik u sadrzaju bio bi "izbor teme": korpa i
+// pokretanje igara su tako stali (nadjeno na pravom launcheru, proba-porudzbine).
+const rend = citajIzvor("client/renderer/js/launcher.js");
+const naBody = [...new Set([...rend.matchAll(/\bb\.dataset\.(\w+)\s*=/g)].map((m) => m[1]))];
+proveri("launcher postavlja temu na body", naBody.includes("tema") && naBody.includes("pokret"), J(naBody));
+for (const ime of naBody) {
+  const kebab = ime.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase());
+  proveri(`klik ne trazi goli [data-${kebab}] (uhvatio bi body)`, !rend.includes(`closest("[data-${kebab}]")`));
+}
+
 w.close();
 await cekaj(200);
 kraj();
