@@ -453,8 +453,9 @@ function handleMsg(m) {
       primeniPozadinu();
       primeniTemu();
       $("#loginPc").textContent = m.computer?.name || "-";
-      // Ekran prijave nosi i podatke kuće - gost sa ulice ih tu i traži.
-      $("#loginKuca").textContent = S.settings.cafeName || "Igraonica";
+      // Ekran prijave nosi podatke kuće - gost sa ulice ih tu i traži. Ime
+      // kuće se ne piše ispod znaka (znak ga već nosi); ostaje kao opis slike.
+      $$(".lb-logo").forEach((i) => { i.alt = S.settings.cafeName || i.alt; });
       $("#loginCena").textContent = S.settings.ratePerHour > 0 ? money(S.settings.ratePerHour) : "-";
       postaviPozadinuPrijave();
       break;
