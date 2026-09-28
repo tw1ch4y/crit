@@ -45,27 +45,26 @@ proveri("widget u baneru i dalje otvara pop-up", contentDeo.includes("#heroTocak
 // ---- 2) ANIMACIJE NA RACUNARU BEZ WINDOWS ANIMACIJA ----
 // Racunari u igraonici se podesavaju za igre: Windows animacije iskljucene.
 // Takav Windows javlja prefers-reduced-motion: reduce. Pravilo koje je sa
-// !important gasilo SVE animacije je na tim racunarima ubijalo i saru u
-// pozadini i vrtnju nagradnog tocka - a vlasnik ih je izricito upalio.
+// !important gasilo SVE animacije je na tim racunarima ubijalo i pozadinu i
+// vrtnju nagradnog tocka - a vlasnik ih je izricito upalio.
 const blokovi = [...jedanRed.matchAll(/@media \(prefers-reduced-motion: reduce\) \{(.*?)\} \}/g)].map((m) => m[1]);
 proveri("postoji pravilo za smanjen motion", blokovi.length > 0);
 for (const b of blokovi) {
   proveri("smanjen motion ne gasi SVE animacije", !/\*, \*::before, \*::after/.test(b), b.slice(0, 120));
-  proveri("smanjen motion ne dira saru u pozadini", !/body::after/.test(b), b.slice(0, 120));
+  proveri("smanjen motion ne dira pozadinu", !/ambijent/.test(b), b.slice(0, 120));
   proveri("smanjen motion ne dira nagradni tocak", !/tocak/.test(b), b.slice(0, 120));
-  proveri("smanjen motion ne gasi iskre", !/iskre-sloj/.test(b), b.slice(0, 120));
 }
 
-// Same animacije moraju da postoje - ovo hvata slucaj da neko obrise keyframes.
-for (const [vrsta, kf] of [["klizanje", "tekstura-klizi"], ["talas", "tekstura-talas"], ["dubina", "tekstura-dubina"]]) {
-  proveri(`kretanje "${vrsta}" ima svoju animaciju`,
-    new RegExp(`body\\[data-kretanje="${vrsta}"\\]::after \\{[^}]*animation: ${kf}`).test(jedanRed));
-  proveri(`animacija "${kf}" je definisana`, jedanRed.includes(`@keyframes ${kf}`));
-}
-// Trajanje dolazi sa servera; 0s znaci "Mirno" i tada animacija stoji - to je
-// jedini ispravan nacin da se kretanje ugasi.
-proveri("trajanje kretanja dolazi iz promenljive, ne zakucano",
-  /animation: tekstura-talas var\(--tekstura-sekundi/.test(jedanRed));
+// Pozadina se krece samo kad je vlasnik ostavio "Lagano". Svaka mrlja ima
+// svoju animaciju i svoje trajanje, pa se nikad ne poklope u isti ritam.
+proveri("mrlje se krecu samo uz data-pokret=lagano",
+  /body\[data-pokret="lagano"\] \.ambijent i:nth-child\(1\) \{ animation: amb-a/.test(jedanRed));
+for (const kf of ["amb-a", "amb-b", "amb-c"]) proveri(`animacija "${kf}" je definisana`, jedanRed.includes(`@keyframes ${kf}`));
+proveri("kretanje ide preko transform-a, ne preko background-position",
+  !/@keyframes amb-[abc] \{[^}]*background-position/.test(jedanRed));
+proveri("bez stare pozadine (sara, iskre, dubina)",
+  !/tekstura-|iskre-sloj|data-kretanje/.test(jedanRed) && !/iskre|dubina|tekstura/.test(launcher));
+proveri("launcher postavlja data-pokret iz podesavanja", /dataset\.pokret/.test(launcher));
 
 console.log(`\n${prosao}/${prosao + pao} proslo`);
 process.exit(pao ? 1 : 0);

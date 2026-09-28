@@ -309,10 +309,17 @@ function migrate() {
   // prometa - promet se sece pri odrzavanju (stari logovi se brisu), pa bi se
   // nivo igraca tiho vratio unazad onog dana kad odrzavanje prodje.
   if (!columnExists("players", "xp")) db.exec("ALTER TABLE players ADD COLUMN xp REAL NOT NULL DEFAULT 0");
-  // Izgled profila: boja imena i okvir oko znaka. Kao tekst (JSON), jer su to
-  // dva sitna izbora koja se ne pretrazuju. Odvojeno od `tema` (sara) da se
-  // citanje sare ne kvari kad se doda jos nesto na profil.
+  // Izgled profila: boja imena, okvir oko znaka i tema launchera. Kao tekst
+  // (JSON), jer su to sitni izbori koji se ne pretrazuju. Kolona `tema` je
+  // ostala od izbacenih sara i vise se ne cita.
   if (!columnExists("players", "profil")) db.exec("ALTER TABLE players ADD COLUMN profil TEXT");
+  // Dostignuća: najveća vrednost ikad po svakom (JSON). Čuva se jer se deo
+  // izvora seče pri održavanju (stara pokretanja igara) - osvojen stepen ne
+  // sme da nestane zato što je baza počišćena.
+  if (!columnExists("players", "dostignuca")) db.exec("ALTER TABLE players ADD COLUMN dostignuca TEXT");
+  // Podesavanja izbacenog sistema sara. Ne smetaju, ali bi zbunila svakog ko
+  // otvori bazu i trazi zasto launcher ne crta sara koja je "ukljucena".
+  db.exec("DELETE FROM settings WHERE key IN ('tekstura','tekstura_jacina','tekstura_kretanje','tekstura_prozirnost')");
   // Obrisan računar koji ima istoriju (sesije, porudžbine) ne sme stvarno da
   // nestane iz baze: promet po računaru bi izgubio svoje redove, a brisanje je
   // ionako padalo na stranom ključu. Ostaje kao arhiviran - van svih spiskova,
@@ -347,6 +354,7 @@ function indeksi() {
     CREATE INDEX IF NOT EXISTS ix_tx_type ON transactions (type, created_at);
     CREATE INDEX IF NOT EXISTS ix_sess_status ON sessions (status, computer_id);
     CREATE INDEX IF NOT EXISTS ix_sess_started ON sessions (started_at);
+    CREATE INDEX IF NOT EXISTS ix_sess_player ON sessions (player_id, started_at);
   `);
 }
 migrate();
@@ -369,13 +377,11 @@ function seed() {
     currency: "RSD",
     rate_per_hour: "120", // dinara na sat
     unlock_pin: "1234", // PIN koji osoblje kuca da otkljuca racunar
-    // Šara i animacija su uključene od početka - inače sveža igraonica izgleda
-    // ravno i niko ne zna da to postoji dok ne pretraži podešavanja. Postavlja
-    // se SAMO ako ključ nikad nije upisan: ko je namerno izabrao "bez šare",
-    // njegov izbor ostaje (getSetting vrati "nema", nije null, pa se preskoči).
-    tekstura: "crit",
-    tekstura_jacina: "srednje",
-    tekstura_kretanje: "talas",
+    // Kućna tema launchera i lagano prelivanje pozadine od početka - inače
+    // sveža igraonica izgleda ravno i niko ne zna da to postoji. Postavlja se
+    // SAMO ako ključ nikad nije upisan, pa izbor vlasnika ostaje.
+    tema_kuce: "kuca",
+    pokret: "lagano",
   };
   for (const [k, v] of Object.entries(defaults)) {
     if (getSetting(k) === null) setSetting(k, v);

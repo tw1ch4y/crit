@@ -86,7 +86,6 @@ const SME_DA_OSTANE = [
   /X-Crit-/,                 // zaglavlja u odgovoru servera, ne vidi ih korisnik
   /promoCrit|napraviPromoCrit|promo-crit-/, // imena funkcija i fajla
   /^\s*crit: \{/,            // kljuc sare - postojece baze ga imaju upisanog
-  /tekstura: "crit"/,        // podrazumevani kljuc sare u bazi
   // Komentari su za onoga ko odrzava program, ne za igraonicu. Traze se CELI
   // redovi komentara - kod iza komentara u istom redu i dalje mora da se
   // preimenuje, pa ovo ne otvara rupu.
@@ -126,12 +125,11 @@ proveri("napravi-paket nema upisano ime",
 // Jedina stvar u launcheru koju vlasnik ne bi mogao da promeni iz panela, a
 // igrac je gleda ceo dan iza svake police.
 const svc = citajIzvor("server/src/service.js");
-proveri("sara sa imenom kuce se crta u hodu", /saraOd: \(ime\) =>/.test(svc));
-proveri("ime u sari je eskejpovano", /escXml\(t\)/.test(svc),
-  "naziv sa & ili < pokvario bi ceo SVG, a to je pozadina svakog ekrana");
-proveri("spisak sara je na jednom mestu", /export function teksturaSpisak\(\)/.test(svc) &&
-  /svc\.teksturaSpisak\(\)/.test(citajIzvor("server/src/routes.js")),
-  "vec se jednom razislo: launcher je dobijao razresenu saru, panel sirov objekat sa funkcijom");
+// Sara sa imenom kuce je izbacena zajedno sa celim sistemom sara. Ostaje
+// pravilo koje je tamo vazilo: boje tema stoje na jednom mestu, a panel i
+// launcher ih dobijaju odatle.
+proveri("palete tema su na jednom mestu", /export const TEME = \{/.test(citajIzvor("server/src/nivoi.js")) &&
+  /svc\.temeSpisak\(\)/.test(citajIzvor("server/src/routes.js")) && /teme: temeSpisak\(\)/.test(svc));
 
 // ---- 7) ni panel ni launcher ne nose ime u tekstu ----
 //

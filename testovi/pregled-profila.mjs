@@ -95,7 +95,13 @@ app.whenReady().then(async () => {
     for (let i = 0; i < 60; i++) { if ((await ekran()) === "loginScreen") break; await cekaj(400); }
     await js('(() => { document.querySelector("#pUser").value = "stefan"; document.querySelector("#pPass").value = "stefan1234";'
       + ' document.querySelector("#loginForm").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); return 1; })()');
-    await cekaj(3800);
+    // Pozdrav nosi niz nedelja, a posle njega stizu cestitke za dostignuca.
+    await cekaj(700);
+    const pozdrav = await js('document.querySelector("#bootSub")?.textContent || ""');
+    await cekaj(2300);
+    const tostovi = await js('[...document.querySelectorAll(".toast")].map((t) => t.textContent.trim())');
+    fs.appendFileSync(path.join(SLIKE, "prijava.jsonl"), JSON.stringify({ xp, pozdrav, tostovi }) + "\\n");
+    await cekaj(800);
     await js('(() => { const t = [...document.querySelectorAll(".tab")].find(x => x.dataset.tab === "account"); t.click(); return 1; })()');
     await cekaj(500);
     await js('(() => { const b = document.querySelector(\\'[data-acc-sekcija="profil"]\\'); if (b) b.click(); return 1; })()');
@@ -110,6 +116,16 @@ app.whenReady().then(async () => {
       const slika = await w.webContents.capturePage();
       fs.writeFileSync(path.join(SLIKE, "profil-xp" + xp + "-" + sw + "x" + sh + ".png"), slika.toPNG());
       fs.appendFileSync(path.join(SLIKE, "mere.jsonl"), JSON.stringify({ xp, rez: sw + "x" + sh, mere }) + "\\n");
+      // Isto za Dostignuca i Teme - i oni moraju da stanu bez skrola.
+      for (const sek of ["dostignuca", "teme"]) {
+        await js('(() => { const b = document.querySelector(\\'.acc-meni [data-acc-sekcija="' + sek + '"], [data-acc-sekcija="' + sek + '"]\\'); if (b) b.click(); return 1; })()');
+        await cekaj(600);
+        const m2 = await js(\`(() => { const s = document.querySelector(".acc-sadrzaj"); return s ? { h: Math.round(s.getBoundingClientRect().height), sh: s.scrollHeight, ch: s.clientHeight } : null; })()\`);
+        fs.writeFileSync(path.join(SLIKE, sek + "-xp" + xp + "-" + sw + "x" + sh + ".png"), (await w.webContents.capturePage()).toPNG());
+        fs.appendFileSync(path.join(SLIKE, "mere.jsonl"), JSON.stringify({ xp, rez: sw + "x" + sh, sek, mere: { sadrzaj: m2 } }) + "\\n");
+      }
+      await js('(() => { const b = document.querySelector(\\'[data-acc-sekcija="profil"]\\'); if (b) b.click(); return 1; })()');
+      await cekaj(500);
     }
     // Klik na boju i okvir, kao igrač. Na niskom nivou mora da ostane odbijeno.
     await js('(() => { document.querySelector(\"[data-pf-boja=roze]\").click(); return 1; })()');
@@ -164,9 +180,15 @@ if (visok) {
   proveri("ime u gornjoj traci dobija boju", /255, 122, 192/.test(visok.klik.imeTraka), visok.klik.imeTraka);
   proveri("znak u glavi dobija okvir", /okvir-puls/.test(visok.klik.znakOkvir), visok.klik.znakOkvir);
 }
+const prijave = (() => { try { return fs.readFileSync(path.join(SLIKE, "prijava.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l)); } catch { return []; } })();
+if (prijave[0]) {
+  proveri("pozdrav kaze koja je nedelja zaredom", /^\d+\. nedelja zaredom$/.test(prijave[0].pozdrav), JSON.stringify(prijave[0]));
+  proveri("posle prve prijave stizu cestitke za dostignuca", prijave[0].tostovi.some((t) => /Dostignuće: .+, stepen \d od \d/.test(t)), JSON.stringify(prijave[0].tostovi));
+}
+if (prijave[1]) proveri("sledeca prijava ne ponavlja cestitke", !prijave[1].tostovi.some((t) => /Dostignuće/.test(t)), JSON.stringify(prijave[1].tostovi));
 for (const red of fs.readFileSync(path.join(SLIKE, "mere.jsonl"), "utf8").trim().split("\n")) {
   const m = JSON.parse(red);
   const s = m.mere?.sadrzaj;
-  proveri(`profil staje bez skrolovanja (${m.rez}, ${m.xp} XP)`, s && s.sh <= s.ch + 2, JSON.stringify(s));
+  proveri(`${m.sek || "profil"} staje bez skrolovanja (${m.rez}, ${m.xp} XP)`, s && s.sh <= s.ch + 2, JSON.stringify(s));
 }
 process.exit(pao ? 1 : 0);

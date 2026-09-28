@@ -6,6 +6,7 @@
 //   node pregled-panela.mjs                 sve strane, 1920x1080 i 1366x768
 //   node pregled-panela.mjs --rez 1366x768  samo jedna rezolucija
 //   node pregled-panela.mjs --strana igraci samo jedna strana
+//   node pregled-panela.mjs --strana izgled --do .tema-mreza   skroluje do elementa pre slike
 //
 // Kod koji se izvrsava U STRANI stoji u zasebnim fajlovima (u-strani/*.js), ne
 // kao tekst unutar teksta. Ranije je bio ugnjezden i escape se lomio na svakoj
@@ -91,6 +92,7 @@ const IZLAZ = ${JSON.stringify(SLIKE)};
 const BAZA = "http://127.0.0.1:${PORT}";
 const REZOLUCIJE = ${JSON.stringify(REZOLUCIJE)};
 const SAMO = ${JSON.stringify(SAMO)};
+const DO = ${JSON.stringify(arg("do", ""))};
 const uStrani = (ime) => fs.readFileSync(path.join(__dirname, "u-strani", ime + ".js"), "utf8");
 
 process.on("uncaughtException", (e) => { console.log("PUKLO: " + (e && e.stack || e)); app.exit(1); });
@@ -121,6 +123,10 @@ app.whenReady().then(async () => {
         JSON.stringify(s.kljuc) + "); if (b) b.click(); return true; })()");
       await cekaj(1100);
       const mere = await win.webContents.executeJavaScript(mereKod);
+      if (DO) {
+        await win.webContents.executeJavaScript("(() => { const e = document.querySelector(" + JSON.stringify(DO) + "); if (e) e.scrollIntoView({ block: 'center' }); return !!e; })()");
+        await cekaj(400);
+      }
       const fajl = s.kljuc + "-" + rez.ime + ".png";
       try { fs.writeFileSync(path.join(IZLAZ, fajl), (await win.webContents.capturePage()).toPNG()); }
       catch (e) { mere.bezSlike = String(e && e.message); }

@@ -30,7 +30,7 @@ proveri("zakljucano stanje nosi pecat", /vip-pecat[\s\S]{0,120}Uskoro!/.test(ren
 proveri("pecat se sklanja cim podaci stignu", /\$\{ima \? "" : `<div class="vip-pecat"/.test(rend));
 proveri("bez podataka napredak je NULA", /: merljiv \? Math\.max\(0, Math\.min\(100,[\s\S]{0,40}: 0;/.test(rend),
   "izmisljen napredak je gori od nikakvog - igrac bi cekao nagradu koje nema");
-proveri("bez podataka se ne izmislja ni nivo", /: "Nivo -"/.test(rend));
+proveri("bez podataka se ne izmislja ni nivo", /const nivo = ima \? `Nivo \$\{v\.nivo\}[^\n]*: "";/.test(rend));
 
 // ---- 2) sa podacima: racun je ogranicen ----
 //

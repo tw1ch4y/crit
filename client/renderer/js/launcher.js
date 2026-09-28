@@ -12,9 +12,8 @@ const S = {
   skoroIgrane: [],
   porudzbine: [],
   pozadine: {},
-  tekstura: { kljuc: "nema", jacina: "srednje" },
-  teksture: null,   // spisak sara za biranje, stize uz welcome
-  mojaTekstura: null, // izbor ovog igraca; null znaci "kao u igraonici"
+  izgled: { tema: "kuca", pokret: "lagano" }, // kućna tema i pokret pozadine (bira vlasnik)
+  teme: [],         // sve teme sa paletama, stižu uz welcome
   promo: [],
   balance: 0,
   remaining: null,
@@ -88,6 +87,8 @@ const ICONS = {
   okvir: '<rect x="3" y="3" width="18" height="18" rx="3"/><rect x="7.5" y="7.5" width="9" height="9" rx="1.5"/>',
   zvezda: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9Z"/>',
   munja: '<path d="M13 2 4 14h7l-1 8 9-12h-7Z"/>',
+  mesec: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/>',
+  trofej: '<path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3M12 14v4M8 21h8M9 18h6"/>',
 };
 const icon = (name, size = 16) =>
   `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ""}</svg>`;
@@ -214,7 +215,7 @@ function show(id) {
 function toast(msg, type = "info", trajanje = 3000) {
   const el = document.createElement("div");
   el.className = "toast " + type;
-  const ic = type === "success" ? "check" : type === "error" ? "alert" : type === "nivo" ? "gift" : "info";
+  const ic = type === "success" ? "check" : type === "error" ? "alert" : type === "nivo" ? "gift" : type === "dostignuce" ? "trofej" : "info";
   el.innerHTML = `<span class="t-ic">${icon(ic)}</span><span class="t-msg"></span>`;
   el.querySelector(".t-msg").textContent = msg;
   $("#toasts").appendChild(el);
@@ -282,12 +283,6 @@ function toast(msg, type = "info", trajanje = 3000) {
   resetIdle();
 })();
 
-// POZADINE EKRANA
-// Osoblje ih kaci kroz panel, launcher ih samo primenjuje. Menjaju se u letu,
-// bez restarta, jer server posalje novo stanje svim racunarima odjednom.
-// Saru crta server (service.js), ovde se samo prosledi u CSS. Stariji server
-// ovo polje ne salje uopste - tada tekstura ostaje ugasena, umesto da ekran
-// zavrsi u polovicnom stanju.
 // BREND: ZNAK I BOJA IGRAONICE
 //
 // Znak i boja su nekad stajali ušiveni u fajlove - ali sledeća igraonica nije
@@ -318,113 +313,70 @@ function primeniBrend(b) {
   }
 }
 
-function primeniTeksturu(t) {
-  if (t && typeof t === "object") S.tekstura = t;
-  const sara = String(S.tekstura?.sara || "");
-  const vid = Number(S.tekstura?.prozirnost);
-  const korak = Number(S.tekstura?.korak);
-  const sekundi = Number(S.tekstura?.sekundi);
-  // Prima se samo oblik koji server stvarno salje - url("data:image/svg+xml,...").
-  const ispravna = /^url\("data:image\/svg\+xml,[^"]*"\)$/.test(sara);
-  const st = document.body.style;
-  st.setProperty("--tekstura", ispravna ? sara : "none");
-  st.setProperty("--tekstura-vid", ispravna && vid >= 0 && vid <= 1 ? String(vid) : "0");
-  // Kretanje: 0s znaci da sara stoji. Gornja granica je zastita od zapisa koji
-  // bi napravio animaciju od sat vremena ili obrnuto - trepereci ekran.
-  const kreceSe = ispravna && Number.isFinite(sekundi) && sekundi >= 3 && sekundi <= 120
-    && Number.isFinite(korak) && korak > 0;
-  // Korak vazi kad god sara postoji, ne samo kad se pomera: iskre ga koriste da
-  // se crvena figura poklopi sa belom, a nemaju trajanje animacije.
-  const imaKorak = ispravna && Number.isFinite(korak) && korak > 0;
-  st.setProperty("--tekstura-korak", imaKorak ? `${korak}px` : "0px");
-  st.setProperty("--tekstura-sekundi", kreceSe ? `${sekundi}s` : "0s");
+// TEME LAUNCHERA
+//
+// Tema menja podlogu, ploče, boju dugmadi i boje pozadine koja se preliva.
+// Paleta stiže sa servera (TEME u nivoi.js) - jedna definicija, pa pregled u
+// panelu i ono što igrač vidi ne mogu da se raziđu.
+//
+// Koja važi: dok je igrač prijavljen - njegova, ako ju je izabrao; inače kućna,
+// koju bira vlasnik. Posle odjave se računar vraća na kućnu, pa sledeći gost ne
+// zatiče tuđi izgled.
+//
+// "kuca" nema svoj akcenat: tu važi boja kuće iz panela (primeniBrend), pa se
+// za nju promenljive akcenta samo sklanjaju sa body-ja.
+const TEMA_PROMENLJIVE = ["--bg", "--bg-2", "--bg-rgb", "--panel", "--panel-2", "--panel-3", "--text-2", "--text-3",
+  "--brend", "--brend-rgb", "--brend-deep", "--brend-soft", "--brend-glow", "--na-brendu", "--amb-1", "--amb-2", "--amb-3"];
+const HEKS = /^#[0-9a-f]{6}$/i;
+const uRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(", ");
+const tamnije = (h, k = 0.82) => "#" + [1, 3, 5].map((i) => Math.round(parseInt(h.slice(i, i + 2), 16) * k).toString(16).padStart(2, "0")).join("");
 
-  // Vrstu kretanja bira CSS preko ovog atributa. Prima se samo ono sto je
-  // poznato, da nepoznata vrednost ne ostavi ekran u polovicnom stanju.
-  // "Iskre" nemaju trajanje animacije (sekundi = 0), pa se ne traze kroz
-  // kreceSe nego zasebno - njima je dovoljno da sara postoji.
-  const zna = KRETANJA_UI.includes(S.tekstura?.kretanje);
-  const iskreRade = zna && S.tekstura.kretanje === "iskre" && ispravna
-    && Number.isFinite(korak) && korak > 0 && /^url\("data:image\/svg\+xml,[^"]*"\)$/.test(String(S.tekstura?.iskra || ""));
-  const vrsta = (kreceSe && zna) || iskreRade ? S.tekstura.kretanje : "mirno";
-
-  document.body.dataset.kretanje = vrsta;
-  st.setProperty("--tekstura-iskra", iskreRade ? S.tekstura.iskra : "none");
-  pratiMisZaDubinu(vrsta === "dubina");
-  pustiIskre(iskreRade ? korak : 0);
+function aktivnaTema() {
+  const lista = Array.isArray(S.teme) ? S.teme : [];
+  const moja = S.player ? S.profil?.izgled?.tema : null;
+  const k = moja || S.izgled?.tema || "kuca";
+  return lista.find((t) => t.kljuc === k) || lista.find((t) => t.kljuc === "kuca") || null;
 }
 
-// ISKRE
-// Preko nasumicne plocice u mrezi legne ISTA figura u boji kuce, zasvetli i
-// ugasi se. Da bi se crvena figura poklopila sa belom ispod nje, iskra mora da
-// stoji tacno na koraku mreze - zato se pozicija zaokruzuje na ceo korak.
-// Namerno ih je malo i traju kratko: ovo stoji ceo dan iza igara i treba da se
-// primeti tek kad pogled odluta, ne da vuce paznju.
-const NAJVISE_ISKRI = 5;
-let iskreKorak = 0, iskreTajmer = null, iskreSloj = null;
-
-function pustiIskre(korak) {
-  if (korak === iskreKorak) return;
-  iskreKorak = korak;
-  clearInterval(iskreTajmer); iskreTajmer = null;
-  if (iskreSloj) { iskreSloj.remove(); iskreSloj = null; }
-  if (!korak) return;
-
-  iskreSloj = document.createElement("div");
-  iskreSloj.className = "iskre-sloj";
-  document.body.appendChild(iskreSloj);
-
-  const zapali = () => {
-    if (!iskreSloj || iskreSloj.childElementCount >= NAJVISE_ISKRI) return;
-    // Mreza pocinje od 0 0, isto kao pozadina - zato se bira ceo korak.
-    const kolona = Math.floor(Math.random() * Math.ceil(window.innerWidth / korak));
-    const red = Math.floor(Math.random() * Math.ceil(window.innerHeight / korak));
-    const i = document.createElement("i");
-    i.className = "iskra";
-    i.style.left = `${kolona * korak}px`;
-    i.style.top = `${red * korak}px`;
-    i.style.width = `${korak}px`;
-    i.style.height = `${korak}px`;
-    // Svaka gori malo drugacije dugo, da se ne pale u ritmu.
-    i.style.animationDuration = `${(2.2 + Math.random() * 1.8).toFixed(2)}s`;
-    i.addEventListener("animationend", () => i.remove(), { once: true });
-    iskreSloj.appendChild(i);
-  };
-
-  zapali();
-  iskreTajmer = setInterval(zapali, 900);
+function primeniTemu() {
+  const t = aktivnaTema();
+  const b = document.body;
+  const kljuc = t?.kljuc || "kuca";
+  // Promena teme je trenutna. Sa prelazima bi svako dugme i ploca posebno
+  // klizili iz stare boje u novu, pa bi ekran na trenutak bio pola jedne, pola
+  // druge teme. Prelazi se gase samo dok se boje menjaju (reflow izmedju).
+  const menja = b.dataset.tema && b.dataset.tema !== kljuc;
+  if (menja) b.classList.add("tema-menja");
+  primeniBojeTeme(t, kljuc);
+  if (menja) { void b.offsetHeight; b.classList.remove("tema-menja"); }
 }
-
-// DUBINA: blizi sloj sare prati pokret misa.
-// Racuna se u ritmu iscrtavanja, ne na svaki dogadjaj misa - inace bi se posao
-// gomilao dok igrac brzo prevlaci po ekranu.
-const KRETANJA_UI = ["klizanje", "talas", "dubina", "iskre"];
-let dubinaUkljucena = false, dubinaZakazana = false, dubinaX = 0, dubinaY = 0;
-
-function dubinaPomeraj(e) {
-  dubinaX = (e.clientX / window.innerWidth - 0.5) * 2;   // -1 levo, 1 desno
-  dubinaY = (e.clientY / window.innerHeight - 0.5) * 2;
-  if (dubinaZakazana) return;
-  dubinaZakazana = true;
-  requestAnimationFrame(() => {
-    dubinaZakazana = false;
-    // Pomeraj je mali (do 26 px): pozadina treba da "dise" uz pokret, ne da se
-    // vozi po ekranu i vuce pogled sa igara.
-    document.body.style.setProperty("--par-x", `${(-dubinaX * 26).toFixed(1)}px`);
-    document.body.style.setProperty("--par-y", `${(-dubinaY * 18).toFixed(1)}px`);
-  });
-}
-
-function pratiMisZaDubinu(uklj) {
-  if (uklj === dubinaUkljucena) return;
-  dubinaUkljucena = uklj;
-  if (uklj) {
-    window.addEventListener("pointermove", dubinaPomeraj, { passive: true });
-  } else {
-    window.removeEventListener("pointermove", dubinaPomeraj);
-    document.body.style.setProperty("--par-x", "0px");
-    document.body.style.setProperty("--par-y", "0px");
+function primeniBojeTeme(t, kljuc) {
+  const b = document.body;
+  b.dataset.tema = kljuc;
+  b.dataset.pokret = S.izgled?.pokret === "iskljuceno" ? "iskljuceno" : "lagano";
+  const st = b.style;
+  TEMA_PROMENLJIVE.forEach((v) => st.removeProperty(v));
+  const c = t?.boje;
+  if (!c) return;
+  // Prima se samo ispravna boja - pokvaren podatak ne sme da ostavi ekran bez podloge.
+  const postavi = (ime, h) => { if (HEKS.test(String(h || ""))) st.setProperty(ime, h); };
+  postavi("--bg", c.bg); postavi("--bg-2", c.bg2);
+  if (HEKS.test(c.bg || "")) st.setProperty("--bg-rgb", uRgb(c.bg));
+  postavi("--panel", c.panel); postavi("--panel-2", c.panel2); postavi("--panel-3", c.panel3);
+  postavi("--text-2", c.t2); postavi("--text-3", c.t3);
+  if (HEKS.test(c.akcenat || "")) {
+    const rgb = uRgb(c.akcenat);
+    st.setProperty("--brend", c.akcenat);
+    st.setProperty("--brend-rgb", rgb);
+    st.setProperty("--brend-deep", tamnije(c.akcenat));
+    st.setProperty("--brend-soft", `rgba(${rgb}, 0.15)`);
+    st.setProperty("--brend-glow", `rgba(${rgb}, 0.5)`);
+    postavi("--na-brendu", c.naAkcentu);
   }
+  const amb = Array.isArray(c.amb) ? c.amb : [];
+  // Kućnoj temi prva boja pozadine je boja kuće, da se slaže sa dugmadima.
+  if (!c.akcenat) st.setProperty("--amb-1", "var(--brend)"); else postavi("--amb-1", amb[0]);
+  postavi("--amb-2", amb[1]); postavi("--amb-3", amb[2]);
 }
 
 function primeniPozadinu() {
@@ -452,9 +404,8 @@ function primeniPozadinu() {
   // ostanu glavna stvar.
   const prazan = aktivan === "loginScreen" || aktivan === "lockedScreen";
   document.body.classList.toggle("pozadina-prazna", prazan && !!slika);
-  // Prazni ekrani (prijava, zakljucan) nemaju sadrzaj preko sare, pa bi se
-  // ponavljanje videlo kao vodeni zig. Tamo sara ide tise.
-  document.body.classList.toggle("tiha-sara", aktivan === "loginScreen" || aktivan === "lockedScreen" || aktivan === "connScreen");
+  // Na praznim ekranima boje pozadine smeju jače da se vide.
+  document.body.classList.toggle("prazan-ekran", aktivan === "loginScreen" || aktivan === "lockedScreen" || aktivan === "connScreen");
 }
 
 // Prazan racunar stoji satima na ekranu prijave i to je izlog igraonice.
@@ -484,10 +435,11 @@ function handleMsg(m) {
       S.settings = m.settings; S.computer = m.computer; S.games = m.games || []; S.shop = m.shop || []; S.tools = m.tools || [];
       S.pozadine = m.pozadine || {};
       S.promo = m.promo || [];
-      S.teksture = m.teksture || null;
+      if (m.izgled) S.izgled = m.izgled;
+      if (Array.isArray(m.teme)) S.teme = m.teme;
       primeniBrend(m.brend);
       primeniPozadinu();
-      primeniTeksturu(m.tekstura);
+      primeniTemu();
       $("#loginPc").textContent = m.computer?.name || "-";
       // Ekran prijave nosi i podatke kuće - gost sa ulice ih tu i traži.
       $("#loginKuca").textContent = S.settings.cafeName || "Igraonica";
@@ -509,6 +461,7 @@ function handleMsg(m) {
       // gost baš tada kucao ime i lozinku, ne sme da mu se obriše.
       const bioIgrac = !!S.player || !$("#loginScreen")?.classList.contains("active");
       S.player = null; S.sesijaId = null; stopTimer(); document.body.classList.remove("desktop-active");
+      primeniTemu(); // sledeći gost zatiče kućni izgled, ne tuđi
       if (bioIgrac) { $("#pPass").value = ""; $("#pUser").value = ""; $("#loginErr").textContent = ""; }
       show("loginScreen"); if (bioIgrac) $("#pUser").focus(); resetIdle();
       break;
@@ -525,7 +478,7 @@ function handleMsg(m) {
       if (istaSesija) {
         S.player = m.player; S.balance = m.balance; S.remaining = m.remainingSeconds;
         if (m.vip) S.vip = m.vip;
-        if (m.profil) S.profil = m.profil;
+        if (m.profil) { S.profil = m.profil; primeniTemu(); }
         if (Array.isArray(m.porudzbine)) S.porudzbine = m.porudzbine;
         S.tocak = m.tocak || S.tocak;
         // Sa ekrana "Povezivanje..." nazad na isti ekran i istu karticu, a
@@ -539,13 +492,11 @@ function handleMsg(m) {
       S.player = m.player; S.balance = m.balance; S.remaining = m.remainingSeconds;
       S.skoroIgrane = Array.isArray(m.skoroIgrane) ? m.skoroIgrane : [];
       S.porudzbine = Array.isArray(m.porudzbine) ? m.porudzbine : [];
-      // Igraceva pozadina stize odmah uz prijavu, da kucna ne bljesne pa se
-      // promeni cim se ekran otvori. "mojaTekstura" je null kad igrac nije
-      // birao svoju, pa vazi ono sto je vlasnik podesio.
-      if (m.tekstura) primeniTeksturu(m.tekstura);
-      S.mojaTekstura = m.mojaTekstura || null;
       S.vip = m.vip || null;
+      // Igračeva tema stiže uz profil, odmah uz prijavu - da kućna ne bljesne
+      // pa se promeni pred očima.
       S.profil = m.profil || null;
+      primeniTemu();
       S.accSekcija = null; // sledeci igrac ne nasledjuje odeljak koji je prethodni gledao
       S.tocak = m.tocak || null;
       osveziZnackuNaloga();
@@ -590,6 +541,7 @@ function handleMsg(m) {
       break;
     case "locked":
       stopTimer(); S.player = null; S.sesijaId = null; document.body.classList.remove("desktop-active");
+      primeniTemu();
       sfx.alert();
       $("#lockTitle").textContent = m.reason === "time" ? "Vreme je isteklo" : "Računar je zaključan";
       $("#lockSub").textContent = m.reason === "time" ? "Kredit je potrošen. Dopuni na kasi pa nastavi gde si stao." : "Pozovite osoblje da otključa računar.";
@@ -668,14 +620,11 @@ function handleMsg(m) {
       // Vlasnik je promenio znak ili boju - vidi se odmah, na svih 13 masina.
       primeniBrend(m.brend);
       break;
-    case "tekstura":
-      primeniTeksturu(m.tekstura);
-      // Server javlja i sta je igrac izabrao; null znaci "kao u igraonici".
-      if ("moja" in m) S.mojaTekstura = m.moja || null;
+    case "izgled":
+      // Vlasnik je promenio kućnu temu ili pokret pozadine - odmah, na svim mašinama.
+      S.izgled = m.izgled || S.izgled;
+      primeniTemu();
       if (S.tab === "account") renderContent();
-      break;
-    case "moja_tekstura_err":
-      toast(m.message || "Ne mogu da promenim pozadinu.", "error");
       break;
     case "vip":
       S.vip = m.vip || null;
@@ -683,6 +632,7 @@ function handleMsg(m) {
       break;
     case "profil":
       S.profil = m.profil || null;
+      primeniTemu();
       updateHud(); // boja imena u gornjoj traci
       if (S.tab === "account") renderContent();
       break;
@@ -692,6 +642,21 @@ function handleMsg(m) {
     case "nivo_gore":
       proslaviNivo(m);
       break;
+    case "dostignuce": {
+      // Nov stepen dostignuća. Spisak i niz stižu uz čestitku, pa se profil
+      // osveži bez novog upita. Ako je pozdrav još na ekranu, čestitka čeka
+      // da se skloni - inače bi je pokrio.
+      if (S.profil) { S.profil.dostignuca = m.dostignuca || S.profil.dostignuca; S.profil.niz = m.niz || S.profil.niz; }
+      const nova = Array.isArray(m.nova) ? m.nova : [];
+      const kasni = $("#bootOverlay")?.classList.contains("active") ? 1900 : 0;
+      nova.forEach((n, i) => setTimeout(() => {
+        toast(`Dostignuće: ${n.naziv}, stepen ${n.stepen} od ${n.od}`, "dostignuce", 6000);
+        if (i === 0) sfx.success();
+      }, kasni + i * 700));
+      osveziZnackuNaloga();
+      if (S.tab === "account") renderContent();
+      break;
+    }
     case "moje_porudzbine":
       S.porudzbine = Array.isArray(m.porudzbine) ? m.porudzbine : [];
       osveziZnackuNaloga();
@@ -714,7 +679,7 @@ function handleMsg(m) {
 // Ulaz u podešavanja TRAŽI servisni PIN. Ovo dugme se pojavljuje kad server ne
 // odgovara - a to igrač izazove čupanjem mrežnog kabla. Bez provere bi mogao da
 // obriše podešavanje računara ili da ga preusmeri na svoj server.
-$("#connSetup").addEventListener("click", () => openPin("Servisni PIN - promena adrese servera", false, "setup"));
+$("#connSetup").addEventListener("click", () => openPin("Servisni PIN za promenu adrese servera", false, "setup"));
 
 $("#cfgSave").addEventListener("click", async () => {
   const host = $("#cfgHost").value.trim(), token = $("#cfgToken").value.trim();
@@ -837,6 +802,10 @@ function playBoot(name) {
   const ov = $("#bootOverlay");
   if (!ov) return;
   $("#bootLine").textContent = name ? `Dobrodošao, ${String(name).toUpperCase()}` : "Sistem spreman";
+  // Niz nedelja u pozdravu: prvo što stalni gost vidi je da se dolazak računa.
+  const n = name ? S.profil?.niz?.nedelja || 0 : 0;
+  const sub = $("#bootSub");
+  if (sub) sub.textContent = n >= 2 ? `${n}. nedelja zaredom` : "";
   ov.classList.remove("hidden", "out"); ov.classList.add("active");
   sfx.boot();
   clearTimeout(playBoot._t);
@@ -882,7 +851,6 @@ function renderContent() {
     dovuciIkoneAlata();
   } else { clearInterval(promoTajmer); promoTajmer = null; }
   if (S.tab === "shop") { requestAnimationFrame(colorizeShop); setTimeout(colorizeShop, 350); }
-  if (S.tab === "account") requestAnimationFrame(obojiUzorkePozadine);
   if (S.tab === "account" && S.accSekcija === "podesavanja") vezeKlizace();
 }
 
@@ -1258,9 +1226,10 @@ function vipHtml() {
   const naKraju = ima && v.poslednji;
   const merljiv = ima && !naKraju && Number.isFinite(v.xpDo) && v.xpDo > 0;
   const postotak = naKraju ? 100 : merljiv ? Math.max(0, Math.min(100, (v.xp / v.xpDo) * 100)) : 0;
-  const nivo = ima ? `Nivo ${v.nivo}${v.naziv ? " - " + esc(v.naziv) : ""}` : "Nivo -";
+  // Bez podataka nivo se ne izmišlja i ne piše se crtica - pečat "Uskoro!" već kaže da podaci tek stižu.
+  const nivo = ima ? `Nivo ${v.nivo}${v.naziv ? ", " + esc(v.naziv) : ""}` : "";
   const pod = naKraju
-    ? "Najviši nivo - dalje se ne ide"
+    ? "Najviši nivo. Stigao si do vrha."
     : merljiv
       ? `${Math.round(v.xp)} / ${Math.round(v.xpDo)} XP do nivoa ${esc(v.sledeci || "")}`
       : "Otključava se igranjem";
@@ -1320,7 +1289,7 @@ function osveziVip() {
 // nije rekao da postoji. Zato preko ekrana ide obaveštenje sa onim ŠTA je dobio.
 function proslaviNivo(m) {
   const dobio = (m.otkljucano || []).map((o) => o.naziv).filter(Boolean);
-  toast(`Nivo ${m.nivo} - ${m.naziv}${dobio.length ? ": " + dobio.join(", ") : ""}`, "nivo", 7000);
+  toast(`Nivo ${m.nivo}, ${m.naziv}${dobio.length ? ": " + dobio.join(", ") : ""}`, "nivo", 7000);
   const el = $(".vip");
   if (el) {
     // Animacija se pokreće ponovo i kad klasa već stoji - inače drugi nivo
@@ -1517,8 +1486,8 @@ function shopPorudzbine() {
   const komada = aktivne.reduce((z, o) => z + o.items.reduce((s, i) => s + i.qty, 0), 0);
   const sprema = aktivne.some((o) => o.status === "preparing");
   return `<button class="shop-traka" data-acc-sekcija="porudzbine">
-    <span class="st-tacka"></span>
-    <span class="st-t">${sprema ? "Porudžbina se sprema" : "Porudžbina je primljena"} - ${komada} ${oblikKom(komada)}</span>
+    <span class="st-ik">${icon("cup", 16)}</span>
+    <span class="st-t">${sprema ? "Porudžbina se sprema" : "Porudžbina je primljena"}, ${komada} ${oblikKom(komada)}</span>
     <span class="st-o">Radnik donosi do računara</span>
     <span class="st-vise">Pogledaj ${icon("chev", 14)}</span>
   </button>`;
@@ -1767,9 +1736,10 @@ const ACC_SEKCIJE = [
   // Profil je prvi: nalog pocinje od toga KO si, pa tek onda od toga sta radis.
   { kljuc: "profil", naziv: "Profil", ikona: "user", grupa: "Moj nalog" },
   { kljuc: "porudzbine", naziv: "Porudžbine", ikona: "cup", grupa: "Moj nalog" },
+  { kljuc: "dostignuca", naziv: "Dostignuća", ikona: "trofej", grupa: "Moj nalog" },
   { kljuc: "nagrade", naziv: "Nagrade", ikona: "gift", grupa: "Moj nalog" },
   { kljuc: "podesavanja", naziv: "Miš i zvuk", ikona: "mis", grupa: "Podešavanja" },
-  { kljuc: "pozadina", naziv: "Pozadina", ikona: "image", grupa: "Podešavanja" },
+  { kljuc: "teme", naziv: "Teme", ikona: "image", grupa: "Podešavanja" },
   { kljuc: "lozinka", naziv: "Lozinka", ikona: "key", grupa: "Podešavanja" },
 ];
 
@@ -1795,10 +1765,19 @@ function stanjeStavke(kljuc) {
       if (t.sledeciSpin) return { tekst: "Sledeći spin uskoro" };
       return { tekst: `Još ${money(Math.max(0, t.prag - t.potroseno))} do spina` };
     }
+    case "dostignuca": {
+      const d = Array.isArray(p?.dostignuca) ? p.dostignuca : [];
+      if (!d.length) return { tekst: "Dolasci, sati, igre" };
+      const n = p.niz?.nedelja || 0;
+      if (n >= 2) return { tekst: `Niz: ${n} ${oblikNedelja(n)} zaredom` };
+      return { tekst: `Osvojeno ${d.reduce((a, x) => a + x.stepen, 0)} od ${d.reduce((a, x) => a + x.stepeni.length, 0)}` };
+    }
     case "podesavanja": return { tekst: "Brzina miša i jačina" };
-    case "pozadina": {
-      const o = (p?.otkljucano || []).find((x) => x.kljuc === "sara");
-      return o && !o.otkljucano ? { tekst: `Otključava se na nivou ${o.nivo}`, zakljucano: true } : { tekst: "Tvoja šara" };
+    case "teme": {
+      const lista = p?.teme || [];
+      const ime = aktivnaTema()?.naziv || "Kućna";
+      const ima = lista.filter((t) => t.otkljucano).length;
+      return lista.length > 1 ? { tekst: `${ime}, otključano ${ima} od ${lista.length}` } : { tekst: ime };
     }
     case "lozinka": return { tekst: "Promena lozinke" };
     default: return { tekst: "" };
@@ -1813,7 +1792,7 @@ function stavkaMenija(s) {
   return `<button class="acc-mi ${aktivna ? "aktivna" : ""} ${st.vazno ? "vazno" : ""}" data-acc-sekcija="${s.kljuc}">
     <span class="acc-mi-ik">${icon(s.ikona, 17)}</span>
     <span class="acc-mi-t"><b>${s.naziv}</b><small>${st.zakljucano ? icon("brava", 11) : ""}${esc(st.tekst)}</small></span>
-    ${cek ? `<i class="acc-mi-broj">${cek}</i>` : st.vazno ? `<i class="acc-mi-tacka"></i>` : ""}
+    ${cek ? `<i class="acc-mi-broj">${cek}</i>` : ""}
   </button>`;
 }
 function meniNaloga() {
@@ -1846,8 +1825,9 @@ function sadrzajSekcije() {
     case "profil": return sekcijaProfil();
     case "porudzbine": return sekcijaPorudzbine();
     case "nagrade": return sekcijaNagrade();
+    case "dostignuca": return sekcijaDostignuca();
     case "podesavanja": return sekcijaPodesavanja();
-    case "pozadina": return panelMojaPozadina();
+    case "teme": return sekcijaTeme();
     case "lozinka": return sekcijaLozinka();
     default: return sekcijaProfil();
   }
@@ -1863,7 +1843,9 @@ function sadrzajSekcije() {
 // Ranije su nagrade stajale kao četiri visoka reda jedan ispod drugog, bez
 // ostalih nivoa i bez "koliko još". Na 1366x768 je trećina strane bila ispod
 // ivice. Put je sada jedna vodoravna traka, a izgled dve kolone.
-const IKONA_NAGRADE = { sara: "image", boja: "kap", okvir: "okvir", vip: "zvezda" };
+const IKONA_NAGRADE = { boja: "kap", okvir: "okvir", vip: "zvezda" };
+// Teme dolaze kao "tema:ime" - sve imaju istu ikonu.
+const ikonaNagrade = (kljuc) => IKONA_NAGRADE[kljuc] || (String(kljuc).startsWith("tema:") ? "image" : "gift");
 const hiljade = (n) => Math.round(Number(n) || 0).toLocaleString("sr-Latn-RS");
 
 function sekcijaProfil() {
@@ -1890,10 +1872,10 @@ function sekcijaProfil() {
       </div>
       <div class="pf-xp-traka"><i style="width:${postotak.toFixed(1)}%"></i></div>
       <div class="pf-np-red pf-np-pod">
-        <span>${naKraju ? "Najviši nivo - svaka čast!" : `Još <b>${hiljade(p.doSledeceg)} XP</b> do nivoa ${esc(p.sledeciNaziv || "")}`}</span>
+        <span>${naKraju ? "Najviši nivo. Svaka čast!" : `Još <b>${hiljade(p.doSledeceg)} XP</b> do nivoa ${esc(p.sledeciNaziv || "")}`}</span>
         <span class="pf-kako" title="Iskustvo stiže od potrošenog kredita: sat igre ili piće plaćeno sa naloga. Dopuna i pokloni ne donose XP.">${icon("info", 13)} 1 potrošen dinar = 1 XP</span>
       </div>
-      ${sledece ? `<div class="pf-sledece">${icon(IKONA_NAGRADE[sledece.kljuc] || "gift", 15)}
+      ${sledece ? `<div class="pf-sledece">${icon(ikonaNagrade(sledece.kljuc), 15)}
         <span>Sledeće otključavaš: <b>${esc(sledece.naziv)}</b> na nivou ${sledece.nivo}${doSledeceg != null ? `, još ${hiljade(doSledeceg)} XP` : ""}</span></div>`
       : `<div class="pf-sledece gotovo">${icon("check", 15)}<span>Sve nagrade su otključane</span></div>`}
     </div>
@@ -1904,10 +1886,13 @@ function sekcijaProfil() {
     <div class="pf-put-linija"><i style="width:${Math.max(0, Math.min(100, ((p.nivo - 1 + (naKraju ? 0 : postotak / 100)) / (nivoi.length - 1)) * 100)).toFixed(1)}%"></i></div>
     ${nivoi.map((n) => {
       const stanje = n.nivo < p.nivo ? "predjen" : n.nivo === p.nivo ? "sada" : "";
-      const nag = n.otkljucava ? otk.find((o) => o.kljuc === n.otkljucava) : null;
-      const opis = `Nivo ${n.nivo} - ${n.naziv} (${hiljade(n.prag)} XP)${nag ? `: ${nag.naziv}` : ""}`;
+      // Nivo može da donese više stvari odjednom (npr. boju imena i temu).
+      const kljucevi = Array.isArray(n.otkljucava) ? n.otkljucava : n.otkljucava ? [n.otkljucava] : [];
+      const nagrade = kljucevi.map((k) => otk.find((o) => o.kljuc === k)).filter(Boolean);
+      const nag = nagrade[0] || null;
+      const opis = `Nivo ${n.nivo}, ${n.naziv} (${hiljade(n.prag)} XP)${nagrade.length ? `: ${nagrade.map((x) => x.naziv).join(", ")}` : ""}`;
       return `<div class="pf-cvor ${stanje} ${nag ? "nagrada" : ""}" title="${esc(opis)}">
-        ${nag ? `<span class="pf-cvor-nag">${icon(IKONA_NAGRADE[n.otkljucava] || "gift", 12)}</span>` : ""}
+        ${nag ? `<span class="pf-cvor-nag">${icon(ikonaNagrade(nag.kljuc), 12)}</span>` : ""}
         <span class="pf-cvor-krug">${n.nivo}</span>
         <span class="pf-cvor-ime">${esc(n.naziv)}</span>
       </div>`;
@@ -1919,10 +1904,11 @@ function sekcijaProfil() {
   const satiTekst = (h) => (h >= 10 ? Math.round(h) : Number(h || 0).toFixed(1).replace(".0", ""));
   const brojke = [
     ["sat", "Sati igre", `${satiTekst(p.sati)} <i>h</i>`],
-    ["munja", "Ove nedelje", `${satiTekst(p.satiNedelja || 0)} <i>h</i>`],
+    p.niz ? ["kalendar", "Niz dolazaka", `${p.niz.nedelja || 0} <i>${oblikNedelja(p.niz.nedelja || 0)}</i>`]
+      : ["munja", "Ove nedelje", `${satiTekst(p.satiNedelja || 0)} <i>h</i>`],
     ["vrata", "Poseta", hiljade(p.poseta)],
     ["cup", "Poručeno", hiljade(p.porudzbina)],
-    ["kalendar", "Član od", esc(clanOd)],
+    ["user", "Član od", esc(clanOd)],
   ].map(([ik, l, v]) => `<div class="pf-brojka"><span class="pf-b-ik">${icon(ik, 16)}</span>
     <div class="pf-b-t"><div class="pf-bl">${l}</div><div class="pf-bv">${v}</div></div></div>`).join("");
 
@@ -1956,6 +1942,19 @@ function sekcijaProfil() {
     </div>`).join("")}</div>
   </div>` : "";
 
+  // ---- dostignuća u malom ----
+  // Na visokom ekranu ispod igara ostaje prazan pojas - tu stoje dostignuća,
+  // svako sa stepenom, i vode u svoj odeljak. Na niskom se skrivaju (CSS).
+  const dost = Array.isArray(p.dostignuca) ? p.dostignuca : [];
+  const dostignucaUMalom = dost.length ? `<div class="pf-dost">
+    <div class="pf-naslov">Dostignuća <button class="pf-vise" data-acc-sekcija="dostignuca">Sva dostignuća ${icon("chev", 12)}</button></div>
+    <div class="pf-dost-red">${dost.map((d) => `<button class="pf-dk ${d.stepen ? "" : "nov"} ${d.sledeci == null ? "pun" : ""}" data-acc-sekcija="dostignuca"
+      title="${esc(`${d.naziv}: ${d.opis}. ${d.sledeci == null ? "Sve osvojeno" : `${hiljade(d.vrednost)} od ${hiljade(d.sledeci)}`}`)}">
+      <span class="pf-dk-ik">${icon(d.ikona, 16)}</span>
+      <span class="pf-dk-t"><b>${esc(d.naziv)}</b>${trakaStepena(d)}<small>${d.stepen ? `Stepen ${d.stepen} od ${d.stepeni.length}` : `${hiljade(d.vrednost)} od ${hiljade(d.sledeci)}`}</small></span>
+    </button>`).join("")}</div>
+  </div>` : "";
+
   return `<div class="pf">
     ${napredak}
     ${put}
@@ -1971,8 +1970,78 @@ function sekcijaProfil() {
       </div>
     </div>
     ${tvojeIgre}
+    ${dostignucaUMalom}
   </div>`;
 }
+// 1 nedelja, 2-4 nedelje, 5+ nedelja; 12-14 idu uz "nedelja".
+function oblikNedelja(n) {
+  n = Math.abs(Math.round(Number(n) || 0));
+  const d = n % 10, s = n % 100;
+  return d >= 2 && d <= 4 && (s < 12 || s > 14) ? "nedelje" : "nedelja";
+}
+
+// DOSTIGNUĆA: KAKO DOLAZIŠ, NE KOLIKO TROŠIŠ
+//
+// Nivo meri potrošnju. Ovde je ono što skuplja i gost koji malo troši a stalno
+// dolazi: dolasci, sati, igre koje je probao, niz nedelja. Svako dostignuće ima
+// četiri stepena i traku do sledećeg, da se uvek vidi šta je blizu.
+function napredakDostignuca(d) {
+  const pre = d.stepen > 0 ? d.stepeni[d.stepen - 1] : 0;
+  if (d.sledeci == null) return 100;
+  return Math.max(0, Math.min(100, ((d.vrednost - pre) / Math.max(1, d.sledeci - pre)) * 100));
+}
+function trakaStepena(d, saPragovima = false) {
+  // Traka je podeljena na stepene: pune su osvojene, tekući se puni. Ispod
+  // svakog dela može da stoji prag tog stepena - da se zna koliko je sledeći.
+  const uTekucem = napredakDostignuca(d);
+  const traka = `<span class="dn-traka">${d.stepeni.map((_, i) => `<i><b style="width:${i < d.stepen ? 100 : i === d.stepen ? uTekucem.toFixed(1) : 0}%"></b></i>`).join("")}</span>`;
+  if (!saPragovima) return traka;
+  return `${traka}<span class="dn-pragovi">${d.stepeni.map((x, i) => `<span class="${i < d.stepen ? "osvojen" : ""}">${hiljade(x)}</span>`).join("")}</span>`;
+}
+function porukaNiza(n) {
+  if (!n) return "";
+  if (n.ovaNedelja && n.nedelja >= 2) return `Ova nedelja je upisana. Dođi i sledeće, pa niz raste na ${n.nedelja + 1}.`;
+  if (n.ovaNedelja) return "Niz je počeo. Dođi i sledeće nedelje da se nastavi.";
+  if (n.nedelja > 0) return "Niz čeka ovu nedelju. Dođi do nedelje uveče i ne puca.";
+  return "Dođi bar jednom nedeljno i niz raste.";
+}
+function sekcijaDostignuca() {
+  const p = S.profil;
+  const lista = Array.isArray(p?.dostignuca) ? p.dostignuca : [];
+  if (!lista.length) return `<div class="acc-prazno">${icon("trofej", 34)}<div>Dostignuća se učitavaju...</div></div>`;
+  const n = p.niz || { nedelja: 0, najduzi: 0, poslednje: [] };
+  const osvojeno = lista.reduce((a, d) => a + d.stepen, 0);
+  const ukupno = lista.reduce((a, d) => a + d.stepeni.length, 0);
+  const nedelje = (n.poslednje || []).map((bio, i, niz) => `<span class="dn-ned ${bio ? "bio" : ""} ${i === niz.length - 1 ? "ova" : ""}"
+    title="${i === niz.length - 1 ? "Ova nedelja" : `Pre ${niz.length - 1 - i} ${oblikNedelja(niz.length - 1 - i)}`}"></span>`).join("");
+  const kartica = (d) => {
+    const pun = d.sledeci == null;
+    return `<div class="dn-k ${pun ? "pun" : ""} ${d.stepen === 0 ? "nov" : ""}">
+      <span class="dn-ik">${icon(d.ikona, 20)}</span>
+      <div class="dn-t">
+        <div class="dn-red"><b>${esc(d.naziv)}</b><span class="dn-st">${d.stepen ? `Stepen ${d.stepen} od ${d.stepeni.length}` : "Još nije osvojeno"}</span></div>
+        <div class="dn-opis">${esc(d.opis)}</div>
+        ${trakaStepena(d, true)}
+        <div class="dn-pod">${pun ? `Sve osvojeno, <b>${hiljade(d.vrednost)}</b> ${esc(d.jedinica)}`
+          : `<b>${hiljade(d.vrednost)}</b> od ${hiljade(d.sledeci)} ${esc(d.jedinica)}`}</div>
+      </div>
+    </div>`;
+  };
+  return `<div class="acc-sek dn">
+    <div class="acc-sek-h"><h3>Dostignuća</h3>
+      <p>Skupljaju se dolascima, ne novcem. Osvojeno ${osvojeno} od ${ukupno} stepeni.</p></div>
+    <div class="dn-niz">
+      <div class="dn-niz-broj"><b>${n.nedelja || 0}</b><span>${oblikNedelja(n.nedelja || 0)} zaredom</span></div>
+      <div class="dn-niz-telo">
+        <div class="dn-niz-poruka">${esc(porukaNiza(n))}</div>
+        <div class="dn-nedelje" aria-label="Poslednjih ${(n.poslednje || []).length} nedelja">${nedelje}</div>
+        <div class="dn-niz-pod"><span>Pre ${Math.max(0, (n.poslednje || []).length - 1)} nedelja</span><span>Najduži niz: ${n.najduzi || 0} ${oblikNedelja(n.najduzi || 0)}</span><span>Ova nedelja</span></div>
+      </div>
+    </div>
+    <div class="dn-mreza">${lista.map(kartica).join("")}</div>
+  </div>`;
+}
+
 // 1 put, 2-4 puta, 5+ puta; 11-14 idu uz "puta" iako se završavaju na 1-4.
 function oblikPuta(n) {
   n = Math.abs(Math.round(Number(n) || 0));
@@ -2310,7 +2379,7 @@ function zavrtiTocakKlik() {
   if (btn) { btn.disabled = true; btn.textContent = "..."; }
   clearTimeout(tocakRokTajmer);
   tocakRokTajmer = setTimeout(
-    () => otpustiTocak("Server se nije javio. Spin nije potrošen - probaj ponovo."),
+    () => otpustiTocak("Server se nije javio. Spin nije potrošen, probaj ponovo."),
     TOCAK_ROK);
   window.crit.toServer({ t: "tocak_spin" });
 }
@@ -2417,77 +2486,68 @@ function zavrsiSpin(nagrada, sledeciSpin) {
   if (S.tab === "home") renderContent();
 }
 
-// MOJA POZADINA
-// Igrac bira svoju saru na svom nalogu. Vazi dok je prijavljen; kad se odjavi,
-// racunar se vraca na ono sto je vlasnik podesio. Izbor se pamti uz nalog, pa
-// ga igrac zatekne i kad sledeci put sedne za drugi racunar.
-function panelMojaPozadina() {
-  const t = S.teksture;
-  if (!t?.spisak) return ""; // stariji server ovo ne salje
-  const moja = S.mojaTekstura;
-  const izabranaSara = moja?.kljuc || "kuca";
-  const jacina = moja?.jacina || S.tekstura?.jacina || "srednje";
-  const kretanje = moja?.kretanje || "mirno";
-  const vid = t.prozirnosti?.[jacina] ?? 0.75;
-
-  const kucna = t.spisak[S.tekstura?.kljuc || "nema"];
-  const uzorak = (kljuc, o) => `
-    <button class="poz-uzorak ${kljuc === izabranaSara ? "izabran" : ""}" data-moja-sara="${esc(kljuc)}" title="${esc(o.opis || "")}">
-      <span class="pu-slika" data-sara="${esc(kljuc)}"></span>
-      <span class="pu-ime">${esc(o.naziv)}</span>
-    </button>`;
-
-  return `<div class="acc-sek">
-    <div class="acc-sek-h"><h3>Pozadina</h3>
-      <p>Važi samo za tvoj nalog. Kad se odjaviš, računar se vraća na izgled igraonice.</p></div>
-    <div class="poz-uzorci">
-      ${uzorak("kuca", { naziv: "Kao u igraonici", opis: kucna ? `Trenutno: ${kucna.naziv}` : "Ono što je osoblje podesilo" })}
-      ${Object.entries(t.spisak).filter(([k]) => k !== "nema").map(([k, o]) => uzorak(k, o)).join("")}
-      ${uzorak("nema", { naziv: "Bez šare", opis: "Čista tamna pozadina" })}
-    </div>
-    <div class="poz-podesavanja">
-      <div>
-        <span class="pp-l">Jačina</span>
-        <div class="pp-dugmad">${Object.entries(t.jacine || {}).map(([k, n]) =>
-          `<button class="btn btn-sm ${k === jacina ? "btn-primary" : "btn-ghost"}" data-moja-jacina="${esc(k)}">${esc(n)}</button>`).join("")}</div>
-      </div>
-      <div>
-        <span class="pp-l">Kretanje</span>
-        <div class="pp-dugmad">${Object.entries(t.kretanja || {}).map(([k, o]) =>
-          `<button class="btn btn-sm ${k === kretanje ? "btn-primary" : "btn-ghost"}" data-moja-kretanje="${esc(k)}" title="${esc(o.opis)}">${esc(o.naziv)}</button>`).join("")}</div>
-      </div>
+// TEME
+//
+// Mreža tema: svaka kartica je umanjen launcher u bojama te teme - podloga,
+// ploča sa dugmetom i boje pozadine - pa igrač vidi šta bira pre nego što
+// klikne. Zaključane kažu na kom nivou dolaze i koliko XP fali; VIP teme su
+// označene. Izbor važi odmah i pamti se uz nalog.
+// Ispod mreže: koja tema dolazi sledeća i koliko fali. Cilj koji se ne vidi
+// ne vuče napred - a zaključana kartica sama ne kaže koliko je blizu.
+function sledecaTema(lista, p, pragZa) {
+  const t = lista.filter((x) => !x.otkljucano).sort((a, b) => a.nivo - b.nivo)[0];
+  if (!t || !p) return "";
+  const cilj = pragZa(t.nivo), od = pragZa(p.nivo) ?? 0;
+  if (cilj == null) return "";
+  const fali = Math.max(0, cilj - p.xp);
+  const posto = Math.max(0, Math.min(100, ((p.xp - od) / Math.max(1, cilj - od)) * 100));
+  return `<div class="tema-sledeca">
+    <span class="ts-ik">${icon("brava", 18)}</span>
+    <div class="ts-t">
+      <div><b>Sledeća tema: ${esc(t.naziv)}</b>${t.vip ? ` <i class="tema-vip">VIP</i>` : ""}<span>nivo ${t.nivo}, još ${hiljade(fali)} XP</span></div>
+      <div class="pf-xp-traka"><i style="width:${posto.toFixed(1)}%"></i></div>
+      <small>Od petog nivoa teme su VIP: tamnije, bogatije boje i pozadina koja se drugačije preliva. Iskustvo stiže od sati igre i porudžbina.</small>
     </div>
   </div>`;
 }
 
-// Uzorci se crtaju posle ubacivanja u stranu: sara sadrzi navodnike, pa ne sme
-// kroz style="..." atribut - tamo bi se string prekinuo na prvom navodniku.
-function obojiUzorkePozadine() {
-  const t = S.teksture;
-  if (!t?.spisak) return;
-  const moja = S.mojaTekstura;
-  const jacina = moja?.jacina || S.tekstura?.jacina || "srednje";
-  const vid = t.prozirnosti?.[jacina] ?? 0.75;
-  document.querySelectorAll(".pu-slika[data-sara]").forEach((el) => {
-    const k = el.dataset.sara;
-    const o = k === "kuca" ? t.spisak[S.tekstura?.kljuc || "nema"] : t.spisak[k];
-    if (!o?.sara) { el.style.backgroundImage = "none"; return; }
-    el.style.backgroundImage = o.sara;
-    // Kvadratic je izlog sare, ne pregled jacine. Pri slaboj jacini se na
-    // tamnoj plocici nije video nikakav uzorak, pa se biralo naslepo.
-    el.style.opacity = String(Math.max(vid, 0.9));
-  });
-}
+function sekcijaTeme() {
+  const p = S.profil;
+  const lista = Array.isArray(p?.teme) && p.teme.length ? p.teme : (S.teme || []).map((t) => ({ ...t, otkljucano: t.nivo <= 1 }));
+  if (!lista.length) return `<div class="acc-prazno">${icon("image", 34)}<div>Teme se učitavaju...</div></div>`;
+  const moja = p?.izgled?.tema || null;
+  const kucna = S.izgled?.tema || "kuca";
+  const aktivna = moja || kucna;
+  const pragZa = (nivo) => (p?.nivoi || []).find((n) => n.nivo === nivo)?.prag;
+  const otkljucanih = lista.filter((t) => t.otkljucano).length;
 
-// Salje izbor serveru. Menja se samo jedno polje, ostala ostaju kakva su bila.
-function posaljiMojuPozadinu(izmena) {
-  const moja = S.mojaTekstura;
-  const sad = {
-    kljuc: moja?.kljuc || "kuca",
-    jacina: moja?.jacina || S.tekstura?.jacina || "srednje",
-    kretanje: moja?.kretanje || "mirno",
+  const kartica = (t) => {
+    const c = t.boje || {};
+    const ak = t.kljuc === "kuca" ? (S.brend?.akcenat || "#2f6ae8") : c.akcenat;
+    const amb = Array.isArray(c.amb) ? c.amb : [];
+    const fali = !t.otkljucano && pragZa(t.nivo) != null && p ? Math.max(0, pragZa(t.nivo) - p.xp) : null;
+    const stil = `--m-bg:${c.bg};--m-panel:${c.panel2};--m-ak:${ak};--m-a1:${t.kljuc === "kuca" ? ak : amb[0]};--m-a2:${amb[1]};--m-a3:${amb[2]}`;
+    return `<button class="tema-k ${t.kljuc === aktivna ? "aktivna" : ""} ${t.otkljucano ? "" : "zakljucana"}" data-tema="${esc(t.kljuc)}"
+      ${t.otkljucano ? "" : "aria-disabled=\"true\""} title="${esc(t.opis || "")}">
+      <span class="tema-mini" style="${esc(stil)}">
+        <span class="tm-bar"></span>
+        <span class="tm-ploca"><i></i><i></i><b></b></span>
+        ${t.otkljucano ? "" : `<span class="tm-brava">${icon("brava", 18)}</span>`}
+      </span>
+      <span class="tema-dno">
+        <span class="tema-ime">${esc(t.naziv)}${t.vip ? `<i class="tema-vip">VIP</i>` : ""}</span>
+        <span class="tema-st">${t.kljuc === aktivna ? "Izabrana" : t.otkljucano ? (t.kljuc === kucna && !moja ? "Kao u igraonici" : esc(t.opis || "")) : `Nivo ${t.nivo}${fali != null ? `, još ${hiljade(fali)} XP` : ""}`}</span>
+      </span>
+    </button>`;
   };
-  window.crit.toServer({ t: "moja_tekstura", ...sad, ...izmena });
+
+  return `<div class="acc-sek">
+    <div class="acc-sek-h"><h3>Teme</h3>
+      <p>Menjaš izgled celog launchera. Važi dok si prijavljen, i čeka te na svakom računaru. Otključano: ${otkljucanih} od ${lista.length}.</p></div>
+    <div class="teme-mreza">${lista.map(kartica).join("")}</div>
+    ${moja ? `<button class="btn btn-ghost btn-sm tema-kuca" data-tema="">Vrati na izgled igraonice</button>` : ""}
+    ${sledecaTema(lista, p, pragZa)}
+  </div>`;
 }
 
 // ---- Delegacija klikova ----
@@ -2564,14 +2624,16 @@ $("#content").addEventListener("click", (e) => {
     return;
   }
 
-  // Moja pozadina: izbor se odmah salje serveru, on vrati novu saru i ekran se
-  // promeni pred igracem - bez dugmeta "sacuvaj".
-  const sara = e.target.closest("[data-moja-sara]");
-  if (sara) return posaljiMojuPozadinu({ kljuc: sara.dataset.mojaSara });
-  const jac = e.target.closest("[data-moja-jacina]");
-  if (jac) return posaljiMojuPozadinu({ jacina: jac.dataset.mojaJacina });
-  const kre = e.target.closest("[data-moja-kretanje]");
-  if (kre) return posaljiMojuPozadinu({ kretanje: kre.dataset.mojaKretanje });
+  // Tema: izbor se odmah šalje serveru, on proveri nivo i vrati profil, pa se
+  // launcher promeni pred igračem - bez dugmeta "sačuvaj". Zaključana se ni ne
+  // šalje; server bi je svejedno odbio.
+  const tema = e.target.closest("[data-tema]");
+  if (tema) {
+    if (tema.classList.contains("zakljucana")) { sfx.error(); return; }
+    window.crit.toServer({ t: "moj_profil", tema: tema.dataset.tema || null });
+    sfx.click();
+    return;
+  }
 
   const arrEl = e.target.closest("[data-arr]");
   if (arrEl) {

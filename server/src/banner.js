@@ -26,8 +26,8 @@ const PALETA = {
 
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-// d20 (ikosaedar) - znak kritičnog pogotka, odatle i ime kuće. Isti oblik kao
-// tekstura "kockice", uvelican. Crta se kao ukras u pozadini.
+// d20 (ikosaedar) - znak kritičnog pogotka, odatle i ime kuće. Crta se kao
+// ukras u pozadini banera.
 function d20(cx, cy, r, boja, prozirnost, sirinaLinije = 2.4) {
   // jedinicni oblik u koordinatama 0..32, pa se skalira i pomera
   const s = r / 16;

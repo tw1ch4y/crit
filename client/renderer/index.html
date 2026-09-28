@@ -28,7 +28,8 @@
 </head>
 <body>
   <div class="pozadina" id="pozadina" aria-hidden="true"></div>
-  <div class="fx-scan" aria-hidden="true"></div>
+  <div class="ambijent" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <div class="fx-vinjeta" aria-hidden="true"></div>
   <div class="fx-lowtime" aria-hidden="true"></div>
   <div class="fx-layer" id="fxLayer" aria-hidden="true"></div>
 
@@ -53,7 +54,7 @@
          zna da li mu se vreme i dalje trosi, pa zove osoblje. Server naplatu
          pauzira dok racunar nije na vezi, tako da je ovo tacno. -->
     <div id="connSesija" class="hidden conn-sesija">
-      <span class="cs-tacka"></span>
+      <svg class="cs-ik" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
       <div>
         <b>Vreme ti se ne troši dok nema veze.</b>
         <span>Sesija te čeka i nastavlja se čim se veza vrati.</span>
@@ -187,6 +188,7 @@
     <div class="boot-inner">
       <img class="brand-logo" src="img/crit-logo.png" alt="Crit" />
       <div class="boot-line" id="bootLine">Sistem spreman</div>
+      <div class="boot-sub" id="bootSub"></div>
       <div class="boot-bar"><span></span></div>
     </div>
   </div>

@@ -514,6 +514,45 @@ istorijom, 3 nivoa x 2 rezolucije, pa klik na boju i okvir).
 - [x] Staje na 1366x768; proveren na pravom launcheru (`pregled-profila`,
   `proba-klikova`, `pregled-electron`)
 
+### Revizija 2.52 - teme, pozadina i dostignuća
+
+- [x] **Stari sistem šara je izbačen u celosti**: ponavljani natpis preko celog
+  ekrana i pet vrsta kretanja (klizanje, talas, dubina, iskre). Natpis se čitao
+  kao vodeni žig iza svakog teksta, a kretanja su bila ukras radi ukrasa. Stara
+  podešavanja se brišu iz baze pri pokretanju servera
+- [x] **Nova pozadina**: podloga teme, četiri velike meke mrlje u bojama teme
+  koje se sporo prelivaju (90 do 130 s, preko `transform`, bez opterećenja
+  procesora) i fino zrno. Vlasnik bira "Lagano" ili "Isključeno"
+- [x] **Deset tema launchera**: Kućna, Grafit, Arktik, Smaragd, pa VIP od petog
+  nivoa (Zlato, Ametist, Žar, Aurora, Obsidijan, Mit). Tema menja podlogu,
+  ploče, dugmad i pozadinu. Svaki nivo donosi novu temu. Igrač bira u Nalog >
+  Teme, važi dok je prijavljen i prati ga na svaki računar; odjava vraća kućnu
+- [x] Vlasnik bira kućnu temu u panelu (Izgled launchera > Tema launchera);
+  promena stiže na sve računare odmah
+- [x] Tekst na dugmetu u boji teme se čita i na svetlim akcentima (`naAkcentu`,
+  kontrast proveren u `test-nivoi`)
+- [x] Promena teme je trenutna: bez prelaza bi svako dugme posebno klizilo iz
+  stare boje u novu (nađeno na pravom launcheru, `proba-teme`)
+- [x] **Dostignuća**: Stalni gost, Maratonac, Veran, Istraživač, Gurman, Noćna
+  ptica, svako sa četiri stepena. Mere kako igrač dolazi, ne koliko troši, pa i
+  gost koji malo troši ima šta da skuplja. Čestitka stiže odmah (posle prijave,
+  porudžbine, pokretanja igre, a za sate uz naplatu), i samo jednom. Osvojen
+  stepen se čuva i ne nestaje kad održavanje obriše stara pokretanja igara
+- [x] **Niz nedelja**: nedelje zaredom sa bar jednim dolaskom (dnevni niz u
+  igraonici bi stalno pucao i prestao da znači). Ne puca usred nedelje i ne gubi
+  nedelju zbog pomeranja sata. Vidi se u pozdravu ("5. nedelja zaredom"), u
+  meniju, na profilu i u odeljku Dostignuća sa trakom poslednjih 12 nedelja
+- [x] Popunjeni prazni delovi: dostignuća u malom ispod igara na profilu (na
+  visokom ekranu), sledeća tema i koliko fali ispod mreže tema
+- [x] **Bez AI tragova**: treperave tačke u meniju i na traci porudžbine
+  zamenjene su ikonama, svetleća tačka na ekranu povezivanja kvačicom, kosa
+  šrafura sa pločica igara bez korica je skinuta, crtice u tekstu zamenjene
+  zarezima i tačkama ("Nivo 10, Mit", "Najviši nivo. Svaka čast!")
+- [x] Validacija izbora (tema, boja, okvir, pokret) više ne prima nizove ni
+  imena iz prototipa (`constructor`), a ne samo nepoznata imena
+- [x] Novo: `test-teme`, `test-dostignuca`, `proba-teme`; `pregled-profila`
+  sada slika i meri i Dostignuća i Teme i proverava pozdrav i čestitke
+
 ---
 
 ## Šta ostaje pred otvaranje

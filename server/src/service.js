@@ -9,7 +9,7 @@ import { verifyPassword, hashPassword, rang } from "./auth.js";
 import { broadcastPanels, broadcastClients, sendClient, isClientOnline, izbaciPanel, izbaciKlijenta } from "./hub.js";
 import { banerIgre, promoCrit } from "./banner.js";
 import * as nad from "./nadogradnja.js";
-import { nivoZa, smeDa, otkljucanoZa, OTKLJUCAVANJA, NIVOI } from "./nivoi.js";
+import { nivoZa, smeDa, otkljucanoZa, OTKLJUCAVANJA, NIVOI, TEME, smeTemu, DOSTIGNUCA, stepenZa, nizNedelja } from "./nivoi.js";
 import * as rez from "./rezervacije.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -893,13 +893,9 @@ export function sendWelcomeState(computerId) {
     games: gamesForClient(),
     tools: toolsForClient(),
     pozadine: pozadineObj(),
-    tekstura: teksturaObj(),
-    // Spisak sara ide klijentu da bi igrac mogao da bira svoju na svom nalogu.
-    // Sve sare zajedno su oko 4 KB - salje se jednom, pri povezivanju.
-    teksture: {
-      spisak: teksturaSpisak(),
-      jacine: JACINE, kretanja: KRETANJA, prozirnosti: PROZIRNOSTI,
-    },
+    // Kućna tema i pokret pozadine. Igračeva tema stiže uz prijavu (profil).
+    izgled: izgledKuce(),
+    teme: temeSpisak(),
     promo: promoZaKlijenta(),
   });
 
@@ -910,6 +906,7 @@ export function sendWelcomeState(computerId) {
     db.prepare("UPDATE computers SET status='in_use', current_player_id=?, current_session_id=? WHERE id=?")
       .run(p.id, s.id, comp.id);
     sendClient(comp.id, loginOkPayload(p, s));
+    javiDostignuca(p.id, comp.id);
   } else if (comp.status === "locked") {
     sendClient(comp.id, { t: "locked", reason: "staff" });
   } else {
@@ -933,14 +930,12 @@ function loginOkPayload(player, session) {
     session: { id: session.id, startedAt: session.started_at },
     skoroIgrane: skoroIgraneIgre(player.id),
     porudzbine: igracevePorudzbine(player.id),
-    // Igraceva sara ide odmah uz prijavu, da ne bljesne kucna pa se promeni.
-    tekstura: teksturaZaRacunar(player.id),
     // Nivo i iskustvo idu odmah: traka na vrhu pocetne se crta iz njih, a ako
     // stignu naknadno, igrac vidi "Uskoro!" pa mu se promeni pred ocima.
     vip: vipOd(player.xp),
+    // Uz profil ide i igračeva tema (izgled.tema) - odmah uz prijavu, da ne
+    // bljesne kućna pa se promeni pred očima.
     profil: profilIgraca(player.id),
-    // Sta je bas ovaj igrac izabrao; null znaci "kao u igraonici".
-    mojaTekstura: (() => { const t = temaIgraca(player.id); return t ? { kljuc: t.kljuc, jacina: t.jacina, kretanje: t.kretanje } : null; })(),
     // Nagradni tocak: stanje bas za ovog igraca (koliko je potrosio, sme li da vrti).
     tocak: tocakInfo(player.id),
   };
@@ -979,6 +974,7 @@ function zabeleziPokretanje(computerId, gameId) {
     .run(gameId, comp?.current_player_id || null, computerId, Date.now());
   const p = comp?.current_player_id ? playerById(comp.current_player_id) : null;
   logEvent({ category: "igre", action: "launch", actor: p?.username || "?", target: comp?.name || "?", detail: `Pokrenuta igra: ${g.name}` });
+  if (p) javiDostignuca(p.id, computerId); // Istraživač: nova igra može da donese stepen
 }
 
 // Igra koja nece da se pokrene. Do sada je to znao samo igrac koji sedi za tim
@@ -1106,8 +1102,6 @@ export function handleClientMessage(computerId, msg) {
       return clientOrder(computerId, msg.items || [], msg.note || "", msg.payment === "cash" ? "cash" : "credit", msg.poId);
     case "change_password":
       return clientChangePassword(computerId, msg.oldPassword, msg.newPassword);
-    case "moja_tekstura":
-      return clientTekstura(computerId, msg);
     case "moj_profil":
       return clientProfil(computerId, msg);
     case "install_status":
@@ -1139,24 +1133,12 @@ export function handleClientMessage(computerId, msg) {
   }
 }
 
-// Igrac menja svoju pozadinu sa svog naloga u launcheru. Menja se samo NJEGOV
-// zapis - kucnu sara dira jedino vlasnik kroz panel.
-function clientTekstura(computerId, msg) {
-  const comp = computerById(computerId);
-  if (!comp?.current_player_id) return; // niko nije prijavljen na tom racunaru
-  const r = sacuvajTemuIgraca(comp.current_player_id, {
-    kljuc: msg.kljuc, jacina: msg.jacina, kretanje: msg.kretanje,
-  });
-  if (r.error) return sendClient(computerId, { t: "moja_tekstura_err", message: r.error });
-  sendClient(computerId, { t: "tekstura", tekstura: r.tekstura, moja: r.tema });
-}
-
 // Igrac menja izgled svog profila (boja imena, okvir). Sve provere su na
 // serveru - vidi sacuvajProfilIgraca.
 function clientProfil(computerId, msg) {
   const comp = computerById(computerId);
   if (!comp?.current_player_id) return;
-  const r = sacuvajProfilIgraca(comp.current_player_id, { boja: msg.boja, okvir: msg.okvir });
+  const r = sacuvajProfilIgraca(comp.current_player_id, { boja: msg.boja, okvir: msg.okvir, tema: msg.tema });
   if (r.error) return sendClient(computerId, { t: "profil_err", message: r.error });
   sendClient(computerId, { t: "profil", profil: profilIgraca(comp.current_player_id) });
 }
@@ -1237,6 +1219,7 @@ function clientLogin(computerId, username, password) {
 
   const session = db.prepare("SELECT * FROM sessions WHERE id=?").get(sessionId);
   sendClient(computerId, loginOkPayload(p, session));
+  javiDostignuca(p.id, computerId);
   pushComputers();
   broadcastPanels({ t: "event", kind: "login", text: `${p.username} se prijavio na ${comp.name}` });
   logEvent({ category: "prijava", action: "login", actor: p.username, target: comp.name, detail: "Igrač se prijavio" });
@@ -1407,6 +1390,7 @@ function clientOrder(computerId, items, note, payment = "credit", poId = null) {
   // Nivo se javlja tek kad je porudzbina stvarno upisana - inace bi igrac dobio
   // cestitku za nesto sto je u medjuvremenu puklo.
   javiNivo(p.id, prelaz);
+  javiDostignuca(p.id, computerId);
 
   sendClient(computerId, zapamtiOdgovor(poId, {
     t: "order_ok",
@@ -1495,8 +1479,6 @@ export function endSession(computerId, { lock = false, reason = "logout", adminI
   }
   javiLog(log);
 
-  // Igraceva sara odlazi sa njim - sledeci gost zatice kucnu.
-  sendClient(computerId, { t: "tekstura", tekstura: teksturaObj() });
   if (lock) sendClient(computerId, { t: "locked", reason });
   else sendClient(computerId, { t: "to_login" });
   pushComputers();
@@ -1597,6 +1579,8 @@ function naplatiSesiju(s, r, now) {
     const preostalo = remainingSeconds(newBal);
     sendClient(s.computer_id, { t: "balance", balance: round2(newBal), remainingSeconds: preostalo, vip: vipOd(noviXp) });
     javiOsobljuPredIstek(s, p, preostalo);
+    // Sati rastu dok se igra - "Maratonac" se proverava uz naplatu, ali retko.
+    javiDostignuca(p.id, s.computer_id, { najredje: 10 * 60000 });
   }
 }
 
@@ -2663,311 +2647,40 @@ export function pushPozadine() {
   broadcastClients({ t: "pozadine", pozadine: pozadineObj() });
 }
 
-// TEKSTURA POZADINE
-// Sitna sara koja se ponavlja preko cele pozadine. Ne cuva se kao slika nego
-// kao izbor - launcher je crta sam, pa je ostra na svakoj rezoluciji, ne tezi
-// nista i ne mora da se salje kroz mrezu.
-// Sara se pise SAMO ovde. I launcher i panel je dobijaju odavde, pa pregled u
-// panelu ne moze da se razidje od onoga sto igrac vidi.
-// Prozirnost je po sari razlicita namerno: tackice pokrivaju malo povrsine pa
-// im treba vise, kose linije pokrivaju mnogo pa im treba manje - da sve sare
-// deluju podjednako prisutno kad se prebacuje sa jedne na drugu.
-// Šara koja se crta od naziva igraonice se pravi u hodu; ostale su upisane.
-// Bez ovoga bi `o.sara` za nju bilo `undefined` i pozadina bi nestala.
-const saraTeksture = (o) => (o.saraOd ? o.saraOd(getSetting("cafe_name", "Igraonica")) : o.sara);
-
-// Spisak šara spreman za slanje - i launcheru i panelu.
+// IZGLED LAUNCHERA: TEMA I POKRET POZADINE
 //
-// Stoji na jednom mestu jer je već jednom razišlo: launcher je dobijao razrešenu
-// šaru, a panel sirov objekat sa funkcijom u sebi. `JSON.stringify` funkciju
-// izbaci, pa je vlasnik u Podešavanjima gledao prazan kvadrat umesto šare -
-// bez ijedne greške, i to samo za onu jednu koja se crta u hodu.
-export function teksturaSpisak() {
-  return Object.fromEntries(Object.entries(TEKSTURE)
-    .map(([k, o]) => [k, { naziv: o.naziv, opis: o.opis, korak: o.korak, sara: saraTeksture(o) }]));
-}
-// Razmaci i prelomi reda se sklanjaju pre nego sto sara postane adresa.
-// CSS `url("...")` ne sme da sadrzi prelom reda - pravilo tada tiho otpadne i
-// pozadina ostane prazna, bez ijedne greske. Bez ovoga bi svaka sara morala
-// da se pise u jednom redu, a takve se ne mogu ni citati ni ispravljati.
-const svg = (s) => `url("data:image/svg+xml,${s.replace(/\s+/g, " ").trim().replace(/</g, "%3C").replace(/>/g, "%3E").replace(/#/g, "%23")}")`;
-// Naziv igraonice upisuje vlasnik i završava USRED SVG-a. Ime sa `&` ili `<`
-// pokvarilo bi celu sliku, a šara je pozadina svakog ekrana u launcheru - jedan
-// ampersand u nazivu i trinaest mašina ostane bez pozadine.
-const escXml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
-// ISKRE: ista sara, ali u boji kuce i punom jacinom.
-// Sluzi za kretanje "Iskre" - preko nasumicne plocice u mrezi legne ista figura
-// u crvenom, zasvetli i ugasi se. Zato mora da bude ISTI obris: da bi se crvena
-// figura poklopila sa belom ispod nje, ne sme da se crta posebno.
-// Iskra nosi BOJU KUCE, a ne upisanu crvenu.
+// Ovde je ranije stajao sistem šara - sitan crtež (između ostalog natpis
+// "CRIT") koji se ponavljao preko celog ekrana, sa pet vrsta kretanja
+// (klizanje, talas, dubina, iskre). Izbačen je u celosti: ponavljani natpis se
+// čitao kao vodeni žig iza svakog teksta, a kretanja su delovala kao ukras radi
+// ukrasa.
 //
-// Ovde je stajalo `#ff2b2b`. Dok je boja kuce i bila crvena, to se nije videlo -
-// a onda bi igraonica koja u panelu izabere svoju boju dobila saru koja iskri
-// tudjom. Boja se cita u trenutku crtanja, pa promena u panelu vazi odmah.
-const uIskru = (obris) => obris
-  .replace(/#fff\b/g, getSetting("brend_akcenat", AKCENAT_PODRAZUMEVANI))
-  .replace(/(fill|stroke)-opacity='[\d.]+'/g, "$1-opacity='0.95'");
-
-// Varijanta u boji kuce se izvlaci iz vec napisane bele - sara se ne pise
-// dvaput, pa ne mogu da se raziđu.
-const dekodiraj = (u) => String(u)
-  .replace(/^url\("data:image\/svg\+xml,/, "").replace(/"\)$/, "")
-  .replace(/%3C/g, "<").replace(/%3E/g, ">").replace(/%23/g, "#");
-const iskraOd = (sara) => (sara ? svg(uIskru(dekodiraj(sara))) : "");
-
-export const TEKSTURE = {
-  nema: { naziv: "Bez teksture", opis: "Čista pozadina, samo gradijent", sara: "", korak: 0 },
-
-  // PRAVI RASTER IZ STAMPE, NE DVE TACKE U POLJU.
-  //
-  // Ovde su stajala dva jednaka kruga u polju od 14px. To nije sara nego
-  // popuna: oko odmah uhvati resetku i vise ne vidi nista drugo.
-  //
-  // Raster se u stampi radi pod 45 stepeni i sa razlicitim precnikom tacke -
-  // odatle mu ton. Ovde su tri velicine: krupne nose sliku, srednje je vezuju,
-  // sitne popunjavaju medjuprostor. Tacke na ivici stoje i sa suprotne strane,
-  // pa se sav plocice ne vidi.
-  tacke: {
-    naziv: "Raster", opis: "Rasterske tačke iz štampe stripa, tri veličine", korak: 48,
-    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48'><g fill='#fff'>
-      <circle cx='12' cy='12' r='2.1' fill-opacity='0.20'/><circle cx='36' cy='36' r='2.1' fill-opacity='0.20'/>
-      <circle cx='36' cy='12' r='1.25' fill-opacity='0.14'/><circle cx='12' cy='36' r='1.25' fill-opacity='0.14'/>
-      <circle cx='24' cy='0' r='0.75' fill-opacity='0.10'/><circle cx='24' cy='48' r='0.75' fill-opacity='0.10'/>
-      <circle cx='0' cy='24' r='0.75' fill-opacity='0.10'/><circle cx='48' cy='24' r='0.75' fill-opacity='0.10'/>
-      <circle cx='24' cy='24' r='0.75' fill-opacity='0.10'/></g></svg>`),
-  },
-  // Iskre sa znaka: cetiri kraka, stranice UVUCENE. Prava zvezdica iz stripa
-  // nije mnogougao nego oblik koji se suzava ka sredini - zato krive, ne linije.
-  // Pet velicina, van resetke, da grupa deluje raspoređeno a ne poređano.
-  zvezde: {
-    naziv: "Iskre", opis: "Četvorokrake iskre sa znaka, pet veličina", korak: 88,
-    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='88' height='88'><g fill='#fff'>
-      <path d='M22 15C24.9 23.1 24.9 23.1 33 26C24.9 28.9 24.9 28.9 22 37C19.1 28.9 19.1 28.9 11 26C19.1 23.1 19.1 23.1 22 15z' fill-opacity='0.19'/>
-      <path d='M64 52.5C66 58 66 58 71.5 60C66 62 66 62 64 67.5C62 62 62 62 56.5 60C62 58 62 58 64 52.5z' fill-opacity='0.14'/>
-      <path d='M72 11.5C73.2 15 73.2 15 76.5 16C73.2 17 73.2 17 72 20.5C70.8 17 70.8 17 67.5 16C70.8 15 70.8 15 72 11.5z' fill-opacity='0.10'/>
-      <path d='M14 64.5C14.9 67.2 14.9 67.2 17.5 68C14.9 68.8 14.9 68.8 14 71.5C13.1 68.8 13.1 68.8 10.5 68C13.1 67.2 13.1 67.2 14 64.5z' fill-opacity='0.09'/>
-      <path d='M44 41.4C44.7 43.3 44.7 43.3 46.6 44C44.7 44.7 44.7 44.7 44 46.6C43.3 44.7 43.3 44.7 41.4 44C43.3 43.3 43.3 43.3 44 41.4z' fill-opacity='0.07'/>
-    </g></svg>`),
-  },
-  // Prasak iz znaka. Krupan oblik u sredini polja se u ponavljanju cita kao red
-  // jednakih zvezda, pa je polje uvecano, glavni oblik pomeren iz sredine i
-  // prigusen, a oko njega idu sitniji pod razlicitim uglovima - oko tada vidi
-  // grupu, ne resetku. Zraci su naizmenicno duzi i kraci, kao u stripu.
-  prasak: {
-    naziv: "Praskovi", opis: "Strip prasak iz znaka, raspoređen bez reda", korak: 150,
-    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150'><g fill='none' stroke='#fff' stroke-linejoin='round'>
-      <path d='M54.8 46.4L44.1 51.4L45.6 63.1L37.4 54.7L27.2 60.7L31.5 49.7L21.2 43.9L33 43.3L34.9 31.6L40.5 42.1L51.4 37.6L44.4 46.9z' stroke-opacity='0.13' stroke-width='1.5'/>
-      <path d='M122.5 100.6L115.6 104L116.6 111.6L111.2 106.1L104.6 110L107.4 102.9L100.8 99.1L108.4 98.7L109.7 91.1L113.3 97.9L120.3 95z' stroke-opacity='0.10' stroke-width='1.2'/>
-      <path d='M124.3 24.3L120.5 26.2L121.1 30.4L118.1 27.4L114.5 29.5L116 25.6L112.4 23.5L116.6 23.3L117.3 19.1L119.3 22.8L123.2 21.2z' stroke-opacity='0.085' stroke-width='1'/>
-      <path d='M23.4 117.9L20.6 119.3L21 122.4L18.8 120.2L16.1 121.8L17.2 118.9L14.6 117.3L17.7 117.2L18.2 114.1L19.7 116.8L22.6 115.6z' stroke-opacity='0.075' stroke-width='0.9'/>
-    </g></svg>`),
-  },
-  // Linije brzine, ZASILJENE. Prva verzija su bile tri prave crte jednake
-  // debljine - to nije brzina nego resetka. U stripu je linija brzine klin:
-  // debela odakle krece, u nulu gde se gubi.
-  //
-  // Nagib je tacno 45 stepeni, i to nije estetika nego uslov: samo pri tom nagibu
-  // ono sto izadje na desnu ivicu ulazi na levu u istoj visini, pa se sav ne vidi.
-  kose: {
-    naziv: "Brzina", opis: "Zašiljene linije brzine, kao iza figure u stripu", korak: 96,
-    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><g fill='#fff'>
-      <path d='M-16 20 l60 60 l0 -3.2 l-60 -60z' fill-opacity='0.16'/><path d='M80 20 l60 60 l0 -3.2 l-60 -60z' fill-opacity='0.16'/>
-      <path d='M10 62 l38 38 l0 -2 l-38 -38z' fill-opacity='0.11'/>
-      <path d='M44 8 l28 28 l0 -1.4 l-28 -28z' fill-opacity='0.09'/>
-      <path d='M-8 88 l34 34 l0 -1.8 l-34 -34z' fill-opacity='0.10'/><path d='M88 88 l34 34 l0 -1.8 l-34 -34z' fill-opacity='0.10'/>
-      <path d='M56 52 l22 22 l0 -1.1 l-22 -22z' fill-opacity='0.07'/>
-    </g></svg>`),
-  },
-  kockice: {
-    naziv: "Kockice d20", opis: "Znak kritičnog pogotka iz stonih igara", korak: 64,
-    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><g fill='none' stroke='#fff' stroke-opacity='0.15' stroke-width='1.4' stroke-linejoin='round'><path d='M16 3L27.3 9.5L27.3 22.5L16 29L4.7 22.5L4.7 9.5Z'/><path d='M16 9.5L21.6 19.3L10.3 19.3Z'/><path d='M16 3L16 9.5M27.3 22.5L21.6 19.3M4.7 22.5L10.3 19.3'/></g><g transform='translate(32 32) scale(0.62)' fill='none' stroke='#fff' stroke-opacity='0.1' stroke-width='2.2' stroke-linejoin='round'><path d='M16 3L27.3 9.5L27.3 22.5L16 29L4.7 22.5L4.7 9.5Z'/><path d='M16 9.5L21.6 19.3L10.3 19.3Z'/></g></svg>`),
-  },
-  // Sestougaona mreza - najmirnija od svih, dobra ispod okacene fotografije.
-  // Kljuc je namerno bez nasih slova - ide kroz API i CSS.
-  sace: {
-    naziv: "Saće", opis: "Šestougaona mreža, krupna i sitna u njoj", korak: 84,
-    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='84' height='48'><g fill='none' stroke='#fff'>
-      <g stroke-opacity='0.12' stroke-width='1.2'><path d='M21 1L42 13v24L21 49L0 37V13z'/><path d='M63 1L84 13v24L63 49L42 37V13z'/></g>
-      <g stroke-opacity='0.055' stroke-width='0.9'><path d='M21 13L31 19v12l-10 6-10-6V19z'/><path d='M63 13L73 19v12l-10 6-10-6V19z'/></g>
-    </g></svg>`),
-  },
-  // Munje: energija, uz shop sa energetskim picima i uz gaming.
-  munje: {
-    naziv: "Munje", opis: "Sitne munje, najživlja od svih šara", korak: 48,
-    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48'><path d='M14 4L7 21h6l-3 13 12-19h-7l4-11z' fill='#fff' fill-opacity='0.14'/><path d='M37 27L32.5 38h3.8l-1.9 8.4L42 34h-4.5l2.5-7z' fill='#fff' fill-opacity='0.1'/></svg>`),
-  },
-  // ŠARA SA IMENOM KUĆE - PIŠE SE U HODU, NE STOJI UPISANA.
-  //
-  // Ovde je stajalo slovo po slovo "CRIT". Dok je igraonica jedna, to je bila
-  // najbrendiranija šara u spisku. Drugoj igraonici bi to bila šara sa TUĐIM
-  // imenom - jedina stvar u launcheru koju vlasnik ne bi mogao da promeni iz
-  // panela, a igrač je gleda ceo dan iza svake police.
-  //
-  // Zato se crta od naziva iz Podešavanja. Promeni ime igraonice u panelu i
-  // pozadina se promeni sa njim, bez nove verzije launchera.
-  // Ključ ostaje `crit` iako se šara više ne zove tako: postojeće baze u
-  // igraonici ga imaju upisanog u podešavanjima. Preimenovanje ključa bi im
-  // tiho ugasilo pozadinu - `TEKSTURE["crit"]` više ne bi postojalo, pa bi
-  // pala na "nema" i niko ne bi znao zašto je pozadina nestala.
-  crit: {
-    naziv: "Ime kuće", opis: "Naziv igraonice kao šara, najbrendiranije", korak: 96,
-    saraOd: (ime) => {
-      // Duga imena se ne skraćuju nego se smanjuju - presečeno ime izgleda kao
-      // kvar, a sitno ime je i dalje ime.
-      const t = String(ime || "").toUpperCase().trim().slice(0, 14) || "?";
-      const v = Math.max(9, Math.min(21, Math.round(126 / Math.max(t.length, 4))));
-      return svg(`<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><text x='6' y='30' font-family='Segoe UI, Arial, sans-serif' font-size='${v}' font-weight='900' letter-spacing='2' fill='#fff' fill-opacity='0.11'>${escXml(t)}</text><text x='54' y='78' font-family='Segoe UI, Arial, sans-serif' font-size='${Math.round(v * 0.72)}' font-weight='900' letter-spacing='2' fill='#fff' fill-opacity='0.075' transform='rotate(-14 54 78)'>${escXml(t)}</text></svg>`);
-    },
-  },
-  romb: {
-    naziv: "Rombovi", opis: "Mirna dijagonalna šara, najdiskretnija", korak: 34,
-    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='34' height='34'><path d='M17 2l15 15-15 15L2 17z' fill='none' stroke='#fff' stroke-opacity='0.11' stroke-width='1.1'/></svg>`),
-  },
-  // Ugljenicno tkanje - klasika na gaming opremi. Nije sahovnica: niti se
-  // SMENJUJU po pravcu (dva polja lezu vodoravno, dva uspravno), a svako nosi
-  // svetlu ivicu na strani odakle pada svetlo. Bez te ivice ostaje samo tabla.
-  ugljenik: {
-    naziv: "Ugljenik", opis: "Tkanje kao na gaming opremi, sitno i mirno", korak: 18,
-    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><g fill='#fff'>
-      <rect x='0' y='0' width='9' height='9' fill-opacity='0.055'/><rect x='9' y='9' width='9' height='9' fill-opacity='0.055'/>
-      <rect x='9' y='0' width='9' height='9' fill-opacity='0.028'/><rect x='0' y='9' width='9' height='9' fill-opacity='0.028'/>
-      <rect x='0' y='0' width='9' height='1.5' fill-opacity='0.075'/><rect x='9' y='9' width='9' height='1.5' fill-opacity='0.075'/>
-      <rect x='9' y='0' width='1.5' height='9' fill-opacity='0.06'/><rect x='0' y='9' width='1.5' height='9' fill-opacity='0.06'/>
-    </g></svg>`),
-  },
-  // Veze sa stampane ploce. Glavne linije prelaze CELU plocicu (vodoravna na
-  // y=34, uspravna na x=96), pa se sa susednom spajaju u istoj tacki - inace se
-  // u ponavljanju vide razbacani stapici umesto mreze.
-  kolo: {
-    naziv: "Kolo", opis: "Veze sa štampane ploče, tehnička i mirna", korak: 128,
-    sara: svg(`<svg xmlns='http://www.w3.org/2000/svg' width='128' height='128'>
-      <g fill='none' stroke='#fff' stroke-opacity='0.11' stroke-width='1.25' stroke-linecap='round' stroke-linejoin='round'>
-        <path d='M0 34h128'/><path d='M96 0v128'/><path d='M0 96h44l16-16h36'/>
-        <path d='M32 128V80l14-14h50'/><path d='M96 62l14-14h18'/><path d='M60 34v22'/>
-      </g>
-      <g fill='#fff' fill-opacity='0.15'><circle cx='96' cy='34' r='2.6'/><circle cx='60' cy='56' r='2'/>
-        <circle cx='96' cy='80' r='2'/><circle cx='46' cy='66' r='1.7'/></g></svg>`),
-  },
+// Sada launcher ima TEME (vidi TEME u nivoi.js): svaka menja podlogu, ploče,
+// boju dugmadi i pozadinu - slojeve boje koji se polako prelivaju. Vlasnik bira
+// kućnu temu i da li se pozadina pomera; igrač bira svoju među otključanim, i
+// ona važi dok je prijavljen.
+export const POKRETI = {
+  lagano: { naziv: "Lagano", opis: "Boje pozadine se sporo prelivaju" },
+  iskljuceno: { naziv: "Isključeno", opis: "Pozadina stoji" },
 };
-export const JACINE = { slabo: "Slabo", srednje: "Srednje", jako: "Jako" };
-export const PROZIRNOSTI = { slabo: 0.45, srednje: 0.75, jako: 1 };
-
-// KRETANJE SARE
-// Sara moze polako da klizi. Namerno je SPORO: ovo stoji ceo dan iza igara i
-// ne sme da vuce pogled dok neko igra. Brzina je u sekundama po jednom koraku
-// (jedna plocica), pa je kretanje besavno bez obzira na velicinu sare.
-// "mirno" je podrazumevano - ko ne zeli kretanje, ne mora da ga ima.
-// Svako kretanje ima JEDNU dobro podesenu brzinu. Ranije su postojali "lagano"
-// i "zivo" kao dve brzine istog klizanja - to je bio jedan efekat sa klizacem,
-// a ne izbor. Sad je svaki nacin svoja stvar.
-export const KRETANJA = {
-  mirno: { naziv: "Mirno", opis: "Šara stoji", sekundi: 0 },
-  klizanje: { naziv: "Klizanje", opis: "Šara polako putuje po dijagonali", sekundi: 30 },
-  talas: { naziv: "Talas", opis: "Svetlo prelazi preko šare, kao odsjaj", sekundi: 15 },
-  dubina: { naziv: "Dubina", opis: "Dva sloja, bliži prati pokret miša", sekundi: 44 },
-  // Nasumicne figure u mrezi na trenutak zasvetle u boji kuce pa se ugase.
-  // Sara stoji - pomera se samo svetlo, i to na malo mesta odjednom.
-  iskre: { naziv: "Iskre", opis: "Pojedine figure zasvetle crveno pa se ugase", sekundi: 0 },
-};
-// Stara imena iz ranijih verzija - da vec sacuvan izbor ne ispadne "nepoznat"
-// i tiho se ugasi kad se server nadogradi.
-const STARA_KRETANJA = { lagano: "klizanje", zivo: "klizanje" };
-
-// Pretvara izbor u gotove vrednosti za CSS. Radi i za kucnu teksturu i za
-// igracevu, pa je pravilo na jednom mestu.
-export function spremiTeksturu({ kljuc, jacina, kretanje } = {}) {
-  const k = TEKSTURE[kljuc] ? kljuc : "nema";
-  const j = JACINE[jacina] ? jacina : "srednje";
-  const staro = STARA_KRETANJA[kretanje];
-  const kr = KRETANJA[kretanje] ? kretanje : (staro || "mirno");
-  // Bez sare nema sta da se pomera, pa se kretanje gasi umesto da CSS vrti
-  // praznu animaciju u krug.
-  const radi = k !== "nema" && kr !== "mirno";
-  const vazi = radi ? kr : "mirno";
-  return {
-    kljuc: k, jacina: j, kretanje: vazi,
-    sara: saraTeksture(TEKSTURE[k]),
-    prozirnost: k === "nema" ? 0 : PROZIRNOSTI[j],
-    // Korak je velicina plocice: kretanje pomera saru za tacno jednu plocicu,
-    // pa se petlja zatvara bez vidljivog skoka. Iskre ga koriste da se crvena
-    // figura poklopi tacno sa belom ispod nje.
-    korak: TEKSTURE[k].korak || 0,
-    sekundi: radi ? KRETANJA[vazi].sekundi : 0,
-    // Ista sara u boji kuce - salje se samo kad zatreba, da welcome ne nosi
-    // dvostruko vise podataka bez potrebe.
-    iskra: vazi === "iskre" ? iskraOd(saraTeksture(TEKSTURE[k])) : "",
-  };
+export function izgledKuce() {
+  const tema = Object.hasOwn(TEME, getSetting("tema_kuce", "kuca")) ? getSetting("tema_kuce", "kuca") : "kuca";
+  const pokret = Object.hasOwn(POKRETI, getSetting("pokret", "lagano")) ? getSetting("pokret", "lagano") : "lagano";
+  return { tema, pokret };
 }
-
-export function teksturaObj() {
-  return spremiTeksturu({
-    kljuc: getSetting("tekstura", "nema"),
-    jacina: getSetting("tekstura_jacina", "srednje"),
-    kretanje: getSetting("tekstura_kretanje", "mirno"),
-  });
+// Spisak tema za panel i launcher: ime, opis, nivo, VIP.
+export function temeSpisak() {
+  return Object.entries(TEME).map(([kljuc, t]) => ({ kljuc, naziv: t.naziv, opis: t.opis, nivo: t.nivo, vip: !!t.vip, boje: t.boje }));
 }
-
-export function saveTeksturu(kljuc, jacina, kretanje) {
-  if (!TEKSTURE[kljuc]) return { error: "Nepoznata tekstura" };
-  if (jacina != null && !JACINE[jacina]) return { error: "Nepoznata jačina" };
-  if (kretanje != null && !KRETANJA[kretanje] && !STARA_KRETANJA[kretanje]) return { error: "Nepoznato kretanje" };
-  if (kretanje != null) kretanje = KRETANJA[kretanje] ? kretanje : STARA_KRETANJA[kretanje];
-  setSetting("tekstura", kljuc);
-  if (jacina != null) setSetting("tekstura_jacina", jacina);
-  if (kretanje != null) setSetting("tekstura_kretanje", kretanje);
-  pushTeksturu();
-  return { ok: true, ...teksturaObj() };
-}
-
-export function pushTeksturu() {
-  broadcastClients({ t: "tekstura", tekstura: teksturaObj() });
-  // Prijavljeni igraci koji imaju SVOJU pozadinu ne smeju da je izgube kad
-  // vlasnik promeni kucnu - njima se ponovo salje njihova.
-  for (const c of db.prepare("SELECT id, current_player_id FROM computers WHERE current_player_id IS NOT NULL").all()) {
-    const t = temaIgraca(c.current_player_id);
-    if (t) sendClient(c.id, { t: "tekstura", tekstura: t });
-  }
-}
-
-// TEKSTURA IGRACA
-// Igrac bira svoju saru na svom nalogu, u launcheru. Vazi samo dok je on
-// prijavljen; kad se odjavi, racunar se vraca na kucnu.
-export function temaIgraca(playerId) {
-  const red = db.prepare("SELECT tema FROM players WHERE id=?").get(playerId);
-  if (!red || !red.tema) return null;
-  let t;
-  try { t = JSON.parse(red.tema); } catch { return null; }
-  if (!t || typeof t !== "object" || t.kljuc === "kuca") return null;
-  return spremiTeksturu(t);
-}
-
-export function sacuvajTemuIgraca(playerId, { kljuc, jacina, kretanje } = {}) {
-  // "kuca" znaci: vrati me na ono sto je vlasnik podesio.
-  if (kljuc === "kuca") {
-    db.prepare("UPDATE players SET tema=NULL WHERE id=?").run(playerId);
-    return { ok: true, tema: null, tekstura: teksturaObj() };
-  }
-  // Svoja sara je NAGRADA za drugi nivo, i to se proverava OVDE.
-  //
-  // Launcher zakljucane stvari prikazuje sivo i ne da da se kliknu - ali
-  // launcher stoji na racunaru igraca. Ko posalje poruku mimo njega dobija isti
-  // odgovor kao da je kliknuo.
-  if (!smeDa(db.prepare("SELECT xp FROM players WHERE id=?").get(playerId)?.xp, "sara")) {
-    return { error: `Svoja šara se otključava na ${OTKLJUCAVANJA.sara.nivo}. nivou` };
-  }
-  if (!TEKSTURE[kljuc]) return { error: "Nepoznata tekstura" };
-  if (jacina != null && !JACINE[jacina]) return { error: "Nepoznata jačina" };
-  if (kretanje != null && !KRETANJA[kretanje] && !STARA_KRETANJA[kretanje]) return { error: "Nepoznato kretanje" };
-  const t = spremiTeksturu({ kljuc, jacina, kretanje });
-  db.prepare("UPDATE players SET tema=? WHERE id=?")
-    .run(JSON.stringify({ kljuc: t.kljuc, jacina: t.jacina, kretanje: t.kretanje }), playerId);
-  return { ok: true, tema: { kljuc: t.kljuc, jacina: t.jacina, kretanje: t.kretanje }, tekstura: t };
-}
-
-// Sta racunar treba da prikaze: igraceva sara ako je ima, inace kucna.
-export function teksturaZaRacunar(playerId) {
-  return (playerId && temaIgraca(playerId)) || teksturaObj();
+export function sacuvajIzgledKuce({ tema, pokret } = {}) {
+  // hasOwn, ne TEME[x]: "constructor" ili "toString" bi inace prosli proveru
+  const ime = (x) => typeof x === "string"; // niz ["kuca"] bi kroz String() prošao kao "kuca"
+  if (tema != null && !(ime(tema) && Object.hasOwn(TEME, tema))) return { error: "Nepoznata tema" };
+  if (pokret != null && !(ime(pokret) && Object.hasOwn(POKRETI, pokret))) return { error: "Nepoznat pokret" };
+  if (tema != null) setSetting("tema_kuce", tema);
+  if (pokret != null) setSetting("pokret", pokret);
+  broadcastClients({ t: "izgled", izgled: izgledKuce() });
+  return { ok: true, ...izgledKuce() };
 }
 
 // PROMO BANERI (vrh pocetne u launcheru)
@@ -3181,8 +2894,11 @@ const profilIzBaze = (red) => {
   let p = {};
   try { p = JSON.parse(red?.profil || "{}") || {}; } catch { p = {}; }
   return {
-    boja: BOJE_IMENA[p.boja] ? p.boja : "bela",
-    okvir: OKVIRI[p.okvir] ? p.okvir : "nema",
+    boja: Object.hasOwn(BOJE_IMENA, String(p.boja)) ? p.boja : "bela",
+    okvir: Object.hasOwn(OKVIRI, String(p.okvir)) ? p.okvir : "nema",
+    // null = "kao u igraonici". Tema iznad igračevog nivoa (npr. posle
+    // otkazane porudžbine koja mu je vratila iskustvo) ne važi.
+    tema: smeTemu(red?.xp, p.tema) ? p.tema : null,
   };
 };
 
@@ -3295,8 +3011,80 @@ export function profilIgraca(playerId) {
     boje: BOJE_IMENA, okviri: OKVIRI,
     // Ceo put kroz nivoe, da launcher nacrta mapu od prvog do poslednjeg:
     // cilj koji se ne vidi ne vuče napred. Uz svaki nivo ide i šta otključava.
-    nivoi: NIVOI.map((x) => ({ nivo: x.nivo, naziv: x.naziv, prag: x.prag, otkljucava: x.otkljucava || null })),
+    nivoi: NIVOI.map((x) => ({ nivo: x.nivo, naziv: x.naziv, prag: x.prag,
+      otkljucava: otkljucanoZa(p.xp).filter((o) => o.nivo === x.nivo).map((o) => o.kljuc) })),
+    teme: temeSpisak().map((t) => ({ ...t, otkljucano: smeTemu(p.xp, t.kljuc) })),
+    ...dostignucaIgraca(playerId),
   };
+}
+
+// DOSTIGNUĆA I NIZ NEDELJA (definicije i pravila su u nivoi.js)
+//
+// Vrednost svakog dostignuća je NAJVEĆA IKAD: izračunata sada ili upisana
+// ranije, šta je veće. Pokretanja igara se posle nekog vremena brišu pri
+// održavanju, a niz nedelja pukne - osvojen stepen ostaje.
+function vrednostiDostignuca(playerId) {
+  const red = db.prepare("SELECT dostignuca FROM players WHERE id=?").get(playerId);
+  let upisano = {};
+  try { const x = JSON.parse(red?.dostignuca || "{}"); if (x && typeof x === "object" && !Array.isArray(x)) upisano = x; } catch {}
+  const dolasci = db.prepare("SELECT started_at FROM sessions WHERE player_id=? ORDER BY started_at").all(playerId).map((r) => r.started_at);
+  const niz = nizNedelja(dolasci);
+  const cena = rate();
+  const trosak = db.prepare("SELECT COALESCE(SUM(cost),0) c FROM sessions WHERE player_id=?").get(playerId).c;
+  // Posle 22 i pre 4 ujutru - ko sedne u ponoć i dalje je "noćna ptica".
+  const noc = dolasci.filter((t) => { const h = new Date(t).getHours(); return h >= 22 || h < 4; }).length;
+  const sada = {
+    dolasci: dolasci.length,
+    sati: cena > 0 ? Math.floor(trosak / cena) : 0,
+    niz: niz.najduzi,
+    igre: db.prepare("SELECT COUNT(DISTINCT game_id) n FROM game_launches WHERE player_id=?").get(playerId).n,
+    porudzbine: db.prepare("SELECT COUNT(*) n FROM orders WHERE player_id=? AND status<>'cancelled'").get(playerId).n,
+    noc,
+  };
+  const vrednosti = {};
+  for (const d of DOSTIGNUCA) vrednosti[d.kljuc] = Math.max(Number(sada[d.kljuc]) || 0, Number(upisano[d.kljuc]) || 0);
+  return { upisano, vrednosti, niz };
+}
+function dostignucaIgraca(playerId) {
+  const { vrednosti, niz } = vrednostiDostignuca(playerId);
+  const dostignuca = DOSTIGNUCA.map((d) => {
+    const stepen = stepenZa(d, vrednosti[d.kljuc]);
+    return { kljuc: d.kljuc, naziv: d.naziv, opis: d.opis, jedinica: d.jedinica, ikona: d.ikona,
+      stepeni: d.stepeni, vrednost: vrednosti[d.kljuc], stepen,
+      sledeci: stepen < d.stepeni.length ? d.stepeni[stepen] : null };
+  });
+  return { dostignuca, niz: { nedelja: niz.niz, ovaNedelja: niz.ovaNedelja, najduzi: niz.najduzi, poslednje: niz.poslednje } };
+}
+
+// Upiše nove vrednosti i javi igraču svaki stepen koji je upravo osvojio.
+// Zove se posle prijave, porudžbine, pokretanja igre i (retko) iz naplate -
+// da čestitka stigne dok igrač sedi za računarom, ne sledeći put.
+const poslednjaProveraDostignuca = new Map();
+export function javiDostignuca(playerId, computerId, { najredje = 0 } = {}) {
+  if (!playerId) return [];
+  if (najredje) {
+    const bilo = poslednjaProveraDostignuca.get(playerId) || 0;
+    if (Date.now() - bilo < najredje) return [];
+  }
+  poslednjaProveraDostignuca.set(playerId, Date.now());
+  try {
+    const { upisano, vrednosti } = vrednostiDostignuca(playerId);
+    const nova = [];
+    for (const d of DOSTIGNUCA) {
+      const pre = stepenZa(d, upisano[d.kljuc]), posle = stepenZa(d, vrednosti[d.kljuc]);
+      if (posle > pre) nova.push({ kljuc: d.kljuc, naziv: d.naziv, stepen: posle, od: d.stepeni.length, ikona: d.ikona });
+    }
+    if (DOSTIGNUCA.some((d) => (Number(upisano[d.kljuc]) || 0) !== vrednosti[d.kljuc])) {
+      db.prepare("UPDATE players SET dostignuca=? WHERE id=?").run(JSON.stringify(vrednosti), playerId);
+    }
+    if (nova.length && computerId) sendClient(computerId, { t: "dostignuce", nova, ...dostignucaIgraca(playerId) });
+    return nova;
+  } catch (e) {
+    // Dostignuća su nagrada, ne knjigovodstvo - greška ovde ne sme da obori
+    // prijavu ili porudžbinu koja ju je pozvala.
+    console.error("[dostignuca]", e?.message || e);
+    return [];
+  }
 }
 
 // Izbor izgleda se PROVERAVA NA SERVERU, ne samo skriva u launcheru.
@@ -3304,25 +3092,35 @@ export function profilIgraca(playerId) {
 // Launcher zaključane stvari prikazuje sivo i ne da da se kliknu - ali launcher
 // je na računaru igrača. Ko pošalje poruku mimo njega, dobija isti odgovor kao
 // da je kliknuo: ne može dok ne stigne do nivoa.
-export function sacuvajProfilIgraca(playerId, { boja, okvir } = {}) {
+export function sacuvajProfilIgraca(playerId, { boja, okvir, tema } = {}) {
   const p = db.prepare("SELECT xp, profil FROM players WHERE id=?").get(playerId);
   if (!p) return { error: "Nalog ne postoji" };
   const sad = profilIzBaze(p);
   const novo = { ...sad };
 
   if (boja != null) {
-    if (!BOJE_IMENA[boja]) return { error: "Nepoznata boja" };
+    if (typeof boja !== "string" || !Object.hasOwn(BOJE_IMENA, boja)) return { error: "Nepoznata boja" };
     if (boja !== "bela" && !smeDa(p.xp, "boja")) {
       return { error: `Boja imena se otključava na ${OTKLJUCAVANJA.boja.nivo}. nivou` };
     }
     novo.boja = boja;
   }
   if (okvir != null) {
-    if (!OKVIRI[okvir]) return { error: "Nepoznat okvir" };
+    if (typeof okvir !== "string" || !Object.hasOwn(OKVIRI, okvir)) return { error: "Nepoznat okvir" };
     if (okvir !== "nema" && !smeDa(p.xp, "okvir")) {
       return { error: `Okvir se otključava na ${OTKLJUCAVANJA.okvir.nivo}. nivou` };
     }
     novo.okvir = okvir;
+  }
+  // Tema: "" ili null vraća na kućnu. Zaključana se odbija ISTO kao boja -
+  // launcher je na računaru igrača i nije mesto na kom se odlučuje šta sme.
+  if (tema !== undefined) {
+    if (tema === null || tema === "") novo.tema = null;
+    else {
+      if (typeof tema !== "string" || !Object.hasOwn(TEME, tema)) return { error: "Nepoznata tema" };
+      if (!smeTemu(p.xp, tema)) return { error: `Tema ${TEME[tema].naziv} se otključava na ${TEME[tema].nivo}. nivou` };
+      novo.tema = tema;
+    }
   }
   db.prepare("UPDATE players SET profil=? WHERE id=?").run(JSON.stringify(novo), playerId);
   return { ok: true, izgled: novo };

@@ -14,12 +14,11 @@ function sirovi(putanja, zaglavlja = {}) {
     r.on("error", rej); r.end();
   });
 }
-// Dva razloga zbog kojih nadogradnja "ne uhvati": stara sara i kesiran panel.
+// Dva razloga zbog kojih nadogradnja "ne uhvati": izgled i kesiran panel.
 //
-// 1. Igracu fale animacije. Sara i kretanje se cuvaju u bazi. Postojeca baza,
-//    napravljena pre nego sto smo dodali sare, nema taj podatak - pa server
-//    podrazumeva "nema" i launcher ne crta nista. Vlasnik zameni fajlove i i
-//    dalje je ravno.
+// 1. Igracu fali nov izgled. Tema i pokret pozadine se cuvaju u bazi. Postojeca
+//    baza, napravljena pre tema, nema taj podatak - pa bi launcher ostao ravan.
+//    Vlasnik zameni fajlove i ne vidi razliku.
 // 2. Panelu fale sve izmene. style.css i app.js se ucitavaju bez oznake verzije,
 //    pa pregledac posle nadogradnje servira staru, kesiranu stranu. Vlasnik se
 //    zakune da se "nista nije promenilo".
@@ -29,24 +28,25 @@ const DATA = radniFolder("nadogradnja-data");
 let pao = 0, prosao = 0;
 const proveri = (n, u, d = "") => { if (u) { prosao++; console.log("  OK   " + n); } else { pao++; console.log("  PAO  " + n + (d ? "  -> " + d : "")); } };
 
-// Napravi bazu KAO PRE nadogradnje: bez ijednog zapisa o teksturi. To radi tako
-// sto prvi put digne server (napravi tabele i seed), pa obrise teksture, pa se
-// server u testu ponovo digne i seed treba da ih vrati.
+// Napravi bazu KAO PRE nadogradnje: podesavanja starog sistema sara, bez
+// ijednog zapisa o temi. Server pri pokretanju treba da postavi temu i da
+// pocisti stare kljuceve.
 {
-  // seed se dogodi pri prvom import-u; ovde samo obrisemo teksture iz gotove baze
   const db = new DatabaseSync(path.join(DATA, "crit.db"));
   db.exec("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)");
+  db.exec("INSERT OR REPLACE INTO settings VALUES ('tekstura','crit'),('tekstura_kretanje','talas'),('tekstura_jacina','srednje')");
   db.close();
 }
 
 await podigniServer(DATA, 8129);
 
-// ---- 1. sara se ukljuci na postojecoj bazi ----
+// ---- 1. tema se ukljuci na postojecoj bazi ----
 const posle = new DatabaseSync(path.join(DATA, "crit.db"), { readOnly: true });
 const nadji = (k) => posle.prepare("SELECT value FROM settings WHERE key=?").get(k)?.value;
-proveri("sara je ukljucena posle nadogradnje", nadji("tekstura") === "crit", `tekstura=${nadji("tekstura")}`);
-proveri("kretanje nije 'mirno' (inace se ne vidi da radi)", nadji("tekstura_kretanje") === "talas", `kretanje=${nadji("tekstura_kretanje")}`);
-proveri("jacina je postavljena", nadji("tekstura_jacina") === "srednje", `jacina=${nadji("tekstura_jacina")}`);
+proveri("kucna tema je postavljena posle nadogradnje", nadji("tema_kuce") === "kuca", `tema_kuce=${nadji("tema_kuce")}`);
+proveri("pozadina se lagano krece (inace se ne vidi da radi)", nadji("pokret") === "lagano", `pokret=${nadji("pokret")}`);
+proveri("stara podesavanja sara su pociscena",
+  ["tekstura", "tekstura_kretanje", "tekstura_jacina"].every((k) => nadji(k) === undefined));
 posle.close();
 
 // ---- 2. panel se servira sa verzijom u adresama ----
@@ -74,7 +74,7 @@ proveri("nepromenjen CSS vraca 304, ne ceo fajl", drugi.status === 304, String(d
 // ---- izvor ----
 const db = citajIzvor("server/src/db.js");
 const index = citajIzvor("server/src/index.js");
-proveri("seed postavlja saru samo ako nije birana", /tekstura: "crit"[\s\S]{0,200}getSetting\(k\) === null/.test(db.replace(/\n/g, " ")) || (db.includes('tekstura: "crit"') && db.includes("getSetting(k) === null")));
+proveri("seed postavlja temu samo ako nije birana", db.includes('tema_kuce: "kuca"') && db.includes("getSetting(k) === null"));
 proveri("server ubacuje verziju u panel", index.includes("__VERZIJA__") && index.includes("posaljiPanel"));
 
 console.log(`\n${prosao}/${prosao + pao} proslo`);

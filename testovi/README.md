@@ -28,6 +28,8 @@ Prava baza iz `server/data/` se ne dira ni u jednom testu.
 | `promo` | promo baneri: kačenje, redosled, skrivanje, brisanje, trenutna primena na launcherima |
 | `veza` | namerno gađanje WebSocketa: pokvarene poruke, tuđi tokeni, brzo prekidanje veze, dve veze za isti računar |
 | `nadogradnja` | postojeća baza iz igraonice preživljava novu verziju servera |
+| `teme` | kućna tema iz panela: samo poznata tema i pokret, promena stiže na računare odmah, radnik ne menja izgled igraonice |
+| `dostignuca` | dostignuća i niz nedelja: čestitka stiže odmah i samo jednom, osvojen stepen ostaje posle čišćenja baze, niz ne puca usred nedelje ni zbog pomeranja sata |
 
 ## Alati koji gledaju pravi launcher
 
@@ -52,7 +54,7 @@ Pojedinačno traže da server već radi na 8096.
 |---|---|
 | `pregled-electron.mjs` | slika **svih 9 ekrana** na 1920x1080 i 1366x768, plus 3 obaveštenja preko igre. Uz svaku sliku meri šta ispada iz ekrana, šta ulazi pod donju traku, koji je tekst odsečen i koji se font primenio. Slike u `.slike/` |
 | `proba-porudzbine.mjs` | ceo tok porudžbine kroz launcher: dodavanje u korpu, izbor keš/kredit, slanje, provera šta je stiglo u bazu, promena statusa. Preko **pravog WebSocketa**, ne kroz lažni most |
-| `proba-kretanja.mjs` | meri da li animacije šare stvarno rade — pozicija pozadine kroz vreme, maska kod talasa, dva sloja kod dubine, iskre. Sa `--reduced` pušta isto na računaru kakav je u igraonici (Windows sa isključenim animacijama) — pod tim uslovom su animacije jednom bile potpuno mrtve |
+| `proba-teme.mjs` | teme na pravom launcheru: kućna tema stiže iz panela uživo, isključen pokret zaustavlja pozadinu, zaključana tema se ne primeni, otključana se primeni klikom i odmah oboji i dugmad, odjava vraća kućnu. Slika svaku temu u `.slike-teme/` |
 | `proba-klikova.mjs` | prolazi kroz sve ekrane i za **svako dugme** proverava da li klik uopšte stiže do koda. Nastao posle kvara u kom se nagradni točak otvarao, ali se nije mogao ni zavrteti ni zatvoriti: delegacija klikova visi na `#content`, a pop-up stoji izvan njega. Alat sam sebe proverava — ako presretač ne uhvati nijednog slušaoca ili launcher uopšte ne krene, javlja da provera nije ispravna umesto da kaže da je sve u redu |
 | `proba-fonta.mjs` | da li ugrađeni font stvarno ima č ć š ž đ. Poredi širinu slova sa fontom i bez njega |
 | `proba-procesa.mjs` | daljinski task manager: traži popis sa računara, gasi **pravi** pokrenut program i proverava da ga stvarno više nema. Diže i svoj server, ne treba mu spoljni |

@@ -1,6 +1,6 @@
 // Postavlja bazu tako da igraonica ODMAH radi: prave igre iz C:\games sa
 // pravim prečicama, 9 alata sa logotipima, pozadine svih pet ekrana,
-// vidljiv shop, upaljena tekstura i nagradni točak, vremenski paket.
+// vidljiv shop, kućna tema i nagradni točak, vremenski paket.
 //
 // Pokreni:  node postavi-bazu.mjs
 // Radi na server/data/crit.db (baza koja se pakuje). Server NE sme da radi.
@@ -117,15 +117,13 @@ db.exec("UPDATE shop_items SET available=1");
 for (const s of db.prepare("SELECT image FROM shop_items WHERE image IS NOT NULL").all()) zadrzaneSlike.add(path.basename(s.image));
 log(`Shop: ${db.prepare("SELECT COUNT(*) c FROM shop_items").get().c} artikala vidljivo`);
 
-// ---- 5) PODEŠAVANJA: tekstura, točak, paket ----
-// Sara: sitna d20 kockica koja se ponavlja. Ranije je stajala rec "CRIT" i to
-// je preko praznog ekrana izgledalo kao vodeni zig, a ne kao tekstura.
-setSetting("tekstura", "kockice");
-setSetting("tekstura_jacina", "slabo");
-setSetting("tekstura_kretanje", "talas");
+// ---- 5) PODEŠAVANJA: tema, točak, paket ----
+// Kućna tema launchera i lagano prelivanje pozadine.
+setSetting("tema_kuce", "kuca");
+setSetting("pokret", "lagano");
 setSetting("tocak_ukljucen", "1");   // nagradni točak upaljen
 setSetting("tocak_prag", "1200");
-log("Šara: d20 kockice (slabo, talas), nagradni točak upaljen (prag 1200)");
+log("Tema: Kućna (pozadina se lagano preliva), nagradni točak upaljen (prag 1200)");
 
 // paket 5h/500 (ako ga nema)
 if (db.prepare("SELECT COUNT(*) c FROM paketi").get().c === 0) {

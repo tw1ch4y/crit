@@ -162,7 +162,7 @@ proveri("igra preko steam:// se ne pita za ikonu",
 proveri("spisak ikona je zajednicki za igre i precice",
   launcher.includes("IKONE_PROGRAMA") && !launcher.includes("IKONE_ALATA"));
 proveri("plocica bez korice je smirena, ne obojen blok",
-  css.includes(".tile-fallback") && /linear-gradient\(160deg, #16161d/.test(css),
+  css.includes(".tile-fallback") && /linear-gradient\(160deg, var\(--panel-2\), var\(--bg\)/.test(css) && !/\.tile-fallback::after/.test(css),
   "jak obojen blok bi u polici vikao glasnije od prave korice");
 proveri("dva slova stoje na istom mestu kao ikona",
   /\.tile-fallback \.tile-emoji \{ margin-bottom: 26px; \}/.test(css),

@@ -75,7 +75,7 @@ const stavi = (o, put, v) => {
 // još radi. Alat koji se pokreće kad je već sve otišlo naopako mora da radi.
 //
 // BARE IME ("Crit") se NE menja svuda, i to je namerno: pojavljuje se u
-// `crit.db`, `CRIT_DATA_DIR`, `promoCrit`, `tekstura: "crit"` i u zaglavljima
+// `crit.db`, `CRIT_DATA_DIR`, `promoCrit`, i u zaglavljima
 // `X-Crit-*`. To su unutrašnja imena - ne vidi ih nijedan korisnik, a
 // preimenovanje baze bi ostavilo sve postojeće podatke sa strane. Zato za njega
 // ide izričit spisak mesta.

@@ -88,7 +88,7 @@ for (const f of ["package.json", "Pokreni server.bat", "Otvori port u firewall-u
   const brPozadina = jedan("SELECT COUNT(*) c FROM settings WHERE key LIKE 'pozadina_%' AND value <> ''");
   const brNagrada = jedan("SELECT COUNT(*) c FROM tocak_nagrade");
   const brPaketa = jedan("SELECT COUNT(*) c FROM paketi WHERE available=1");
-  const tekstura = post("tekstura");
+  const tema = post("tema_kuce");
   const tocak = post("tocak_ukljucen");
   pdb.close();
   // Provera prati ono sto launcher STVARNO prikazuje. Ranije je trazila promo
@@ -99,7 +99,7 @@ for (const f of ["package.json", "Pokreni server.bat", "Otvori port u firewall-u
   if (brAlata === 0) upozorenja.push("nema nijednog internet alata");
   if (brShop === 0) upozorenja.push("nijedan artikal u shopu nije vidljiv");
   if (brPozadina < 5) upozorenja.push(`samo ${brPozadina} od 5 pozadina ekrana (login bi razvlacio tudju sliku)`);
-  if (!tekstura || tekstura === "nema") upozorenja.push("tekstura pozadine je iskljucena");
+  if (!tema) upozorenja.push("kucna tema launchera nije podesena");
   if (tocak !== "1") upozorenja.push("nagradni tocak je iskljucen");
   else if (brNagrada === 0) upozorenja.push("tocak je upaljen ali nema nijednu nagradu");
   if (brPaketa === 0) upozorenja.push("nema nijednog vremenskog paketa (5h za 500)");
@@ -380,7 +380,7 @@ const uputstvoProbe = [
   "",
   "  IZGLED I IZVESTAJI:",
   "  - Izvestaji -> promet po satu, kes/kredit podela, Izvoz u CSV",
-  `  - Izgled launchera -> promeni teksturu / napravi ${IME.toUpperCase()} baner`,
+  `  - Izgled launchera -> izaberi kucnu temu / napravi ${IME.toUpperCase()} baner`,
   "  - Igre -> klikni 'baner' na kartici da napravis privremeni baner",
   "  - Internet alati -> svih 9 alata sa originalnim logotipima",
   "",

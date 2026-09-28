@@ -148,12 +148,12 @@ const EKRANI = [
       await klik(win, '.tab[data-tab="account"]'); await cekaj(500);
       await klik(win, '[data-acc-sekcija="podesavanja"]'); await cekaj(2500);
     } },
-  { ime: "4c-nalog-pozadina", opis: "Nalog > Pozadina (izbor sare)", ocekivan: "desktopScreen",
+  { ime: "4c-nalog-teme", opis: "Nalog > Teme (izbor teme launchera)", ocekivan: "desktopScreen",
     do: async (win, p) => {
       posalji(win, p.login); await sacekajPozdrav(win);
       await cekaj(400);
       await klik(win, '.tab[data-tab="account"]'); await cekaj(500);
-      await klik(win, '[data-acc-sekcija="pozadina"]'); await cekaj(700);
+      await klik(win, '[data-acc-sekcija="teme"]'); await cekaj(700);
     } },
   { ime: "4d-nalog-lozinka", opis: "Nalog > Lozinka", ocekivan: "desktopScreen",
     do: async (win, p) => {
@@ -326,16 +326,15 @@ app.whenReady().then(async () => {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ username: "admin", password: "admin" }) }).then((r) => r.json());
   const uzmi = (p) => fetch(BAZA + p, { headers: { authorization: "Bearer " + prijava.token } }).then((r) => r.json());
-  const [shop, games, tools, poz, promo, tex] = await Promise.all(
-    ["/api/shop", "/api/games", "/api/tools", "/api/pozadine", "/api/promo", "/api/tekstura"].map(uzmi));
+  const [shop, games, tools, poz, promo, izg] = await Promise.all(
+    ["/api/shop", "/api/games", "/api/tools", "/api/pozadine", "/api/promo", "/api/izgled-kuce"].map(uzmi));
 
   const poruke = {
     welcome: { t: "welcome", computer: { id: 7, name: "PC-07" },
       settings: { cafeName: "Crit", currency: "RSD", ratePerHour: 120 },
-      shop, games, tools, pozadine: poz.slike || {}, tekstura: tex.izbor,
-      // Spisak sara: bez njega se na Nalogu ne prikaze panel "Moja pozadina",
-      // pa bi delovalo kao da ga nema.
-      teksture: { spisak: tex.spisak, jacine: tex.jacine, kretanja: tex.kretanja, prozirnosti: tex.prozirnosti },
+      shop, games, tools, pozadine: poz.slike || {},
+      // Spisak tema: bez njega Nalog > Teme stoji na "Teme se ucitavaju".
+      izgled: { tema: izg.tema, pokret: izg.pokret }, teme: izg.teme,
       promo: (promo || []).filter((x) => x.available) },
     login: { t: "login_ok", player: { id: 1, username: "marko", displayName: "Marko" },
       balance: 640, remainingSeconds: 19200, session: { id: 1, startedAt: Date.now() - 3600000 },

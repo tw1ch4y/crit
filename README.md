@@ -138,9 +138,13 @@ Program je jedan, izgled je svačiji. Sve se podešava iz panela i menja se
 | **Znak (logo)** | Izgled launchera > Znak i boja |
 | **Boja** | isto — biraš jednu, nijanse se izvode iz nje |
 | Pozadine svih pet ekrana | Izgled launchera |
-| Šara i njeno kretanje | Izgled launchera |
+| Kućna tema i pokret pozadine | Izgled launchera > Tema launchera |
 | Promo baneri | Izgled launchera |
 | Omoti i baneri igara | Igre |
+
+Igrač uz to bira **svoju temu** u Nalogu > Teme, među onima koje je
+otključao nivoom (od petog nivoa teme su VIP). Važi dok je prijavljen; pri
+odjavi launcher se vraća na kućnu temu.
 
 > Zelena, zlatna i status boje se **ne menjaju** izborom boje kuće. Zelena znači
 > „ima kredita", zlatna „nagrada", crvena u launcheru „ističe vreme" — to su

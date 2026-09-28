@@ -38,8 +38,9 @@ proveri("krug dobija boju kuce tek pod misem", /\.pice-plus:hover \{[^}]*backgro
 proveri("shop javlja da porudzbina stize", launcher.includes("shopPorudzbine()"));
 proveri("to je jedna traka, ne spisak", /\.shop-traka \{/.test(jedanRed));
 proveri("traka se vidi kao nesto na sta se klikce", /\.shop-traka \{[^}]*cursor: pointer/.test(jedanRed));
-proveri("tacka na traci kuca dok se sprema", /\.st-tacka \{[^}]*animation: st-kuc/.test(jedanRed),
-  "mirna tacka izgleda kao oznaka, a ne kao nesto sto je u toku");
+// Treperava tacka je bila ukras bez sadrzaja - traka je zlatna i tekst kaze
+// "se sprema". Umesto nje stoji ikona sta stize.
+proveri("traka nosi ikonu, ne treperavu tacku", /class="st-ik"/.test(launcher) && !/st-tacka|st-kuc/.test(css + launcher));
 // Mreza artikala se skroluje. Traka ispod nje je bila van vidnog polja, a
 // postoji bas zato da se odgovor vidi na prvi pogled.
 proveri("traka stoji IZNAD mreze artikala",

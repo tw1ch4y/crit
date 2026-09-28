@@ -1099,26 +1099,13 @@ th.th-sort.aktivan { color: var(--accent-hover); }
 
 /* Izbor teksture pozadine. Uzorak se crta na tamnom kvadratu, istom bojom i
    istom prozirnoscu kao u launcheru - da izbor u panelu ne laze o rezultatu. */
-.tex-nota { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); margin-bottom: 14px; }
-.tex-nota svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--text-3); }
-.tex-jacina { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.tex-grupa { margin-left: 8px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-3); }
-.tex-grupa:first-child { margin-left: 0; }
-.tex-mreza { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(158px, 100%), 1fr)); gap: 12px; }
-.tex-kartica {
-  display: flex; flex-direction: column; gap: 3px; padding: 0 0 11px; text-align: left; cursor: pointer;
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden;
-  font: inherit; color: inherit; transition: border-color 0.15s ease, transform 0.15s ease;
-}
-.tex-kartica:hover { border-color: var(--line-2); transform: translateY(-2px); }
-.tex-kartica.izabrana { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
-.tex-uzorak {
-  display: grid; place-items: center; height: 92px; margin-bottom: 8px;
-  background-color: #101018; background-repeat: repeat; border-bottom: 1px solid var(--line);
-}
-.tex-nista { font-style: normal; font-size: 11px; color: var(--text-3); }
-.tex-ime { padding: 0 11px; font-size: 13px; font-weight: 650; }
-.tex-opis { padding: 0 11px; font-size: 11px; color: var(--text-2); line-height: 1.45; }
+.tema-nota { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); margin-bottom: 14px; }
+.tema-nota svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--text-3); }
+.tema-izbor { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tema-grupa { margin-left: 8px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-3); }
+.tema-grupa:first-child { margin-left: 0; }
+.tema-ime { padding: 0 3px; font-size: 13px; font-weight: 650; }
+.tema-opis { padding: 0 3px; font-size: 11px; color: var(--text-2); line-height: 1.45; }
 
 .poz-mreza { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(330px, 100%), 1fr)); gap: 16px; }
 .poz-kartica { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
@@ -1499,3 +1486,27 @@ tr.rez-gotova td { opacity: 0.5; }
   background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--r);
 }
 .brend-boje #brendHeks { width: 110px; font-family: var(--mono, monospace); text-transform: lowercase; }
+
+/* Kućna tema launchera: uzorak je umanjen launcher u bojama teme. */
+.tema-mreza { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)); gap: 12px; }
+.tema-kartica {
+  display: flex; flex-direction: column; gap: 3px; padding: 8px 8px 10px; text-align: left;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; cursor: pointer;
+  transition: border-color var(--tr), transform var(--tr);
+}
+.tema-kartica:hover { border-color: var(--line-3); transform: translateY(-2px); }
+.tema-kartica.izabrana { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.tema-uzorak {
+  position: relative; height: 70px; border-radius: 7px; margin-bottom: 5px; overflow: hidden; display: block;
+  background:
+    radial-gradient(70% 90% at 12% 10%, color-mix(in srgb, var(--u-a1) 55%, transparent), transparent 70%),
+    radial-gradient(60% 80% at 92% 70%, color-mix(in srgb, var(--u-a2) 45%, transparent), transparent 70%),
+    radial-gradient(50% 60% at 45% 110%, color-mix(in srgb, var(--u-a3) 40%, transparent), transparent 70%),
+    var(--u-bg);
+}
+.tema-uzorak i {
+  position: absolute; left: 12px; right: 12px; top: 14px; bottom: 12px; border-radius: 4px;
+  background: color-mix(in srgb, var(--u-p) 85%, transparent);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+.tema-uzorak i::after { content: ""; position: absolute; left: 8px; bottom: 8px; width: 40px; height: 9px; border-radius: 2px; background: var(--u-ak); }

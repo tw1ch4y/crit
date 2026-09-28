@@ -2919,11 +2919,10 @@ async function ucitajBrend() {
 async function renderIzgled() {
   let podaci = { spisak: {}, slike: {} };
   try { podaci = await api("/pozadine"); } catch (e) { toast(e.message, "error"); }
-  // Sare i prozirnosti stizu sa servera, iste one koje dobija launcher - pregled
-  // ovde zato ne moze da pokaze nesto drugo od onoga sto igrac vidi.
-  let tex = { spisak: {}, jacine: {}, prozirnosti: {}, izbor: { kljuc: "nema", jacina: "srednje" } };
-  try { tex = await api("/tekstura"); } catch (e) { toast(e.message, "error"); }
-  const vid = tex.prozirnosti[tex.izbor.jacina] ?? 0.75;
+  // Teme i njihove palete stižu sa servera, iste one koje dobija launcher -
+  // pregled ovde zato ne može da pokaže nešto drugo od onoga što igrač vidi.
+  let izg = { tema: "kuca", pokret: "lagano", teme: [], pokreti: {} };
+  try { izg = await api("/izgled-kuce"); } catch (e) { toast(e.message, "error"); }
 
   const kartica = (kljuc) => {
     const o = POZADINE_OPIS[kljuc] || { naslov: kljuc, opis: "", zona: "" };
@@ -2989,54 +2988,38 @@ async function renderIzgled() {
 
     <div class="card" style="margin-bottom:18px">
       <div class="card-head">
-        <h2>Tekstura pozadine</h2>
-        <div class="tex-jacina">
-          <span class="tex-grupa">Jačina</span>
-          ${Object.entries(tex.jacine).map(([k, n]) =>
-            `<button class="btn btn-sm ${k === tex.izbor.jacina ? "btn-primary" : "btn-ghost"}" data-tex-jacina="${k}">${esc(n)}</button>`).join("")}
-          <span class="tex-grupa">Kretanje</span>
-          ${Object.entries(tex.kretanja || {}).map(([k, o]) =>
-            `<button class="btn btn-sm ${k === tex.izbor.kretanje ? "btn-primary" : "btn-ghost"}" data-tex-kretanje="${k}" title="${esc(o.opis)}">${esc(o.naziv)}</button>`).join("")}
+        <h2>Tema launchera</h2>
+        <div class="tema-izbor">
+          <span class="tema-grupa">Pozadina</span>
+          ${Object.entries(izg.pokreti || {}).map(([k, o]) =>
+            `<button class="btn btn-sm ${k === izg.pokret ? "btn-primary" : "btn-ghost"}" data-pokret="${k}" title="${esc(o.opis)}">${esc(o.naziv)}</button>`).join("")}
         </div>
       </div>
       <div class="card-body">
-        <div class="tex-nota">${icon("info")} Sitna šara koja se ponavlja preko celog ekrana, iznad okačene pozadine. Menja se odmah na svim računarima, bez restarta.</div>
-        <div class="tex-mreza">
-          ${Object.entries(tex.spisak).map(([k, o]) => `
-            <button class="tex-kartica ${k === tex.izbor.kljuc ? "izabrana" : ""}" data-tex="${k}">
-              <span class="tex-uzorak" data-sara="${k}">
-                ${k === "nema" ? '<i class="tex-nista">bez šare</i>' : ""}
-              </span>
-              <span class="tex-ime">${esc(o.naziv)}</span>
-              <span class="tex-opis">${esc(o.opis)}</span>
-            </button>`).join("")}
+        <div class="tema-nota">${icon("info")} Tema menja ceo launcher: podlogu, ploče, dugmad i boje pozadine koja se polako preliva. Ovde biraš kućnu: onu koju vidi svaki računar dok niko nije prijavljen. Igrači otključavaju ostale nivoima (od 5. nivoa VIP teme) i biraju svoju na svom nalogu. Menja se odmah na svim računarima.</div>
+        <div class="tema-mreza">
+          ${(izg.teme || []).map((t) => {
+            const c = t.boje || {};
+            const ak = t.kljuc === "kuca" ? "var(--accent)" : c.akcenat;
+            const amb = c.amb || [];
+            return `<button class="tema-kartica ${t.kljuc === izg.tema ? "izabrana" : ""}" data-kucna-tema="${esc(t.kljuc)}">
+              <span class="tema-uzorak" style="--u-bg:${esc(c.bg)};--u-p:${esc(c.panel2)};--u-ak:${esc(ak)};--u-a1:${esc(t.kljuc === "kuca" ? ak : amb[0])};--u-a2:${esc(amb[1])};--u-a3:${esc(amb[2])}"><i></i></span>
+              <span class="tema-ime">${esc(t.naziv)}${t.vip ? ' <span class="pill amber">VIP</span>' : ""}</span>
+              <span class="tema-opis">${t.nivo > 1 ? `Igrači: od ${t.nivo}. nivoa` : "Dostupna svima"}</span>
+            </button>`;
+          }).join("")}
         </div>
       </div>
     </div>
 
     <div class="poz-mreza">${Object.keys(POZADINE_OPIS).map(kartica).join("")}</div>`;
 
-  // Sara sadrzi navodnike, pa ne sme kroz style="..." atribut - tu bi se string
-  // prekinuo na prvom navodniku i uzorak bi ostao prazan.
-  $$("[data-sara]").forEach((el) => {
-    const o = tex.spisak[el.dataset.sara];
-    if (!o || !o.sara) return;
-    el.style.backgroundImage = o.sara;
-    el.style.opacity = String(vid);
-  });
-
-  // Menja se jedno polje, ostala ostaju kakva jesu.
-  const snimiTeksturu = async (izmena) => {
-    try {
-      await api("/tekstura", "POST", {
-        kljuc: tex.izbor.kljuc, jacina: tex.izbor.jacina, kretanje: tex.izbor.kretanje, ...izmena,
-      });
-      renderIzgled();
-    } catch (e) { toast(e.message, "error"); }
+  const snimiIzgled = async (izmena) => {
+    try { await api("/izgled-kuce", "POST", izmena); renderIzgled(); }
+    catch (e) { toast(e.message, "error"); }
   };
-  $$("[data-tex]").forEach((b) => b.addEventListener("click", () => snimiTeksturu({ kljuc: b.dataset.tex })));
-  $$("[data-tex-jacina]").forEach((b) => b.addEventListener("click", () => snimiTeksturu({ jacina: b.dataset.texJacina })));
-  $$("[data-tex-kretanje]").forEach((b) => b.addEventListener("click", () => snimiTeksturu({ kretanje: b.dataset.texKretanje })));
+  $$("[data-kucna-tema]").forEach((b) => b.addEventListener("click", () => snimiIzgled({ tema: b.dataset.kucnaTema })));
+  $$("[data-pokret]").forEach((b) => b.addEventListener("click", () => snimiIzgled({ pokret: b.dataset.pokret })));
 
   $("#promoDodaj").addEventListener("click", () => $("#promoFile").click());
   $("#promoCrit").addEventListener("click", async (e) => {

@@ -68,118 +68,56 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Pozadina: svetlo pada odozgo, dno je tamnije - sadrzaj tako ima na cemu da
-   stoji umesto da lebdi na ravnoj crnoj. Bez sara i bez animacija. */
+/* POZADINA LAUNCHERA
+   Tri sloja, odozdo nagore:
+   1. body::before - podloga teme: svetlo pada odozgo, dno je tamnije, pa
+      sadržaj ima na čemu da stoji umesto da lebdi na ravnoj boji.
+   2. .ambijent - četiri velike, meke mrlje u bojama teme (--amb-1..3). Kad je
+      pokret uključen, sporo se prelivaju: ciklus je minut i po, pa oko ne
+      prati kretanje nego samo oseti da ekran "diše". Pomeraju se samo
+      transformacijom, a to crta grafička kartica - procesor i igra u prvom
+      planu to ne osete.
+   3. body::after - fino zrno preko svega. Gradijenti na tamnoj podlozi prave
+      vidljive stepenice u boji; zrno ih razbija, i ekran deluje kao štampa a
+      ne kao ravna plastika. Statično je, bez ikakve animacije.
+
+   Ranije je ovde stajala šara koja se ponavljala preko celog ekrana (i natpis
+   "CRIT" kao vodeni žig iza svakog teksta), sa pet vrsta kretanja. Izbačena je
+   u celosti. */
 body::before {
-  content: ""; position: fixed; inset: 0; z-index: -3; pointer-events: none;
+  content: ""; position: fixed; inset: 0; z-index: -4; pointer-events: none;
   background:
-    radial-gradient(1100px 420px at 50% -6%, rgba(255, 255, 255, 0.055), transparent 70%),
-    radial-gradient(820px 560px at 8% -10%, rgba(var(--brend-rgb), 0.14), transparent 62%),
-    radial-gradient(880px 620px at 96% 108%, rgba(255, 181, 39, 0.07), transparent 58%),
-    linear-gradient(180deg, #0c0c12 0%, var(--bg) 46%, #050508 100%);
+    radial-gradient(1200px 520px at 50% -8%, rgba(255, 255, 255, 0.05), transparent 70%),
+    linear-gradient(180deg, var(--bg-2) 0%, var(--bg) 48%, color-mix(in srgb, var(--bg) 70%, #000) 100%);
 }
-
-/* TEKSTURA POZADINE
-   Sitna sara koja se ponavlja preko celog ekrana. Crta se ovde, ne kaci se kao
-   slika - ostra je na svakoj rezoluciji i ne opterecuje mrezu. Stoji IZNAD
-   okacene pozadine, pa se vidi i kad je slika postavljena i kad nije; tako cela
-   pozadina dobije izgled stampanog stripa, isto kao logotip.
-   Bira se u panelu, sara i jacina odvojeno. Podrazumevano je iskljucena.
-   Sama sara stize sa servera (jedna definicija, u service.js), pa se pregled u
-   panelu i ono sto igrac vidi ne mogu razici. Ovde stoji samo kako se crta.
-
-   Sloj je namerno veci od ekrana (inset: -60px): kod "dubine" se pomera za
-   pokretom misa, pa bez te rezerve ivice ekrana ostanu prazne.
-   Sve animacije rade nad POZICIJOM pozadine, maskom i transformacijom - to su
-   poslovi kompozitora, ne procesora, pa ne smetaju igri u prvom planu. */
+.ambijent {
+  position: fixed; inset: -18%; z-index: -3; pointer-events: none; overflow: hidden;
+  filter: saturate(1.1);
+}
+.ambijent i {
+  position: absolute; border-radius: 50%; opacity: var(--amb-jacina, 0.22);
+  filter: blur(90px); will-change: transform;
+}
+.ambijent i:nth-child(1) { width: 58vw; height: 58vw; left: 2%;  top: -4%;  background: var(--amb-1); }
+.ambijent i:nth-child(2) { width: 46vw; height: 46vw; right: 0%; top: 34%;  background: var(--amb-2); opacity: calc(var(--amb-jacina, 0.22) * 0.8); }
+.ambijent i:nth-child(3) { width: 40vw; height: 40vw; left: 30%; bottom: -6%; background: var(--amb-3); opacity: calc(var(--amb-jacina, 0.22) * 0.7); }
+.ambijent i:nth-child(4) { width: 30vw; height: 30vw; left: 58%; top: 2%;  background: var(--amb-1); opacity: calc(var(--amb-jacina, 0.22) * 0.55); }
+body[data-pokret="lagano"] .ambijent i:nth-child(1) { animation: amb-a 90s ease-in-out infinite alternate; }
+body[data-pokret="lagano"] .ambijent i:nth-child(2) { animation: amb-b 110s ease-in-out infinite alternate; }
+body[data-pokret="lagano"] .ambijent i:nth-child(3) { animation: amb-c 100s ease-in-out infinite alternate; }
+body[data-pokret="lagano"] .ambijent i:nth-child(4) { animation: amb-b 130s ease-in-out infinite alternate-reverse; }
+@keyframes amb-a { 50% { transform: translate3d(14vw, 8vh, 0) scale(1.12); } 100% { transform: translate3d(4vw, 18vh, 0) scale(0.94); } }
+@keyframes amb-b { 50% { transform: translate3d(-16vw, -10vh, 0) scale(1.08); } 100% { transform: translate3d(-6vw, 12vh, 0) scale(1.16); } }
+@keyframes amb-c { 50% { transform: translate3d(-10vw, -14vh, 0) scale(1.15); } 100% { transform: translate3d(12vw, -4vh, 0) scale(0.92); } }
 body::after {
-  content: ""; position: fixed; inset: -60px; z-index: -1; pointer-events: none;
-  background-image: var(--tekstura, none);
-  background-repeat: repeat; background-position: 0 0;
-  opacity: var(--tekstura-vid, 0); transition: opacity 0.35s ease;
-  transform: translate3d(var(--par-x, 0px), var(--par-y, 0px), 0);
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='z'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23z)'/%3E%3C/svg%3E");
 }
-/* Na ekranu prijave i zakljucanom ekranu preko sare nema sadrzaja koji je
-   prekriva, pa se ponavljanje vidi kao vodeni zig preko celog ekrana. Tu ide
-   znatno tise - posao nosi pozadinska slika, sara je samo tekstura ispod. */
-body.tiha-sara::after { opacity: calc(var(--tekstura-vid, 0) * 0.34); }
-
-/* KLIZANJE - sara polako putuje po dijagonali.
-   Pomera se za TACNO jednu plocicu, pa se petlja zatvara bez vidljivog skoka. */
-body[data-kretanje="klizanje"]::after {
-  animation: tekstura-klizi var(--tekstura-sekundi, 0s) linear infinite;
-  will-change: background-position;
-}
-@keyframes tekstura-klizi {
-  to { background-position: var(--tekstura-korak, 0px) var(--tekstura-korak, 0px); }
-}
-
-/* TALAS - sara stoji, ali preko nje polako prelazi pojas svetla, kao odsjaj.
-   Radi se maskom: sara se u pojasu vidi punom jacinom, van njega prigusenije.
-   Mirnije je od klizanja jer se nista ne pomera, samo "dise" u prolazu. */
-body[data-kretanje="talas"]::after {
-  -webkit-mask-image: linear-gradient(112deg, rgba(0, 0, 0, 0.38) 12%, #000 26%, rgba(0, 0, 0, 0.38) 42%);
-  mask-image: linear-gradient(112deg, rgba(0, 0, 0, 0.38) 12%, #000 26%, rgba(0, 0, 0, 0.38) 42%);
-  -webkit-mask-size: 260% 260%; mask-size: 260% 260%;
-  -webkit-mask-repeat: repeat; mask-repeat: repeat;
-  animation: tekstura-talas var(--tekstura-sekundi, 0s) linear infinite;
-  will-change: mask-position;
-}
-@keyframes tekstura-talas {
-  from { -webkit-mask-position: 0% 0%; mask-position: 0% 0%; }
-  to   { -webkit-mask-position: 260% 260%; mask-position: 260% 260%; }
-}
-
-/* DUBINA - dva sloja iste sare, zadnji krupniji i sporiji.
-   Blizi sloj prati pokret misa (--par-x/--par-y postavlja launcher), pa se
-   pozadina pomera KAD IGRAC POMERI MIS, umesto da se vrti sama od sebe.
-   To je jedini nacin kretanja koji reaguje na coveka za racunarom. */
-body[data-kretanje="dubina"]::after {
-  background-image: var(--tekstura, none), var(--tekstura, none);
-  background-size: auto, calc(var(--tekstura-korak, 64px) * 2.1);
-  animation: tekstura-dubina var(--tekstura-sekundi, 0s) linear infinite;
-  transition: opacity 0.35s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: background-position, transform;
-}
-@keyframes tekstura-dubina {
-  to {
-    background-position:
-      var(--tekstura-korak, 0px) var(--tekstura-korak, 0px),
-      calc(var(--tekstura-korak, 0px) * -1) calc(var(--tekstura-korak, 0px) * -0.5);
-  }
-}
-
-/* ISKRE - pojedine figure u mrezi zasvetle u boji kuce pa se ugase.
-   Svaka iskra je jedna plocica mreze: ista sara, samo crvena, polozena tacno
-   preko bele ispod nje. Zato izgleda kao da je bas TA figura zasvetlela, a ne
-   kao da je neko nalepio crveni kvadrat.
-   Sloj stoji odmah iznad teksture i ispod celog sadrzaja. */
-.iskre-sloj {
-  position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;
-}
-.iskra {
-  position: absolute; display: block;
-  background-image: var(--tekstura-iskra, none);
-  background-repeat: no-repeat; background-position: 0 0;
-  opacity: 0;
-  /* Sjaj oko figure - bez njega crvena samo "stoji", sa njim izgleda upaljeno. */
-  filter: drop-shadow(0 0 7px rgba(var(--brend-rgb), 0.55));
-  animation-name: iskra-zasvetli;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  animation-fill-mode: forwards;
-}
-/* Pali se brzo, gori kratko, gasi se polako - tako se primeti a ne trepce. */
-@keyframes iskra-zasvetli {
-  0%   { opacity: 0; }
-  18%  { opacity: 1; }
-  46%  { opacity: 1; }
-  100% { opacity: 0; }
-}
-
-/* Racunar koji trazi manje kretanja na sistemskom nivou ga ovde i ne dobija. */
-/* Sara i iskre se NE gase na prefers-reduced-motion - vidi objasnjenje uz
-   drugi blok istog upita, na dnu fajla. Prekidac je u panelu (kretanje
-   "Mirno"), i vlasnik ga bira svesno. */
+/* Prazni ekrani (prijava, zaključan) nemaju ploče preko pozadine, pa boje
+   smeju jače da se vide - to je izlog igraonice dok je računar slobodan. */
+body.prazan-ekran { --amb-jacina: 0.3; }
+/* Dok launcher menja temu, nista ne klizi - vidi primeniTemu. */
+body.tema-menja *, body.tema-menja *::before, body.tema-menja *::after { transition: none !important; }
 
 /* Pozadina koju osoblje kaci kroz panel, po ekranu. Stoji ispod celog sadrzaja
    i uvek ide sa tamnim slojem preko - inace tekst ne bi bio citljiv ni na
@@ -214,15 +152,15 @@ body.pozadina-prazna .pozadina::after {
   box-shadow: inset 0 0 0 1px rgba(61, 201, 126, 0.28);
   clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
 }
-.conn-sesija .cs-tacka {
-  width: 9px; height: 9px; margin-top: 5px; flex: 0 0 auto; border-radius: 50%;
-  background: var(--green, #3dc97e); box-shadow: 0 0 10px 1px rgba(61, 201, 126, 0.7);
+.conn-sesija .cs-ik {
+  width: 18px; height: 18px; margin-top: 1px; flex: 0 0 auto;
+  fill: none; stroke: var(--green, #3dc97e); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
 }
 .conn-sesija b { display: block; color: #d7f5e5; font-size: 13.5px; font-weight: 800; }
 .conn-sesija span { display: block; margin-top: 3px; color: var(--text-3); font-size: 12.5px; line-height: 1.5; }
 
 /* Vinjeta: ivice ekrana tamnije da sadržaj u sredini dobije težinu. */
-.fx-scan {
+.fx-vinjeta {
   position: fixed; inset: 0; z-index: 500; pointer-events: none;
   background: radial-gradient(140% 130% at 50% 45%, transparent 62%, rgba(var(--bg-rgb), 0.42));
 }
@@ -319,7 +257,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .btn:active { transform: scale(0.97); }
 .btn svg { width: 17px; height: 17px; }
 .btn-primary {
-  background: linear-gradient(135deg, var(--brend) 0%, var(--brend-deep) 100%); color: #fff;
+  background: linear-gradient(135deg, var(--brend) 0%, var(--brend-deep) 100%); color: var(--na-brendu, #fff);
   filter: drop-shadow(0 4px 16px var(--brend-glow));
 }
 .btn-primary::after { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3); }
@@ -490,13 +428,6 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .content { flex: 1; min-height: 0; overflow: hidden; padding: 24px 30px; position: relative; }
 .content.swap { animation: content-swap 0.28s var(--tr); }
 @keyframes content-swap { from { opacity: 0; transform: translateY(10px); } }
-/* scan-pass linija pri promeni taba */
-#content.swap::after {
-  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 42%; pointer-events: none; z-index: 5;
-  background: linear-gradient(180deg, transparent, rgba(var(--brend-rgb), 0.08), transparent);
-  animation: scanpass 0.42s ease forwards;
-}
-@keyframes scanpass { from { transform: translateY(-42%); opacity: 0.9; } to { transform: translateY(255%); opacity: 0; } }
 .section-title {
   position: relative;
   font-family: var(--font-display);
@@ -559,7 +490,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 }
 .tile-hover .play-btn {
   width: 58px; height: 58px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--brend), var(--brend-deep)); color: #fff;
+  background: linear-gradient(135deg, var(--brend), var(--brend-deep)); color: var(--na-brendu, #fff);
   display: grid; place-items: center;
   box-shadow: 0 0 30px -2px var(--brend-glow), inset 0 1px 0 rgba(255, 255, 255, 0.3);
   transform: scale(0.82) translateY(6px); transition: transform 0.22s var(--tr);
@@ -596,7 +527,7 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 
 /* POČETNA: hero baner */
 /* Svetlo iza cele strane dolazi od izdvojene igre: mutna, utisana kopija
-   njenog banera. Dubina iz sadrzaja, ne iz sara. */
+   njenog banera. Dubina iz sadrzaja, ne iz ukrasa. */
 /* VRH POČETNE
    Traka nosi dve stvari: znak kuće (ili okačene promo banere) levo, i stanje
    nagradnog točka desno. Visina je fiksna i mirna - ranije je traka bila
@@ -795,12 +726,8 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
 .tile-fallback {
   position: absolute; inset: 0; display: grid; place-items: center;
   background:
-    radial-gradient(130% 78% at 50% 0%, hsl(var(--h) 58% 34% / 0.34), transparent 66%),
-    linear-gradient(160deg, #16161d, #0b0b10 72%);
-}
-.tile-fallback::after {
-  content: ""; position: absolute; inset: 0;
-  background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.022) 0 2px, transparent 2px 15px);
+    radial-gradient(130% 78% at 50% 0%, hsl(var(--h) 58% 34% / 0.3), transparent 66%),
+    linear-gradient(160deg, var(--panel-2), var(--bg) 72%);
 }
 /* Dva slova samo kad ni ikone nema (igra preko steam://). Sitna i prigusena -
    to je oznaka da slika fali, ne ukras. */
@@ -916,14 +843,11 @@ input:focus { border-color: var(--brend); border-left-color: var(--brend); box-s
   background: linear-gradient(95deg, rgba(var(--brend-rgb), 0.24), rgba(var(--brend-rgb), 0.05) 75%);
   box-shadow: inset 3px 0 0 var(--brend);
 }
-.acc-mi.aktivna .acc-mi-ik { color: #fff; background: var(--brend); box-shadow: 0 0 16px -3px var(--brend-glow); }
+.acc-mi.aktivna .acc-mi-ik { color: var(--na-brendu, #fff); background: var(--brend); box-shadow: 0 0 16px -3px var(--brend-glow); }
 .acc-mi.aktivna .acc-mi-t small { color: var(--text-2); }
-/* Nešto čeka igrača (spin, piće u pripremi): zlatan red stanja i tačka. */
+/* Nešto čeka igrača (spin, piće u pripremi): zlatan red stanja. Tekst kaže
+   šta čeka; treperava tačka pored njega nije dodavala ništa osim nemira. */
 .acc-mi.vazno .acc-mi-t small { color: var(--gold); }
-.acc-mi-tacka {
-  flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--gold);
-  box-shadow: 0 0 10px var(--gold-glow); animation: por-disi 2.2s ease-in-out infinite;
-}
 /* Broj porudžbina koje se spremaju - igrač ne mora da ulazi da bi video. */
 .acc-mi-broj {
   flex: none; min-width: 20px; height: 20px; padding: 0 6px;
@@ -1123,7 +1047,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
    Stoji desno od natpisa, u svom prostoru, pa nista ne prekriva. */
 .tab-znacka {
   min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
-  background: var(--brend); color: #fff; font-size: 11px; font-weight: 800; line-height: 1;
+  background: var(--brend); color: var(--na-brendu, #fff); font-size: 11px; font-weight: 800; line-height: 1;
   display: grid; place-items: center; flex: 0 0 auto;
   box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.8);
 }
@@ -1201,7 +1125,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .tocak-akcija { text-align: center; }
 .tocak-spin {
   font-family: var(--font-display); font-weight: 700; font-size: 17px; letter-spacing: 0.1em;
-  text-transform: uppercase; color: #fff; padding: 14px 52px; cursor: pointer;
+  text-transform: uppercase; color: var(--na-brendu, #fff); padding: 14px 52px; cursor: pointer;
   background: linear-gradient(135deg, var(--brend), var(--brend-deep));
   clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
   filter: drop-shadow(0 6px 22px var(--brend-glow));
@@ -1219,27 +1143,128 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
 .tocak-dobitak { font-family: var(--font-display); font-weight: 700; font-size: 19px; color: var(--text-2); display: flex; align-items: center; justify-content: center; gap: 10px; }
 .tocak-dobitak.win { color: var(--gold); text-shadow: 0 0 20px var(--gold-glow); }
 .tocak-dobitak svg { width: 21px; height: 21px; }
-.poz-uzorci { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(124px, 100%), 1fr)); gap: 11px; }
-.poz-uzorak {
-  display: flex; flex-direction: column; gap: 0; padding: 0 0 9px; cursor: pointer; overflow: hidden;
-  background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line); color: inherit; font: inherit;
-  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
-  transition: transform 0.14s var(--ease-out), box-shadow var(--tr);
+
+/* ---------- Teme ----------
+   Svaka kartica je umanjen launcher u bojama te teme: podloga sa bojama
+   pozadine, gornja traka, ploča sa dugmetom u akcentu. Igrač vidi šta bira pre
+   nego što klikne. */
+/* DOSTIGNUĆA
+   Traka stepena je podeljena na delove: puni su osvojeni stepeni, tekući se
+   puni. Tako se u jednom pogledu vidi i gde si i koliko fali. */
+.dn-traka { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px; height: 5px; }
+.dn-traka i { display: block; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
+.dn-traka b { display: block; height: 100%; background: var(--brend); }
+.pf-dk.pun .dn-traka b, .dn-k.pun .dn-traka b { background: var(--gold); }
+
+.dn-niz {
+  display: flex; align-items: center; gap: 26px; margin-bottom: 16px; padding: 18px 22px;
+  background: linear-gradient(110deg, var(--brend-soft), transparent 55%), var(--panel-2);
+  border: 1px solid var(--line);
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
 }
-.poz-uzorak:hover { transform: translateY(-3px); box-shadow: inset 0 0 0 1px var(--line-2); }
-.poz-uzorak.izabran { box-shadow: inset 0 0 0 1.5px var(--brend), 0 12px 26px -14px var(--brend-glow); }
-.pu-slika {
-  display: block; height: 62px; margin-bottom: 8px;
-  background-color: #101018; background-repeat: repeat; border-bottom: 1px solid var(--line);
+.dn-niz-broj { flex: none; display: flex; flex-direction: column; align-items: center; min-width: 110px; }
+.dn-niz-broj b { font-family: var(--font-display); font-size: 52px; line-height: 1; color: var(--text); }
+.dn-niz-broj span { margin-top: 4px; font-family: var(--font-ui); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
+.dn-niz-telo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.dn-niz-poruka { font-size: 14.5px; color: var(--text); }
+.dn-nedelje { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; }
+.dn-ned { height: 22px; background: rgba(255, 255, 255, 0.06); }
+.dn-ned.bio { background: var(--brend); }
+.dn-ned.ova { box-shadow: inset 0 0 0 2px var(--text-2); }
+.dn-ned.ova.bio { box-shadow: inset 0 0 0 2px var(--text); }
+.dn-niz-pod { display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px; color: var(--text-3); }
+
+.dn-mreza { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.dn-pragovi { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px; margin-top: -2px; }
+.dn-pragovi span { font-size: 10.5px; color: var(--text-3); text-align: right; font-variant-numeric: tabular-nums; }
+.dn-pragovi span.osvojen { color: var(--text-2); }
+.dn-k {
+  display: flex; gap: 14px; padding: 15px 16px;
+  background: var(--panel-2); border: 1px solid var(--line);
 }
-.pu-ime {
-  padding: 0 10px; font-size: 11.5px; font-weight: 700; text-align: left; color: var(--text-2);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.dn-ik {
+  flex: none; width: 42px; height: 42px; display: grid; place-items: center;
+  background: var(--brend-soft); color: var(--brend);
 }
-.poz-uzorak.izabran .pu-ime { color: var(--text); }
-.poz-podesavanja { display: flex; flex-wrap: wrap; gap: 22px; margin-top: 16px; }
-.pp-l { display: block; margin-bottom: 7px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; font-family: var(--font-ui); text-transform: uppercase; color: var(--text-3); }
-.pp-dugmad { display: flex; gap: 6px; }
+.dn-k.nov .dn-ik { background: rgba(255, 255, 255, 0.05); color: var(--text-3); }
+.dn-k.pun { border-color: rgba(255, 181, 39, 0.35); }
+.dn-k.pun .dn-ik { background: rgba(255, 181, 39, 0.14); color: var(--gold); }
+.dn-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.dn-red { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.dn-red b { font-size: 15px; font-weight: 700; }
+.dn-st { font-family: var(--font-ui); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); white-space: nowrap; }
+.dn-k.pun .dn-st { color: var(--gold); }
+.dn-opis { font-size: 12.5px; color: var(--text-3); }
+.dn-pod { font-size: 12px; color: var(--text-2); }
+.dn-pod b { color: var(--text); }
+@media (max-height: 820px) {
+  .dn-niz { padding: 12px 18px; margin-bottom: 12px; gap: 20px; }
+  .dn-niz-broj b { font-size: 40px; }
+  .dn-ned { height: 16px; }
+  .dn-k { padding: 11px 13px; }
+  .dn-ik { width: 36px; height: 36px; }
+  .dn-mreza { gap: 10px; }
+}
+
+.tema-sledeca {
+  display: flex; gap: 16px; align-items: flex-start; margin-top: 18px; padding: 16px 18px;
+  background: var(--panel-2); border: 1px solid var(--line);
+}
+.ts-ik { flex: none; width: 40px; height: 40px; display: grid; place-items: center; background: var(--brend-soft); color: var(--brend); }
+.ts-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.ts-t > div:first-child { display: flex; align-items: baseline; gap: 10px; }
+.ts-t > div:first-child span { margin-left: auto; font-size: 12.5px; color: var(--text-2); white-space: nowrap; }
+.ts-t .pf-xp-traka { margin: 0; }
+.ts-t small { font-size: 12px; color: var(--text-3); }
+@media (max-height: 820px) { .tema-sledeca { margin-top: 12px; padding: 11px 14px; } .ts-t small { display: none; } }
+.teme-mreza { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(170px, 100%), 1fr)); gap: 14px; }
+.tema-k {
+  display: flex; flex-direction: column; gap: 0; padding: 0; text-align: left; cursor: pointer;
+  background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line);
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+  transition: transform var(--tr), box-shadow var(--tr);
+}
+.tema-k:hover { transform: translateY(-3px); box-shadow: inset 0 0 0 1px var(--line-2); }
+.tema-k.aktivna { box-shadow: inset 0 0 0 2px var(--brend), 0 14px 30px -16px var(--brend-glow); }
+.tema-mini {
+  position: relative; height: 104px; overflow: hidden; display: block;
+  background:
+    radial-gradient(70% 90% at 12% 10%, color-mix(in srgb, var(--m-a1) 55%, transparent), transparent 70%),
+    radial-gradient(60% 80% at 92% 70%, color-mix(in srgb, var(--m-a2) 45%, transparent), transparent 70%),
+    radial-gradient(50% 60% at 45% 110%, color-mix(in srgb, var(--m-a3) 40%, transparent), transparent 70%),
+    var(--m-bg);
+}
+.tm-bar { position: absolute; left: 0; right: 0; top: 0; height: 14px; background: color-mix(in srgb, var(--m-bg) 70%, #000); }
+.tm-ploca {
+  position: absolute; left: 14px; right: 14px; top: 28px; bottom: 14px; padding: 10px;
+  display: flex; flex-direction: column; gap: 6px;
+  background: color-mix(in srgb, var(--m-panel) 88%, transparent);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+.tm-ploca i { display: block; height: 6px; width: 70%; background: rgba(255, 255, 255, 0.22); }
+.tm-ploca i + i { width: 45%; background: rgba(255, 255, 255, 0.12); }
+.tm-ploca b { display: block; margin-top: auto; height: 12px; width: 52px; background: var(--m-ak); }
+.tm-brava {
+  position: absolute; inset: 0; display: grid; place-items: center; color: rgba(255, 255, 255, 0.85);
+  background: rgba(0, 0, 0, 0.45);
+}
+.tema-k.zakljucana .tema-mini { filter: saturate(0.55); }
+.tema-dno { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px 12px; }
+.tema-ime { display: flex; align-items: center; gap: 8px; font-family: var(--font-ui); font-size: 14.5px; font-weight: 700; color: var(--text); }
+.tema-vip {
+  font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: 0.12em; padding: 2px 7px;
+  color: #1a1204; background: var(--gold);
+}
+.tema-st { font-size: 12px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tema-k.aktivna .tema-st { color: var(--brend); font-weight: 700; }
+.tema-k.zakljucana .tema-st { color: var(--gold); }
+.tema-kuca { margin-top: 16px; }
+@media (max-height: 820px) {
+  .teme-mreza { gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)); }
+  .tema-mini { height: 78px; }
+  .tm-ploca { top: 22px; bottom: 10px; padding: 7px; }
+  .tema-dno { padding: 7px 10px 9px; }
+}
 
 /* Promena lozinke: dva polja i dugme u jednom redu. Panel je iste sirine kao
    ostali na Nalogu, a sadrzaj se ne razvlaci preko celog ekrana. */
@@ -1484,7 +1509,7 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
   background: rgba(255, 255, 255, 0.05); box-shadow: inset 0 0 0 1px var(--line-2);
   transition: background var(--tr), color var(--tr), box-shadow var(--tr), transform 0.12s ease;
 }
-.pice-plus:hover { background: var(--brend); color: #fff; box-shadow: inset 0 0 0 1px var(--brend); }
+.pice-plus:hover { background: var(--brend); color: var(--na-brendu, #fff); box-shadow: inset 0 0 0 1px var(--brend); }
 .pice-plus:active { transform: scale(0.92); }
 
 .pice-step {
@@ -1516,11 +1541,12 @@ body.bez-animacija *, body.bez-animacija *::before, body.bez-animacija *::after 
   transition: background var(--t-brzo);
 }
 .shop-traka:hover { background: rgba(255, 181, 39, 0.12); }
-.st-tacka {
-  width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex-shrink: 0;
-  box-shadow: 0 0 0 4px rgba(255, 181, 39, 0.16); animation: st-kuc 1.8s ease-in-out infinite;
+/* Ikona šoljice, ne treperava tačka: traka je i bez toga zlatna, a tekst kaže
+   da je porudžbina u toku. */
+.st-ik {
+  flex-shrink: 0; width: 30px; height: 30px; display: grid; place-items: center;
+  background: rgba(255, 181, 39, 0.14); color: var(--gold);
 }
-@keyframes st-kuc { 50% { box-shadow: 0 0 0 8px rgba(255, 181, 39, 0.05); } }
 .st-t { font-weight: 700; font-size: 13.5px; color: var(--gold); }
 .st-o { font-size: 12px; color: var(--text-3); }
 .st-vise { margin-left: auto; display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text-2); }
@@ -1774,6 +1800,13 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
   box-shadow: 0 0 12px var(--brend-glow); animation: boot-bar 1.25s ease 0.3s forwards;
 }
 @keyframes boot-bar { to { width: 100%; } }
+/* Niz nedelja ispod pozdrava - mirnije od imena, da ga ne nadjača. */
+.boot-sub {
+  margin-top: 10px; min-height: 18px; font-family: var(--font-ui); font-size: 13px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-2);
+  opacity: 0; animation: boot-line 0.4s ease 0.55s both;
+}
+.boot-sub:empty { visibility: hidden; }
 
 /* SMANJEN MOTION - pazljivo, ne preko svega
    Windows sa iskljucenim animacijama ("Adjust for best performance", Ease of
@@ -1781,9 +1814,9 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
    reduce - a to je na racunarima u igraonici skoro pravilo, jer se bas tako
    podesavaju za igre.
    Ovde je ranije stajalo pravilo koje je sa !important gasilo SVE animacije na
-   strani. Posledica: na tim racunarima sara u pozadini je stajala mrtva i
-   nagradni tocak se nije vrteo, iako je vlasnik oboje izricito upalio u panelu.
-   Kretanje sare ima svoj pravi prekidac - Izgled launchera > Mirno. Zato ovde
+   strani. Posledica: na tim racunarima pozadina je stajala mrtva i nagradni
+   tocak se nije vrteo, iako je vlasnik oboje izricito upalio u panelu.
+   Kretanje pozadine ima svoj pravi prekidac - Izgled launchera > Isključeno. Zato ovde
    ostaju samo ulazne animacije kartica, koje nista ne znace ako izostanu. */
 @media (prefers-reduced-motion: reduce) {
   .tile, .pice, .hero { animation: none !important; }
@@ -2077,6 +2110,34 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
 .pf-igra.prva .pf-igra-traka i { background: var(--gold); }
 .pf-igra-puta { font-size: 11.5px; color: var(--text-3); }
 
+/* DOSTIGNUĆA U MALOM: red ispod igara, na visokim ekranima. Svaka pločica
+   vodi u odeljak Dostignuća. */
+.pf-dost { display: flex; flex-direction: column; gap: 10px; }
+.pf-vise {
+  display: inline-flex; align-items: center; gap: 4px; color: var(--text-3);
+  font-family: var(--font-ui); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  transition: color var(--tr);
+}
+.pf-vise:hover { color: var(--brend); }
+.pf-dost-red { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.pf-dk {
+  display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px 11px; text-align: left; cursor: pointer;
+  background: var(--panel-2); border: 1px solid var(--line); transition: border-color var(--tr), background var(--tr);
+}
+.pf-dk:hover { border-color: var(--line-2); background: var(--panel-3); }
+.pf-dk-ik {
+  flex: none; width: 32px; height: 32px; display: grid; place-items: center;
+  background: var(--brend-soft); color: var(--brend);
+}
+.pf-dk.nov .pf-dk-ik { background: rgba(255, 255, 255, 0.05); color: var(--text-3); }
+.pf-dk.pun .pf-dk-ik { background: rgba(255, 181, 39, 0.14); color: var(--gold); }
+.pf-dk-t { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.pf-dk-t b { font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-dk-t small { font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-height: 900px) {
+  .pf-dost { display: none; }
+}
+
 /* Niski ekrani (1366x768): isto, samo zbijenije - sve mora da stane bez
    skrolovanja, jer igrač ne zna da ispod ima još. */
 @media (max-height: 820px) {
@@ -2120,5 +2181,5 @@ body.attract #loginScreen .login-hint { animation: attract-blink 1.6s ease-in-ou
   18% { box-shadow: inset 0 0 90px -20px var(--gold-glow); }
   100% { box-shadow: inset 0 0 0 0 rgba(255, 181, 39, 0); }
 }
-.toast.nivo { border-left-color: var(--gold); border-left-width: 4px; }
-.toast.nivo .t-ic { color: var(--gold); }
+.toast.nivo, .toast.dostignuce { border-left-color: var(--gold); border-left-width: 4px; }
+.toast.nivo .t-ic, .toast.dostignuce .t-ic { color: var(--gold); }

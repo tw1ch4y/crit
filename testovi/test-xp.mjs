@@ -85,7 +85,7 @@ proveri("uz prijavu stize i profil", !!prijava?.profil?.otkljucano, JSON.stringi
 // ostao na staroj, dvostrukoj glavi.
 proveri("profil nosi ceo put kroz nivoe", Array.isArray(prijava?.profil?.nivoi) && prijava.profil.nivoi.length === 10
   && prijava.profil.nivoi.every((n) => Number.isFinite(n.prag) && n.naziv), JSON.stringify(prijava?.profil?.nivoi?.[0]));
-proveri("uz nivo ide i sta otkljucava", prijava?.profil?.nivoi?.find((n) => n.nivo === 3)?.otkljucava === "boja");
+proveri("uz nivo ide i sta otkljucava", prijava?.profil?.nivoi?.find((n) => n.nivo === 3)?.otkljucava?.includes("boja"));
 proveri("profil nosi najigranije igre", Array.isArray(prijava?.profil?.igre));
 proveri("profil nosi sate ove nedelje", Number.isFinite(prijava?.profil?.satiNedelja));
 
@@ -123,10 +123,17 @@ proveri("uz nivo stize i osvezena traka", !!poruke.find((m) => m.t === "vip"),
 
 // Sada sme ono sto je otkljucano na drugom nivou.
 poruke.length = 0;
-w.send(JSON.stringify({ t: "moja_tekstura", kljuc: "munje", jacina: "jako", kretanje: "talas" }));
+w.send(JSON.stringify({ t: "moj_profil", tema: "grafit" }));
 await cekaj(500);
-proveri("posle nivoa svoja sara radi", !!poruke.find((m) => m.t === "tekstura"),
-  JSON.stringify(poruke.map((m) => m.t)));
+const posleTeme = poruke.find((m) => m.t === "profil");
+proveri("posle nivoa tema drugog nivoa radi", posleTeme?.profil?.izgled?.tema === "grafit" || posleTeme?.profil?.tema === "grafit",
+  JSON.stringify(posleTeme || poruke.map((m) => m.t)));
+proveri("tema poslata kao niz se ne pusta",
+  await (async () => { poruke.length = 0; w.send(JSON.stringify({ t: "moj_profil", tema: ["grafit"], boja: ["bela"] })); await cekaj(400);
+    return poruke.some((m) => m.t === "profil_err"); })());
+proveri("tema sa viseg nivoa se ne pusta",
+  await (async () => { poruke.length = 0; w.send(JSON.stringify({ t: "moj_profil", tema: "mit" })); await cekaj(400);
+    return !poruke.some((m) => m.t === "profil" && (m.profil?.izgled?.tema === "mit" || m.profil?.tema === "mit")); })());
 
 // ---- 7) panel vidi nivo ----
 const uPanelu = (await api("/api/players")).body.find((p) => p.id === igrac.id);

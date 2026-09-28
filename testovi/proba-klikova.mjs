@@ -90,7 +90,7 @@ const posalji = (w, m) => w.webContents.send("server-msg", m);
 const KLIKABILNO = [
   "button", "a[href]", "[data-game]", "[data-tool]", "[data-add]", "[data-inc]",
   "[data-dec]", "[data-kat]", "[data-nacin]", "[data-arr]", "[data-promo-idi]",
-  "[data-moja-sara]", "[data-moja-jacina]", "[data-moja-kretanje]", ".tab", ".tile",
+  "[data-tema]", "[data-acc-sekcija]", ".tab", ".tile",
   ".site-card", ".pice", ".shop-cip",
 ].join(", ");
 
@@ -116,8 +116,8 @@ app.whenReady().then(async () => {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ username: "admin", password: "admin" }) }).then((r) => r.json());
   const uzmi = (p) => fetch(BAZA + p, { headers: { authorization: "Bearer " + prijava.token } }).then((r) => r.json());
-  const [shop, games, tools, tex] = await Promise.all(
-    ["/api/shop", "/api/games", "/api/tools", "/api/tekstura"].map(uzmi));
+  const [shop, games, tools, izg] = await Promise.all(
+    ["/api/shop", "/api/games", "/api/tools", "/api/izgled-kuce"].map(uzmi));
 
   const win = new BrowserWindow({ width: 1600, height: 900, show: true, frame: false,
     webPreferences: { preload: OMOTAC_PUT, contextIsolation: true } });
@@ -128,8 +128,6 @@ app.whenReady().then(async () => {
   const tocak = { ukljucen: true, moze: true, prag: 1200, potroseno: 1500, nagrade: [
     { id: 1, naziv: "30 din", kredit: 30 }, { id: 2, naziv: "Ništa", kredit: 0 },
     { id: 3, naziv: "60 din", kredit: 60 }, { id: 4, naziv: "250 din", kredit: 250 } ] };
-  const tekstura = { kljuc: "kockice", sara: tex.spisak.kockice.sara, prozirnost: 0.5,
-    korak: tex.spisak.kockice.korak, sekundi: 15, kretanje: "talas" };
 
   const nalazi = {};
   // Zastita: ako se negde zaglavi, prozor se ipak zatvori i javi sta je stiglo.
@@ -147,8 +145,7 @@ app.whenReady().then(async () => {
   // 1) Ekran za prijavu
   posalji(win, { t: "welcome", computer: { id: 7, name: "PC-07" },
     settings: { cafeName: "Crit", currency: "RSD", ratePerHour: 120 },
-    shop, games, tools, pozadine: {}, promo: [], tekstura,
-    teksture: { spisak: tex.spisak, jacine: tex.jacine, kretanja: tex.kretanja, prozirnosti: tex.prozirnosti } });
+    shop, games, tools, pozadine: {}, promo: [], izgled: { tema: izg.tema, pokret: izg.pokret }, teme: izg.teme });
   posalji(win, { t: "to_login" });
   await cekaj(700);
   korak("ekran prijave"); nalazi["ekran prijave"] = await js(PREGLED);
@@ -156,8 +153,7 @@ app.whenReady().then(async () => {
   // 2) Prijavljen: pocetna, shop, nalog
   posalji(win, { t: "login_ok", player: { id: 1, username: "marko", displayName: "Marko" },
     balance: 640, remainingSeconds: 19200, session: { id: 1, startedAt: Date.now() },
-    skoroIgrane: [], tocak, tekstura,
-    teksture: { spisak: tex.spisak, jacine: tex.jacine, kretanja: tex.kretanja, prozirnosti: tex.prozirnosti } });
+    skoroIgrane: [], tocak });
   await cekaj(4200);
   korak("pocetna"); nalazi["pocetna"] = await js(PREGLED);
 
@@ -168,6 +164,8 @@ app.whenReady().then(async () => {
 
   await klik('.tab[data-tab="account"]'); await cekaj(700);
   korak("nalog"); nalazi["nalog"] = await js(PREGLED);
+  await klik('[data-acc-sekcija="teme"]'); await cekaj(500);
+  korak("nalog teme"); nalazi["nalog teme"] = await js(PREGLED);
 
   // 3) Pop-up nagradnog tocka - tu je i bio kvar
   await klik('.tab[data-tab="home"]'); await cekaj(600);

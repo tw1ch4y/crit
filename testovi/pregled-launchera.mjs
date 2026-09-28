@@ -49,10 +49,10 @@ const PODACI = `// Puni launcher pravim podacima sa servera, kao da je igrac pri
     body: JSON.stringify({ username: "admin", password: "admin" }),
   })).json()).token);
   const uzmi = async (p) => (await fetch(p, { headers: { authorization: "Bearer " + (await prijava()) } })).json();
-  const [shop, games, tools, poz, promo, tex] = await Promise.all([uzmi("/api/shop"), uzmi("/api/games"), uzmi("/api/tools"), uzmi("/api/pozadine"), uzmi("/api/promo"), uzmi("/api/tekstura")]);
+  const [shop, games, tools, poz, promo, izg] = await Promise.all([uzmi("/api/shop"), uzmi("/api/games"), uzmi("/api/tools"), uzmi("/api/pozadine"), uzmi("/api/promo"), uzmi("/api/izgled-kuce")]);
   window.__salji({ t: "welcome", computer: { id: 7, name: "PC-07" },
     settings: { cafeName: "Crit", currency: "RSD", ratePerHour: 120 }, shop, games, tools, pozadine: poz.slike || {},
-    tekstura: tex.izbor, promo: (promo || []).filter((x) => x.available) });
+    izgled: { tema: izg.tema, pokret: izg.pokret }, teme: izg.teme, promo: (promo || []).filter((x) => x.available) });
   window.__salji({ t: "login_ok", player: { id: 1, username: "marko", displayName: "Marko" },
     balance: 640, remainingSeconds: 19200, session: { id: 1, startedAt: Date.now() - 3600000 }, skoroIgrane: [] });
 })();

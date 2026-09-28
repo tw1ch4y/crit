@@ -123,9 +123,8 @@ proveri("postavi-bazu postavlja 9 alata sa logotipima", setup.includes("const AL
 // prijave pobedio pravu koricu (baner ima prednost nad omotom).
 proveri("postavi-bazu ne pravi banere ni promo", setup.includes("UPDATE games SET banner=NULL") && setup.includes('db.exec("DELETE FROM promo")'));
 proveri("postavi-bazu pravi pozadine svih ekrana", setup.includes("pozadinaEkrana(kljuc)") && setup.includes("POZADINE_EKRANI"));
-// Sara je d20 kockica, ne rec "CRIT": ponovljena rec preko praznog ekrana
-// izgleda kao vodeni zig, a ne kao tekstura.
-proveri("postavi-bazu pali saru i tocak", setup.includes('setSetting("tocak_ukljucen", "1")') && setup.includes('setSetting("tekstura", "kockice")'));
+proveri("postavi-bazu pali temu, pozadinu i tocak", setup.includes('setSetting("tocak_ukljucen", "1")') &&
+  setup.includes('setSetting("tema_kuce", "kuca")') && setup.includes('setSetting("pokret", "lagano")'));
 proveri("postavi-bazu pravi pozadine za sve ekrane", setup.includes("POZADINE_EKRANI") && setup.includes("pozadina_"),
   "bez njih se na prijavi razvlacio baner 2800x400 i pozadina je skakala");
 proveri("postavi-bazu cisti cover slike izbacenih igara", setup.includes("Orphani") || setup.includes("orphan") || setup.includes("zadrzaneSlike"));

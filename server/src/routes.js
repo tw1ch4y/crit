@@ -169,15 +169,15 @@ router.post("/pozadine/:kljuc", requireOwner, (req, res) => {
   svc.logEvent({ category: "podesavanja", action: "pozadina", actor: req.admin.username, target: req.params.kljuc, detail: "Postavljena pozadina ekrana" });
   res.json(r);
 });
-// ---------- TEKSTURA POZADINE ----------
-router.get("/tekstura", requireOwner, (req, res) =>
-  res.json({ spisak: svc.teksturaSpisak(), jacine: svc.JACINE, kretanja: svc.KRETANJA,
-    izbor: svc.teksturaObj(), prozirnosti: svc.PROZIRNOSTI }));
-router.post("/tekstura", requireOwner, (req, res) => {
-  const r = svc.saveTeksturu(req.body?.kljuc, req.body?.jacina, req.body?.kretanje);
+// ---------- IZGLED LAUNCHERA: KUĆNA TEMA I POKRET POZADINE ----------
+router.get("/izgled-kuce", requireOwner, (req, res) =>
+  res.json({ ...svc.izgledKuce(), teme: svc.temeSpisak(), pokreti: svc.POKRETI }));
+router.post("/izgled-kuce", requireOwner, (req, res) => {
+  const r = svc.sacuvajIzgledKuce({ tema: req.body?.tema, pokret: req.body?.pokret });
   if (r.error) return res.status(400).json(r);
-  svc.logEvent({ category: "podesavanja", action: "tekstura", actor: req.admin.username,
-    target: r.kljuc, detail: `Tekstura pozadine: ${svc.TEKSTURE[r.kljuc].naziv} (${svc.JACINE[r.jacina].toLowerCase()})` });
+  const tema = svc.temeSpisak().find((t) => t.kljuc === r.tema);
+  svc.logEvent({ category: "podesavanja", action: "izgled_kuce", actor: req.admin.username,
+    target: r.tema, detail: `Kućna tema launchera: ${tema?.naziv || r.tema}, pozadina: ${svc.POKRETI[r.pokret].naziv.toLowerCase()}` });
   res.json(r);
 });
 

@@ -28,7 +28,7 @@ async function zovi(m, p, b) {
 const RUTE = [
   ["GET", "/api/computers"], ["GET", "/api/games"], ["GET", "/api/tools"], ["GET", "/api/shop"],
   ["GET", "/api/orders"], ["GET", "/api/logs"], ["GET", "/api/players"], ["GET", "/api/programs"],
-  ["GET", "/api/promo"], ["GET", "/api/pozadine"], ["GET", "/api/tekstura"], ["GET", "/api/settings"],
+  ["GET", "/api/promo"], ["GET", "/api/pozadine"], ["GET", "/api/izgled-kuce"], ["GET", "/api/settings"],
   ["GET", "/api/report"], ["GET", "/api/stats"], ["GET", "/api/shifts"], ["GET", "/api/shift"],
   ["GET", "/api/admins"], ["GET", "/api/server-info"], ["GET", "/api/snapshot"], ["GET", "/api/zalihe"],
   ["GET", "/api/me"], ["GET", "/api/install-status"], ["GET", "/api/kopije"],
@@ -52,7 +52,7 @@ const RUTE = [
   ["POST", "/api/promo"], ["DELETE", "/api/promo/999999"],
   ["POST", "/api/programs"], ["DELETE", "/api/programs/999999"], ["POST", "/api/install"],
   ["DELETE", "/api/install-status"],
-  ["POST", "/api/tekstura"], ["POST", "/api/me/password"],
+  ["POST", "/api/izgled-kuce"], ["POST", "/api/me/password"],
   ["POST", "/api/admins"], ["POST", "/api/admins/999999/password"], ["DELETE", "/api/admins/999999"],
   ["POST", "/api/shift/open"], ["POST", "/api/shift/close"],
   // Nepoznata adresa pod /api mora da vrati JSON. Express podrazumevano vrati
@@ -66,7 +66,7 @@ const TELA = [
   ["prazno telo", {}],
   ["pogresni tipovi", { name: [], username: {}, path: {}, target: [], price: {}, amount: [], id: {}, kind: 7,
     count: {}, add: [], image: 12, kljuc: [], url: {}, message: [], cmd: {}, status: [], stock: {},
-    password: [], balance: {}, ratePerHour: [], idleMinutes: {}, cafeName: [], unlockPin: {}, tekstura: [] }],
+    password: [], balance: {}, ratePerHour: [], idleMinutes: {}, cafeName: [], unlockPin: {}, tema: [], pokret: {} }],
   ["lomljivi brojevi", { price: "Infinity", amount: "NaN", count: -99999, add: 1e308, balance: "-0",
     ratePerHour: "1e400", idleMinutes: "-5", stock: "abc", id: "abc" }],
 ];
