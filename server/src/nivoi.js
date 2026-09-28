@@ -57,42 +57,59 @@ export const OTKLJUCAVANJA = {
 // stigao do Platine.
 //
 // "kuca" je kućna tema: nosi boju koju je vlasnik izabrao u panelu.
-// Boje: podloga (bg, bg2), ploče (panel..panel3), sporedni tekst (t2, t3),
-// akcenat (dugmad, izabrano) i tri boje pozadine koja se preliva (amb). Glavni
-// tekst je svuda isti, skoro beo - čitljivost se ne menja sa temom. Zlatna
-// ostaje boja nagrada u svakoj temi.
+// PALETE SU RAČUNATE, NE BIRANE NA OKO. Svaka tema ima jednu nijansu za
+// neutralne boje i od nje se u OKLCH prostoru prave podloga (bg, bg2) i ploče
+// (panel..panel3) u jednakim koracima svetline - pa su razmaci između slojeva
+// isti u svakoj temi i nijedna ne deluje "ravnije" od druge. Tekst (t1..t3)
+// nosi toplinu teme: beo na zlatu je topao, na ledu hladan. Kontrast je meren
+// (test-nivoi): sporedni tekst na ploči preko 9:1, treći preko 4,5:1.
+//
+// akcenat je boja dugmadi i izabranog, akcenat2 drugi ton iste porodice - ide u
+// prelive (dugme, traka napretka), pa dugme ima dubinu umesto ravne boje.
+// naAkcentu je taman tekst za svetle akcente. amb su tri boje pozadine koja se
+// preliva. Zlatna ostaje boja nagrada u svakoj temi.
 // "kuca" nema svoj akcenat: nosi boju koju je vlasnik izabrao u panelu.
 export const TEME = {
   kuca: { nivo: 1, naziv: "Kućna", opis: "Boje igraonice", boje: {
-    bg: "#070c1c", bg2: "#0b1226", panel: "#111a36", panel2: "#172343", panel3: "#1f2d54",
-    t2: "#a4adca", t3: "#626c8c", akcenat: null, amb: ["#2f6ae8", "#ffb527", "#3fc9e0"] } },
-  grafit: { nivo: 2, naziv: "Grafit", opis: "Tamno siva, mirna", boje: {
-    bg: "#0b0c0f", bg2: "#101115", panel: "#15171c", panel2: "#1b1e24", panel3: "#252932",
-    t2: "#a7abb4", t3: "#6b707a", akcenat: "#5b7cfa", amb: ["#3d4a66", "#5b7cfa", "#2a2f3a"] } },
-  arktik: { nivo: 3, naziv: "Arktik", opis: "Hladna tirkizna i led", boje: {
-    bg: "#041318", bg2: "#06191f", panel: "#0b222a", panel2: "#102c36", panel3: "#173a46",
-    t2: "#9fbac2", t3: "#5f7d86", akcenat: "#0fb5c7", naAkcentu: "#0b0d12", amb: ["#0fb5c7", "#7dd3fc", "#0e7490"] } },
-  smaragd: { nivo: 4, naziv: "Smaragd", opis: "Duboka zelena", boje: {
-    bg: "#04120d", bg2: "#061812", panel: "#0b2019", panel2: "#112a21", panel3: "#18372c",
-    t2: "#9fc0b1", t3: "#5d7d6f", akcenat: "#10b981", naAkcentu: "#0b0d12", amb: ["#10b981", "#34d399", "#065f46"] } },
+    bg: "#020821", bg2: "#040d27", panel: "#091532", panel2: "#101e3c", panel3: "#1b2a4b",
+    t1: "#f1f3f8", t2: "#b7becb", t3: "#7f8695", akcenat: null, akcenat2: null,
+    amb: ["#2f6ae8", "#6a4cf0", "#22b8e0"] } },
+  grafit: { nivo: 2, naziv: "Grafit", opis: "Karbon i čelik", boje: {
+    bg: "#080a0e", bg2: "#0d1013", panel: "#15171c", panel2: "#1d1f24", panel3: "#282b31",
+    t1: "#f2f3f6", t2: "#babec4", t3: "#82868e", akcenat: "#ced9e6", akcenat2: "#85a9c8", naAkcentu: "#080a0e",
+    amb: ["#6f86a6", "#4f7fa6", "#3a414c"], ambJacina: 0.9 } },
+  arktik: { nivo: 3, naziv: "Arktik", opis: "Led i hladna tirkizna", boje: {
+    bg: "#000d13", bg2: "#011219", panel: "#041a21", panel2: "#0b232a", panel3: "#162f38",
+    t1: "#eef5f7", t2: "#b1c1c7", t3: "#778a91", akcenat: "#4ad6e9", akcenat2: "#a8d8fb", naAkcentu: "#000d13",
+    amb: ["#00bacf", "#94ccf3", "#1d677f"] } },
+  smaragd: { nivo: 4, naziv: "Smaragd", opis: "Duboki žad i limeta", boje: {
+    bg: "#000e08", bg2: "#02140d", panel: "#071c14", panel2: "#0e241c", panel3: "#193128",
+    t1: "#eff5f2", t2: "#b3c2bb", t3: "#798b83", akcenat: "#3fd996", akcenat2: "#b6e86e", naAkcentu: "#000e08",
+    amb: ["#23ba7d", "#26bdae", "#699630"] } },
   zlato: { nivo: 5, naziv: "Zlato", opis: "Crno i zlatno", vip: true, boje: {
-    bg: "#0c0a06", bg2: "#110e08", panel: "#17130c", panel2: "#1e1910", panel3: "#2a2316",
-    t2: "#c2b59a", t3: "#7d7359", akcenat: "#c9951a", naAkcentu: "#0b0d12", amb: ["#d4a017", "#8a5a12", "#f5d27a"] } },
-  ametist: { nivo: 6, naziv: "Ametist", opis: "Ljubičasta noć", vip: true, boje: {
-    bg: "#0c0816", bg2: "#110b1e", panel: "#171027", panel2: "#1e1532", panel3: "#2a1e45",
-    t2: "#b3a8cc", t3: "#6f6588", akcenat: "#8b5cf6", amb: ["#8b5cf6", "#d946ef", "#4338ca"] } },
-  zar: { nivo: 7, naziv: "Žar", opis: "Toplo narandžasto, kao žar", vip: true, boje: {
-    bg: "#120806", bg2: "#180b08", panel: "#1f100c", panel2: "#281510", panel3: "#361d16",
-    t2: "#c9ada3", t3: "#83685f", akcenat: "#ea6a1e", naAkcentu: "#0b0d12", amb: ["#f97316", "#dc2626", "#fbbf24"] } },
+    bg: "#0f0903", bg2: "#140e07", panel: "#1c160d", panel2: "#251e15", panel3: "#312a20",
+    t1: "#f8f3ec", t2: "#c9bcaa", t3: "#93836e", akcenat: "#ecb84e", akcenat2: "#efda9a", naAkcentu: "#0f0903",
+    amb: ["#e0a93a", "#7a4a14", "#3a2408"], ambJacina: 0.75 } },
+  ametist: { nivo: 6, naziv: "Ametist", opis: "Ljubičasta i magenta", vip: true, boje: {
+    bg: "#0d051a", bg2: "#120a20", panel: "#1a122a", panel2: "#221a34", panel3: "#2e2542",
+    t1: "#f4f2f9", t2: "#bfbbcd", t3: "#888297", akcenat: "#8142e1", akcenat2: "#e861d3",
+    amb: ["#8f5aec", "#d648c2", "#4455c2"] } },
+  zar: { nivo: 7, naziv: "Žar", opis: "Žar i plamen", vip: true, boje: {
+    bg: "#140603", bg2: "#1a0a06", panel: "#23120c", panel2: "#2d1a14", panel3: "#3a251f",
+    t1: "#faf1ee", t2: "#cfb8b1", t3: "#9a7f77", akcenat: "#fb8139", akcenat2: "#f45246", naAkcentu: "#140603",
+    amb: ["#f4741e", "#db2c2f", "#ffbd47"] } },
   aurora: { nivo: 8, naziv: "Aurora", opis: "Polarna svetlost koja se preliva", vip: true, boje: {
-    bg: "#040b14", bg2: "#06101c", panel: "#0b1726", panel2: "#101f32", panel3: "#172a42",
-    t2: "#a3b6cc", t3: "#607489", akcenat: "#14b8a6", naAkcentu: "#0b0d12", amb: ["#2dd4bf", "#a78bfa", "#38bdf8"] } },
-  obsidijan: { nivo: 9, naziv: "Obsidijan", opis: "Potpuno crno sa grimiznim", vip: true, boje: {
-    bg: "#050506", bg2: "#09090b", panel: "#0f0f12", panel2: "#151518", panel3: "#1f1f24",
-    t2: "#a8a8b0", t3: "#66666f", akcenat: "#e11d48", amb: ["#e11d48", "#3f3f46", "#7f1d1d"] } },
-  mit: { nivo: 10, naziv: "Mit", opis: "Samo za one koji su stigli do kraja", vip: true, boje: {
-    bg: "#0a0a12", bg2: "#0e0e18", panel: "#14141f", panel2: "#1b1b29", panel3: "#262638",
-    t2: "#bdb8c9", t3: "#767286", akcenat: "#c99a2e", naAkcentu: "#0b0d12", amb: ["#e8b64c", "#c4b5fd", "#fef3c7"] } },
+    bg: "#000c19", bg2: "#00111f", panel: "#021928", panel2: "#072232", panel3: "#132e40",
+    t1: "#eff4f8", t2: "#b3c0c9", t3: "#798993", akcenat: "#4be4bd", akcenat2: "#b696f7", naAkcentu: "#000c19",
+    amb: ["#22dcb3", "#9f79e6", "#49c1ea"] } },
+  obsidijan: { nivo: 9, naziv: "Obsidijan", opis: "Crno sa grimiznim", vip: true, boje: {
+    bg: "#0c0909", bg2: "#110f0f", panel: "#191616", panel2: "#211e1e", panel3: "#2e2a2a",
+    t1: "#f5f3f3", t2: "#c2bcbc", t3: "#8b8484", akcenat: "#d01a34", akcenat2: "#a50e19",
+    amb: ["#de1d3f", "#5a0f22", "#2a2224"], ambJacina: 0.85 } },
+  mit: { nivo: 10, naziv: "Mit", opis: "Sedef i zlato, za one koji su stigli do kraja", vip: true, boje: {
+    bg: "#0a0816", bg2: "#0f0d1c", panel: "#161525", panel2: "#1e1d2e", panel3: "#2a293c",
+    t1: "#f3f3f9", t2: "#bcbccc", t3: "#858497", akcenat: "#cfbaff", akcenat2: "#efc469", naAkcentu: "#0a0816",
+    amb: ["#a58bf0", "#4a3fb0", "#d9b055"], ambJacina: 0.85 } },
 };
 
 // Da li igrač sa tim iskustvom sme temu. Nepoznata tema - ne sme.

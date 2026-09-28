@@ -84,8 +84,10 @@ for (const [k, t] of Object.entries(TEME)) {
   const prag = NIVOI.find((n) => n.nivo === t.nivo).prag;
   if (prag > 0) proveri(`tema ${k} se otkljucava tacno na nivou ${t.nivo}`, smeTemu(prag, k) && !smeTemu(prag - 1, k));
   proveri(`tema ${k} ima celu paletu`,
-    ["bg", "bg2", "panel", "panel2", "panel3", "t2", "t3"].every((x) => /^#[0-9a-f]{6}$/i.test(t.boje[x])) &&
-    Array.isArray(t.boje.amb) && t.boje.amb.length === 3);
+    ["bg", "bg2", "panel", "panel2", "panel3", "t1", "t2", "t3"].every((x) => /^#[0-9a-f]{6}$/i.test(t.boje[x])) &&
+    Array.isArray(t.boje.amb) && t.boje.amb.length === 3 && t.boje.amb.every((x) => /^#[0-9a-f]{6}$/i.test(x)));
+  // Kucna nosi boju vlasnika; svaka druga ima i drugi ton za prelive.
+  if (k !== "kuca") proveri(`tema ${k} ima drugi ton akcenta`, /^#[0-9a-f]{6}$/i.test(t.boje.akcenat2 || ""));
 }
 proveri("VIP teme su tek od petog nivoa", Object.values(TEME).every((t) => !t.vip || t.nivo >= 5));
 proveri("svaki nivo donosi bar jednu temu", NIVOI.every((n) => Object.values(TEME).some((t) => t.nivo === n.nivo)));
@@ -98,10 +100,21 @@ const osv = (hex) => {
   return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 };
 const kontrast = (a, b) => { const [x, y] = [osv(a), osv(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+// Pragovi su WCAG AA: 4,5:1 za tekst. Sporedni tekst (t2) se cita po ceo dan,
+// pa mu je prag visi; treci (t3) su oznake i datumi.
+const osvetljenost = (hex) => osv(hex);
 for (const [k, t] of Object.entries(TEME)) {
-  if (!t.boje.akcenat) continue;
-  const tekst = t.boje.naAkcentu || "#ffffff";
-  proveri(`tema ${k}: tekst na akcentu se cita`, kontrast(t.boje.akcenat, tekst) >= 3, kontrast(t.boje.akcenat, tekst).toFixed(2));
+  const b = t.boje;
+  proveri(`tema ${k}: glavni tekst na ploci`, kontrast(b.t1, b.panel3) >= 12, kontrast(b.t1, b.panel3).toFixed(2));
+  proveri(`tema ${k}: sporedni tekst na ploci`, kontrast(b.t2, b.panel2) >= 7, kontrast(b.t2, b.panel2).toFixed(2));
+  proveri(`tema ${k}: treci tekst na ploci`, kontrast(b.t3, b.panel) >= 4.5, kontrast(b.t3, b.panel).toFixed(2));
+  // Slojevi rastu: podloga je najtamnija, svaka sledeca ploca svetlija.
+  const niz = [b.bg, b.bg2, b.panel, b.panel2, b.panel3].map(osvetljenost);
+  proveri(`tema ${k}: slojevi idu od tamnog ka svetlom`, niz.every((x, i) => i === 0 || x > niz[i - 1]));
+  if (!b.akcenat) continue;
+  const tekst = b.naAkcentu || "#ffffff";
+  proveri(`tema ${k}: tekst na akcentu se cita`, kontrast(b.akcenat, tekst) >= 4.5, kontrast(b.akcenat, tekst).toFixed(2));
+  proveri(`tema ${k}: akcenat se vidi na podlozi`, kontrast(b.akcenat, b.bg) >= 3, kontrast(b.akcenat, b.bg).toFixed(2));
 }
 
 kraj();

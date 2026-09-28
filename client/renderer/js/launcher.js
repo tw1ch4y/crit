@@ -325,8 +325,10 @@ function primeniBrend(b) {
 //
 // "kuca" nema svoj akcenat: tu važi boja kuće iz panela (primeniBrend), pa se
 // za nju promenljive akcenta samo sklanjaju sa body-ja.
-const TEMA_PROMENLJIVE = ["--bg", "--bg-2", "--bg-rgb", "--panel", "--panel-2", "--panel-3", "--text-2", "--text-3",
-  "--brend", "--brend-rgb", "--brend-deep", "--brend-soft", "--brend-glow", "--na-brendu", "--amb-1", "--amb-2", "--amb-3"];
+const TEMA_PROMENLJIVE = ["--bg", "--bg-2", "--bg-rgb", "--panel", "--panel-2", "--panel-3", "--panel-rgb",
+  "--text", "--text-2", "--text-3",
+  "--brend", "--brend-rgb", "--brend-deep", "--brend-soft", "--brend-glow", "--na-brendu", "--brend-2", "--brend-2-rgb",
+  "--amb-1", "--amb-2", "--amb-3", "--amb-mnozilac"];
 const HEKS = /^#[0-9a-f]{6}$/i;
 const uRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(", ");
 const tamnije = (h, k = 0.82) => "#" + [1, 3, 5].map((i) => Math.round(parseInt(h.slice(i, i + 2), 16) * k).toString(16).padStart(2, "0")).join("");
@@ -363,7 +365,8 @@ function primeniBojeTeme(t, kljuc) {
   postavi("--bg", c.bg); postavi("--bg-2", c.bg2);
   if (HEKS.test(c.bg || "")) st.setProperty("--bg-rgb", uRgb(c.bg));
   postavi("--panel", c.panel); postavi("--panel-2", c.panel2); postavi("--panel-3", c.panel3);
-  postavi("--text-2", c.t2); postavi("--text-3", c.t3);
+  if (HEKS.test(c.panel || "")) st.setProperty("--panel-rgb", uRgb(c.panel));
+  postavi("--text", c.t1); postavi("--text-2", c.t2); postavi("--text-3", c.t3);
   if (HEKS.test(c.akcenat || "")) {
     const rgb = uRgb(c.akcenat);
     st.setProperty("--brend", c.akcenat);
@@ -372,11 +375,20 @@ function primeniBojeTeme(t, kljuc) {
     st.setProperty("--brend-soft", `rgba(${rgb}, 0.15)`);
     st.setProperty("--brend-glow", `rgba(${rgb}, 0.5)`);
     postavi("--na-brendu", c.naAkcentu);
+    // Drugi ton akcenta: dugmad i trake idu prelivom od jednog do drugog.
+    if (HEKS.test(c.akcenat2 || "")) {
+      st.setProperty("--brend-2", c.akcenat2);
+      st.setProperty("--brend-2-rgb", uRgb(c.akcenat2));
+    }
   }
   const amb = Array.isArray(c.amb) ? c.amb : [];
   // Kućnoj temi prva boja pozadine je boja kuće, da se slaže sa dugmadima.
   if (!c.akcenat) st.setProperty("--amb-1", "var(--brend)"); else postavi("--amb-1", amb[0]);
   postavi("--amb-2", amb[1]); postavi("--amb-3", amb[2]);
+  // Luksuzne teme (zlato, mit, obsidijan) nose tiši sjaj: topla boja preko
+  // skoro crnog na punoj jačini prelazi u mutno braon.
+  const mn = Number(c.ambJacina);
+  if (Number.isFinite(mn) && mn > 0 && mn <= 1.5) st.setProperty("--amb-mnozilac", String(mn));
 }
 
 function primeniPozadinu() {
@@ -2526,7 +2538,8 @@ function sekcijaTeme() {
     const ak = t.kljuc === "kuca" ? (S.brend?.akcenat || "#2f6ae8") : c.akcenat;
     const amb = Array.isArray(c.amb) ? c.amb : [];
     const fali = !t.otkljucano && pragZa(t.nivo) != null && p ? Math.max(0, pragZa(t.nivo) - p.xp) : null;
-    const stil = `--m-bg:${c.bg};--m-panel:${c.panel2};--m-ak:${ak};--m-a1:${t.kljuc === "kuca" ? ak : amb[0]};--m-a2:${amb[1]};--m-a3:${amb[2]}`;
+    const ak2 = c.akcenat2 || ak;
+    const stil = `--m-bg:${c.bg};--m-panel:${c.panel2};--m-ak:${ak};--m-ak2:${ak2};--m-t:${c.t3 || "#7f8695"};--m-a1:${t.kljuc === "kuca" ? ak : amb[0]};--m-a2:${amb[1]};--m-a3:${amb[2]}`;
     return `<button class="tema-k ${t.kljuc === aktivna ? "aktivna" : ""} ${t.otkljucano ? "" : "zakljucana"}" data-tema="${esc(t.kljuc)}"
       ${t.otkljucano ? "" : "aria-disabled=\"true\""} title="${esc(t.opis || "")}">
       <span class="tema-mini" style="${esc(stil)}">

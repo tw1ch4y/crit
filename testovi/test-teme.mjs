@@ -80,6 +80,20 @@ for (const ime of naBody) {
   proveri(`klik ne trazi goli [data-${kebab}] (uhvatio bi body)`, !rend.includes(`closest("[data-${kebab}]")`));
 }
 
+// DIZAJN SISTEM: boje dolaze iz teme. Upisana neutralna boja ostaje ista u
+// svakoj temi i u zlatnoj ili zelenoj temi strci kao siva ili ljubicasta mrlja.
+// Tako je dugme na hover skakalo u crveno u svakoj temi.
+const css = citajIzvor("client/renderer/css/launcher.css");
+for (const [opis, upisano] of [["crveni hover dugmeta", "#ff4040"], ["siva hover dugmeta", "#24242f"],
+  ["tamna ploca na traci", "rgba(16, 16, 23"], ["crna podloga polja", "rgba(6, 6, 10"], ["ljubicasti preliv banera", "#16121a"],
+  ["siva kartica alata", "#17171f"], ["crni velo preko ekrana", "rgba(4, 4, 7"]]) {
+  proveri(`nema upisane boje: ${opis}`, !css.includes(upisano));
+}
+proveri("glavno dugme ide prelivom kroz dva tona teme", /\.btn-primary \{[^}]*linear-gradient\([^)]*var\(--brend\)[^)]*var\(--brend-2\)/.test(css));
+proveri("izvedeni tonovi stoje na body-ju, ne na :root", /body \{\s*--brend-2:/.test(css) && !/:root \{[^}]*--brend-2:/.test(css),
+  "promenljiva izvedena na :root se racuna od kucne boje i ne prati temu");
+proveri("tema postavlja i glavni tekst i drugi ton", /postavi\("--text", c\.t1\)/.test(rend) && /"--brend-2", c\.akcenat2/.test(rend));
+
 w.close();
 await cekaj(200);
 kraj();

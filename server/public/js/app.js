@@ -3003,7 +3003,7 @@ async function renderIzgled() {
             const ak = t.kljuc === "kuca" ? "var(--accent)" : c.akcenat;
             const amb = c.amb || [];
             return `<button class="tema-kartica ${t.kljuc === izg.tema ? "izabrana" : ""}" data-kucna-tema="${esc(t.kljuc)}">
-              <span class="tema-uzorak" style="--u-bg:${esc(c.bg)};--u-p:${esc(c.panel2)};--u-ak:${esc(ak)};--u-a1:${esc(t.kljuc === "kuca" ? ak : amb[0])};--u-a2:${esc(amb[1])};--u-a3:${esc(amb[2])}"><i></i></span>
+              <span class="tema-uzorak" style="--u-bg:${esc(c.bg)};--u-p:${esc(c.panel2)};--u-ak:${esc(ak)};--u-ak2:${esc(c.akcenat2 || ak)};--u-a1:${esc(t.kljuc === "kuca" ? ak : amb[0])};--u-a2:${esc(amb[1])};--u-a3:${esc(amb[2])}"><i></i></span>
               <span class="tema-ime">${esc(t.naziv)}${t.vip ? ' <span class="pill amber">VIP</span>' : ""}</span>
               <span class="tema-opis">${t.nivo > 1 ? `Igrači: od ${t.nivo}. nivoa` : "Dostupna svima"}</span>
             </button>`;

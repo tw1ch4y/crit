@@ -558,6 +558,30 @@ istorijom, 3 nivoa x 2 rezolucije, pa klik na boju i okvir).
 - [x] Novo: `test-teme`, `test-dostignuca`, `proba-teme`; `pregled-profila`
   sada slika i meri i Dostignuća i Teme i proverava pozdrav i čestitke
 
+### Revizija 2.53 - palete i dizajn sistem
+
+- [x] **Palete su računate, ne birane na oko**: svaka tema ima jednu nijansu za
+  neutralne boje, a podloga i ploče se prave u OKLCH prostoru u jednakim
+  koracima svetline. Razmak između slojeva je isti u svakoj temi
+- [x] **Tekst nosi toplinu teme**: beo na Zlatu i Žaru je topao, na Arktiku
+  hladan. Kontrast je meren i čuvan testom: glavni tekst na ploči preko 12:1,
+  sporedni preko 7:1, treći preko 4,5:1, tekst na dugmetu preko 4,5:1
+- [x] **Drugi ton akcenta**: dugmad, aktivan tab, ikone menija i trake
+  dostignuća idu prelivom kroz dva tona iste porodice (Ametist ljubičasta u
+  magentu, Žar narandžasta u crvenu, Mit sedef u zlato)
+- [x] Grafit je sada karbon i čelik (svetao čelični akcenat), da se ne bi
+  mešao sa plavom kućnom temom; Mit je sedef i zlato, da se razlikuje od Zlata
+- [x] **Pozadina bez blata**: boje koje se prelivaju su susedne nijanse.
+  Komplementarne (plava i zlatna, zlatna i lavanda) su se mešale u sivo-zeleno.
+  Luksuzne teme imaju tiši sjaj (`ambJacina`)
+- [x] **Dizajn sistem bez upisanih boja**: glavno dugme je na hover skakalo u
+  crveno u svakoj temi; hover obične dugmadi, polja, gornja traka, baner,
+  kartice alata, obaveštenja i velo preko ekrana su bili upisani sivi ili
+  ljubičasti. Sve sada dolazi iz teme, a `test-teme` čuva da se ne vrate
+- [x] Pločice igara bez korica nose svetlo u boji teme umesto nasumične boje
+  iz imena (ljubičasta u zlatnoj temi, ružičasta u zelenoj)
+- [x] Pregled tema u panelu i u launcheru pokazuje oba tona akcenta
+
 ---
 
 ## Šta ostaje pred otvaranje
