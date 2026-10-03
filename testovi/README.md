@@ -27,6 +27,11 @@ Prava baza iz `server/data/` se ne dira ni u jednom testu.
 | `slike` | omoti i baneri igara, slike prečica, i da spisak ugrađenih logoa u panelu prati onaj u launcheru |
 | `promo` | promo baneri: kačenje, redosled, skrivanje, brisanje, trenutna primena na launcherima |
 | `veza` | namerno gađanje WebSocketa: pokvarene poruke, tuđi tokeni, brzo prekidanje veze, dve veze za isti računar |
+| `seme` | Zod šeme bez servera: prave poruke launchera prolaze, višak polja i pogrešni tipovi ne prolaze, greška ne nosi lozinku, svaka poruka launchera ima šemu |
+| `brzina` | kočnica brzine na WebSocketu: kofa sa lažnim satom, rafal, zatrpavanje (prekid 1008), ogromna poruka (1009), skupe poruke |
+| `sesija-token` | token sesije vezan za sesiju, računar i igrača: šta veza bez potvrde ne sme, nastavak posle prekida, tuđi i lažni tokeni, preostalo vreme samo sa servera |
+| `tocak-zastita` | varanje na točku: kriptografski izbor, spin koji izgubi trku, „poruči, zavrti, otkaži“, nametanje ishoda |
+| `bezbednosni-log` | bezbednosni dnevnik: oblik zapisa, skrivanje tajni, prigušivanje, okretanje fajla, stvarni događaji sa servera, blokada adrese koja pogađa tokene |
 | `nadogradnja` | postojeća baza iz igraonice preživljava novu verziju servera |
 
 ## Alati koji gledaju pravi launcher

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import dgram from "node:dgram";
-import { scryptSync, randomBytes } from "node:crypto";
+import { scryptSync, randomBytes, randomInt } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { db, getSetting, setSetting, DATA_DIR, uJednomPoslu } from "./db.js";
 import { verifyPassword, hashPassword, rang } from "./auth.js";
@@ -10,6 +10,8 @@ import { broadcastPanels, broadcastClients, sendClient, isClientOnline, izbaciPa
 import { banerIgre, promoCrit } from "./banner.js";
 import * as nad from "./nadogradnja.js";
 import { nivoZa, smeDa, otkljucanoZa, OTKLJUCAVANJA } from "./nivoi.js";
+import { izdajToken, proveriToken } from "./sesija.js";
+import { zabelezi, NIVO } from "./bezbednost.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -750,7 +752,88 @@ function pushOrders() {
 // KLIJENT: konekcija / prijava
 const connectedSince = new Map(); // computerId -> ts (od kada je launcher povezan)
 
-export function onClientOpen(comp, ip, verzija) {
+// ---- SESIJA JE VEZANA ZA VEZU ----
+//
+// Ko sme da radi u ime igraca koji sedi za racunarom: samo VEZA na kojoj se on
+// prijavio, ili nova veza koja pokaze token te sesije (sesija.js). Veza koja se
+// otvori samo sa tokenom racunara vidi stanje - kao i do sada, launcher posle
+// restarta servera mora odmah da pokaze ko igra i koliko mu je ostalo - ali ne
+// moze da poruci, zavrti tocak, menja lozinku ni izgled naloga.
+//
+// computerId -> { vezaId, sesijaId }
+const vezaneSesije = new Map();
+// sessionId -> ts kad je racunar sa aktivnom sesijom izgubio vezu
+const prekidiVeze = new Map();
+// Prekid duzi od ovoga se belezi: naplata je za to vreme stajala.
+export const PRAG_PREKIDA_MS = 2 * 60_000;
+
+function vezi(computerId, veza, sesijaId) {
+  if (!veza) return;
+  vezaneSesije.set(computerId, { vezaId: veza.id, sesijaId: Number(sesijaId) });
+}
+// Da li je ova veza ovlascena za aktivnu sesiju racunara.
+export function jeVezana(computerId, veza, s = activeSessionForComputer(computerId)) {
+  const v = vezaneSesije.get(computerId);
+  return !!(veza && s && v && v.vezaId === veza.id && v.sesijaId === s.id);
+}
+function tokenZaVezu(computerId, veza, s) {
+  return jeVezana(computerId, veza, s) ? izdajToken(s) : null;
+}
+
+const RAZLOZI_TOKENA = {
+  oblik: { vrsta: "token_sesije_neispravan", nivo: NIVO.upozorenje, opis: "token sesije nije ispravnog oblika" },
+  nepoznata: { vrsta: "token_sesije_neispravan", nivo: NIVO.upozorenje, opis: "token sesije koja nikad nije postojala" },
+  potpis: { vrsta: "token_sesije_lazan", nivo: NIVO.kriticno, opis: "token sesije sa lažnim potpisom" },
+  tudji_racunar: { vrsta: "token_sesije_tudji_racunar", nivo: NIVO.kriticno, opis: "token sesije sa drugog računara" },
+  zavrsena: { vrsta: "token_sesije_istekao", nivo: NIVO.info, opis: "token sesije koja je u međuvremenu završena" },
+};
+
+// Nova veza: odluci da li nastavlja sesiju (ima ispravan token) ili samo gleda.
+function poveziVezu(comp, veza) {
+  const bila = vezaneSesije.get(comp.id);
+  if (bila && (!veza || bila.vezaId !== veza.id)) vezaneSesije.delete(comp.id);
+  const s = activeSessionForComputer(comp.id);
+
+  // Racunar se vratio posle prekida - koliko je naplata stajala.
+  if (s && prekidiVeze.has(s.id)) {
+    const trajao = Date.now() - prekidiVeze.get(s.id);
+    prekidiVeze.delete(s.id);
+    if (trajao >= PRAG_PREKIDA_MS) {
+      const p = playerById(s.player_id);
+      zabelezi({ vrsta: "sesija_dug_prekid", nivo: NIVO.upozorenje, ip: veza?.ip, racunar: comp.name, racunarId: comp.id,
+        igrac: p?.username, kljuc: `prekid|${s.id}`,
+        opis: `${comp.name} (${p?.username || "?"}) je bio van mreže ${Math.round(trajao / 60000)} min usred sesije - naplata je za to vreme stajala`,
+        podaci: { sesijaId: s.id, sekundi: Math.round(trajao / 1000) } });
+    }
+  }
+  if (!veza) return;
+
+  if (veza.sesija) {
+    const r = proveriToken(veza.sesija, comp.id);
+    if (r.ok) {
+      vezi(comp.id, veza, r.sesija.id);
+      return;
+    }
+    const o = RAZLOZI_TOKENA[r.razlog] || RAZLOZI_TOKENA.oblik;
+    const p = r.sesija ? playerById(r.sesija.player_id) : null;
+    zabelezi({ vrsta: o.vrsta, nivo: o.nivo, ip: veza.ip, racunar: comp.name, racunarId: comp.id, igrac: p?.username,
+      opis: `${comp.name}: ${o.opis}${r.razlog === "tudji_racunar" ? ` (sesija je na ${compName(r.sesija.computer_id)})` : ""}`,
+      podaci: { razlog: r.razlog, sesijaId: r.sesija?.id ?? null } });
+    return;
+  }
+  // Bez tokena, a racunar ima sesiju koju je do malopre drzala druga veza.
+  // Launcher koji zna za tokene ga uvek pokaze; ovo je ili stariji launcher
+  // posle prekida, ili neko ko je preuzeo token racunara.
+  if (s && bila) {
+    const p = playerById(s.player_id);
+    zabelezi({ vrsta: "sesija_preuzeta_bez_tokena", nivo: veza.protokol >= 2 ? NIVO.upozorenje : NIVO.info,
+      ip: veza.ip, racunar: comp.name, racunarId: comp.id, igrac: p?.username,
+      opis: `${comp.name}: nova veza bez tokena sesije zamenila je vezu igrača ${p?.username || "?"} - može da gleda, ne i da radi u njegovo ime`,
+      podaci: { protokol: veza.protokol, verzija: veza.verzija } });
+  }
+}
+
+export function onClientOpen(comp, ip, verzija, veza = null) {
   connectedSince.set(comp.id, Date.now());
   // Verzija se pamti samo kad je launcher posalje. Stariji je ne salju, pa
   // ostaje ono sto je poslednje bilo poznato - a prazno polje u panelu znaci
@@ -759,13 +842,14 @@ export function onClientOpen(comp, ip, verzija) {
     .run(Date.now(), ip || null, verzija || null, comp.id);
   // Racunar koji se vratio sa novom verzijom je dokaz da je nadogradnja prosla.
   nadogradnjaPoPovratku(comp, verzija);
-  sendWelcomeState(comp.id);
+  poveziVezu(comp, veza);
+  sendWelcomeState(comp.id, veza);
   pushComputers();
 }
 
 // Pun "welcome" + trenutno stanje računara. Poziva se na konekciju klijenta,
 // ali i na "hello" - kad se launcher ponovo učita pa mu treba svež katalog.
-export function sendWelcomeState(computerId) {
+export function sendWelcomeState(computerId, veza = null) {
   const comp = computerById(computerId);
   if (!comp) return;
   const settings = settingsObj();
@@ -797,7 +881,8 @@ export function sendWelcomeState(computerId) {
     const p = playerById(s.player_id);
     db.prepare("UPDATE computers SET status='in_use', current_player_id=?, current_session_id=? WHERE id=?")
       .run(p.id, s.id, comp.id);
-    sendClient(comp.id, loginOkPayload(p, s));
+    // Token ide SAMO vezi koja je sesiju i otvorila ili ga je pokazala.
+    sendClient(comp.id, loginOkPayload(p, s, { token: tokenZaVezu(comp.id, veza, s) }));
   } else if (comp.status === "locked") {
     sendClient(comp.id, { t: "locked", reason: "staff" });
   } else {
@@ -806,15 +891,25 @@ export function sendWelcomeState(computerId) {
   }
 }
 
-export function onClientClose(computerId) {
+export function onClientClose(computerId, veza = null) {
   connectedSince.delete(computerId);
+  const v = vezaneSesije.get(computerId);
+  if (v && veza && v.vezaId === veza.id) {
+    vezaneSesije.delete(computerId);
+    // Zapamti kad je sesija ostala bez veze - vidi poveziVezu.
+    const s = activeSessionForComputer(computerId);
+    if (s && s.id === v.sesijaId) prekidiVeze.set(s.id, Date.now());
+  }
   db.prepare("UPDATE computers SET last_seen = ? WHERE id = ?").run(Date.now(), computerId);
   pushComputers();
 }
 
-function loginOkPayload(player, session) {
+function loginOkPayload(player, session, { token = null } = {}) {
   return {
     t: "login_ok",
+    // Token sesije (vidi sesija.js). Launcher ga cuva i pokaze kad se ponovo
+    // poveze; ekran ga ne dobija. Veza koja nije ovlascena ga ne dobija.
+    ...(token ? { sesija: token } : {}),
     player: { id: player.id, username: player.username, displayName: player.display_name },
     balance: round2(player.balance),
     remainingSeconds: remainingSeconds(player.balance),
@@ -977,12 +1072,61 @@ export function najigranije(from, to, limit = 10) {
     GROUP BY g.id ORDER BY puta DESC LIMIT ?`).all(from, to, limit);
 }
 
+// ---- KO SME STA ----
+//
+// Poruke koje rade u ime prijavljenog igraca (trose kredit, dele nagradu,
+// menjaju njegov nalog) prolaze samo sa veze koja je ovlascena za njegovu
+// sesiju - vidi jeVezana.
+const U_IME_IGRACA = new Set(["order", "tocak_spin", "change_password", "moja_tekstura", "moj_profil"]);
+
+// Odjava i odjava zbog mirovanja ZAVRSAVAJU sesiju - niko na tome ne zaradi, a
+// igrac koji ne moze da se odjavi placa dalje. Zato ih stariji launcher (koji ne
+// zna za tokene, protokol 1) sme i bez potvrde. Launcher koji zna za tokene uvek
+// ima potvrdu; ako je nema, nesto nije u redu.
+function smeDaZavrsi(computerId, veza) {
+  if (!activeSessionForComputer(computerId)) return true;
+  if (!veza || jeVezana(computerId, veza)) return true;
+  return veza.protokol < 2;
+}
+
+const ODGOVOR_BEZ_POTVRDE = {
+  order: "order_err", tocak_spin: "tocak_err", change_password: "pw_err",
+  moja_tekstura: "moja_tekstura_err", moj_profil: "profil_err", logout: "error",
+};
+const PORUKA_BEZ_POTVRDE = "Sesija na ovom računaru nije potvrđena. Odjavi se i prijavi ponovo, ili pozovi osoblje.";
+
+function odbijBezPotvrde(computerId, tip, veza) {
+  const s = activeSessionForComputer(computerId);
+  const p = s ? playerById(s.player_id) : null;
+  // Novac je uvek kritican. Ostalo sa starijeg launchera (protokol 1) je
+  // ocekivano posle svakog prekida veze i ne treba da puni panel.
+  const novac = tip === "order" || tip === "tocak_spin";
+  const nivo = novac ? NIVO.kriticno : (veza?.protokol ?? 1) < 2 ? NIVO.info : NIVO.upozorenje;
+  zabelezi({ vrsta: "sesija_nepotvrdjena", nivo,
+    ip: veza?.ip, racunar: compName(computerId), racunarId: computerId, igrac: p?.username,
+    kljuc: `nepotvrdjena|${computerId}|${tip}`,
+    opis: `${compName(computerId)}: "${tip}" u ime igrača ${p?.username || "?"} sa veze koja nije potvrdila sesiju - odbijeno`,
+    podaci: { tip, protokol: veza?.protokol ?? null } });
+  const t = ODGOVOR_BEZ_POTVRDE[tip];
+  if (!t) return;
+  const odgovor = { t, message: PORUKA_BEZ_POTVRDE };
+  if (tip === "tocak_spin" && p) odgovor.tocak = tocakInfo(p.id);
+  sendClient(computerId, odgovor);
+}
+
 // glavni ruter za poruke sa klijenta
-export function handleClientMessage(computerId, msg) {
+//
+// Poruka je ovde VEC proverena semom (hub.js -> seme.js): tip je poznat, polja
+// su ocekivanog tipa i duzine, viska nema. `veza` je veza sa koje je stigla.
+export function handleClientMessage(computerId, msg, veza = null) {
+  if (U_IME_IGRACA.has(msg.t) && activeSessionForComputer(computerId) && !jeVezana(computerId, veza)) {
+    return odbijBezPotvrde(computerId, msg.t, veza);
+  }
   switch (msg.t) {
     case "login":
-      return clientLogin(computerId, msg.username, msg.password);
+      return clientLogin(computerId, msg.username, msg.password, veza);
     case "logout":
+      if (!smeDaZavrsi(computerId, veza)) return odbijBezPotvrde(computerId, "logout", veza);
       return endSession(computerId, { lock: false, reason: "logout" });
     case "unlock_pin":
       return clientUnlockPin(computerId, msg.pin);
@@ -1003,6 +1147,9 @@ export function handleClientMessage(computerId, msg) {
     case "nadogradnja_status":
       return clientNadogradnjaStatus(computerId, msg);
     case "game_start":
+      // Pokretanje se pripisuje igracu koji sedi - zato, dok sesija traje,
+      // samo sa njegove veze. Bez sesije se belezi bez igraca, kao i ranije.
+      if (activeSessionForComputer(computerId) && !jeVezana(computerId, veza)) return odbijBezPotvrde(computerId, "game_start", veza);
       return zabeleziPokretanje(computerId, Number(msg.gameId));
     case "igra_ne_radi":
       return igraNeRadi(computerId, msg);
@@ -1017,11 +1164,14 @@ export function handleClientMessage(computerId, msg) {
       return clientSysInfo(computerId, msg);
     case "hello":
       // launcher se (ponovo) učitao - pošalji mu svež katalog i stanje
-      return sendWelcomeState(computerId);
+      return sendWelcomeState(computerId, veza);
     case "heartbeat":
       db.prepare("UPDATE computers SET last_seen = ? WHERE id = ?").run(Date.now(), computerId);
-      if (msg.mirovanje != null) proveriMirovanje(computerId, Number(msg.mirovanje));
+      // Mirovanje moze da zatvori sesiju, pa vazi isto pravilo kao za odjavu.
+      if (msg.mirovanje != null && smeDaZavrsi(computerId, veza)) proveriMirovanje(computerId, Number(msg.mirovanje));
       return;
+    case "log_klijent":
+      return; // launcher belezi za sebe; server nema sta da uradi sa tim
     default:
       return;
   }
@@ -1054,12 +1204,12 @@ function clientProfil(computerId, msg) {
 function clientTocakSpin(computerId) {
   const comp = computerById(computerId);
   if (!comp?.current_player_id) return;
-  const r = zavrtiTocak(comp.current_player_id);
+  const r = zavrtiTocak(comp.current_player_id, { racunar: comp });
   if (r.error) return sendClient(computerId, { t: "tocak_err", message: r.error, tocak: tocakInfo(comp.current_player_id) });
   sendClient(computerId, { t: "tocak_rezultat", index: r.index, nagrada: r.nagrada, balance: r.balance, sledeciSpin: r.sledeciSpin });
 }
 
-function clientLogin(computerId, username, password) {
+function clientLogin(computerId, username, password, veza = null) {
   const comp = computerById(computerId);
   if (comp.status === "locked") {
     return sendClient(computerId, { t: "login_err", message: "Računar je zaključan. Pozovite osoblje." });
@@ -1069,8 +1219,13 @@ function clientLogin(computerId, username, password) {
   if (comp.current_player_id || activeSessionForComputer(computerId)) {
     const cur = playerById(comp.current_player_id);
     const s = activeSessionForComputer(computerId);
-    if (cur && s) sendClient(computerId, loginOkPayload(cur, s));
-    return;
+    if (!cur || !s) return;
+    // Veza koja je sesiju i otvorila: samo ponovi potvrdu.
+    if (!veza || jeVezana(computerId, veza, s)) return sendClient(computerId, loginOkPayload(cur, s, { token: tokenZaVezu(computerId, veza, s) }));
+    // Nova veza bez tokena (npr. launcher koji je izgubio token) potvrdjuje
+    // sesiju lozinkom TOG igraca. Ranije je ovde svako dobijao prijavu onoga
+    // ko vec sedi - bez ikakve lozinke.
+    return potvrdiSesijuLozinkom(comp, cur, s, username, password, veza);
   }
   // Kocnica se gleda tek ovde: sve iznad su uredna odbijanja koja se ne broje.
   const kljucKocnice = `igrac:${computerId}`;
@@ -1113,10 +1268,35 @@ function clientLogin(computerId, username, password) {
   tickState.set(Number(sessionId), { last: now });
 
   const session = db.prepare("SELECT * FROM sessions WHERE id=?").get(sessionId);
-  sendClient(computerId, loginOkPayload(p, session));
+  // Od ovog trenutka u ime igraca radi samo ova veza (i ona koja pokaze token).
+  vezi(computerId, veza, session.id);
+  sendClient(computerId, loginOkPayload(p, session, { token: tokenZaVezu(computerId, veza, session) }));
   pushComputers();
   broadcastPanels({ t: "event", kind: "login", text: `${p.username} se prijavio na ${comp.name}` });
   logEvent({ category: "prijava", action: "login", actor: p.username, target: comp.name, detail: "Igrač se prijavio" });
+}
+
+// Potvrda vec zapocete sesije lozinkom, sa nove veze. Ista kocnica kao prijava.
+function potvrdiSesijuLozinkom(comp, cur, s, username, password, veza) {
+  const kljucKocnice = `igrac:${comp.id}`;
+  const pauza = kocnica.ceka(kljucKocnice);
+  if (pauza) return sendClient(comp.id, { t: "login_err", message: `Previše pokušaja. Sačekajte ${pauza} s.` });
+  const p = db.prepare("SELECT * FROM players WHERE username = ?").get(String(username || "").trim());
+  if (!p || !verifyPassword(password, p.password_hash)) {
+    const cekaj = kocnica.promasaj(kljucKocnice);
+    zabelezi({ vrsta: "sesija_potvrda_neuspela", nivo: NIVO.upozorenje, ip: veza?.ip, racunar: comp.name, racunarId: comp.id,
+      igrac: cur.username, opis: `${comp.name}: pogrešna lozinka pri potvrdi sesije igrača ${cur.username}` });
+    return sendClient(comp.id, { t: "login_err",
+      message: cekaj ? `Previše pokušaja. Sačekajte ${cekaj} s.` : "Pogrešno korisničko ime ili lozinka." });
+  }
+  if (p.id !== cur.id) {
+    return sendClient(comp.id, { t: "login_err", message: `Na ovom računaru je već prijavljen ${cur.username}. Pozovite osoblje.` });
+  }
+  kocnica.pogodak(kljucKocnice);
+  vezi(comp.id, veza, s.id);
+  zabelezi({ vrsta: "sesija_ponovo_potvrdjena", nivo: NIVO.info, ip: veza?.ip, racunar: comp.name, racunarId: comp.id,
+    igrac: cur.username, opis: `${comp.name}: ${cur.username} je lozinkom potvrdio sesiju na novoj vezi` });
+  sendClient(comp.id, loginOkPayload(cur, s, { token: tokenZaVezu(comp.id, veza, s) }));
 }
 
 // KOČNICA PROTIV POGAĐANJA
@@ -1199,23 +1379,54 @@ function ocistiNaloge() {
   const granica = Date.now() - NALOZI_PAMTI;
   for (const [k, v] of obradjeniNalozi) if (v.kad < granica) obradjeniNalozi.delete(k);
 }
+// BROJ POKUSAJA VAZI SAMO ZA ONOGA KO GA JE POSLAO.
+//
+// Kljuc je izvor + broj: "racunar:5:<poId>" ili "kasa:<poId>". Ranije je kljuc
+// bio sam broj, pa je racunar koji posalje tudji broj dobijao TUDJI odgovor -
+// broj porudzbine i stanje kredita drugog igraca.
+const kljucNaloga = (izvor, poId) => `${izvor}:${String(poId).slice(0, 64)}`;
+
 // Vrati raniji odgovor ako je ovaj broj već obrađen.
-export function ranijiOdgovor(poId) {
+export function ranijiOdgovor(poId, izvor = "kasa") {
   if (!poId) return null;
   ocistiNaloge();
-  return obradjeniNalozi.get(String(poId))?.odgovor ?? null;
+  return obradjeniNalozi.get(kljucNaloga(izvor, poId))?.odgovor ?? null;
 }
-export function zapamtiOdgovor(poId, odgovor) {
+export function zapamtiOdgovor(poId, odgovor, izvor = "kasa") {
   if (!poId) return odgovor;
   ocistiNaloge();
-  obradjeniNalozi.set(String(poId), { odgovor, kad: Date.now() });
+  obradjeniNalozi.set(kljucNaloga(izvor, poId), { odgovor, kad: Date.now() });
   return odgovor;
+}
+// Isti broj pokusaja vec iskoriscen sa DRUGOG racunara.
+function tudjiBrojPokusaja(poId, izvor) {
+  if (!poId) return null;
+  const broj = String(poId).slice(0, 64);
+  for (const k of obradjeniNalozi.keys()) {
+    // "racunar:<id>:<poId>" - poId sme i sam da sadrzi ":"
+    const m = /^racunar:(\d+):(.*)$/s.exec(k);
+    if (m && m[2] === broj && k !== kljucNaloga(izvor, poId)) return m[1];
+  }
+  return null;
 }
 
 function clientOrder(computerId, items, note, payment = "credit", poId = null) {
+  const izvor = `racunar:${computerId}`;
   // Isti pokušaj drugi put: vrati raniji odgovor, ne pravi nov račun.
-  const ranije = ranijiOdgovor(poId);
-  if (ranije) return sendClient(computerId, ranije);
+  const ranije = ranijiOdgovor(poId, izvor);
+  if (ranije) {
+    zabelezi({ vrsta: "dupla_naplata_sprecena", nivo: NIVO.upozorenje, racunar: compName(computerId), racunarId: computerId,
+      kljuc: `dupla|${izvor}|${poId}`,
+      opis: `${compName(computerId)}: porudžbina #${ranije.orderId ?? "?"} je stigla ponovo (isti broj pokušaja) - nije naplaćena drugi put`,
+      podaci: { orderId: ranije.orderId ?? null } });
+    return sendClient(computerId, ranije);
+  }
+  const tudji = tudjiBrojPokusaja(poId, izvor);
+  if (tudji) {
+    zabelezi({ vrsta: "porudzbina_tudji_broj", nivo: NIVO.kriticno, racunar: compName(computerId), racunarId: computerId,
+      opis: `${compName(computerId)} je poslao broj pokušaja porudžbine koji je već iskoristio drugi računar (#${tudji})`,
+      podaci: { drugiRacunar: Number(tudji) } });
+  }
   const comp = computerById(computerId);
   if (!comp.current_player_id) return sendClient(computerId, { t: "error", message: "Niste prijavljeni." });
   const p = playerById(comp.current_player_id);
@@ -1283,7 +1494,7 @@ function clientOrder(computerId, items, note, payment = "credit", poId = null) {
     total: round2(total),
     balance: newBal,
     remainingSeconds: remainingSeconds(newBal),
-  }));
+  }, izvor));
   posaljiPorudzbineIgracu(p.id);
   pushOrders();
   pushComputers();
@@ -1310,9 +1521,20 @@ function clientChangePassword(computerId, oldPassword, newPassword) {
   const comp = computerById(computerId);
   if (!comp.current_player_id) return sendClient(computerId, { t: "error", message: "Niste prijavljeni." });
   const p = playerById(comp.current_player_id);
+  // Promena lozinke je pogadjanje lozinke kao i prijava, samo sa vec otvorene
+  // sesije - ista kocnica, inace bi se ovuda pogadjalo bez pauze.
+  const kljucKocnice = `lozinka:${p.id}`;
+  const pauza = kocnica.ceka(kljucKocnice);
+  if (pauza) return sendClient(computerId, { t: "pw_err", message: `Previše pokušaja. Sačekajte ${pauza} s.` });
   if (!verifyPassword(oldPassword, p.password_hash)) {
-    return sendClient(computerId, { t: "pw_err", message: "Trenutna lozinka nije tačna." });
+    const cekaj = kocnica.promasaj(kljucKocnice);
+    if (cekaj) {
+      zabelezi({ vrsta: "lozinka_pogadjanje", nivo: NIVO.upozorenje, racunar: comp.name, racunarId: computerId, igrac: p.username,
+        opis: `${comp.name}: više pogrešnih "trenutnih lozinki" pri promeni lozinke naloga ${p.username} - pauza ${cekaj} s` });
+    }
+    return sendClient(computerId, { t: "pw_err", message: cekaj ? `Previše pokušaja. Sačekajte ${cekaj} s.` : "Trenutna lozinka nije tačna." });
   }
+  kocnica.pogodak(kljucKocnice);
   if (!newPassword || String(newPassword).length < 3) {
     return sendClient(computerId, { t: "pw_err", message: "Nova lozinka mora imati bar 3 znaka." });
   }
@@ -1362,7 +1584,11 @@ export function endSession(computerId, { lock = false, reason = "logout", adminI
     tickState.delete(s.id);
     javljenoZaSesiju.delete(s.id); // sledeća sesija kreće sa čistim upozorenjima
     mirovanjeJavljeno.delete(s.id);
+    prekidiVeze.delete(s.id);
   }
+  // Zavrsena sesija nema vise ko da je zastupa. Njen token pada sam od sebe
+  // (status vise nije "active"), a veza vise ne vazi ni za sledecu.
+  vezaneSesije.delete(computerId);
   javiLog(log);
 
   // Igraceva sara odlazi sa njim - sledeci gost zatice kucnu.
@@ -1763,10 +1989,16 @@ export function prodajPaket(playerId, paketId, adminId, adminUsername = "sistem"
 // kredit. Ishod BIRA server (težinski nasumično), klijent samo animira do njega.
 const NEDELJA = 7 * 86400000;
 
+// POVRACAJ SE ODUZIMA OD POTROSNJE.
+//
+// Ranije su se brojale samo kupovine i sesije. Igrac je mogao da poruci za 1200
+// dinara sa naloga, zavrti tocak, pa zamoli osoblje da otkaze porudzbinu - kredit
+// mu se vrati (zapis 'refund'), a potrosnja je ostala "ispunjena". Sada se
+// otkazano odbija od potrosnje, kao da nije ni poruceno.
 function potrosnjaNedelja(playerId) {
   const od = Date.now() - NEDELJA;
   return round2(db.prepare(
-    "SELECT COALESCE(SUM(-amount),0) s FROM transactions WHERE player_id=? AND type IN ('session','shop') AND created_at>=?"
+    "SELECT COALESCE(SUM(-amount),0) s FROM transactions WHERE player_id=? AND type IN ('session','shop','refund') AND created_at>=?"
   ).get(playerId, od).s);
 }
 
@@ -1793,15 +2025,31 @@ export function tocakInfo(playerId) {
 }
 
 // Izloženo radi testa raspodele - da se proveri da težine stvarno rade.
-export function izaberiNagradu(nagrade) {
-  const ukupno = nagrade.reduce((a, n) => a + Math.max(0, n.tezina), 0);
+//
+// ISHOD IZ KRIPTOGRAFSKOG IZVORA. Math.random nije pravljen da se ne moze
+// predvideti: ko vidi dovoljno njegovih izlaza moze da izracuna sledece. Tezine
+// su celi brojevi, pa je crypto.randomInt nad njihovim zbirom tacan i bez
+// zaokruzivanja. `nasumicno` se ubacuje samo u testu.
+export function izaberiNagradu(nagrade, nasumicno = randomInt) {
+  const tezine = nagrade.map((n) => Math.max(0, Math.floor(Number(n.tezina) || 0)));
+  const ukupno = tezine.reduce((a, t) => a + t, 0);
   if (ukupno <= 0) return 0;
-  let r = Math.random() * ukupno;
-  for (let i = 0; i < nagrade.length; i++) { r -= Math.max(0, nagrade[i].tezina); if (r < 0) return i; }
+  let r = nasumicno(ukupno); // 0 .. ukupno-1
+  for (let i = 0; i < tezine.length; i++) { r -= tezine[i]; if (r < 0) return i; }
   return nagrade.length - 1;
 }
 
-export function zavrtiTocak(playerId) {
+class VecVrteo extends Error {}
+
+// Oznaci da je igrac zavrteo - ali SAMO ako u bazi i dalje stoji da ove nedelje
+// nije. Vraca true ako je upis prosao. Jedno mesto, jedan upit: provera i upis
+// su isti iskaz, pa izmedju njih nema procepa u kom bi se provukao drugi spin.
+export function oznaciSpin(playerId, sada = Date.now()) {
+  return db.prepare("UPDATE players SET last_spin_at=? WHERE id=? AND (last_spin_at IS NULL OR last_spin_at <= ?)")
+    .run(sada, playerId, sada - NEDELJA).changes === 1;
+}
+
+export function zavrtiTocak(playerId, { racunar = null } = {}) {
   if (getSetting("tocak_ukljucen", "0") !== "1") return { error: "Točak trenutno nije aktivan" };
   const p = playerById(playerId);
   if (!p) return { error: "Nepostojeći igrač" };
@@ -1809,7 +2057,16 @@ export function zavrtiTocak(playerId) {
   const potroseno = potrosnjaNedelja(playerId);
   if (potroseno < prag) return { error: `Potrebno je ${prag} potrošnje ove nedelje (imaš ${potroseno})` };
   const now = Date.now();
-  if (p.last_spin_at && now - p.last_spin_at < NEDELJA) return { error: "Već si zavrteo ove nedelje" };
+  const dupli = () => {
+    // Launcher posle spina sakrije dugme; drugi zahtev iste nedelje je ili
+    // dupli klik koji je prosao bravu, ili neko ko pokusava da naplati dvaput.
+    zabelezi({ vrsta: "tocak_dupli_spin", nivo: NIVO.upozorenje, racunar: racunar?.name, racunarId: racunar?.id,
+      igrac: p.username, kljuc: `tocak|${playerId}`,
+      opis: `${p.username} pokušava da zavrti točak ponovo iste nedelje - odbijeno`,
+      podaci: { poslednjiSpin: p.last_spin_at ? new Date(p.last_spin_at).toISOString() : null } });
+    return { error: "Već si zavrteo ove nedelje" };
+  };
+  if (p.last_spin_at && now - p.last_spin_at < NEDELJA) return dupli();
   const nagrade = tocakNagrade();
   if (!nagrade.length) return { error: "Nema podešenih nagrada" };
   const idx = izaberiNagradu(nagrade);
@@ -1821,7 +2078,13 @@ export function zavrtiTocak(playerId) {
   try {
     bal = uJednomPoslu(() => {
       // Prvo upiši da je vrteo - da dupli klik ili puknuta veza ne daju drugi spin.
-      db.prepare("UPDATE players SET last_spin_at=? WHERE id=?").run(now, playerId);
+      //
+      // Upis je USLOVAN: prolazi samo ako u bazi i dalje stoji da nije vrteo
+      // ove nedelje. Provera iznad cita stanje PRE posla; ako je izmedju nje i
+      // ovog upisa isti igrac vec zavrteo (drugi proces nad istom bazom, ili
+      // buduca izmena koja ovde ubaci await), upis ne menja nijedan red i
+      // nagrada se ne isplacuje.
+      if (!oznaciSpin(playerId, now)) throw new VecVrteo();
       let b = round2(Number(p.balance) || 0);
       if (dobit.kredit > 0) {
         b = round2(b + dobit.kredit);
@@ -1833,6 +2096,7 @@ export function zavrtiTocak(playerId) {
       return b;
     });
   } catch (e) {
+    if (e instanceof VecVrteo) return dupli();
     logEvent({ category: "sistem", action: "greska", actor: "server",
       detail: `Točak nije upisan: ${String(e?.message || e).slice(0, 150)}` });
     return { error: "Točak nije prošao. Pokušaj ponovo." };
@@ -1906,8 +2170,13 @@ export function pushTocak() {
 export function createPosOrder({ items, playerId, computerId, payment = "cash", note, actor = "radnik", poId = null }) {
   // Isti pokusaj drugi put: vrati raniji odgovor, ne pravi nov racun - vidi
   // objasnjenje uz obradjeniNalozi.
-  const ranije = ranijiOdgovor(poId);
-  if (ranije) return ranije;
+  const ranije = ranijiOdgovor(poId, "kasa");
+  if (ranije) {
+    zabelezi({ vrsta: "dupla_naplata_sprecena", nivo: NIVO.upozorenje, igrac: actor, kljuc: `dupla|kasa|${poId}`,
+      opis: `Kasa: račun #${ranije.orderId ?? "?"} je poslat ponovo (isti broj pokušaja) - nije naplaćen drugi put`,
+      podaci: { orderId: ranije.orderId ?? null, radnik: actor } });
+    return ranije;
+  }
   // Isti artikal se spaja u jedan red - inace bi se zaliha proveravala vise
   // puta prema istom stanju i prodalo bi se vise nego sto ima. Radnik sme veci
   // broj komada i skrivene artikle.
@@ -1972,7 +2241,7 @@ export function createPosOrder({ items, playerId, computerId, payment = "cash", 
   const who = player ? player.username : "keš";
   logEvent({ category: "shop", action: "pos", actor, target: who, detail: `POS #${orderId} (${payment === "cash" ? "keš" : "kredit"}): ` + resolved.map((r) => `${r.qty}x ${r.item.name}`).join(", "), amount: -total });
   broadcastPanels({ t: "event", kind: "order", text: `Nova porudžbina #${orderId} (${payment === "cash" ? "keš" : who})` });
-  return zapamtiOdgovor(poId, { ok: true, orderId, total: round2(total) });
+  return zapamtiOdgovor(poId, { ok: true, orderId, total: round2(total) }, "kasa");
 }
 
 const ORDER_STATUS_LABEL = { pending: "na čekanju", preparing: "priprema se", delivered: "dostavljeno", cancelled: "otkazano" };

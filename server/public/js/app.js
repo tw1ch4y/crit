@@ -3310,7 +3310,7 @@ document.addEventListener("click", async (e) => {
 });
 
 // Logovi
-const LOG_CATS = { sve: "Sve", prijava: "Prijave", sesija: "Sesije", novac: "Novac", shop: "Shop", igre: "Igre", racunar: "Računari", nalozi: "Nalozi", podesavanja: "Podešavanja", sistem: "Sistem" };
+const LOG_CATS = { sve: "Sve", prijava: "Prijave", sesija: "Sesije", novac: "Novac", shop: "Shop", igre: "Igre", racunar: "Računari", nalozi: "Nalozi", podesavanja: "Podešavanja", sistem: "Sistem", bezbednost: "Bezbednost" };
 const clockS = (ts) => new Date(ts).toLocaleTimeString("sr-Latn-RS", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 function dayLabel(ts) {
   const d = new Date(ts), now = new Date();
@@ -3357,7 +3357,7 @@ async function refreshLogs() {
   const pg = $("#lgPager");
   if (pg) { pg.innerHTML = pagerHtml(d); bindPager(pg, d, (p) => { state.lgPage = p; refreshLogs(); }); }
 }
-const LOG_ICON = { prijava: "key", sesija: "clock", novac: "cash", shop: "bag", igre: "igre", racunar: "monitor", nalozi: "user", podesavanja: "sliders", sistem: "info" };
+const LOG_ICON = { prijava: "key", sesija: "clock", novac: "cash", shop: "bag", igre: "igre", racunar: "monitor", nalozi: "user", podesavanja: "sliders", sistem: "info", bezbednost: "lock" };
 function logRow(l) {
   // Kategorija se pise samo dok se gleda "Sve". Kad je filter vec na "Prijave",
   // oznaka "Prijave" uz svaki red ne kaze nista novo.

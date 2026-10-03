@@ -278,6 +278,7 @@ crit/
   testovi/                 provera sistema, pokreni PROVERI-SISTEM.bat
   README.md
   DEPLOY.md                detaljno postavljanje i zaključavanje sistema
+  BEZBEDNOST.md            šta server prima od računara i panela, tokeni, dnevnik
 ```
 
 ## Razvojni računar se ne dira

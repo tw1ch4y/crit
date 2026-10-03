@@ -5,13 +5,15 @@ import path from "node:path";
 import os from "node:os";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import { db, checkpoint } from "./db.js";
+import { db, checkpoint, DATA_DIR } from "./db.js";
 import { backupDb, odrzavanje } from "./odrzavanje.js";
 import { getAdmin } from "./auth.js";
 import { router } from "./routes.js";
 import * as nadg from "./nadogradnja.js";
 import { initWs, setHandlers, broadcastPanels } from "./hub.js";
 import * as svc from "./service.js";
+import * as bezbednost from "./bezbednost.js";
+import { strazaTokena } from "./brzina.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8095;
@@ -22,6 +24,9 @@ const PUBLIC = path.join(__dirname, "..", "public");
 // svezi fajlovi, a stari se i dalje kesiraju dok verzija stoji.
 let VERZIJA = "0";
 try { VERZIJA = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")).version || "0"; } catch {}
+
+// Bezbednosni dnevnik: fajl pored baze, a ono sto je za oko vlasnika i u Logove.
+bezbednost.povezi({ logEvent: svc.logEvent, putanja: path.join(DATA_DIR, "bezbednost.jsonl") });
 
 const app = express();
 // Slike stizu kao base64, sto naduva sadrzaj za oko trecinu - limit mora da
@@ -93,9 +98,23 @@ app.use("/api", (req, res) => res.status(404).json({ error: `Nepoznata adresa: $
 //     vec zapamtio i proverice ga; ako mu stigne bilo sta drugo, odbice da to
 //     pokrene.
 app.get("/nadogradnja/launcher.exe", (req, res) => {
-  const token = String(req.query.token || "");
+  // Isti token racunara kao za WebSocket, pa i ista straza: adresa koja pogadja
+  // tokene ovde blokirana je i tamo, i obrnuto.
+  const ip = String(req.socket.remoteAddress || "").replace(/^::ffff:/, "").replace(/^::1$/, "127.0.0.1");
+  if (strazaTokena.blokirana(ip)) return res.status(429).type("text").send("Previše neispravnih pokušaja");
+  const token = typeof req.query.token === "string" ? req.query.token.slice(0, 200) : "";
   const comp = token ? db.prepare("SELECT id FROM computers WHERE token = ?").get(token) : null;
-  if (!comp) return res.status(403).type("text").send("Nevažeći token računara");
+  if (!comp) {
+    const s = strazaTokena.promasaj(ip);
+    bezbednost.zabelezi({
+      vrsta: s.upravo ? "ip_blokiran" : "token_racunara_neispravan",
+      nivo: s.upravo ? bezbednost.NIVO.kriticno : bezbednost.NIVO.upozorenje, ip,
+      opis: s.upravo
+        ? `Adresa ${ip} je blokirana - ${s.promasaja} neispravnih tokena računara zaredom`
+        : `Preuzimanje launchera sa neispravnim tokenom računara sa ${ip}`,
+    });
+    return res.status(403).type("text").send("Nevažeći token računara");
+  }
 
   const st = nadg.stanje();
   if (!st.ima || !st.pusteno) return res.status(404).type("text").send("Nema puštene nadogradnje");
@@ -157,9 +176,9 @@ initWs(server, {
 });
 
 setHandlers({
-  onClientOpen: (comp, ws, ip, verzija) => svc.onClientOpen(comp, ip, verzija),
-  onClientClose: (id) => svc.onClientClose(id),
-  onClientMessage: (id, msg) => svc.handleClientMessage(id, msg),
+  onClientOpen: (comp, ws, ip, verzija, veza) => svc.onClientOpen(comp, ip, verzija, veza),
+  onClientClose: (id, veza) => svc.onClientClose(id, veza),
+  onClientMessage: (id, msg, veza) => svc.handleClientMessage(id, msg, veza),
   onPanelOpen: (ws) => {
     // posalji pun snapshot novom panelu
     ws.send(JSON.stringify(svc.fullSnapshot()));

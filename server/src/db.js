@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import { randomInt } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import fs from "node:fs";
@@ -442,10 +443,17 @@ function seed() {
   }
 }
 
-export function randomToken(len = 10) {
+// TOKEN RACUNARA IZ KRIPTOGRAFSKOG IZVORA.
+//
+// Token je jedino sto stoji izmedju mreze i "ja sam PC-05". Ranije je pravljen
+// od Math.random, ciji se izlazi mogu predvideti kad se vidi dovoljno njih, i
+// imao je 10 znakova. Sada je 16 znakova iz crypto.randomInt (oko 82 bita).
+// Postojeci tokeni u bazi ostaju kakvi jesu i rade dalje - menja se samo kako
+// nastaju novi.
+export function randomToken(len = 16) {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
   let s = "";
-  for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < len; i++) s += chars[randomInt(chars.length)];
   return s;
 }
 

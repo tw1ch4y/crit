@@ -58,6 +58,9 @@ if (NO_LOCK && !PAKOVAN && !DEV) {
     "  Na računaru u igraonici koristi instaler. Za nepakovanu probu SA zaključavanjem: --zakljucaj\n");
 }
 const CONFIG_PATH = path.join(app.getPath("userData"), "config.json");
+// Token sesije igraca (vidi server/src/sesija.js). Stoji van config.json jer
+// zivi koliko i sesija, a config.json koliko i podesavanje racunara.
+const SESIJA_PATH = path.join(app.getPath("userData"), "sesija.json");
 
 let win = null;
 let ws = null;
@@ -278,6 +281,33 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
 }
 
+// ---------- Token sesije ----------
+//
+// Server uz prijavu izda token vezan za ovu sesiju, ovaj racunar i ovog igraca.
+// U ime igraca (porudzbina, tocak, lozinka, izgled naloga) server prima poruke
+// samo sa veze na kojoj je prijava obavljena - ili sa nove veze koja pokaze taj
+// token. Zato se token pamti i salje pri svakom ponovnom povezivanju: restart
+// servera ili zagrcnuta mreza ne smeju igracu da oduzmu shop i tocak.
+//
+// Cuva se i na disku, da prezivi i pad samog launchera. Brise se cim sesija
+// prestane. Ekran launchera ga nikad ne dobija - ne treba mu.
+let sesijaToken = ucitajSesiju();
+function ucitajSesiju() {
+  try {
+    const t = JSON.parse(fs.readFileSync(SESIJA_PATH, "utf8"))?.token;
+    return typeof t === "string" && t.length <= 200 ? t : null;
+  } catch { return null; }
+}
+function zapamtiSesiju(token) {
+  const novi = typeof token === "string" && token.length <= 200 ? token : null;
+  if (novi === sesijaToken) return;
+  sesijaToken = novi;
+  try {
+    if (novi) fs.writeFileSync(SESIJA_PATH, JSON.stringify({ token: novi }));
+    else fs.unlinkSync(SESIJA_PATH);
+  } catch {}
+}
+
 // ---------- WebSocket ka serveru ----------
 function connectWs() {
   if (!config.configured || !config.host || !config.token) {
@@ -306,8 +336,12 @@ function connectWs() {
   // Verzija ide uz adresu da bi se u panelu, na strani Racunari, videlo koji
   // racunar ima koji launcher. Bez toga se u igraonici sa 13 masina ne moze
   // znati zasto se jedna ponasa drugacije.
+  //
+  // p=2 kaze serveru da ovaj launcher ume da cuva token sesije, a `sesija`
+  // nosi taj token kad se nastavlja vec zapoceta sesija.
   const url = config.host.replace(/^http/i, "ws") + "/ws?kind=client&token=" + encodeURIComponent(config.token)
-    + "&v=" + encodeURIComponent(app.getVersion());
+    + "&v=" + encodeURIComponent(app.getVersion()) + "&p=2"
+    + (sesijaToken ? "&sesija=" + encodeURIComponent(sesijaToken) : "");
   let sveza;
   try { sveza = new WebSocket(url); } catch (e) { scheduleReconnect(); return; }
   ws = sveza;
@@ -334,6 +368,11 @@ function connectWs() {
     if (!jeAktuelna()) return;
     let msg; try { msg = JSON.parse(buf.toString()); } catch { return; }
     handleServerMsg(msg);
+    // Token sesije ostaje ovde; ekran dobija poruku kakvu je i do sada dobijao.
+    if (msg && msg.t === "login_ok" && "sesija" in msg) {
+      const { sesija, ...zaEkran } = msg;
+      msg = zaEkran;
+    }
     sendToRenderer("server-msg", msg);
   });
   sveza.on("close", () => {
@@ -401,6 +440,10 @@ function handleServerMsg(msg) {
       .catch(() => wsSend({ t: "proces_ugasen", zahtev: msg.zahtev, ok: false, greska: "Gašenje nije uspelo" }));
     return;
   }
+  // Prijava donosi token sesije; prijava BEZ tokena znaci da ovaj vise ne vazi
+  // (npr. server je zamenio tajnu) i nema svrhe pokazivati ga ponovo.
+  if (msg.t === "login_ok") zapamtiSesiju(msg.sesija || null);
+  if (msg.t === "locked" || msg.t === "to_login" || msg.t === "force_logout") zapamtiSesiju(null);
   // Igrač se prijavio - zapamti šta je radilo pre njega, da na kraju sesije
   // znamo šta je tačno on pokrenuo (igre preko Steam-a rade pod drugim imenom).
   if (msg.t === "login_ok") {

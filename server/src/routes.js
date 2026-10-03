@@ -6,14 +6,39 @@ import fs from "node:fs";
 import { verifyPassword, issueAdminToken, revokeAdminToken, requireAdmin, requireOwner, requireServiser } from "./auth.js";
 import * as nadg from "./nadogradnja.js";
 import * as svc from "./service.js";
+import { SEME_HTTP, proveriTelo } from "./seme.js";
+import { zabelezi, poslednjiZapisi, NIVO } from "./bezbednost.js";
 
 export const router = express.Router();
+
+// ---------- PROVERA ULAZA ----------
+//
+// Telo zahteva prolazi kroz semu (seme.js) pre nego sto ga ruta procita.
+// Odbijanje ide u bezbednosni dnevnik: panel nikad ne salje objekat umesto
+// broja niti nepoznatu komandu, pa takav zahtev nije napravio panel.
+const telo = (sema) => proveriTelo(sema, (req, greske) => {
+  zabelezi({ vrsta: "zahtev_neispravan", nivo: NIVO.upozorenje, igrac: req.admin?.username || null,
+    ip: String(req.socket?.remoteAddress || "").replace(/^::ffff:/, ""),
+    kljuc: `zahtev|${req.admin?.username || req.ip}|${req.method} ${req.route?.path || req.path}`,
+    opis: `${req.method} ${req.path}: telo zahteva ne odgovara očekivanom (${greske.map((g) => g.polje).join(", ")})`,
+    podaci: { greske } });
+});
+
+// Broj u adresi (/players/:id, /computers/:id/...) je pozitivan ceo broj. Sve
+// ostalo je greska u pozivu - ranije je Number("abc") postajao NaN i isao u upit.
+const BROJ_U_ADRESI = /^[1-9][0-9]{0,14}$/;
+for (const ime of ["id", "pid"]) {
+  router.param(ime, (req, res, next, v) => {
+    if (!BROJ_U_ADRESI.test(String(v))) return res.status(400).json({ error: "Neispravan broj u adresi" });
+    next();
+  });
+}
 
 const pName = (id) => db.prepare("SELECT username FROM players WHERE id=?").get(id)?.username || `#${id}`;
 const cName = (id) => db.prepare("SELECT name FROM computers WHERE id=?").get(id)?.name || `#${id}`;
 
 // ---------- AUTH ----------
-router.post("/login", (req, res) => {
+router.post("/login", telo(SEME_HTTP.prijava), (req, res) => {
   const { username, password } = req.body || {};
   const ime = String(username || "").trim();
   // Kljuc je racunar + ime naloga: jedan racunar ne moze da mlati jedan nalog,
@@ -55,7 +80,7 @@ router.get("/me", requireAdmin, (req, res) => res.json({ admin: req.admin }));
 router.use(requireAdmin);
 
 // promena sopstvene lozinke (radnik i vlasnik)
-router.post("/me/password", (req, res) => {
+router.post("/me/password", telo(SEME_HTTP.mojaLozinka), (req, res) => {
   const r = svc.changeOwnPassword(req.admin.adminId, req.body?.oldPassword, req.body?.newPassword);
   if (r.error) return res.status(400).json(r);
   svc.logEvent({ category: "nalozi", action: "self_pw", actor: req.admin.username, detail: "Promenio sopstvenu lozinku" });
@@ -64,14 +89,14 @@ router.post("/me/password", (req, res) => {
 
 // ---------- RADNICI / ADMINI (samo vlasnik) ----------
 router.get("/admins", requireOwner, (req, res) => res.json(svc.listAdmins()));
-router.post("/admins", requireOwner, (req, res) => {
+router.post("/admins", requireOwner, telo(SEME_HTTP.noviRadnik), (req, res) => {
   const r = svc.createAdmin(req.body || {}, req.admin);
   if (r.error) return res.status(400).json(r);
   const ULOGA_NAZIV = { serviser: "serviser", owner: "vlasnik", staff: "radnik" };
   svc.logEvent({ category: "nalozi", action: "admin_create", actor: req.admin.username, target: req.body?.username, detail: `Kreiran ${ULOGA_NAZIV[req.body?.role] || "radnik"} nalog` });
   res.json(r);
 });
-router.post("/admins/:id/password", requireOwner, (req, res) => {
+router.post("/admins/:id/password", requireOwner, telo(SEME_HTTP.lozinka), (req, res) => {
   const r = svc.updateAdminPassword(Number(req.params.id), req.body?.password, req.admin);
   if (r.error) return res.status(400).json(r);
   svc.logEvent({ category: "nalozi", action: "admin_pw", actor: req.admin.username, detail: "Reset lozinke radniku" });
@@ -100,6 +125,14 @@ router.get("/logs", requireOwner, (req, res) => {
     return res.json(svc.logsPage({ category: req.query.category, search: req.query.search, page: req.query.page, per: req.query.per }));
   }
   res.json(svc.getLogs({ category: req.query.category, search: req.query.search, limit: req.query.limit }));
+});
+
+// ---------- BEZBEDNOSNI DOGADJAJI (samo vlasnik) ----------
+// Poslednji zapisi iz memorije; ceo trag je u data/bezbednost.jsonl.
+router.get("/bezbednost", requireOwner, (req, res) => {
+  const nivo = ["info", "upozorenje", "kriticno"].includes(req.query.nivo) ? req.query.nivo : null;
+  const vrsta = typeof req.query.vrsta === "string" ? req.query.vrsta.slice(0, 60) : null;
+  res.json(poslednjiZapisi({ limit: req.query.limit, nivo, vrsta }));
 });
 
 // ---------- SNAPSHOT ----------
@@ -179,12 +212,12 @@ router.delete("/pozadine/:kljuc", requireOwner, (req, res) => {
 
 // ---------- SMENE ----------
 router.get("/shift", (req, res) => res.json(svc.activeShiftInfo()));
-router.post("/shift/open", (req, res) => {
+router.post("/shift/open", telo(SEME_HTTP.otvoriSmenu), (req, res) => {
   const r = svc.openShift(req.admin.adminId, req.admin.username, req.body?.openingCash);
   if (r.error) return res.status(400).json(r);
   res.json(r);
 });
-router.post("/shift/close", (req, res) => {
+router.post("/shift/close", telo(SEME_HTTP.zatvoriSmenu), (req, res) => {
   const r = svc.closeShift(req.admin.username, req.body?.closingCash);
   if (r.error) return res.status(400).json(r);
   res.json(r);
@@ -195,7 +228,7 @@ router.get("/shifts/:id", requireOwner, (req, res) => {
   if (!d) return res.status(404).json({ error: "Smena ne postoji" });
   res.json(d);
 });
-router.post("/shifts/:id/napomena", requireOwner, (req, res) => {
+router.post("/shifts/:id/napomena", requireOwner, telo(SEME_HTTP.napomenaSmene), (req, res) => {
   const r = svc.zabeleziUzSmenu(Number(req.params.id), req.body?.note);
   if (r.error) return res.status(400).json(r);
   svc.logEvent({ category: "sistem", action: "shift_note", actor: req.admin.username,
@@ -212,14 +245,14 @@ router.get("/players", (req, res) => {
   res.json(svc.playersSnapshot());
 });
 
-router.post("/players", (req, res) => {
+router.post("/players", telo(SEME_HTTP.noviIgrac), (req, res) => {
   const r = svc.createPlayer(req.body || {});
   if (r.error) return res.status(400).json(r);
   svc.logEvent({ category: "nalozi", action: "player_create", actor: req.admin.username, target: req.body?.username, detail: `Kreiran nalog igrača${Number(req.body?.balance) > 0 ? `, kredit ${Number(req.body.balance)}` : ""}`, amount: Number(req.body?.balance) || null });
   res.json(r);
 });
 
-router.post("/players/guests", (req, res) => {
+router.post("/players/guests", telo(SEME_HTTP.gosti), (req, res) => {
   const r = svc.createGuests(req.body?.count, req.body?.balance);
   if (r.error) return res.status(400).json(r);
   const imena = r.players.map((p) => p.username).join(", ");
@@ -241,7 +274,7 @@ router.post("/players/guests/ocisti", requireOwner, (req, res) => {
 });
 
 // Zapis u logove pravi sam servis, u istom poslu sa novcem - vidi topUpPlayer.
-router.post("/players/:id/topup", (req, res) => {
+router.post("/players/:id/topup", telo(SEME_HTTP.dopuna), (req, res) => {
   const id = Number(req.params.id);
   const amt = Number(req.body?.amount);
   const r = svc.topUpPlayer(id, amt, req.admin.adminId, req.body?.note, req.admin.username);
@@ -251,13 +284,13 @@ router.post("/players/:id/topup", (req, res) => {
 
 // ---------- VREMENSKI PAKETI ----------
 router.get("/paketi", (req, res) => res.json(svc.paketiLista()));
-router.post("/paketi", requireOwner, (req, res) => {
+router.post("/paketi", requireOwner, telo(SEME_HTTP.paket), (req, res) => {
   const r = svc.kreirajPaket(req.body || {});
   if (r.error) return res.status(400).json(r);
   svc.logEvent({ category: "podesavanja", action: "paket", actor: req.admin.username, target: req.body?.name, detail: "Dodat vremenski paket" });
   res.json(r);
 });
-router.put("/paketi/:id", requireOwner, (req, res) => {
+router.put("/paketi/:id", requireOwner, telo(SEME_HTTP.paket), (req, res) => {
   const r = svc.izmeniPaket(Number(req.params.id), req.body || {});
   if (r.error === "Paket ne postoji") return res.status(404).json(r);
   if (r.error) return res.status(400).json(r);
@@ -272,7 +305,7 @@ router.delete("/paketi/:id", requireOwner, (req, res) => {
 });
 // Prodaja paketa igraču - novac koji uđe se vodi kao dopuna (pazar smene).
 // Zapis u logove pravi sam servis, u istom poslu sa novcem - vidi prodajPaket.
-router.post("/players/:id/paket", (req, res) => {
+router.post("/players/:id/paket", telo(SEME_HTTP.prodajaPaketa), (req, res) => {
   const id = Number(req.params.id);
   const r = svc.prodajPaket(id, Number(req.body?.paketId), req.admin.adminId, req.admin.username);
   if (r.error) return res.status(400).json(r);
@@ -281,19 +314,19 @@ router.post("/players/:id/paket", (req, res) => {
 
 // ---------- NAGRADNI TOČAK (podešavanje) ----------
 router.get("/tocak", requireOwner, (req, res) => res.json(svc.tocakConfig()));
-router.post("/tocak", requireOwner, (req, res) => {
+router.post("/tocak", requireOwner, telo(SEME_HTTP.tocak), (req, res) => {
   const r = svc.postaviTocak(req.body || {});
   if (r.error) return res.status(400).json(r);
   svc.logEvent({ category: "podesavanja", action: "tocak", actor: req.admin.username, detail: `Točak: ${r.ukljucen ? "uključen" : "isključen"}, prag ${r.prag}` });
   res.json(r);
 });
-router.post("/tocak/nagrade", requireOwner, (req, res) => {
+router.post("/tocak/nagrade", requireOwner, telo(SEME_HTTP.nagrada), (req, res) => {
   const r = svc.dodajNagradu(req.body || {});
   if (r.error) return res.status(400).json(r);
   svc.logEvent({ category: "podesavanja", action: "tocak", actor: req.admin.username, target: req.body?.naziv, detail: "Dodata nagrada na točak" });
   res.json(r);
 });
-router.put("/tocak/nagrade/:id", requireOwner, (req, res) => {
+router.put("/tocak/nagrade/:id", requireOwner, telo(SEME_HTTP.nagrada), (req, res) => {
   const r = svc.izmeniNagradu(Number(req.params.id), req.body || {});
   if (r.error === "Nagrada ne postoji") return res.status(404).json(r);
   if (r.error) return res.status(400).json(r);
@@ -305,7 +338,7 @@ router.delete("/tocak/nagrade/:id", requireOwner, (req, res) => {
   res.json(r);
 });
 
-router.post("/players/:id/password", (req, res) => {
+router.post("/players/:id/password", telo(SEME_HTTP.lozinka), (req, res) => {
   const id = Number(req.params.id);
   const r = svc.resetPlayerPassword(id, req.body?.password);
   if (r.error) return res.status(400).json(r);
@@ -313,7 +346,7 @@ router.post("/players/:id/password", (req, res) => {
   res.json(r);
 });
 
-router.post("/players/:id/ban", (req, res) => {
+router.post("/players/:id/ban", telo(SEME_HTTP.blokada), (req, res) => {
   const id = Number(req.params.id);
   const banned = !!req.body?.banned;
   const r = svc.setPlayerBanned(id, banned);
@@ -321,7 +354,7 @@ router.post("/players/:id/ban", (req, res) => {
   res.json(r);
 });
 
-router.put("/players/:id", (req, res) => {
+router.put("/players/:id", telo(SEME_HTTP.izmenaIgraca), (req, res) => {
   const id = Number(req.params.id);
   const r = svc.updatePlayer(id, req.body || {});
   if (r.error) return res.status(400).json(r);
@@ -420,14 +453,14 @@ router.post("/computers/:id/logout", (req, res) => {
   svc.logEvent({ category: "racunar", action: "force_logout", actor: req.admin.username, target: cName(id), detail: "Osoblje odjavilo igrača" });
   res.json(r);
 });
-router.post("/computers/:id/message", (req, res) => {
+router.post("/computers/:id/message", telo(SEME_HTTP.porukaRacunaru), (req, res) => {
   const id = Number(req.params.id);
   const text = String(req.body?.text || "");
   const r = svc.sendMessageToComputer(id, text);
   svc.logEvent({ category: "racunar", action: "message", actor: req.admin.username, target: cName(id), detail: `Poruka: ${text}` });
   res.json(r);
 });
-router.post("/computers/:id/command", (req, res) => {
+router.post("/computers/:id/command", telo(SEME_HTTP.komanda), (req, res) => {
   const id = Number(req.params.id);
   const cmd = String(req.body?.cmd || "");
   const r = svc.sendCommand(id, cmd);
@@ -462,7 +495,7 @@ router.post("/computers/:id/wake", async (req, res) => {
 });
 
 // grupna akcija
-router.post("/computers-action", (req, res) => {
+router.post("/computers-action", telo(SEME_HTTP.grupnaAkcija), (req, res) => {
   const { ids, action } = req.body || {};
   if (!action) return res.status(400).json({ error: "Akcija je obavezna" });
   const r = svc.bulkAction(ids, action);
@@ -472,7 +505,7 @@ router.post("/computers-action", (req, res) => {
 
 // ---------- PORUDŽBINE ----------
 router.get("/orders", (req, res) => res.json(svc.ordersSnapshot(req.query.all === "1")));
-router.post("/orders/:id/status", (req, res) => {
+router.post("/orders/:id/status", telo(SEME_HTTP.statusPorudzbine), (req, res) => {
   // logovanje radi servis (zna iznos i da li je otkazivanje)
   const r = svc.setOrderStatus(Number(req.params.id), req.body?.status, req.admin.username);
   if (r.error) return res.status(400).json(r);
@@ -480,7 +513,7 @@ router.post("/orders/:id/status", (req, res) => {
 });
 
 // POS: radnik ručno kuca porudžbinu
-router.post("/pos", (req, res) => {
+router.post("/pos", telo(SEME_HTTP.kasa), (req, res) => {
   const r = svc.createPosOrder({ ...(req.body || {}), actor: req.admin.username });
   if (r.error) return res.status(400).json(r);
   res.json(r);
@@ -699,7 +732,7 @@ router.put("/programs/:id", requireOwner, (req, res) => res.json(svc.updateProgr
 router.delete("/programs/:id", requireOwner, (req, res) => { svc.deleteProgram(Number(req.params.id)); res.json({ ok: true }); });
 router.get("/install-status", requireOwner, (req, res) => res.json(svc.getInstallStatus()));
 router.delete("/install-status", requireOwner, (req, res) => res.json(svc.clearInstallStatus()));
-router.post("/install", requireOwner, (req, res) => {
+router.post("/install", requireOwner, telo(SEME_HTTP.instalacija), (req, res) => {
   const { ids, programId, name, url, args } = req.body || {};
   let prog;
   if (programId) { prog = db.prepare("SELECT * FROM programs WHERE id=?").get(Number(programId)); if (!prog) return res.status(400).json({ error: "Program ne postoji" }); }
@@ -716,7 +749,7 @@ router.get("/settings", (req, res) => {
   if (req.admin.role !== "owner") delete s.fabrickaLozinka;
   res.json(s);
 });
-router.post("/settings", requireOwner, (req, res) => {
+router.post("/settings", requireOwner, telo(SEME_HTTP.podesavanja), (req, res) => {
   const map = { cafeName: "cafe_name", currency: "currency", ratePerHour: "rate_per_hour", unlockPin: "unlock_pin", idleMinutes: "idle_minutes", servisniPin: "servisni_pin" };
   // Negativna cena po satu bi igračima DODAVALA kredit dok sede, a negativno
   // mirovanje bi ih odjavljivalo odmah - oba se odbijaju pre upisa.
@@ -823,7 +856,7 @@ router.post("/nadogradnja/povuci", requireServiser, (req, res) => {
   res.json(svc.nadogradnjaStanje());
 });
 
-router.post("/nadogradnja/posalji", requireOwner, (req, res) => {
+router.post("/nadogradnja/posalji", requireOwner, telo(SEME_HTTP.nadogradnjaPosalji), (req, res) => {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : null;
   const r = svc.posaljiNadogradnju(ids, req.admin.username);
   if (r.error) return res.status(400).json(r);

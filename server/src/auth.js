@@ -1,5 +1,6 @@
 import { scryptSync, randomBytes, timingSafeEqual, randomUUID } from "node:crypto";
 import { db } from "./db.js";
+import { zabelezi, NIVO } from "./bezbednost.js";
 
 // ---- Lozinke (scrypt, bez spoljnih zavisnosti) ----
 export function hashPassword(pw) {
@@ -41,6 +42,20 @@ export function getAdmin(token) {
   if (!row || row.created_at < Date.now() - TOKEN_TTL) return null;
   return { adminId: row.admin_id, username: row.username, role: row.role };
 }
+// Zahtev panela sa tokenom koji ne vazi. Bez tokena se ne belezi nista - to je
+// samo neprijavljen pregledac.
+//
+// Nivo je "info": najcesci razlog je istekao token (30 dana) ili odjava u
+// drugom prozoru. Token panela je UUID (122 bita) i ne moze se pogoditi, pa
+// jedan neispravan nije napad - ali trag ostaje. Token ugasenog naloga se
+// brise pri gasenju (deleteAdmin), pa ni on ne prolazi.
+function prijaviLosToken(req) {
+  const ip = String(req.socket?.remoteAddress || req.ip || "").replace(/^::ffff:/, "");
+  zabelezi({ vrsta: "token_panela_neispravan", nivo: NIVO.info, ip,
+    opis: `Zahtev panela sa neispravnim ili isteklim tokenom sa ${ip}`,
+    podaci: { metod: req.method, adresa: String(req.originalUrl || req.path).split("?")[0].slice(0, 80) } });
+}
+
 export function revokeAdminToken(token) {
   db.prepare("DELETE FROM admin_tokens WHERE token = ?").run(String(token));
 }
@@ -62,7 +77,10 @@ export function revokeAdminToken(token) {
 export function requireAdmin(req, res, next) {
   const token = tokenFromReq(req);
   const admin = getAdmin(token);
-  if (!admin) return res.status(401).json({ error: "Neautorizovano" });
+  if (!admin) {
+    if (token) prijaviLosToken(req);
+    return res.status(401).json({ error: "Neautorizovano" });
+  }
   req.admin = admin;
   next();
 }
@@ -94,9 +112,19 @@ export const jeServiser = (a) => rang(a?.role) >= RANG.serviser;
 
 function traziRang(potreban, poruka) {
   return (req, res, next) => {
-    const admin = getAdmin(tokenFromReq(req));
-    if (!admin) return res.status(401).json({ error: "Neautorizovano" });
-    if (rang(admin.role) < potreban) return res.status(403).json({ error: poruka });
+    const token = tokenFromReq(req);
+    const admin = getAdmin(token);
+    if (!admin) {
+      if (token) prijaviLosToken(req);
+      return res.status(401).json({ error: "Neautorizovano" });
+    }
+    if (rang(admin.role) < potreban) {
+      // Radnik koji gadja vlasnicku adresu mimo panela (panel mu to dugme ni ne
+      // pokazuje) - nije napad sam po sebi, ali je vredno traga.
+      zabelezi({ vrsta: "pristup_bez_prava", nivo: NIVO.info, igrac: admin.username,
+        opis: `${admin.username} (${admin.role}) je pokušao ${req.method} ${req.path} bez potrebnih prava` });
+      return res.status(403).json({ error: poruka });
+    }
     req.admin = admin;
     next();
   };
