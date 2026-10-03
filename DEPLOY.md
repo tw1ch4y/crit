@@ -116,7 +116,7 @@ Prečice za osoblje: `Ctrl+Alt+U` otključavanje (PIN), `Ctrl+Alt+Home` povratak
 
 1. Napravi **poseban Windows nalog za igrače** - obavezno *standardni*, ne administrator.
    Time igrač ne može da instalira, menja sistem ni da ugasi zaštitu.
-2. Prijavi se na taj nalog i pokreni **`zastita-ukljuci.bat`** iz paketa (`2 - LAUNCHER\ALATI OSOBLJA`,
+2. Prijavi se na taj nalog i pokreni **`zastita-ukljuci.bat`** iz paketa (`2 - LAUNCHER - racunari igraca\ALATI OSOBLJA`,
    u izvornom kodu `client\`) - desni klik > *Run as administrator*. Zaštita se upisuje na nalog
    igrača (`HKEY_USERS\<SID>`), ne na administratora čiju lozinku ukucaš.
    Gasi: Task Manager, Registry Editor, promenu lozinke, zaključavanje, odjavu, Windows taster,

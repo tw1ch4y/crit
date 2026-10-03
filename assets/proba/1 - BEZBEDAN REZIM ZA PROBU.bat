@@ -18,6 +18,9 @@ echo.
 echo  I postavlja adresu servera na  http://127.0.0.1:8095
 echo  jer su server i launcher na istom racunaru.
 echo.
+echo  Vazi samo kad launcher radi na ADMINISTRATORSKOM nalogu - na nalogu
+echo  igraca u igraonici launcher ovaj prekidac namerno ne slusa.
+echo.
 echo  Kad zavrsis probu, pokreni  "2 - VRATI NA IGRAONICU.bat"
 echo.
 pause
@@ -37,7 +40,7 @@ echo.
 echo  Gotovo. Pokreni Crit Launcher.
 echo.
 echo  Ako si vec uneo pogresnu adresu servera, prvo je obrisi sa:
-echo    2 - LAUNCHER\ALATI OSOBLJA\resetuj-launcher.bat  ^(kao administrator^)
+echo    2 - LAUNCHER - racunari igraca\ALATI OSOBLJA\resetuj-launcher.bat  ^(kao administrator^)
 echo.
 echo  Izlaz iz launchera dok probas:  Ctrl+Alt+Shift+Q  pa PIN 1234
 echo.

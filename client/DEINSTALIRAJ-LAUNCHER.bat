@@ -52,6 +52,7 @@ if defined PROFIL (
   set "DESKTOP=%USERPROFILE%\Desktop"
 )
 echo  Nalog igraca: %IGRAC%
+echo  Ako to nije nalog igraca: N, pa  DEINSTALIRAJ-LAUNCHER.bat IME-NALOGA
 echo.
 choice /C DN /M "  Ukloniti launcher"
 if errorlevel 2 exit /b 2
@@ -64,12 +65,23 @@ timeout /t 2 /nobreak >nul
 echo  [2/3] Pokrecem deinstalaciju...
 set "U1=%ProgramFiles%\Crit Launcher\Uninstall Crit Launcher.exe"
 set "U2=%LOCALAPPDATA%\Programs\Crit Launcher\Uninstall Crit Launcher.exe"
+set "FOLDER=%LOCALAPPDATA%\Programs\Crit Launcher"
+set "USPEH=1"
+REM Instalacija u profilu igraca se brise direktno, BEZ njenog deinstalera:
+REM pokrenut kao administrator, on trazi instalaciju u profilu ADMINISTRATORA,
+REM ne nadje je i javi uspeh. Launcher je gore ugasen, pa fajlovi nisu zauzeti.
 if exist "%U1%" (
   start /wait "" "%U1%" /S
   echo       deinstalirano iz Program Files
 ) else if exist "%U2%" (
-  start /wait "" "%U2%" /S
-  echo       deinstalirano iz profila igraca
+  rmdir /S /Q "%FOLDER%" >nul 2>&1
+  if exist "%FOLDER%\" (
+    set "USPEH=0"
+    echo       NIJE obrisan folder - obrisi ga rucno:
+    echo       "%FOLDER%"
+  ) else (
+    echo       obrisano iz profila igraca
+  )
 ) else (
   echo       nije nadjen instaler - obrisi rucno folder "Crit Launcher"
 )
@@ -82,11 +94,20 @@ REM Deinstalacija pokrenuta kao administrator brise precice administratora;
 REM precice i stavka u "Apps" na nalogu igraca se brisu ovde.
 del /F /Q "%DESKTOP%\Crit Launcher.lnk" >nul 2>&1
 del /F /Q "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Crit Launcher.lnk" >nul 2>&1
-if defined SID (
-  for /f "delims=" %%K in ('reg query "HKU\%SID%\Software\Microsoft\Windows\CurrentVersion\Uninstall" /s /f "Crit Launcher" /d 2^>nul ^| findstr /B /I "HKEY_"') do reg delete "%%K" /f >nul 2>&1
+REM Stavka u "Apps" na nalogu igraca - i kad nalog nije prijavljen (zastita.ps1
+REM tada otvori njegov registar).
+if defined PROFIL (
+  powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0zastita.ps1" -Rezim deinstaliraj %NALOG% -Program "Crit Launcher"
 )
 
 echo.
+if "%USPEH%"=="0" (
+  color 0C
+  echo  Launcher NIJE uklonjen do kraja - vidi poruke iznad.
+  echo.
+  pause
+  exit /b 1
+)
 color 0A
 echo  Gotovo. Launcher je uklonjen sa racunara.
 echo  Zastita naloga igraca (Task Manager, Win taster...) ostaje dok se ne

@@ -82,31 +82,30 @@ if (PAKOVAN && trebaPonovo(process.argv.slice(1))) {
 }
 
 // bez-zakljucavanja.txt pored programa gasi zakljucavanje (proba na jednom
-// racunaru, vidi assets/proba). Folder programa je u profilu igraca, pa bi
-// igrac mogao sam da napravi taj fajl. Zato u instaliranom launcheru vazi samo
-// fajl koji NIJE napravio nalog na kome launcher radi - ili ako je taj nalog
-// administrator (proba na sopstvenom racunaru). Standardni nalog ne moze da
-// napravi fajl ciji je vlasnik neko drugi.
+// racunaru, vidi assets/proba). Folder programa je u profilu igraca, pa igrac
+// moze sam da napravi taj fajl - ili da u njega premesti tudji fajl i preimenuje
+// ga (premestanje cuva vlasnika, pa ni provera vlasnika ne drzi). Zato u
+// instaliranom launcheru fajl vazi samo kad launcher radi na ADMINISTRATORSKOM
+// nalogu: proba na sopstvenom racunaru. Na standardnom nalogu igraca nikad.
 function zastavaBezZakljucavanja() {
   const put = path.join(path.dirname(process.execPath), "bez-zakljucavanja.txt");
   if (!fs.existsSync(put)) return false;
   if (!PAKOVAN || process.platform !== "win32") return true;
+  if (nalogJeAdministrator()) { zastavaAktivna = true; return true; }
+  console.error("bez-zakljucavanja.txt na standardnom nalogu - ne vazi");
+  zastavaOdbijena = true;
+  return false;
+}
+// Clan grupe Administrators (i kad UAC drzi prava ugasena - "deny only" grupa
+// se i tada vidi u spisku). Greska znaci "ne".
+function nalogJeAdministrator() {
   try {
-    const izlaz = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
-      "$v=(Get-Acl -LiteralPath $env:ZASTAVA).GetOwner([Security.Principal.SecurityIdentifier]).Value;" +
-      "$ja=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value;" +
-      "$adm=[bool](whoami /groups /fo csv | Select-String -SimpleMatch 'S-1-5-32-544');" +
-      "Write-Output ($v + '|' + $ja + '|' + $adm)"],
-    { env: { ...process.env, ZASTAVA: put }, encoding: "utf8", windowsHide: true, timeout: 10000 });
-    const [vlasnik, ja, admin] = String(izlaz).trim().split("|");
-    if (!vlasnik || !ja) return false;
-    if (vlasnik !== ja || admin === "True") return true;
-    console.error("bez-zakljucavanja.txt je napravio sam nalog igraca - ne vazi");
-    zastavaOdbijena = true;
-    return false;
-  } catch { return false; } // ne zna se ko ga je napravio - ne vazi
+    const izlaz = execFileSync("whoami", ["/groups", "/fo", "csv"], { encoding: "utf8", windowsHide: true, timeout: 10000 });
+    return String(izlaz).includes("S-1-5-32-544");
+  } catch { return false; }
 }
 let zastavaOdbijena = false;
+let zastavaAktivna = false;
 
 const NO_LOCK = DEV || (!PAKOVAN && process.argv.includes("--no-lock")) ||
   zastavaBezZakljucavanja() ||
@@ -501,7 +500,10 @@ function connectWs() {
   });
   sveza.on("close", () => {
     if (!jeAktuelna()) return;
-    sendToRenderer("ws-status", { connected: false });
+    // Uz svaki prekid ide i stanje zakljucavanja (vidi nadzor veze) - inace bi
+    // ovaj "close", koji stize odmah posle zakljucavanja i posle svakog
+    // neuspelog povezivanja, vratio ekranu obican tekst.
+    sendToRenderer("ws-status", statusBezVeze());
     scheduleReconnect();
   });
   sveza.on("error", () => {});
@@ -1888,6 +1890,10 @@ const nadzorVeze = napraviNadzorVeze({
   sat: () => performance.now(),
 });
 let bezVeze = false;
+let igreUgaseneBezVeze = false;
+function statusBezVeze() {
+  return { connected: false, zakljucano: bezVeze, igreUgasene: bezVeze && igreUgaseneBezVeze, gasiIgreZa: GASI_IGRE_BEZ_VEZE_S };
+}
 
 function startNadzorVeze() {
   let otkucaj = 0;
@@ -1913,8 +1919,9 @@ function startNadzorVeze() {
 
 function zakljucajBezVeze() {
   bezVeze = true;
+  igreUgaseneBezVeze = false;
   console.error("[launcher] nema veze sa serverom - racunar zakljucan");
-  sendToRenderer("ws-status", { connected: false, zakljucano: true, gasiIgreZa: GASI_IGRE_BEZ_VEZE_S });
+  sendToRenderer("ws-status", statusBezVeze());
   focusLauncher();
 }
 
@@ -1926,7 +1933,8 @@ function ugasiIgreBezVeze() {
   // Sve sto je igrac pokrenuo u ovoj sesiji. Snimak "pre sesije" ostaje, jer
   // sesija nije gotova - nastavlja se kad se veza vrati.
   if (!NO_LOCK && procesiPreSesije) ugasiNoveProcese(procesiPreSesije, { log: (m) => console.log(m) }).catch(() => {});
-  sendToRenderer("ws-status", { connected: false, zakljucano: true, igreUgasene: true });
+  igreUgaseneBezVeze = true;
+  sendToRenderer("ws-status", statusBezVeze());
 }
 
 // Server se javio. Ako sesija traje, launcher prestaje da bude iznad svega i
@@ -1934,6 +1942,9 @@ function ugasiIgreBezVeze() {
 // "to_login" ili "locked" i launcher ostaje zakljucan kao i uvek.
 function otkljucajPosleVeze() {
   bezVeze = false;
+  igreUgaseneBezVeze = false;
+  // Ekran za podesavanje (otkljucano bez servera) ne sme da zadrzi tekst o zakljucavanju.
+  if (!ws || ws.readyState !== WebSocket.OPEN) sendToRenderer("ws-status", statusBezVeze());
   if (!DEV && win && !win.isDestroyed() && sesijaAktivna) win.setAlwaysOnTop(false);
 }
 
@@ -1949,7 +1960,10 @@ function proveriZastituRacunara() {
   if (ODBIJENO_RANIJE) {
     javiProblem("argumenti_odbijeni", `Launcher je pokrenut sa zabranjenim argumentima (${ODBIJENO_RANIJE.slice(0, 80)}) - proveri precicu u autostartu`);
   }
-  if (zastavaOdbijena) javiProblem("zastava_odbijena", "bez-zakljucavanja.txt je napravio nalog igraca - zanemaren");
+  if (zastavaOdbijena) javiProblem("zastava_odbijena", "bez-zakljucavanja.txt na standardnom nalogu igraca - zanemaren");
+  // Prihvacena zastava znaci da ovaj racunar NIJE zasticen. Osoblje to mora da
+  // zna - inace zaboravljen korak 2 probe izgleda kao ispravna masina.
+  if (zastavaAktivna) javiProblem("zastava_aktivna", "bez-zakljucavanja.txt je aktivan na administratorskom nalogu - launcher ne stiti racunar i ne cisti sesiju. Pokreni \"2 - VRATI NA IGRAONICU.bat\"");
   if (NO_LOCK || !PAKOVAN || process.platform !== "win32") return;
   const fali = [];
   const vrednost = (kljuc, ime, opis) => new Promise((resolve) => {

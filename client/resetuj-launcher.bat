@@ -48,6 +48,7 @@ set "APPDATA=%PROFIL%\AppData\Roaming"
 
 echo.
 echo  Nalog igraca: %IGRAC%
+echo  Ako to nije nalog igraca: N, pa  resetuj-launcher.bat IME-NALOGA
 echo.
 echo  Brisem sacuvana podesavanja launchera (adresa servera i token).
 echo  Posle ovoga ce launcher opet traziti podesavanje, kao prvi put.

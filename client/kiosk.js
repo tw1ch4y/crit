@@ -105,7 +105,7 @@ function lokalnaStrana(url, rendererDir, platforma = process.platform) {
 // (razvojni alati, sandbox, proksi...) - za njih launcher mora da se pokrene
 // ponovo, bez njih.
 // Chromium na Windows-u prihvata prekidac sa "--", "-" i "/" ispred.
-const OPASNI_ARGUMENTI = /^(--|-|\/)(remote-debugging-port|remote-debugging-pipe|remote-debugging-address|remote-allow-origins|inspect|inspect-brk|inspect-port|debug|debug-brk|dev|no-lock|js-flags|user-data-dir|disable-web-security|no-sandbox|disable-site-isolation-trials|allow-file-access-from-files|ignore-certificate-errors|proxy-server|proxy-pac-url|host-rules|host-resolver-rules|load-extension|disable-features|enable-features|enable-blink-features)(=|$)/i;
+const OPASNI_ARGUMENTI = /^(--|-|\/)(remote-debugging-port|remote-debugging-pipe|remote-debugging-address|remote-allow-origins|inspect|inspect-brk|inspect-port|debug|debug-brk|dev|no-lock|js-flags|user-data-dir|disable-web-security|no-sandbox|disable-site-isolation-trials|allow-file-access-from-files|ignore-certificate-errors|proxy-server|proxy-pac-url|host-rules|host-resolver-rules|load-extension|disable-features|enable-features|enable-blink-features|browser-subprocess-path|gpu-launcher|renderer-cmd-prefix|utility-cmd-prefix|gpu-cmd-prefix)(=|$)/i;
 const SAMO_ZANEMARI = /^(--|-|\/)(dev|no-lock)$/i;
 function opasniArgumenti(argv) {
   return (argv || []).filter((a) => OPASNI_ARGUMENTI.test(String(a)));

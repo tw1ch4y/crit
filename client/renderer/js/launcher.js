@@ -2626,7 +2626,8 @@ $("#msgOk").addEventListener("click", () => $("#msgOverlay").classList.remove("a
 // main.js, nadzor veze). Igrac mora da zna da mu se vreme ne trosi i sta sledi.
 const CONN_TEKST = { naslov: null, opis: null };
 function tekstBezVeze({ zakljucano, igreUgasene, gasiIgreZa } = {}) {
-  const b = $("#connSesija b"), sp = $("#connSesija span");
+  // "b + span": opis odmah posle naslova (prvi span je zelena tacka).
+  const b = $("#connSesija b"), sp = $("#connSesija b + span");
   if (!b || !sp) return;
   if (CONN_TEKST.naslov == null) { CONN_TEKST.naslov = b.textContent; CONN_TEKST.opis = sp.textContent; }
   if (igreUgasene) {

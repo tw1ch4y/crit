@@ -9,6 +9,8 @@
 #   zastita.ps1 -Rezim iskljuci [-Nalog IME]
 #   zastita.ps1 -Rezim popravi            svi nalozi na racunaru
 #   zastita.ps1 -Rezim nalog    [-Nalog IME]   ispise SID|PROFIL|IME|ADMIN
+#   zastita.ps1 -Rezim deinstaliraj [-Nalog IME] -Program "Ime Launcher"
+#                                         brise stavku programa u "Apps"
 #
 # ZASTO NALOG IGRACA, A NE HKCU
 # Kad standardni nalog pokrene skriptu "kao administrator", skripta radi pod
@@ -20,9 +22,10 @@
 #
 # Izlaz: 0 uspeh, 1 greska, 2 odustao.
 param(
-  [Parameter(Mandatory = $true)][ValidateSet("ukljuci", "iskljuci", "popravi", "nalog")][string]$Rezim,
+  [Parameter(Mandatory = $true)][ValidateSet("ukljuci", "iskljuci", "popravi", "nalog", "deinstaliraj")][string]$Rezim,
   [string]$Nalog = "",
   [string[]]$Zabrani = @(),
+  [string]$Program = "",
   [switch]$BezPitanja
 )
 
@@ -32,11 +35,13 @@ $ErrorActionPreference = "Stop"
 # Jedan spisak za ukljucivanje i za iskljucivanje - ne mogu da se razidju.
 $POL = "Software\Microsoft\Windows\CurrentVersion\Policies"
 $VREDNOSTI = @(
-  # Task Manager, zakljucavanje, promena lozinke, uredjivac registra
+  # Task Manager, zakljucavanje, promena lozinke. Uredjivac registra NE ide
+  # kroz DisableRegistryTools: ta politika gasi i reg.exe, a launcher (koji radi
+  # kao igrac) njime odjavljuje Steam posle sesije. regedit.exe je zato na
+  # spisku programa koje Explorer ne pokrece (dole).
   @{ Kljuc = "$POL\System"; Ime = "DisableTaskMgr"; Vrednost = 1 },
   @{ Kljuc = "$POL\System"; Ime = "DisableLockWorkstation"; Vrednost = 1 },
   @{ Kljuc = "$POL\System"; Ime = "DisableChangePassword"; Vrednost = 1 },
-  @{ Kljuc = "$POL\System"; Ime = "DisableRegistryTools"; Vrednost = 1 },
   # Windows taster, Win+R, gasenje i odjava iz Start menija
   @{ Kljuc = "$POL\Explorer"; Ime = "NoWinKeys"; Vrednost = 1 },
   @{ Kljuc = "$POL\Explorer"; Ime = "NoRun"; Vrednost = 1 },
@@ -62,6 +67,10 @@ $ZABRANJENI = @(
   "msconfig.exe", "taskmgr.exe", "control.exe"
 )
 $DISALLOW = "$POL\Explorer\DisallowRun"
+# Iskljucivanje skida i ono sto su upisivale ranije verzije ove skripte.
+$STARO = @(
+  @{ Kljuc = "$POL\System"; Ime = "DisableRegistryTools" }
+)
 
 # ---------- POMOCNE ----------
 function Pisi([string]$t = "") { Write-Host "  $t" }
@@ -221,7 +230,21 @@ function Iskljuci([string]$koren) {
     if ($v.Ime -eq "DisallowRun" -and $tudjiSpisak) { continue }
     try { Obrisi $koren $v } catch { Pisi "nije obrisano: $($v.Kljuc) $($v.Ime)"; $greske++ }
   }
+  foreach ($v in $STARO) { try { Obrisi $koren $v } catch {} }
   return $greske
+}
+
+# Stavka programa u "Apps" na nalogu igraca. Deinstaler launchera pokrenut kao
+# administrator brise stavku administratora, pa igracu ostane mrtva stavka.
+function ObrisiIzApps([string]$koren, [string]$ime) {
+  $u = "$koren\Software\Microsoft\Windows\CurrentVersion\Uninstall"
+  if (-not $ime -or -not (Test-Path -LiteralPath $u)) { return 0 }
+  $obrisano = 0
+  foreach ($k in @(Get-ChildItem -LiteralPath $u)) {
+    $naziv = [string](Get-ItemProperty -LiteralPath $k.PSPath -ErrorAction SilentlyContinue).DisplayName
+    if ($naziv -like "$ime*") { Remove-Item -LiteralPath $k.PSPath -Recurse -Force; $obrisano++ }
+  }
+  return $obrisano
 }
 
 function Potvrdi([string]$pitanje) {
@@ -247,8 +270,12 @@ if (-not (JeAdministrator)) {
 if ($Rezim -eq "popravi") {
   # Svi pravi nalozi (lokalni i domenski), i prijavljeni i neprijavljeni.
   $greske = 0
+  # Prvo prijavljeni nalozi (njima ne treba reg.exe): stara verzija zastite je
+  # ume da upise DisableRegistryTools administratoru, pa mu reg.exe ne radi dok
+  # se to ne skine - a za odjavljene naloge treba "reg load".
   $sidovi = @(Get-ChildItem -LiteralPath "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" |
-      Where-Object { $_.PSChildName -match "^S-1-5-21-" } | ForEach-Object { $_.PSChildName })
+      Where-Object { $_.PSChildName -match "^S-1-5-21-" } | ForEach-Object { $_.PSChildName } |
+      Sort-Object { -not (Test-Path -LiteralPath "Registry::HKEY_USERS\$_") })
   foreach ($sid in $sidovi) {
     $profil = $null
     try { $profil = [Environment]::ExpandEnvironmentVariables((Get-ItemProperty -LiteralPath "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$sid").ProfileImagePath) } catch {}
@@ -268,9 +295,23 @@ if ($Rezim -eq "popravi") {
 $n = NadjiNalog $Nalog
 if (-not $n) {
   Pisi "Nisam mogao da odredim nalog igraca."
-  Pisi "Prijavi se na nalog igraca i pokreni ponovo, ili zadaj ime naloga:"
-  Pisi "   zastita-$Rezim.bat IME-NALOGA"
+  Pisi "Prijavi se na nalog igraca i pokreni ponovo, ili zadaj ime naloga"
+  Pisi "posle imena skripte, npr.:  zastita-ukljuci.bat IME-NALOGA"
   exit 1
+}
+
+if ($Rezim -eq "deinstaliraj") {
+  $r = $null
+  $kod = 0
+  try {
+    $r = OtvoriRegistar $n
+    $b = ObrisiIzApps $r.Koren $Program
+    if ($b) { Pisi "obrisana stavka u Apps na nalogu $($n.Ime)" }
+  } catch {
+    Pisi "stavka u Apps nije obrisana: $($_.Exception.Message)"
+    $kod = 1
+  } finally { ZatvoriRegistar $r }
+  exit $kod
 }
 
 $ja = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value

@@ -54,7 +54,7 @@ sam da se nadogradi sa panela, bez obilaska mašina.
 Kad se poveže, u panelu će `PC-01` preći iz *Offline* u *Standby*.
 
 **2.5** Uključi zaštitu. Dok je **nalog igrača prijavljen**, iz paketa (USB ili računar
-osoblja), folder `2 - LAUNCHER\ALATI OSOBLJA`, desni klik na **`zastita-ukljuci.bat`** >
+osoblja), folder `2 - LAUNCHER - racunari igraca\ALATI OSOBLJA`, desni klik na **`zastita-ukljuci.bat`** >
 *Run as administrator* i upiši lozinku administratora. Skripta sama nađe nalog igrača i
 zaštitu upiše **njemu**, ne administratoru. Zatim se odjavi i prijavi ponovo na nalog igrača.
 
@@ -140,9 +140,18 @@ igrača, šta launcher sam brani i šta treba podesiti da bi to držalo.
 
 ### Alati osoblja
 
-Svi su u paketu, u folderu `2 - LAUNCHER\ALATI OSOBLJA`, zajedno sa `zastita.ps1` koji
-radi sav posao (fajlovi moraju da ostanu zajedno). Svaki traži administratora i na
-početku pita koji je nalog igrača.
+Svi su u paketu, u folderu `2 - LAUNCHER - racunari igraca\ALATI OSOBLJA`, zajedno sa
+`zastita.ps1` koji radi sav posao (fajlovi moraju da ostanu zajedno). Svaki traži
+administratora i na početku pokaže na koji nalog igrača radi.
+
+> Putanja do alata **ne sme da ima zagrade ni `&`** (npr. `D:\Kopija (2)\...`):
+> *Run as administrator* tada ne pokrene `.bat` uopšte - prozor se samo otvori i zatvori.
+> Zato su i folderi paketa nazvani bez zagrada.
+
+Ako Windows na nalogu igrača odbije pokretanje ("operation has been cancelled due to
+restrictions"), to je zaštita koja radi: prijavi se na administratorski nalog
+(*Switch user*) i pokreni alat odatle, sa imenom naloga igrača, npr.
+`zastita-iskljuci.bat igrac`. `POPRAVI-RACUNAR.bat` ne traži ime - radi nad svim nalozima.
 
 Kad standardni nalog pokrene skriptu *kao administrator*, skripta radi pod
 **administratorom**: `HKCU` i `%APPDATA%` su tada njegovi, ne igračevi. Zato alati rade nad
@@ -154,7 +163,7 @@ nalogom igrača po SID-u (`HKEY_USERS\<SID>`) i nad njegovim profilom (`C:\Users
 | `zastita-iskljuci.bat` | servis računara | isto; kad je nalog igrača zaključan, pokreni je sa administratorskog naloga uz ime naloga |
 | `resetuj-launcher.bat` | nova adresa servera ili token | podešavanje launchera na nalogu igrača (pita za potvrdu) |
 | `POPRAVI-RACUNAR.bat` | računar zaključan, launcher ne radi | **svi** nalozi, i prijavljeni i odjavljeni; gasi launcher i vadi ga iz autostarta (pita za potvrdu) |
-| `DEINSTALIRAJ-LAUNCHER.bat` | uklanjanje launchera | instalacija i prečice na nalogu igrača (pita za potvrdu) |
+| `DEINSTALIRAJ-LAUNCHER.bat` | uklanjanje launchera | instalacija, prečice i stavka u *Apps* na nalogu igrača (pita za potvrdu) |
 
 `POPRAVI-RACUNAR.bat` više ne pokreće Explorer ponovo. Explorer pokrenut iz prozora
 administratora može da ostane sa pravima administratora na ekranu igrača. Posle
@@ -164,12 +173,16 @@ popravke se odjavi i prijavi ponovo.
 
 | Podešavanje | Šta gasi |
 |---|---|
-| `DisableTaskMgr`, `DisableRegistryTools`, `DisableLockWorkstation`, `DisableChangePassword` | Task Manager, Registry, zaključavanje, promenu lozinke |
+| `DisableTaskMgr`, `DisableLockWorkstation`, `DisableChangePassword` | Task Manager, zaključavanje, promenu lozinke |
 | `NoWinKeys`, `NoRun`, `NoClose`, `NoLogoff` | Win taster, Win+R, gašenje i odjavu iz Start menija |
 | `NoControlPanel` | Control Panel i Podešavanja (odatle bi se launcher deinstalirao bez administratora) |
 | `DisableCMD = 2` | komandnu liniju; `.bat` skripte i dalje rade jer ih launcher koristi za nadogradnju |
 | `DisallowRun` | pokretanje iz Explorer-a i prozora za izbor fajla u igri: `cmd`, `powershell`, `pwsh`, `wscript`, `cscript`, `mshta`, `regedit`, `mmc`, `msconfig`, `taskmgr`, `control`, `Uninstall Crit Launcher.exe` |
 | `DontShowUI` (Windows Error Reporting) | prozor "program je prestao da radi" posle pada igre |
+
+`DisableRegistryTools` se namerno **ne** postavlja: gasi i `reg.exe`, a launcher (koji
+radi kao igrač) njime odjavljuje Steam posle sesije. `regedit` je zabranjen kroz
+`DisallowRun`. Ranija verzija ga je upisivala, pa ga isključivanje i `POPRAVI` skidaju.
 
 Launcher svoje alate i igre pokreće sam, mimo Explorer-a, pa ga `DisallowRun` ne dira.
 Igre upisane kao `.bat` launcher pokreće kroz komandni interpreter, ne kroz Windows
@@ -194,8 +207,10 @@ Igre upisane kao `.bat` launcher pokreće kroz komandni interpreter, ne kroz Win
   javlja to u panel. U samom programu su ugašeni `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS`
   i `--inspect`, a aplikacija se učitava samo iz `app.asar` (Electron fuses,
   `client/fuses.js`).
-- **`bez-zakljucavanja.txt`** (proba na jednom računaru) važi samo ako ga je napravio
-  administrator. Fajl koji napravi sam nalog igrača launcher zanemaruje i javlja u panel.
+- **`bez-zakljucavanja.txt`** (proba na jednom računaru) važi samo kad launcher radi na
+  **administratorskom** nalogu. Na standardnom nalogu igrača se zanemaruje i javlja u
+  panel (`zastava_odbijena`): igrač bi ga napravio ili podmetnuo premeštanjem tuđeg fajla.
+  Kad važi, launcher to javlja svaki put (`zastava_aktivna`), da se proba ne zaboravi.
 - **PIN:** kad je servisni PIN upisan u panelu, važi **samo on**. PIN iz `podesavanja.json`
   tada prestaje da važi, jer je taj fajl u folderu koji igrač može da menja. Posle 5
   pogrešnih PIN-ova zaredom launcher čeka 30 s, pa svaki sledeći promašaj duplo (najviše 15 min).
@@ -244,7 +259,8 @@ server stoji duže od 15 s zbog sopstvenog zastoja, ne gasi veze računara.
 |---|---|
 | `zastita_nepotpuna` | na ovom nalogu fali deo zaštite ili je nalog igrača administrator: pokreni `zastita-ukljuci.bat` |
 | `argumenti_odbijeni` | launcher je pokrenut sa zabranjenim argumentima: proveri prečicu u autostartu |
-| `zastava_odbijena` | igrač je napravio `bez-zakljucavanja.txt` |
+| `zastava_odbijena` | `bez-zakljucavanja.txt` na standardnom nalogu igrača (zanemaren) |
+| `zastava_aktivna` | `bez-zakljucavanja.txt` je aktivan: računar NIJE zaštićen; pokreni `2 - VRATI NA IGRAONICU.bat` |
 | `pin_pogadjanje` | 5 ili više pogrešnih servisnih PIN-ova zaredom |
 | `izlaz_odbijen` | admin izlaz bez potvrđenog PIN-a |
 | `navigacija_odbijena`, `adresa_odbijena` | pokušaj da se u launcheru otvori tuđa strana ili adresa |

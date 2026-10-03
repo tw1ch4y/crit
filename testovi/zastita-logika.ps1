@@ -15,7 +15,7 @@ $tokeni = $null; $greske = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($Skripta, [ref]$tokeni, [ref]$greske)
 if ($greske) { Write-Output "PAO zastita.ps1 se ne parsira"; exit 1 }
 
-$DEFINICIJE = @('$POL', '$VREDNOSTI', '$ZABRANJENI', '$DISALLOW')
+$DEFINICIJE = @('$POL', '$VREDNOSTI', '$ZABRANJENI', '$DISALLOW', '$STARO')
 foreach ($s in $ast.EndBlock.Statements) {
   $definicija = ($s -is [System.Management.Automation.Language.FunctionDefinitionAst]) -or
     (($s -is [System.Management.Automation.Language.AssignmentStatementAst]) -and ($DEFINICIJE -contains $s.Left.Extent.Text))
@@ -27,10 +27,18 @@ $BezPitanja = $true
 # ---- registar u memoriji ----
 $global:REG = @{}
 function Test-Path { param([string]$LiteralPath, [string]$Path) return $global:REG.ContainsKey(("$LiteralPath$Path").ToLower()) }
-function New-Item { param([string]$Path, [switch]$Force) if (-not $global:REG.ContainsKey($Path.ToLower())) { $global:REG[$Path.ToLower()] = [ordered]@{} } }
+# Kao pravi registar: New-Item -Force pravi i sve kljuceve iznad.
+function New-Item {
+  param([string]$Path, [switch]$Force)
+  $delovi = $Path.ToLower().Split("\")
+  for ($i = 2; $i -le $delovi.Count; $i++) {
+    $k = ($delovi[0..($i - 1)] -join "\")
+    if (-not $global:REG.ContainsKey($k)) { $global:REG[$k] = [ordered]@{} }
+  }
+}
 function New-ItemProperty { param([string]$LiteralPath, [string]$Name, [string]$PropertyType, $Value, [switch]$Force) $global:REG[$LiteralPath.ToLower()][$Name] = $Value }
 function Get-ItemProperty {
-  param([string]$LiteralPath)
+  param([string]$LiteralPath, $ErrorAction)
   $h = $global:REG[$LiteralPath.ToLower()]
   if (-not $h -or $h.Count -eq 0) { return $null }
   # pravi Get-ItemProperty dodaje i PS* polja - zastita.ps1 mora da ih preskoci
@@ -39,7 +47,14 @@ function Get-ItemProperty {
   return [pscustomobject]$o
 }
 function Remove-ItemProperty { param([string]$LiteralPath, [string]$Name, $ErrorAction) $h = $global:REG[$LiteralPath.ToLower()]; if ($h) { $h.Remove($Name) } }
-function Remove-Item { param([string]$LiteralPath, [switch]$Force, $ErrorAction) $global:REG.Remove($LiteralPath.ToLower()) }
+function Remove-Item { param([string]$LiteralPath, [switch]$Force, [switch]$Recurse, $ErrorAction) $global:REG.Remove($LiteralPath.ToLower()) }
+function Get-ChildItem {
+  param([string]$LiteralPath)
+  $pre = $LiteralPath.ToLower() + "\"
+  foreach ($k in @($global:REG.Keys)) {
+    if ($k.StartsWith($pre) -and -not $k.Substring($pre.Length).Contains("\")) { [pscustomobject]@{ PSPath = $k } }
+  }
+}
 
 function Proveri([string]$opis, [bool]$uslov) { if ($uslov) { Write-Output "OK  $opis" } else { Write-Output "PAO $opis" } }
 $K = "Registry::HKEY_USERS\S-1-5-21-1-2-3-1001"
@@ -83,6 +98,25 @@ Proveri "nasi unosi idu posle tudjeg" ($global:REG[$dis]["1"] -eq "neka-igra.exe
 $null = Iskljuci $K
 Proveri "tudji unos ostaje posle iskljucivanja" ((Zabranjeni) -join "," -eq "neka-igra.exe")
 Proveri "a sa njim i DisallowRun" ($global:REG[$exp]["DisallowRun"] -eq 1)
+
+# 5a. stara verzija je upisivala DisableRegistryTools - iskljucivanje ga skida
+$global:REG = @{}
+New-Item -Path "$K\$POL\System" -Force
+New-ItemProperty -LiteralPath "$K\$POL\System" -Name "DisableRegistryTools" -PropertyType DWord -Value 1 -Force
+$null = Ukljuci $K
+Proveri "ukljucivanje ne gasi reg.exe (DisableRegistryTools)" ($global:REG[$sys]["DisableRegistryTools"] -eq 1 -and -not ($VREDNOSTI | Where-Object { $_.Ime -eq "DisableRegistryTools" }))
+$null = Iskljuci $K
+Proveri "iskljucivanje skida DisableRegistryTools stare verzije" (-not $global:REG[$sys].Contains("DisableRegistryTools"))
+
+# 5b. stavka launchera u Apps se brise, tudja ostaje
+$global:REG = @{}
+$U = "$K\Software\Microsoft\Windows\CurrentVersion\Uninstall"
+New-Item -Path "$U\{abc}" -Force
+New-ItemProperty -LiteralPath "$U\{abc}" -Name "DisplayName" -PropertyType String -Value "Proba Launcher 2.46.0" -Force
+New-Item -Path "$U\Steam" -Force
+New-ItemProperty -LiteralPath "$U\Steam" -Name "DisplayName" -PropertyType String -Value "Steam" -Force
+$b = ObrisiIzApps $K "Proba Launcher"
+Proveri "stavka launchera u Apps je obrisana, Steam ostaje" ($b -eq 1 -and -not $global:REG.ContainsKey("$U\{abc}".ToLower()) -and $global:REG.ContainsKey("$U\Steam".ToLower()))
 
 # 5. iskljucivanje zna i deinstalaciju pod drugim imenom (igraonica preimenovana)
 $global:REG = @{}

@@ -10,8 +10,14 @@ const ROOT = import.meta.dirname;
 const BREND = JSON.parse(fs.readFileSync(path.join(ROOT, "igraonica.json"), "utf8"));
 const IME = BREND.ime, LAUNCHER = BREND.launcher;
 const OUT = path.join(path.dirname(ROOT), `${IME.toUpperCase().replace(/\s+/g, "-")}-ZA-IGRAONICU`);
-const SRV = path.join(OUT, "1 - SERVER (glavni racunar)");
-const CLI = path.join(OUT, "2 - LAUNCHER (racunari igraca)");
+// Imena foldera BEZ zagrada i &: "Run as administrator" na .bat pokrece
+// cmd.exe /C "<putanja>", a cmd tada skine navodnike sa putanje koja ima ( ) & ^
+// i ne nadje fajl. Alati osoblja i "Otvori port" se pokrecu bas tako.
+const SRV = path.join(OUT, "1 - SERVER - glavni racunar");
+const CLI = path.join(OUT, "2 - LAUNCHER - racunari igraca");
+for (const f of [SRV, CLI]) {
+  if (/[()&^|<>@]/.test(path.basename(f))) throw new Error(`Ime foldera ne sme da ima ( ) & ^ | < > @: ${f}`);
+}
 
 // Stari paket se brise pre novog. Windows to odbija ako je folder OTVOREN -
 // dovoljno je da stoji u Explorer prozoru, u nekom terminalu ili da ga OneDrive
@@ -265,7 +271,7 @@ const readme = [
   "3. Pokreni launcher. Adresa servera je vec popunjena - unesi samo TOKEN",
   "   za taj racunar (spisak je u TOKENI.txt).",
   "4. U panelu ce taj racunar preci iz Offline u Standby.",
-  "5. Kad sve radi, ukljuci zastitu: iz OVOG paketa, folder \"2 - LAUNCHER\",",
+  "5. Kad sve radi, ukljuci zastitu: iz OVOG paketa, folder \"2 - LAUNCHER - racunari igraca\",",
   "   podfolder \"ALATI OSOBLJA\", desni klik na \"zastita-ukljuci.bat\" -",
   "   Run as administrator, dok je nalog igraca prijavljen.",
   "   Alati osoblja se NE kopiraju na racunar igraca - igrac bi mogao da ih izmeni.",

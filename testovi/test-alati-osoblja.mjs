@@ -73,11 +73,13 @@ b.proveri("zastita.ps1 pise u registar naloga (HKEY_USERS), ne u HKCU",
   /Registry::HKEY_USERS\\/.test(ps1) && !/HKCU:/i.test(ps1));
 b.proveri("ukljucivanje i iskljucivanje idu iz istog spiska",
   /foreach \(\$v in \$VREDNOSTI\) \{\s*try \{ Upisi/.test(ps1) && /foreach \(\$v in \$VREDNOSTI\) \{[^}]*\}?\s*try \{ Obrisi/.test(ps1));
-for (const [ime, vrednost] of [["DisableTaskMgr", 1], ["DisableRegistryTools", 1], ["NoWinKeys", 1], ["NoRun", 1],
+for (const [ime, vrednost] of [["DisableTaskMgr", 1], ["NoWinKeys", 1], ["NoRun", 1],
   ["NoControlPanel", 1], ["DisableCMD", 2], ["DisallowRun", 1], ["DontShowUI", 1]]) {
   b.proveri(`zastita.ps1 postavlja ${ime}=${vrednost}`, new RegExp(`Ime = "${ime}"; Vrednost = ${vrednost} \\}`).test(ps1));
 }
 b.proveri("DisableCMD=2: .bat skripte i dalje rade (nadogradnja launchera)", !/Ime = "DisableCMD"; Vrednost = 1/.test(ps1));
+b.proveri("DisableRegistryTools se NE postavlja (gasi reg.exe launcheru, Steam ostaje prijavljen)",
+  !/Ime = "DisableRegistryTools"; Vrednost/.test(ps1) && /\$STARO = @\([\s\S]{0,120}DisableRegistryTools/.test(ps1));
 for (const p of ["cmd.exe", "powershell.exe", "pwsh.exe", "taskmgr.exe", "regedit.exe", "mshta.exe", "wscript.exe"]) {
   b.proveri(`Explorer ne pokrece ${p}`, ps1.includes(`"${p}"`));
 }
@@ -99,6 +101,19 @@ const np = citajIzvor("napravi-paket.mjs");
 for (const f of [...ALATI, "zastita.ps1"]) {
   b.proveri(`paket nosi ${f} u ALATI OSOBLJA`, np.includes(`"${f}"`) && /path\.join\(ROOT, "client", f\)/.test(np));
 }
+
+// "Run as administrator" na .bat = cmd.exe /C "<putanja>"; sa ( ) & u putanji cmd
+// skine navodnike i ne nadje fajl. Alati osoblja i "Otvori port" se pokrecu bas tako.
+for (const [ime, folder] of [...np.matchAll(/const (SRV|CLI) = path\.join\(OUT, "([^"]+)"\)/g)].map((m) => [m[1], m[2]])) {
+  b.proveri(`folder paketa ${ime} nema zagrade ni & ("${folder}")`, !/[()&^|<>@]/.test(folder));
+}
+b.proveri("DEINSTALIRAJ ne pokrece deinstaler iz profila igraca kao administrator (brise folder)",
+  /else if exist "%U2%" \(\s*rmdir \/S \/Q "%FOLDER%"/.test(bat["DEINSTALIRAJ-LAUNCHER.bat"]),
+  "deinstaler bi trazio instalaciju u profilu administratora i javio uspeh");
+b.proveri("DEINSTALIRAJ javlja uspeh samo kad je folder stvarno obrisan",
+  /set "USPEH=0"/.test(bat["DEINSTALIRAJ-LAUNCHER.bat"]) && /if "%USPEH%"=="0" \(/.test(bat["DEINSTALIRAJ-LAUNCHER.bat"]));
+b.proveri("DEINSTALIRAJ brise stavku u Apps i za odjavljen nalog (zastita.ps1)",
+  bat["DEINSTALIRAJ-LAUNCHER.bat"].includes(`-Rezim deinstaliraj %NALOG% -Program "${brend.launcher}"`));
 
 // ---- 6. kopije u korenu su iste i preimenuju se ----
 for (const f of ["POPRAVI-RACUNAR.bat", "DEINSTALIRAJ-LAUNCHER.bat"]) {

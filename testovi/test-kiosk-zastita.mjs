@@ -81,7 +81,8 @@ const opasni = ["--remote-debugging-port=9222", "--remote-debugging-pipe", "--in
   "--load-extension=C:\\x", "--user-data-dir=C:\\x", "--dev", "--no-lock", "--host-rules=MAP * evil", "--disable-features=X"];
 for (const a of opasni) b.proveri(`prepoznaje opasan argument ${a.split("=")[0]}`, k.opasniArgumenti([a]).length === 1);
 b.proveri("obican argument nije opasan", k.opasniArgumenti(["C:\\Program Files\\x\\Crit Launcher.exe", "--updated", "--odbijeni-argumenti=inspect"]).length === 0);
-for (const a of ["-remote-debugging-port=9222", "/remote-debugging-port=9222", "--REMOTE-DEBUGGING-PORT=9222", "/inspect"]) {
+for (const a of ["-remote-debugging-port=9222", "/remote-debugging-port=9222", "--REMOTE-DEBUGGING-PORT=9222", "/inspect",
+  "--renderer-cmd-prefix=powershell", "--gpu-launcher=cmd", "--browser-subprocess-path=C:\\x.exe", "--utility-cmd-prefix=x"]) {
   b.proveri(`prepoznaje i oblik ${a.split("=")[0]} (Chromium na Windows-u prima -, -- i /)`, k.trebaPonovo([a]));
 }
 b.proveri("putanja programa nije prekidac", k.opasniArgumenti(["/home/x/Crit Launcher", "C:/x/debug.exe"]).length === 0);
@@ -170,11 +171,16 @@ b.proveri("igra i sajt se otvaraju samo u sesiji", /ipcMain\.handle\("launch-gam
 // ---- 9. prozori ----
 b.proveri("svi prozori: razvojni alati samo u DEV", (main.match(/devTools: DEV/g) || []).length === 3);
 b.proveri("svi prozori: sandbox", (main.match(/sandbox: true/g) || []).length === 3);
-b.proveri("nijedan prozor ne otvara nov prozor ni webview", /web-contents-created[\s\S]{0,2000}setWindowOpenHandler[\s\S]{0,200}|will-attach-webview/.test(main) && /will-attach-webview", \(e\) => e\.preventDefault\(\)/.test(main));
+b.proveri("nijedan prozor ne otvara nov prozor ni webview",
+  /web-contents-created[\s\S]{0,2000}setWindowOpenHandler\(\(\) => \(\{ action: "deny" \}\)\)/.test(main) && /will-attach-webview", \(e\) => e\.preventDefault\(\)/.test(main));
 b.proveri("dozvole (kamera, mikrofon...) se odbijaju", /setPermissionRequestHandler\(\(_wc, _dozvola, odgovor\) => odgovor\(false\)\)/.test(main));
 b.proveri("ponovno pokretanje bez opasnih argumenata", /app\.relaunch\(\{[\s\S]{0,200}OPASNI_ARGUMENTI/.test(main));
 b.proveri("relaunch ne uzima bravu jedne kopije", /const gotLock = !ponovoPokrecem && app\.requestSingleInstanceLock\(\)/.test(main));
-b.proveri("bez-zakljucavanja.txt koji je napravio igrac ne vazi", /function zastavaBezZakljucavanja[\s\S]{0,900}GetOwner/.test(main) && /zastavaBezZakljucavanja\(\) \|\|/.test(main));
+b.proveri("bez-zakljucavanja.txt vazi samo na administratorskom nalogu (igrac ga ne moze podmetnuti)",
+  /function zastavaBezZakljucavanja[\s\S]{0,900}if \(nalogJeAdministrator\(\)\)/.test(main) && /zastavaBezZakljucavanja\(\) \|\|/.test(main) && !/GetOwner/.test(main));
+b.proveri("aktivna zastava se javlja osoblju", /if \(zastavaAktivna\) javiProblem\("zastava_aktivna"/.test(main));
+b.proveri("svaki prekid veze nosi stanje zakljucavanja", /sveza\.on\("close"[\s\S]{0,400}sendToRenderer\("ws-status", statusBezVeze\(\)\)/.test(main));
+b.proveri("ekran menja opis, ne zelenu tacku", /\$\("#connSesija b \+ span"\)/.test(citajIzvor("client/renderer/js/launcher.js")));
 b.proveri("--no-lock ne vazi u instaliranom launcheru", /\(!PAKOVAN && process\.argv\.includes\("--no-lock"\)\)/.test(main));
 b.proveri("neuhvacena greska ne otvara sistemski prozor", /process\.on\("uncaughtException"/.test(main));
 b.proveri("bez cmd.exe izmedju launchera i Windows alata (execFile)", !/\bexec\(/.test(main));
