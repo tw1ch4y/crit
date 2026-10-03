@@ -108,7 +108,9 @@ for (const [gde, sablon] of [
   // Ove cetiri su bile propustene: svaka je pomerala novac u dva ili tri
   // odvojena upisa. Dopuna je najskuplja - kroz nju prolazi svaki dinar koji
   // gost preda preko pulta.
-  ["dopuna kredita", /log = uJednomPoslu\(\(\) => \{\s*\n\s*db\.prepare\("UPDATE players SET balance=\? WHERE id=\?"\)/],
+  // Kredit dopune se menja kroz glavnu knjigu (knjiga.js), UNUTAR posla - tamo
+  // se stanje i cita, pa provera "ima li dovoljno" ne gleda zastarelo stanje.
+  ["dopuna kredita", /log = uJednomPoslu\(\(\) => \{[\s\S]{0,400}?knjiga\.promeniKredit\(\{ playerId, iznos: amount/],
   ["prodaja paketa", /\{ bal, log \} = uJednomPoslu/],
   // Uz kredit i status, isti posao vraca i pice na stanje - inace bi pad izmedju
   // njih ostavio gosta sa vracenim novcem i picem koje i dalje fali u evidenciji.

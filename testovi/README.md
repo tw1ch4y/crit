@@ -31,6 +31,8 @@ Prava baza iz `server/data/` se ne dira ni u jednom testu.
 | `brzina` | kočnica brzine na WebSocketu: kofa sa lažnim satom, rafal, zatrpavanje (prekid 1008), ogromna poruka (1009), skupe poruke |
 | `sesija-token` | token sesije vezan za sesiju, računar i igrača: šta veza bez potvrde ne sme, nastavak posle prekida, tuđi i lažni tokeni, preostalo vreme samo sa servera |
 | `tocak-zastita` | varanje na točku: kriptografski izbor, spin koji izgubi trku, „poruči, zavrti, otkaži“, nametanje ishoda |
+| `paralelna-kupovina` | pet istovremenih kupovina sa naloga koji ima za jednu: kasa, launcher, mešano, pet niti sa svojim vezama ka bazi (barijera), kontrola sa starim obrascem, vreme i porudžbina nad istim kreditom, okidači u bazi |
+| `audit-log` | glavna knjiga kroz celu smenu: sve vrste zapisa, stanje pre i posle, operater, zbirno vreme, neprekinut lanac, kasa jednaka obračunu, tačna naplata vremena |
 | `bezbednosni-log` | bezbednosni dnevnik: oblik zapisa, skrivanje tajni, prigušivanje, okretanje fajla, stvarni događaji sa servera, blokada adrese koja pogađa tokene |
 | `nadogradnja` | postojeća baza iz igraonice preživljava novu verziju servera |
 

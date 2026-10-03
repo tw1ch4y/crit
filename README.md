@@ -279,6 +279,7 @@ crit/
   README.md
   DEPLOY.md                detaljno postavljanje i zaključavanje sistema
   BEZBEDNOST.md            šta server prima od računara i panela, tokeni, dnevnik
+  KNJIGA.md                novac: transakcije, izolacija, glavna knjiga (audit_log)
 ```
 
 ## Razvojni računar se ne dira

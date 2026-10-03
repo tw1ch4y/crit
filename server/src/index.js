@@ -13,6 +13,7 @@ import * as nadg from "./nadogradnja.js";
 import { initWs, setHandlers, broadcastPanels } from "./hub.js";
 import * as svc from "./service.js";
 import * as bezbednost from "./bezbednost.js";
+import * as knjiga from "./knjiga.js";
 import { strazaTokena } from "./brzina.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -184,6 +185,13 @@ setHandlers({
     ws.send(JSON.stringify(svc.fullSnapshot()));
   },
 });
+
+// ---- Glavna knjiga: pocetno stanje za naloge i smenu od pre knjige ----
+// Jednom, pri prvom pokretanju sa knjigom; posle toga ne nadje nista.
+try {
+  const k = knjiga.pripremi({ ocekivanoUKasi: (s) => svc.ocekivanoUKasi(s) });
+  if (k.naloga || k.kasa) console.log(`glavna knjiga: preneto početno stanje (${k.naloga} naloga${k.kasa ? ", otvorena smena" : ""})`);
+} catch (e) { console.error("glavna knjiga:", e.message); }
 
 // ---- Naplata svakih 5s ----
 setInterval(() => {

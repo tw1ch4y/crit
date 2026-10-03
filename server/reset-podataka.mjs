@@ -18,9 +18,14 @@ console.log("kopija pre brisanja:", path.basename(backup));
 
 const before = {};
 const count = (t) => { try { return db.prepare(`SELECT COUNT(*) c FROM ${t}`).get().c; } catch { return 0; } };
-for (const t of ["players", "sessions", "orders", "order_items", "transactions", "shifts", "logs"]) before[t] = count(t);
+for (const t of ["players", "sessions", "orders", "order_items", "transactions", "shifts", "logs", "audit_log"]) before[t] = count(t);
 
 db.exec("PRAGMA foreign_keys = OFF;");
+// Glavna knjiga se inace ne brise (okidac u bazi). Reset je jedini izuzetak:
+// brisu se i nalozi na koje se odnosi, a brojevi naloga krecu ispocetka - stara
+// knjiga bi se tada lepila na nove naloge. Okidac vraca server pri pokretanju.
+db.exec("DROP TRIGGER IF EXISTS audit_bez_brisanja;");
+try { db.exec("DELETE FROM audit_log;"); } catch {}
 db.exec(`
   DELETE FROM order_items;
   DELETE FROM orders;
@@ -33,7 +38,7 @@ db.exec(`
   DELETE FROM admins WHERE role <> 'owner' OR username <> 'admin';
   UPDATE computers SET status='offline', current_player_id=NULL, current_session_id=NULL, last_seen=NULL;
   DELETE FROM sqlite_sequence WHERE name IN
-    ('players','sessions','orders','order_items','transactions','shifts','logs');
+    ('players','sessions','orders','order_items','transactions','shifts','logs','audit_log');
 `);
 db.exec("PRAGMA foreign_keys = ON;");
 db.exec("VACUUM;");

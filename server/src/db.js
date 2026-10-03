@@ -11,6 +11,10 @@ export const DATA_DIR = process.env.CRIT_DATA_DIR || path.join(__dirname, "..", 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
 export const db = new DatabaseSync(path.join(DATA_DIR, "crit.db"));
+// Ako drugi proces (alat za servis, vracanje kopije, druga instanca) upravo
+// pise, ovaj ceka do 5 s umesto da odmah pukne sa "database is locked". Mora
+// pre svega ostalog: vec sledeci red trazi bravu.
+db.exec("PRAGMA busy_timeout = 5000;");
 db.exec("PRAGMA journal_mode = WAL;");
 db.exec("PRAGMA foreign_keys = ON;");
 
@@ -25,18 +29,38 @@ db.exec("PRAGMA foreign_keys = ON;");
 // SAVEPOINT umesto BEGIN: SQLite ne dozvoljava BEGIN unutar BEGIN-a, a poslovi
 // se pozivaju jedan iz drugog (prodaja paketa zove dopunu kredita). Sa
 // savepoint-ima se ugnežđivanje ponaša ispravno.
+//
+// IZOLACIJA: BEGIN IMMEDIATE, NE OBICAN BEGIN.
+//
+// Obican BEGIN ne uzima bravu za pisanje dok prvi upis ne krene. Dva posla nad
+// istim nalogom tada oba procitaju "ima 130", oba prodju proveru i oba upisu
+// "ostalo 0": naplaceno jednom, prodato dvaput. IMMEDIATE uzima bravu odmah,
+// pre prvog citanja - drugi posao ceka (busy_timeout) dok prvi ne potvrdi, i
+// tek onda cita. Svi poslovi koji pisu idu jedan za drugim (SERIALIZABLE), pa
+// je provera "ima li dovoljno" uvek nad pravim stanjem.
+//
+// To vazi samo za ono sto se procita UNUTAR posla. Zato provera stanja i
+// skidanje kredita idu kroz knjiga.js, koja sama trazi da je u poslu.
 let dubinaPosla = 0;
+export const uPoslu = () => dubinaPosla > 0;
 export function uJednomPoslu(fn) {
   const ime = `p${dubinaPosla}`;
+  // Brojac raste tek kad je posao stvarno otvoren. Ranije je rastao pre BEGIN-a,
+  // pa bi jedan BEGIN koji pukne (baza zakljucana) ostavio brojac zauvek na 1 -
+  // i svaki sledeci posao bi krenuo kao SAVEPOINT bez spoljnog posla.
+  db.exec(dubinaPosla === 0 ? "BEGIN IMMEDIATE" : `SAVEPOINT ${ime}`);
   dubinaPosla++;
-  db.exec(dubinaPosla === 1 ? "BEGIN" : `SAVEPOINT ${ime}`);
   try {
     const r = fn();
+    // Posao mora da bude sinhron. Obecanje bi se potvrdilo PRE nego sto se
+    // izvrsi ono iza `await` - a izmedju bi neko drugi mogao da procita i
+    // potrosi isti kredit.
+    if (r && typeof r.then === "function") throw new Error("uJednomPoslu: posao ne sme da bude async");
     db.exec(dubinaPosla === 1 ? "COMMIT" : `RELEASE ${ime}`);
     dubinaPosla--;
     return r;
   } catch (e) {
-    try { db.exec(dubinaPosla === 1 ? "ROLLBACK" : `ROLLBACK TO ${ime}`); } catch {}
+    try { db.exec(dubinaPosla === 1 ? "ROLLBACK" : `ROLLBACK TO ${ime}; RELEASE ${ime}`); } catch {}
     dubinaPosla--;
     throw e;
   }
@@ -295,6 +319,78 @@ function migrate() {
   if (!columnExists("players", "profil")) db.exec("ALTER TABLE players ADD COLUMN profil TEXT");
 }
 migrate();
+
+// ---- GLAVNA KNJIGA (audit_log) I CUVARI NA NIVOU BAZE ----
+//
+// Jedna tabela za svaki dinar koji se pomeri: kredit igraca i keš u kasi.
+// Pravila knjizenja su u knjiga.js; ovde je samo oblik i ono sto baza sama
+// cuva, i kad bi neki kod (ili rucna izmena) zaobisao knjigu.
+//
+// Jedan red = jedna promena na JEDNOM racunu:
+//   racun 'igrac'  kredit igraca player_id
+//   racun 'kasa'   keš koji bi trebalo da stoji u kasi smene shift_id
+// Operacija koja dira oba racuna (dopuna platena kešom) pravi dva reda sa
+// istom oznakom `operacija`.
+//
+// Lanac: za isti racun, stanje_posle jednog reda je stanje_pre sledeceg. Tako
+// se iz same knjige vidi i ako je neko pomerio novac mimo nje (knjiga.proveri).
+function pripremiKnjigu() {
+  db.exec(`
+CREATE TABLE IF NOT EXISTS audit_log (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts            INTEGER NOT NULL,                 -- ms od 1970.
+  operator_id   INTEGER,                          -- admins.id; NULL = sistem ili igrac
+  operator      TEXT NOT NULL,                    -- ime radnika, igraca, ili 'sistem'
+  operator_tip  TEXT NOT NULL CHECK (operator_tip IN ('radnik','sistem','igrac')),
+  tip           TEXT NOT NULL CHECK (tip IN ('uplata','trosak_vreme','kupovina_artikla','storno',
+                  'otvaranje_smene','zatvaranje_smene','korekcija','poklon','pocetno_stanje')),
+  racun         TEXT NOT NULL CHECK (racun IN ('igrac','kasa')),
+  player_id     INTEGER,                          -- bez FK: knjiga nadzivi brisanje naloga
+  shift_id      INTEGER,
+  iznos         REAL NOT NULL,                    -- promena na racunu: + uslo, - izaslo
+  stanje_pre    REAL NOT NULL,
+  stanje_posle  REAL NOT NULL,
+  operacija     TEXT NOT NULL,                    -- isti za sve redove jedne operacije
+  referenca     TEXT,                             -- 'porudzbina:12', 'sesija:5', 'paket:3', 'smena:2'
+  opis          TEXT,
+  ts_do         INTEGER,                          -- trosak_vreme: kraj zbirnog odsecka
+  zatvoren      INTEGER NOT NULL DEFAULT 1        -- 0 samo dok traje zbirni odsecak vremena
+);
+CREATE INDEX IF NOT EXISTS ix_audit_igrac ON audit_log (player_id, id) WHERE racun = 'igrac';
+CREATE INDEX IF NOT EXISTS ix_audit_kasa ON audit_log (shift_id, id) WHERE racun = 'kasa';
+CREATE INDEX IF NOT EXISTS ix_audit_ts ON audit_log (ts);
+CREATE INDEX IF NOT EXISTS ix_audit_otvoren ON audit_log (player_id) WHERE zatvoren = 0;
+
+-- Knjiga se ne brise i zatvoren red se ne menja. Otvoren odsecak vremena sme
+-- da raste (iznos, stanje_posle, ts_do) i da se zatvori - nista vise.
+CREATE TRIGGER IF NOT EXISTS audit_bez_brisanja BEFORE DELETE ON audit_log
+BEGIN SELECT RAISE(ABORT, 'audit_log: zapis se ne brise'); END;
+CREATE TRIGGER IF NOT EXISTS audit_bez_izmene BEFORE UPDATE ON audit_log
+WHEN OLD.zatvoren = 1
+  OR NEW.id IS NOT OLD.id OR NEW.ts IS NOT OLD.ts OR NEW.tip IS NOT OLD.tip OR NEW.racun IS NOT OLD.racun
+  OR NEW.player_id IS NOT OLD.player_id OR NEW.shift_id IS NOT OLD.shift_id OR NEW.stanje_pre IS NOT OLD.stanje_pre
+  OR NEW.operator IS NOT OLD.operator OR NEW.operator_id IS NOT OLD.operator_id OR NEW.operacija IS NOT OLD.operacija
+BEGIN SELECT RAISE(ABORT, 'audit_log: zatvoren zapis se ne menja'); END;
+
+-- Kredit ne ide u minus, ma ko pisao. Uslov "NEW < OLD" pusta da se nalog koji
+-- je od ranije u minusu dopuni; ne pusta da se iko spusti ispod nule.
+CREATE TRIGGER IF NOT EXISTS kredit_bez_minusa BEFORE UPDATE OF balance ON players
+WHEN NEW.balance < 0 AND NEW.balance < OLD.balance
+BEGIN SELECT RAISE(ABORT, 'Kredit ne može da ode u minus'); END;
+CREATE TRIGGER IF NOT EXISTS kredit_bez_minusa_nov BEFORE INSERT ON players
+WHEN NEW.balance < 0
+BEGIN SELECT RAISE(ABORT, 'Kredit ne može da ode u minus'); END;
+`);
+  // Najvise jedna otvorena smena. Baza iz igraonice u kojoj je greskom ostalo
+  // vise otvorenih ne sme da obori server pri pokretanju - tada indeksa nema,
+  // a provera u openShift (u istom poslu) i dalje radi.
+  try {
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ux_jedna_otvorena_smena ON shifts (status) WHERE status = 'open'");
+  } catch (e) {
+    console.error("PAŽNJA: u bazi je više otvorenih smena - zatvori višak iz panela.", e.message);
+  }
+}
+pripremiKnjigu();
 
 // ---- Helpers za settings ----
 export function getSetting(key, fallback = null) {
