@@ -10,6 +10,7 @@
     "build": "electron-builder --win"
   },
   "devDependencies": {
+    "@electron/fuses": "^1.8.0",
     "electron": "^43.2.0",
     "electron-builder": "^25.1.8"
   },
@@ -24,6 +25,7 @@
     },
     "files": [
       "main.js",
+      "kiosk.js",
       "preload.js",
       "backdrop-preload.js",
       "overlay-preload.js",
@@ -36,30 +38,11 @@
     ],
     "extraResources": [
       {
-        "from": "zastita-ukljuci.bat",
-        "to": "zastita-ukljuci.bat"
-      },
-      {
-        "from": "zastita-iskljuci.bat",
-        "to": "zastita-iskljuci.bat"
-      },
-      {
-        "from": "resetuj-launcher.bat",
-        "to": "resetuj-launcher.bat"
-      },
-      {
-        "from": "POPRAVI-RACUNAR.bat",
-        "to": "POPRAVI-RACUNAR.bat"
-      },
-      {
         "from": "podesavanja.json",
         "to": "podesavanja.json"
-      },
-      {
-        "from": "DEINSTALIRAJ-LAUNCHER.bat",
-        "to": "DEINSTALIRAJ-LAUNCHER.bat"
       }
     ],
+    "afterPack": "./fuses.js",
     "win": {
       "target": [
         {

@@ -94,4 +94,4 @@ Ovo ne mogu da proverim - na ovom računaru nema Steam-a.
 
 Zapiši **šta si radio** i **šta se desilo umesto očekivanog**. Ako je greška u
 panelu, otvori Logove i pogledaj poslednje zapise u tom trenutku. Ako je u
-launcheru, na računaru igrača postoji `POPRAVI-RACUNAR.bat`.
+launcheru, `POPRAVI-RACUNAR.bat` je u paketu (`2 - LAUNCHER\ALATI OSOBLJA`), pokreće se kao administrator.

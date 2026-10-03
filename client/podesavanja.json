@@ -14,5 +14,8 @@
   "ciscenjeLicnihFascikli": false,
 
   "_blokirajPreuzeteProgram": "Gasi programe koje igrac skine kroz pregledac i pokrene iz Preuzimanja, Temp ili sa radne povrsine. Igre i Steam rade normalno.",
-  "blokirajPreuzeteProgram": true
+  "blokirajPreuzeteProgram": true,
+
+  "_gasiIgreBezVezeSekundi": "Kad launcher 15 sekundi ne cuje server, racunar se zakljucava (vreme se tada ne naplacuje). Posle ovoliko sekundi bez veze gase se i igre koje rade iza zakljucanog ekrana. 0 = igre se nikad ne gase same.",
+  "gasiIgreBezVezeSekundi": 120
 }

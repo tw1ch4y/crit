@@ -160,8 +160,18 @@ for (const { f } of sviInstaleri.slice(CUVA_SE)) {
     obrisano++;
   } catch {}
 }
-for (const f of ["POPRAVI-RACUNAR.bat", "DEINSTALIRAJ-LAUNCHER.bat"]) {
-  fs.copyFileSync(path.join(ROOT, f), path.join(CLI, f));
+// ALATI OSOBLJA idu u paket, NE u instaler.
+//
+// Osoblje ih pokrece kao administrator. Folder instalacije launchera je u
+// profilu igraca (igrac sme da pise u njega), pa bi skripta odatle bila poziv
+// da je igrac izmeni i saceka da je neko pokrene sa administratorskim pravima.
+// Kopiraju se iz client/, jer su te kopije preimenovane za ovu igraonicu
+// (igraonica.mjs), a zastita.ps1 mora da stoji pored njih.
+const ALATI_OSOBLJA = path.join(CLI, "ALATI OSOBLJA");
+fs.mkdirSync(ALATI_OSOBLJA, { recursive: true });
+for (const f of ["POPRAVI-RACUNAR.bat", "DEINSTALIRAJ-LAUNCHER.bat", "zastita-ukljuci.bat",
+  "zastita-iskljuci.bat", "resetuj-launcher.bat", "zastita.ps1"]) {
+  fs.copyFileSync(path.join(ROOT, "client", f), path.join(ALATI_OSOBLJA, f));
 }
 
 // Sara i animacija se ukljucuju u samom serveru (seed u db.js, samo ako nikad
@@ -255,8 +265,10 @@ const readme = [
   "3. Pokreni launcher. Adresa servera je vec popunjena - unesi samo TOKEN",
   "   za taj racunar (spisak je u TOKENI.txt).",
   "4. U panelu ce taj racunar preci iz Offline u Standby.",
-  "5. Kad sve radi, ukljuci zastitu: u instalacionom folderu, podfolder",
-  "   \"resources\", desni klik na \"zastita-ukljuci.bat\" - Run as administrator.",
+  "5. Kad sve radi, ukljuci zastitu: iz OVOG paketa, folder \"2 - LAUNCHER\",",
+  "   podfolder \"ALATI OSOBLJA\", desni klik na \"zastita-ukljuci.bat\" -",
+  "   Run as administrator, dok je nalog igraca prijavljen.",
+  "   Alati osoblja se NE kopiraju na racunar igraca - igrac bi mogao da ih izmeni.",
   "",
   "",
   "OBAVEZNO PRE OTVARANJA - TRI FABRICKE LOZINKE",
@@ -284,7 +296,10 @@ const readme = [
   "- Server ne radi, a treba izaci iz launchera",
   "    -> Ctrl+Alt+Shift+Q pa SERVISNI PIN (radi i bez servera)",
   "- Racunar se zakljucao, ne mozes do Windows-a",
-  "    -> POPRAVI-RACUNAR.bat  ili  DEINSTALIRAJ-LAUNCHER.bat (kao administrator)",
+  "    -> POPRAVI-RACUNAR.bat  ili  DEINSTALIRAJ-LAUNCHER.bat (kao administrator,",
+  "       iz foldera ALATI OSOBLJA ovog paketa)",
+  "- Launcher se zakljucao sa porukom da nema veze sa serverom",
+  "    -> server ne radi ili je mreza pala; otkljucava se sam cim se veza vrati",
   "",
   "Detaljno uputstvo: POKRETANJE.md i DEPLOY.md",
   "Spisak sta da proveris pre otvaranja: PROVERI.md",

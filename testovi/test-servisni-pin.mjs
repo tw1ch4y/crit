@@ -112,10 +112,13 @@ proveri("ruta salje PIN kad se promeni", /if \(changed\.includes\("servisniPin"\
 
 proveri("launcher pamti PIN sa servera", /function zapamtiServisniPin\(/.test(main));
 proveri("cuva se u config.json koji nadogradnja ne dira", /servisniPinHes: novi/.test(main));
-proveri("FABRICKI PRESTAJE DA VAZI kad stigne pravi",
-  /if \(lokalni === FABRICKI_PIN && saServera\?\.hes\) return false;/.test(main),
+// Kad PIN stigne sa servera, vazi SAMO on: i fabricki 1234 i PIN iz
+// podesavanja.json prestaju da vaze. Fajl je u folderu instalacije, a on je u
+// profilu igraca - igrac bi upisao svoj PIN i njime izasao iz kioska.
+proveri("FABRICKI PRESTAJE DA VAZI kad stigne pravi (i PIN iz fajla)",
+  /if \(saServera\?\.hes\) return false;\s*const lokalni = servisniPin\(\);/.test(main),
   "cela poenta: dok 1234 radi, masina se preusmerava na tudji server");
-proveri("i dalje prolazi rucno upisan PIN", /return pin === lokalni;/.test(main),
+proveri("dok PIN sa servera nije stigao, i dalje prolazi rucno upisan PIN", /return pin === lokalni;/.test(main),
   "pogresna strogost ovde zakljucava osoblje na svih 13 masina");
 proveri("poredjenje hesa je otporno na merenje vremena", /timingSafeEqual\(Buffer\.from\(test, "hex"\)/.test(main));
 

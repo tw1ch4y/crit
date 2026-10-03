@@ -1,7 +1,7 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, powerMonitor, screen, shell } = require("electron");
+const { app, BrowserWindow, Menu, globalShortcut, ipcMain, powerMonitor, screen, session, shell } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
-const { spawn, exec } = require("node:child_process");
+const { spawn, execFile, execFileSync } = require("node:child_process");
 const https = require("node:https");
 const { scryptSync, timingSafeEqual, createHash } = require("node:crypto");
 const http = require("node:http");
@@ -11,8 +11,21 @@ const { ocistiSesiju, racunarJeZasticen, STOP_FAJL } = require("./ciscenje.js");
 const { snimiStanje, ugasiNoveProcese, presretniPokretanja, spisakZaPanel, ugasiProces } = require("./procesi.js");
 const winPod = require("./windows-podesavanja.js");
 const { napraviSkriptu, napraviOsigurac, KOD_OSIGURAC } = require("./nadogradnja-skripta.js");
+const {
+  opasanTaster, bezbednaAdresa, lokalnaStrana, opasniArgumenti, trebaPonovo, OPASNI_ARGUMENTI,
+  napraviNadzorVeze, vrstaIzlaza,
+} = require("./kiosk.js");
 
-const DEV = process.argv.includes("--dev");
+// --dev gasi kiosk (pun ekran, zastor, nadzor) i pali razvojne alate. Vazi SAMO
+// za launcher pokrenut iz izvornog koda: precica za autostart stoji u folderu
+// igraca i on je moze izmeniti, pa instaliran launcher ovaj argument ne slusa.
+const DEV = !app.isPackaged && process.argv.includes("--dev");
+
+// Neuhvacena greska u glavnom procesu ne sme da otvori sistemski prozor sa
+// greskom preko kiosk ekrana, niti da ugasi launcher: zapis ide osoblju, a
+// launcher radi dalje - isto pravilo kao na serveru.
+process.on("uncaughtException", (e) => javiProblem("greska_launchera", String(e?.stack || e)));
+process.on("unhandledRejection", (e) => javiProblem("greska_launchera", String(e?.stack || e)));
 
 // ŠTA STOJI IZMEĐU RAZVOJNOG RAČUNARA I ŠTETE
 //
@@ -34,7 +47,8 @@ const DEV = process.argv.includes("--dev");
 //
 // Zato postoje DVE nezavisne brave i obe moraju da budu otvorene:
 //
-//   A) izričito rečeno da se ne zaključava (--dev, --no-lock, bez-zakljucavanja.txt)
+//   A) izričito rečeno da se ne zaključava (--dev, --no-lock, bez-zakljucavanja.txt;
+//      --dev i --no-lock važe samo nepakovanom, a fajl uz proveru vlasnika - dole)
 //   B) LAUNCHER MORA DA BUDE INSTALIRAN. `app.isPackaged` je tačno kad launcher
 //      radi iz instalacije (electron-builder). `npm start`, `electron .` i svaki
 //      alat iz testovi/ daju netačno - a nijedno od toga nije računar u
@@ -45,8 +59,57 @@ const DEV = process.argv.includes("--dev");
 // opasno se traži izričito.
 const PAKOVAN = app.isPackaged;
 const IZRICITO_ZAKLJUCAJ = process.argv.includes("--zakljucaj");
-const NO_LOCK = DEV || process.argv.includes("--no-lock") ||
-  fs.existsSync(path.join(path.dirname(process.execPath), "bez-zakljucavanja.txt")) ||
+
+// OPASNI ARGUMENTI SE NE SLUSAJU.
+//
+// Instaliran launcher ne slusa --dev ni --no-lock (gore i dole). Ali neke
+// argumente Chromium procita pre prvog reda ovog fajla: --remote-debugging-port
+// otvara razvojne alate SPOLJA (pregledac na 127.0.0.1:9222 i launcher je u
+// rukama igraca), --inspect isto za ovaj proces, --proxy-server i --host-rules
+// preusmeravaju vezu ka serveru. Tada je kasno za "ne slusaj" - launcher se
+// pokrece ponovo, bez njih, i javlja osoblju sta je odbijeno.
+const ODBIJENO_RANIJE = (process.argv.find((a) => a.startsWith("--odbijeni-argumenti=")) || "").slice(21);
+let ponovoPokrecem = false;
+if (PAKOVAN && trebaPonovo(process.argv.slice(1))) {
+  ponovoPokrecem = true;
+  const odbijeni = opasniArgumenti(process.argv.slice(1)).map((a) => String(a).split("=")[0].replace(/[^a-z-]/gi, "")).join(",");
+  app.relaunch({
+    args: process.argv.slice(1)
+      .filter((a) => !OPASNI_ARGUMENTI.test(String(a)) && !String(a).startsWith("--odbijeni-argumenti="))
+      .concat(`--odbijeni-argumenti=${odbijeni}`),
+  });
+  app.exit(0);
+}
+
+// bez-zakljucavanja.txt pored programa gasi zakljucavanje (proba na jednom
+// racunaru, vidi assets/proba). Folder programa je u profilu igraca, pa bi
+// igrac mogao sam da napravi taj fajl. Zato u instaliranom launcheru vazi samo
+// fajl koji NIJE napravio nalog na kome launcher radi - ili ako je taj nalog
+// administrator (proba na sopstvenom racunaru). Standardni nalog ne moze da
+// napravi fajl ciji je vlasnik neko drugi.
+function zastavaBezZakljucavanja() {
+  const put = path.join(path.dirname(process.execPath), "bez-zakljucavanja.txt");
+  if (!fs.existsSync(put)) return false;
+  if (!PAKOVAN || process.platform !== "win32") return true;
+  try {
+    const izlaz = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
+      "$v=(Get-Acl -LiteralPath $env:ZASTAVA).GetOwner([Security.Principal.SecurityIdentifier]).Value;" +
+      "$ja=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value;" +
+      "$adm=[bool](whoami /groups /fo csv | Select-String -SimpleMatch 'S-1-5-32-544');" +
+      "Write-Output ($v + '|' + $ja + '|' + $adm)"],
+    { env: { ...process.env, ZASTAVA: put }, encoding: "utf8", windowsHide: true, timeout: 10000 });
+    const [vlasnik, ja, admin] = String(izlaz).trim().split("|");
+    if (!vlasnik || !ja) return false;
+    if (vlasnik !== ja || admin === "True") return true;
+    console.error("bez-zakljucavanja.txt je napravio sam nalog igraca - ne vazi");
+    zastavaOdbijena = true;
+    return false;
+  } catch { return false; } // ne zna se ko ga je napravio - ne vazi
+}
+let zastavaOdbijena = false;
+
+const NO_LOCK = DEV || (!PAKOVAN && process.argv.includes("--no-lock")) ||
+  zastavaBezZakljucavanja() ||
   (!PAKOVAN && !IZRICITO_ZAKLJUCAJ);
 
 // Odbijanje mora da se ČUJE. Tiho preskočeno zaključavanje na mašini u
@@ -184,11 +247,50 @@ function proveriPin(uneti) {
       if (timingSafeEqual(Buffer.from(test, "hex"), Buffer.from(saServera.hes, "hex"))) return true;
     } catch {}
   }
+  // Kad je PIN stigao sa servera, samo on vazi. Fabricki 1234 tada prestaje da
+  // vazi (cela poenta), ali i PIN iz podesavanja.json: launcher je instaliran u
+  // profil igraca, pa igrac sme da pise u taj fajl - upisao bi svoj PIN i njime
+  // izasao iz kioska cim iscupa kabl.
+  if (saServera?.hes) return false;
   const lokalni = servisniPin();
-  // Fabrički prolazi samo dok sa servera nije stigao pravi PIN.
-  if (lokalni === FABRICKI_PIN && saServera?.hes) return false;
   return pin === lokalni;
 }
+
+// KOCNICA ZA LOKALNI PIN. Server broji promasaje za PIN koji proverava on; ovaj
+// se proverava ovde, bez servera, i ima cetiri cifre. Posle 5 promasaja zaredom
+// ceka se 30 s, pa svaki sledeci promasaj duplo (najvise 15 min).
+let pinPromasaja = 0;
+let pinCekajDo = 0;
+function pinKocnica() { return Date.now() < pinCekajDo; }
+function pinKocnicaPoruka() { return `Previše pokušaja. Sačekaj ${Math.ceil((pinCekajDo - Date.now()) / 1000)} s.`; }
+function pinPromasen() {
+  pinPromasaja++;
+  if (pinPromasaja >= 5) {
+    pinCekajDo = Date.now() + Math.min(15 * 60000, 30000 * 2 ** (pinPromasaja - 5));
+    javiProblem("pin_pogadjanje", `${pinPromasaja} pogrešnih servisnih PIN-ova zaredom na launcheru`);
+  }
+}
+function pinPogodjen() { pinPromasaja = 0; pinCekajDo = 0; }
+
+// ADMIN IZLAZ ODOBRAVA GLAVNI PROCES, NE EKRAN.
+//
+// Ekran (renderer) proverava PIN i zove admin-exit. Kad bi to bilo sve, bilo
+// koji kod ubacen u ekran ugasio bi kiosk jednim pozivom. Zato izlaz vazi samo
+// kratko posle PIN-a koji je potvrdio server (pin_ok) ili lokalna provera.
+let izlazOdobrenDo = 0;
+function odobriIzlaz() { izlazOdobrenDo = Date.now() + 30000; }
+
+// Pokretanje Windows alata (reg, taskkill, powercfg...) bez komandne linije:
+// argumenti idu programu kakvi jesu, nista se ne tumaci (navodnici, &, %).
+function izvrsi(program, argumenti) {
+  try { execFile(program, argumenti, { windowsHide: true }, () => {}); } catch {}
+}
+// Isto, ali ceka kraj. Pri izlazu launchera asinhron poziv ume da bude prekinut
+// zajedno sa launcherom - pa bi politike ostale upisane.
+function izvrsiOdmah(program, argumenti) {
+  try { execFileSync(program, argumenti, { windowsHide: true, stdio: "ignore", timeout: 5000 }); } catch {}
+}
+const podesen = () => !!(config.configured && config.host && config.token);
 
 function servisniPin() {
   const izFajla = pinIzPodesavanja();
@@ -215,18 +317,25 @@ function loadConfig() {
   }
 }
 function saveConfig(c) {
-  const host = normalizeHost(c.host);
-  const token = String(c.token || "").trim();
+  const host = normalizeHost(c?.host);
+  const token = String(c?.token || "").trim();
   if (!host || !token) return { ok: false, error: "Unesi adresu servera i token računara." };
-  config = { ...config, ...c, host, token, configured: true };
+  // Samo adresa i token. Ranije je ovde stajalo `...c`, pa je ekran mogao da
+  // upise bilo koje polje - i servisniPinHes, koji odlucuje o izlazu iz kioska.
+  config = { ...config, host, token, configured: true };
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
   return { ok: true, host };
 }
 
 // Briše podešavanje i vraća launcher na ekran za podešavanje.
 function resetConfig() {
-  try { fs.unlinkSync(CONFIG_PATH); } catch {}
+  // PIN sa servera ostaje zapamcen: bez njega bi do prve veze sa serverom opet
+  // vazio fabricki 1234 (ili PIN iz fajla koji igrac moze da menja).
+  const { servisniPinHes, servisniPin: zapamcen } = config;
   config = { host: "", token: "", configured: false };
+  if (servisniPinHes) config.servisniPinHes = servisniPinHes;
+  if (zapamcen) config.servisniPin = zapamcen;
+  try { fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2)); } catch {}
   try { if (ws) ws.close(); } catch {}
   clearTimeout(reconnectTimer);
   sendToRenderer("need-setup", {});
@@ -248,6 +357,7 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
       devTools: DEV,
     },
   });
@@ -260,8 +370,8 @@ function createWindow() {
   // ako se ista mašina javlja više puta, to je hardver, ne launcher.
   win.webContents.on("render-process-gone", (_e, detalji) => {
     const razlog = detalji?.reason || "nepoznato";
-    javiProblem("ekran_pukao", `Ekran launchera je pukao (${razlog}) - vraćam ga`);
     if (razlog === "clean-exit" || app.isQuitting) return;
+    javiProblem("ekran_pukao", `Ekran launchera je pukao (${razlog}) - vraćam ga`);
     try { win.reload(); } catch { app.relaunch(); app.exit(0); }
   });
   // Zamrznut ekran igrač doživljava isto kao pokvaren računar.
@@ -329,6 +439,9 @@ function connectWs() {
     const stara = ws;
     ws = null;
     try { stara.removeAllListeners(); } catch {}
+    // Veza koja se jos povezuje javlja gresku kad je ugasimo; bez slusaoca bi ta
+    // greska oborila ceo launcher.
+    try { stara.on("error", () => {}); } catch {}
     try { stara.close(); } catch {}
     try { stara.terminate(); } catch {}
   }
@@ -343,7 +456,9 @@ function connectWs() {
     + "&v=" + encodeURIComponent(app.getVersion()) + "&p=2"
     + (sesijaToken ? "&sesija=" + encodeURIComponent(sesijaToken) : "");
   let sveza;
-  try { sveza = new WebSocket(url); } catch (e) { scheduleReconnect(); return; }
+  // handshakeTimeout: veza koja visi u povezivanju (server prima TCP, a ne
+  // odgovara) ne sme da visi zauvek - nadzor veze broji samo otvorenu vezu.
+  try { sveza = new WebSocket(url, { handshakeTimeout: 10000 }); } catch (e) { scheduleReconnect(); return; }
   ws = sveza;
   // Dogadjaji sa vec zamenjene veze se ignorisu - inace zakasneli "close" sa
   // stare gasi statusnu traku nove.
@@ -351,6 +466,7 @@ function connectWs() {
 
   sveza.on("open", () => {
     if (!jeAktuelna()) return;
+    nadzorVeze.znak();
     sendToRenderer("ws-status", { connected: true });
     // Uz MAC adrese (za Wake-on-LAN) ide i da li je servisni PIN jos fabricki.
     //
@@ -363,9 +479,17 @@ function connectWs() {
     // Ako se prosla nadogradnja polomila, ovo je prvi trenutak kad ima kome
     // da se javi - vidi javiIshodNadogradnje.
     javiIshodNadogradnje();
+    proveriZastituRacunara();
   });
+  // Server pinguje na 5 s (biblioteka sama odgovara). Svaki ping i svaka poruka
+  // su znak da je server ziv - vidi nadzor veze.
+  sveza.on("ping", () => { if (jeAktuelna()) nadzorVeze.znak(); });
+  // Launcher i sam pinguje (nadzor veze), pa ne zavisi od toga koliko cesto
+  // server pinguje - stariji server je pingovao na 15 s.
+  sveza.on("pong", () => { if (jeAktuelna()) nadzorVeze.znak(); });
   sveza.on("message", (buf) => {
     if (!jeAktuelna()) return;
+    nadzorVeze.znak();
     let msg; try { msg = JSON.parse(buf.toString()); } catch { return; }
     handleServerMsg(msg);
     // Token sesije ostaje ovde; ekran dobija poruku kakvu je i do sada dobijao.
@@ -418,6 +542,8 @@ function handleServerMsg(msg) {
   // vlasnik promeni u panelu - da nova vrednost važi odmah, ne tek posle
   // restarta svakog računara.
   if (msg.t === "welcome" && "servisniPin" in msg) zapamtiServisniPin(msg.servisniPin);
+  // Server je potvrdio PIN osoblja: admin izlaz je odobren, kratko.
+  if (msg.t === "pin_ok") odobriIzlaz();
   // Spisak onoga što se sme pokrenuti - vidi zapamtiDozvoljeno.
   if (msg.t === "welcome" || msg.t === "catalog") zapamtiDozvoljeno(msg);
   if (msg.t === "servisni_pin") {
@@ -447,14 +573,20 @@ function handleServerMsg(msg) {
   // Igrač se prijavio - zapamti šta je radilo pre njega, da na kraju sesije
   // znamo šta je tačno on pokrenuo (igre preko Steam-a rade pod drugim imenom).
   if (msg.t === "login_ok") {
+    // login_ok stize i kad se sesija NASTAVLJA posle prekida veze. Tada se
+    // stanje "pre sesije" ne snima ponovo: igra koju je igrac vec pokrenuo bi
+    // usla u snimak i ostala da radi sledecem igracu.
+    const novaSesija = !sesijaAktivna;
     sesijaAktivna = true;
     javljeniPragovi = new Set();
     showBackdrop(); // od sada zastor pokriva desktop dok god traje sesija
     proveriVreme(msg.remainingSeconds, true); // pri prijavi samo zapamti stanje
-    if (!NO_LOCK) snimiStanje().then((s) => { procesiPreSesije = s; }).catch(() => {});
-    // Zapamti kako je miš i zvuk bio pre ovog igrača, da se na kraju sesije
-    // vrati. Bez toga bi sledeći gost zatekao tuđa podešavanja.
-    winPod.procitajSve().then((s) => { podesavanjaPreSesije = s; }).catch(() => {});
+    if (novaSesija) {
+      if (!NO_LOCK) snimiStanje().then((s) => { procesiPreSesije = s; }).catch(() => {});
+      // Zapamti kako je miš i zvuk bio pre ovog igrača, da se na kraju sesije
+      // vrati. Bez toga bi sledeći gost zatekao tuđa podešavanja.
+      winPod.procitajSve().then((s) => { podesavanjaPreSesije = s; }).catch(() => {});
+    }
   }
   // Server šalje novo stanje na svakih par sekundi - odatle znamo koliko je ostalo.
   if (msg.t === "balance") proveriVreme(msg.remainingSeconds);
@@ -517,7 +649,7 @@ function createOverlay() {
     x: Math.round((width - Math.min(660, width - 40)) / 2), y: 0,
     frame: false, transparent: true, resizable: false, movable: false,
     skipTaskbar: true, focusable: false, show: false, alwaysOnTop: true,
-    webPreferences: { preload: path.join(__dirname, "overlay-preload.js"), contextIsolation: true },
+    webPreferences: { preload: path.join(__dirname, "overlay-preload.js"), contextIsolation: true, sandbox: true, devTools: DEV },
   });
   overlay.setAlwaysOnTop(true, "screen-saver");
   overlay.setIgnoreMouseEvents(true); // ne sme da hvata klikove umesto igre
@@ -730,6 +862,9 @@ function runInstall({ name, url, args }) {
     fs.mkdirSync(dir, { recursive: true });
     let base = "setup.exe";
     try { base = decodeURIComponent(new URL(url).pathname.split("/").pop()) || base; } catch {}
+    // Samo ime fajla, bez putanje: "..%5C..%5CStartup%5Cx.exe" bi inace snimio
+    // program van ovog foldera (npr. u autostart).
+    base = path.basename(base.replace(/\\/g, "/")).replace(/[^\w .()-]/g, "") || "setup.exe";
     if (!/\.(exe|msi)$/i.test(base)) base += ".exe";
     const dest = path.join(dir, Date.now() + "-" + base);
     downloadFile(url, dest, (err) => {
@@ -938,14 +1073,17 @@ function runCommand(cmd) {
     return;
   }
   switch (cmd) {
-    case "shutdown": exec('shutdown /s /t 3 /c "Crit - kraj smene"'); break;
-    case "restart": exec('shutdown /r /t 3 /c "Crit - restart"'); break;
-    case "logoff": exec("shutdown /l"); break;
+    case "shutdown": izvrsi("shutdown", ["/s", "/t", "3", "/c", "Crit - kraj smene"]); break;
+    case "restart": izvrsi("shutdown", ["/r", "/t", "3", "/c", "Crit - restart"]); break;
+    case "logoff": izvrsi("shutdown", ["/l"]); break;
     // "taskmgr" je izbačen. Otvarao je Task Manager NA računaru igrača: radnik
     // bi morao da ustane i ode do te mašine, a igrač bi u međuvremenu imao Task
     // Manager pred sobom. Zamenjen je daljinskim prikazom - server šalje
     // "procesi_trazi", a gašenje ide kroz "procesi_ugasi".
-    case "reboot_launcher": app.relaunch(); app.isQuitting = true; app.exit(0); break;
+    // Oznaka o odbijenim argumentima ne prelazi u novo pokretanje - javljeno je.
+    case "reboot_launcher":
+      app.relaunch({ args: process.argv.slice(1).filter((a) => !String(a).startsWith("--odbijeni-argumenti=")) });
+      app.isQuitting = true; app.exit(0); break;
   }
 }
 
@@ -959,7 +1097,8 @@ function focusLauncher() {
   clearExternal();
   launchGuardUntil = 0;
   if (!DEV) {
-    win.setAlwaysOnTop(!sesijaAktivna, "screen-saver");
+    // Bez veze sa serverom launcher je iznad svega i u sesiji - vidi nadzor veze.
+    win.setAlwaysOnTop(!sesijaAktivna || bezVeze, "screen-saver");
     win.setFullScreen(true);
   }
   if (win.isMinimized()) win.restore();
@@ -982,7 +1121,7 @@ function createBackdrop() {
     width, height, x: 0, y: 0,
     frame: false, fullscreen: true, skipTaskbar: true, show: false,
     backgroundColor: "#07070a",
-    webPreferences: { preload: path.join(__dirname, "backdrop-preload.js"), contextIsolation: true },
+    webPreferences: { preload: path.join(__dirname, "backdrop-preload.js"), contextIsolation: true, sandbox: true, devTools: DEV },
   });
   backdrop.loadFile(path.join(__dirname, "renderer", "backdrop.html"));
   backdrop.on("close", (e) => { if (!app.isQuitting) e.preventDefault(); });
@@ -1086,20 +1225,21 @@ function startWatchdog() {
     if (app.isQuitting) return;
     if (!win || win.isDestroyed()) { createWindow(); return; }
 
-    if (sesijaAktivna) {
+    if (sesijaAktivna && !bezVeze) {
       // Igrač radi: ne diramo prvi plan uopšte. Sme da drži Discord, muziku i
       // igru i da se prebacuje kako hoće. Naš posao je samo da zastor pokriva
       // desktop i da prozor launchera ne ostane sakriven.
       if (win.isAlwaysOnTop()) win.setAlwaysOnTop(false);
       showBackdrop();
       if (++tick % 4 === 0) presretniSkinute();
-    } else if (gameActive()) {
+    } else if (gameActive() && !bezVeze) {
       // Nema prijavljenog igrača, ali nešto još radi (npr. osoblje otvorilo Task Manager)
       if (win.isAlwaysOnTop()) win.setAlwaysOnTop(false);
       showBackdrop();
       if (++tick % 5 === 0) checkGameGone();
     } else {
-      // Login ili zaključan ekran: launcher mora biti iznad svega i neizbežan.
+      // Login, zaključan ekran ili nema veze sa serverom: launcher mora biti
+      // iznad svega i neizbežan.
       if (win.isMinimized()) win.restore();
       if (!win.isVisible()) win.showInactive();
       if (!win.isAlwaysOnTop()) win.setAlwaysOnTop(true, "screen-saver");
@@ -1127,7 +1267,7 @@ const recentLaunch = new Map(); // putanja -> vreme (spreči dupli klik)
 // pokretač startovao pa se sam ugasio) - da ne otmemo fokus pokrenutoj igri.
 function isProcessRunning(imageName, cb) {
   if (!imageName) return cb(false);
-  exec(`tasklist /FI "IMAGENAME eq ${imageName}" /NH`, { windowsHide: true }, (err, stdout) => {
+  execFile("tasklist", ["/FI", `IMAGENAME eq ${imageName}`, "/NH"], { windowsHide: true }, (err, stdout) => {
     cb(!err && String(stdout).toLowerCase().includes(String(imageName).toLowerCase()));
   });
 }
@@ -1294,8 +1434,11 @@ function launchGameStvarno(gamePath, args, name) {
 
     // Prečice (.lnk), .url i .bat se ne mogu pokrenuti kroz spawn - njih otvara
     // Windows sam. Osoblje često zalepi baš putanju do prečice sa desktopa.
+    // .bat i .cmd launcher ipak pokreće sam (pokreniSkriptu): zaštita računara
+    // igraču zabranjuje cmd.exe kroz Windows "otvori", pa bi zabrana stigla i igru.
     if (/\.(lnk|url|bat|cmd)$/i.test(gamePath)) {
-      shell.openPath(gamePath).then((greska) => {
+      const otvaranje = /\.(bat|cmd)$/i.test(gamePath) ? pokreniSkriptu(gamePath) : shell.openPath(gamePath);
+      otvaranje.then((greska) => {
         if (!greska) return;
         sendToRenderer("game-error", { name: name || path.basename(gamePath), message: objasniGresku(greska) });
         javiDaNeRadi(name || path.basename(gamePath), "greska");
@@ -1310,7 +1453,7 @@ function launchGameStvarno(gamePath, args, name) {
     const child = spawn(gamePath, razdvojArgumente(args), {
       detached: false, stdio: "ignore", cwd: path.dirname(gamePath),
     });
-    const entry = { child, image, name: name || image };
+    const entry = { child, image, name: name || image, ugasena: false };
     spawnedGames.add(entry);
     startGuard(); // dok gard traje, launcher ne dira prvi plan
 
@@ -1321,10 +1464,14 @@ function launchGameStvarno(gamePath, args, name) {
       javiDaNeRadi(entry.name, "greska");
       focusLauncher();
     });
-    child.on("exit", () => {
+    child.on("exit", (kod, signal) => {
+      spawnedGames.delete(entry);
       // Pokretač je izašao, ali igra verovatno tek startuje pod drugim imenom.
       // Ne vraćamo launcher ovde - o tome odlučuje nadzor kad gard istekne.
-      spawnedGames.delete(entry);
+      // Izuzetak je PAD (vidi kiosk.js vrstaIzlaza): igra koja se srušila ne
+      // ostavlja igrača pred crnim zastorom ili prozorom sa greškom.
+      if (entry.ugasena || vrstaIzlaza({ kod, signal }) !== "pad") return;
+      igraPala(entry, kod, signal);
     });
 
     // pusti igru u prvi plan
@@ -1335,11 +1482,45 @@ function launchGameStvarno(gamePath, args, name) {
   }
 }
 
+// .bat i .cmd igre: kroz komandni interpreter, mimo Windows "otvori" (vidi
+// gore). Vraća "" kad je pokrenuto, ili tekst greške - isto kao shell.openPath.
+// /s i spoljni navodnici: putanja sa razmakom, & ili zagradama ostaje cela.
+function pokreniSkriptu(put) {
+  return new Promise((resolve) => {
+    let p;
+    try {
+      p = spawn(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", `""${put}""`], {
+        cwd: path.dirname(put), detached: true, stdio: "ignore", windowsVerbatimArguments: true,
+      });
+    } catch (e) { resolve(String(e?.message || e || "greska")); return; }
+    p.once("spawn", () => { p.unref(); resolve(""); });
+    p.once("error", (e) => resolve(String(e?.message || e || "greska")));
+  });
+}
+
+// IGRA SE SRUŠILA: povratak u pun kiosk.
+//
+// Windows posle pada otvara prozor "program je prestao da radi" (WerFault), a
+// fokus ode na njega ili ni na šta - igrač ostaje pred crnim zastorom, ili pred
+// prozorom sa linkovima ka pregledaču. Zato: prozor sa greškom se gasi (a
+// zaštita računara ga i ne prikazuje - DontShowUI), osoblje dobija zapis, a
+// launcher se vraća ispred zastora sa porukom igraču. Ako radi još neka igra
+// koju je launcher pokrenuo, ne otima joj se fokus.
+function igraPala(entry, kod, signal) {
+  const opis = signal ? `signal ${signal}` : `kod 0x${(Number(kod) >>> 0).toString(16).toUpperCase()}`;
+  javiProblem("igra_pala", `Igra "${String(entry.name).slice(0, 60)}" se srušila (${opis})`);
+  if (!DEV && process.platform === "win32") izvrsi("taskkill", ["/IM", "WerFault.exe", "/F"]);
+  if (spawnedGames.size) return;
+  sendToRenderer("game-error", { name: entry.name, pala: true, message: `Igra "${entry.name}" se srušila. Pokreni je ponovo, a ako se ponovi, javi osoblju.` });
+  focusLauncher();
+}
+
 function killAllGames() {
   for (const g of spawnedGames) {
+    g.ugasena = true; // gasimo je mi - to nije pad
     try { g.child.kill("SIGKILL"); } catch {}
     // pokretač je često već izašao - dokrajči i sam proces igre
-    if (g.image) { try { exec(`taskkill /IM "${g.image}" /F /T`, { windowsHide: true }); } catch {} }
+    if (g.image) izvrsi("taskkill", ["/IM", g.image, "/F", "/T"]);
   }
   spawnedGames.clear();
   recentLaunch.clear();
@@ -1351,24 +1532,34 @@ function killAllGames() {
 // Launcher se umanji kad se otvori sajt, isto kao pri pokretanju igre.
 function openBrowser(url) {
   const target = url || "https://www.google.com";
+  // Samo prava internet adresa. shell.openExternal predaje adresu Windows-u, a
+  // on "file:///C:/Windows/System32/cmd.exe" pokrene, "ms-settings:" otvori
+  // podešavanja, "\\server\x.exe" pokrene sa mreže.
+  if (!bezbednaAdresa(target)) {
+    javiProblem("adresa_odbijena", `Odbijeno otvaranje adrese: ${String(target).slice(0, 120)}`);
+    return false;
+  }
   shell.openExternal(target).catch(() => {});
   markExternal(BROWSER_IMAGES);
   startGuard();
   stepBack();
+  return true;
 }
 // Kraj sesije zatvara i pregledač: sledeći igrač ne sme da zatekne tuđe
 // otvorene kartice i prijave.
 function closeBrowser() {
   clearExternal();
   if (DEV || process.platform !== "win32") return;
-  for (const img of BROWSER_IMAGES) {
-    try { exec(`taskkill /IM "${img}" /F /T`, { windowsHide: true }, () => {}); } catch {}
-  }
+  for (const img of BROWSER_IMAGES) izvrsi("taskkill", ["/IM", img, "/F", "/T"]);
 }
 
 // ---------- IPC ----------
 ipcMain.handle("get-config", () => ({ host: config.host, token: config.token, configured: config.configured }));
 ipcMain.handle("save-config", (e, c) => {
+  // Upis adrese servera samo na ekranu za podešavanje: prvi put, ili posle
+  // "Promeni adresu servera" (servisni PIN, reset-config). Podešen launcher ne
+  // prima novu adresu sa ekrana - inače bi ubačen kod preusmerio računar.
+  if (podesen()) return { ok: false, error: "Launcher je već podešen. Promena adrese traži servisni PIN." };
   const r = saveConfig(c);
   if (r.ok) connectWs();
   return r;
@@ -1377,15 +1568,32 @@ ipcMain.handle("save-config", (e, c) => {
 // servera" bio otvoren put: iscupa se kabl, sacekaju se sekunde dok se dugme ne
 // pojavi, i masina se preusmeri gde igrac hoce.
 ipcMain.handle("reset-config", (e, pin) => {
-  if (!proveriPin(pin)) return { ok: false, error: "Pogrešan servisni PIN." };
+  if (pinKocnica()) return { ok: false, error: pinKocnicaPoruka() };
+  if (!proveriPin(pin)) { pinPromasen(); return { ok: false, error: "Pogrešan servisni PIN." }; }
+  pinPogodjen();
   resetConfig();
   return { ok: true };
 });
-// Lokalna provera PIN-a - radi i kad server ne odgovara.
-ipcMain.handle("proveri-servisni-pin", (e, pin) => ({ ok: proveriPin(pin) }));
+// Lokalna provera PIN-a - radi i kad server ne odgovara. Uspeh odobrava admin
+// izlaz u glavnom procesu (vidi odobriIzlaz); promasaji idu kroz kocnicu.
+ipcMain.handle("proveri-servisni-pin", (e, pin) => {
+  if (pinKocnica()) return { ok: false, error: pinKocnicaPoruka() };
+  if (!proveriPin(pin)) { pinPromasen(); return { ok: false }; }
+  pinPogodjen();
+  odobriIzlaz();
+  return { ok: true };
+});
 ipcMain.handle("to-server", (e, msg) => { wsSend(msg); return true; });
-ipcMain.handle("launch-game", (e, { path: p, args, name }) => launchGame(p, args, name));
-ipcMain.handle("open-browser", (e, url) => { openBrowser(url); return true; });
+// Igre i sajtovi se pokrecu samo u sesiji: sa ekrana za prijavu ili sa
+// zakljucanog ekrana ne sme nista da se otvori.
+ipcMain.handle("launch-game", (e, { path: p, args, name } = {}) => {
+  if (!sesijaAktivna && !NO_LOCK) return { ok: false, error: "Prvo se prijavi." };
+  return launchGame(p, args, name);
+});
+ipcMain.handle("open-browser", (e, url) => {
+  if (!sesijaAktivna && !NO_LOCK) return false;
+  return openBrowser(url);
+});
 ipcMain.handle("focus-launcher", () => { focusLauncher(); return true; });
 
 // ---------- Global hotkeys ----------
@@ -1398,10 +1606,13 @@ function registerHotkeys() {
   globalShortcut.register("CommandOrControl+Alt+Shift+Q", () => { focusLauncher(); sendToRenderer("hotkey", { action: "exit" }); });
 
   // Ponovno podešavanje adrese/tokena. Radi samo kad NEMA veze sa serverom -
-  // tada osoblju i treba, a igraču ne vredi ništa (i dalje je zaključan u launcheru).
+  // tada osoblju i treba. Ide kroz SERVISNI PIN, isto kao dugme "Promeni adresu
+  // servera": ranije je prečica brisala podešavanje odmah, pa je igrač koji
+  // iščupa kabl mogao da preusmeri računar na svoj server.
   globalShortcut.register("CommandOrControl+Alt+Shift+R", () => {
     if (ws && ws.readyState === WebSocket.OPEN) return;
-    resetConfig();
+    focusLauncher();
+    sendToRenderer("hotkey", { action: "setup" });
   });
   if (DEV) return;
 
@@ -1417,6 +1628,12 @@ function registerHotkeys() {
     "Super+Tab", "Super+L", "Super+I", "Super+X", "Super+S", "Super+A",
     "Super+Up", "Super+Down", "Super+Left", "Super+Right",
     "F11",
+    // Win + slovo: traka zadataka, projekcija, deljenje, Game Bar, beleske,
+    // tabla sa obavestenjima, virtuelne radne povrsine, lupa. NoWinKeys ih
+    // gasi tek kad ga Explorer procita (posle prijave), pa se ovde guta i ranije.
+    "Super+B", "Super+T", "Super+P", "Super+K", "Super+V", "Super+G", "Super+H",
+    "Super+U", "Super+N", "Super+W", "Super+Z", "Super+Shift+S", "Super+Home",
+    "Super+Control+D", "Super+Control+Left", "Super+Control+Right", "Super+Plus",
   ];
   for (const key of blocked) {
     try { globalShortcut.register(key, () => { if (!gameActive()) focusLauncher(); }); } catch {}
@@ -1428,6 +1645,7 @@ function registerHotkeys() {
 // Vraća se u normalu kroz admin izlaz, da osoblje ne ostane zaključano.
 const POLICY_SYS = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System";
 const POLICY_EXP = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer";
+const WER_KLJUC = "HKCU\\Software\\Microsoft\\Windows\\Windows Error Reporting";
 // PLAN NAPAJANJA
 // Windows fabrički gasi ekran i uspavljuje računar posle par minuta mirovanja.
 // U igraonici to znaci crn ekran nasred filma ili striminga, i prekid igre koja
@@ -1453,24 +1671,37 @@ function planNapajanja(ukljuci) {
         "powercfg /change standby-timeout-ac 30",
         "powercfg /change disk-timeout-ac 20",
       ];
-  for (const c of cmds) exec(c, { windowsHide: true }, () => {});
+  const pokreni = app.isQuitting ? izvrsiOdmah : izvrsi;
+  for (const c of cmds) pokreni("powercfg", c.split(" ").slice(1));
 }
 
+// Na standardnom nalogu ovi upisi u Policies ne prolaze (Windows ne da korisniku
+// da menja sopstvene politike) - tamo zastitu stavlja zastita-ukljuci.bat, kao
+// administrator. Prozor posle pada igre (DontShowUI) je obican kljuc i on se
+// upisuje uvek.
 function setPolicies(on) {
   if (NO_LOCK || process.platform !== "win32") return;
   const v = on ? 1 : 0;
-  const cmds = [
-    `reg add "${POLICY_SYS}" /v DisableTaskMgr /t REG_DWORD /d ${v} /f`,
-    `reg add "${POLICY_SYS}" /v DisableLockWorkstation /t REG_DWORD /d ${v} /f`,
-    `reg add "${POLICY_SYS}" /v DisableChangePassword /t REG_DWORD /d ${v} /f`,
-    `reg add "${POLICY_EXP}" /v NoLogoff /t REG_DWORD /d ${v} /f`,
-    `reg add "${POLICY_EXP}" /v NoWinKeys /t REG_DWORD /d ${v} /f`,
-    `reg add "${POLICY_EXP}" /v NoClose /t REG_DWORD /d ${v} /f`,
+  const upisi = [
+    [POLICY_SYS, "DisableTaskMgr"],
+    [POLICY_SYS, "DisableLockWorkstation"],
+    [POLICY_SYS, "DisableChangePassword"],
+    [POLICY_EXP, "NoLogoff"],
+    [POLICY_EXP, "NoWinKeys"],
+    [POLICY_EXP, "NoClose"],
+    [WER_KLJUC, "DontShowUI"],
   ];
-  for (const c of cmds) exec(c, { windowsHide: true }, () => {});
+  const pokreni = app.isQuitting ? izvrsiOdmah : izvrsi;
+  for (const [kljuc, ime] of upisi) pokreni("reg", ["add", kljuc, "/v", ime, "/t", "REG_DWORD", "/d", String(v), "/f"]);
 }
 
 ipcMain.handle("admin-exit", () => {
+  // Bez PIN-a potvrdjenog u glavnom procesu nema izlaza - vidi odobriIzlaz.
+  if (Date.now() > izlazOdobrenDo) {
+    javiProblem("izlaz_odbijen", "Admin izlaz zatražen bez potvrđenog PIN-a");
+    return false;
+  }
+  izlazOdobrenDo = 0;
   app.isQuitting = true;
   killAllGames();
   app.quit();
@@ -1496,8 +1727,9 @@ function cpuTemp() {
   return new Promise((resolve) => {
     if (Date.now() - _tempCache.at < 15000) return resolve(_tempCache.val);
     _tempCache.at = Date.now();
-    exec(
-      'powershell -NoProfile -Command "(Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction Stop | Select-Object -First 1).CurrentTemperature"',
+    execFile(
+      "powershell",
+      ["-NoProfile", "-Command", "(Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction Stop | Select-Object -First 1).CurrentTemperature"],
       { windowsHide: true, timeout: 4000 },
       (err, stdout) => {
         let v = null;
@@ -1603,15 +1835,169 @@ function flushToRenderer() {
   }
 }
 
+// ---------- Zastita svakog prozora ----------
+//
+// Pravila (koji taster je opasan, koja strana sme) su u kiosk.js; ovde se samo
+// primenjuju, na SVAKI prozor launchera: ekran, zastor i obavestenje.
+const RENDERER_DIR = path.join(__dirname, "renderer");
+app.on("web-contents-created", (_e, wc) => {
+  // Tasteri koje bi Chromium sam obradio: osvezavanje (gubi se stanje ekrana),
+  // razvojni alati, zum, stampanje, Alt+F4. Kucanje u poljima ostaje.
+  wc.on("before-input-event", (e, input) => { if (!DEV && opasanTaster(input)) e.preventDefault(); });
+  // Prozor prikazuje samo svoje strane. Prevucen link, preusmerenje ili
+  // ubacena skripta ne vode nigde - a preload (most ka glavnom procesu) bi se
+  // ucitao i u tudju stranu.
+  wc.on("will-navigate", (e, url) => {
+    if (lokalnaStrana(url, RENDERER_DIR)) return;
+    e.preventDefault();
+    javiProblem("navigacija_odbijena", `Odbijena strana u prozoru launchera: ${String(url).slice(0, 120)}`);
+  });
+  wc.on("will-redirect", (e, url) => { if (!lokalnaStrana(url, RENDERER_DIR)) e.preventDefault(); });
+  wc.on("will-frame-navigate", (d) => { if (!lokalnaStrana(d.url, RENDERER_DIR)) d.preventDefault(); });
+  wc.on("will-attach-webview", (e) => e.preventDefault());
+  wc.setWindowOpenHandler(() => ({ action: "deny" }));
+  // Razvojne alate prozori pustaju samo u DEV. Ako se ipak otvore (spoljni
+  // alat, greska u Electron-u), zatvaraju se odmah.
+  wc.on("devtools-opened", () => { if (!DEV) wc.closeDevTools(); });
+});
+
+// ---------- Nadzor veze (heartbeat) ----------
+//
+// Ugovor sa serverom (server/src/hub.js): server pinguje na 5 s i gasi vezu sa
+// koje 15 s nije stiglo nista. Launcher meri isto u drugom smeru: ako 15 s ne
+// cuje server - ni ping, ni poruku - veza je mrtva, i kad TCP misli da nije
+// (iscupan kabl, zamrznut ruter). Tada:
+//   1. veza se prekida (ponovno povezivanje ide na 3 s)
+//   2. racunar se ZAKLJUCAVA: launcher izlazi preko igre i drzi ekran. Dok nema
+//      veze server ne naplacuje - bez ovoga bi igrac iscupao kabl i dzabe igrao
+//      svaku igru kojoj ne treba mreza.
+//   3. posle "gasiIgreBezVezeSekundi" (podesavanja.json, podrazumevano 120,
+//      0 = nikad) gase se igre i pregledaci. Zagrcnuta mreza ne kosta igru, a
+//      racunar ne radi nenaplaceno.
+// Prvi znak od servera skida zakljucavanje, a sesija se nastavlja (token sesije).
+// Odluke su u kiosk.js (napraviNadzorVeze), sa testom na laznom satu.
+function sekundiIzPodesavanja(kljuc, podrazumevano) {
+  const v = Number(podesavanje(kljuc, podrazumevano));
+  return Number.isFinite(v) && v >= 0 ? v : podrazumevano;
+}
+const GASI_IGRE_BEZ_VEZE_S = sekundiIzPodesavanja("gasiIgreBezVezeSekundi", 120);
+// Monotoni sat: pomeranje sistemskog vremena (sinhronizacija) ne sme da
+// zakljuca racunar.
+const nadzorVeze = napraviNadzorVeze({
+  ugasiIgrePosleMs: GASI_IGRE_BEZ_VEZE_S > 0 ? GASI_IGRE_BEZ_VEZE_S * 1000 : Infinity,
+  sat: () => performance.now(),
+});
+let bezVeze = false;
+
+function startNadzorVeze() {
+  let otkucaj = 0;
+  setInterval(() => {
+    if (app.isQuitting) return;
+    const otvorena = !!ws && ws.readyState === WebSocket.OPEN;
+    if (otvorena && ++otkucaj % 5 === 0) { try { ws.ping(); } catch {} }
+    const r = nadzorVeze.korak({
+      vezaOtvorena: otvorena,
+      // Dok sesija traje, launcher se ne otkljucava ni na ekranu za
+      // podesavanje: igra iza njega bi radila nenaplaceno.
+      podeseno: podesen() || sesijaAktivna,
+    });
+    if (r.prekiniVezu && ws) {
+      console.error("[launcher] server cuti 15 s - prekidam vezu");
+      try { ws.terminate(); } catch {}
+    }
+    if (r.zakljucaj) zakljucajBezVeze();
+    if (r.ugasiIgre) ugasiIgreBezVeze();
+    if (r.otkljucaj) otkljucajPosleVeze();
+  }, 1000);
+}
+
+function zakljucajBezVeze() {
+  bezVeze = true;
+  console.error("[launcher] nema veze sa serverom - racunar zakljucan");
+  sendToRenderer("ws-status", { connected: false, zakljucano: true, gasiIgreZa: GASI_IGRE_BEZ_VEZE_S });
+  focusLauncher();
+}
+
+function ugasiIgreBezVeze() {
+  if (!sesijaAktivna || DEV) return;
+  console.error("[launcher] veze nema predugo - gasim igre");
+  killAllGames();
+  closeBrowser();
+  // Sve sto je igrac pokrenuo u ovoj sesiji. Snimak "pre sesije" ostaje, jer
+  // sesija nije gotova - nastavlja se kad se veza vrati.
+  if (!NO_LOCK && procesiPreSesije) ugasiNoveProcese(procesiPreSesije, { log: (m) => console.log(m) }).catch(() => {});
+  sendToRenderer("ws-status", { connected: false, zakljucano: true, igreUgasene: true });
+}
+
+// Server se javio. Ako sesija traje, launcher prestaje da bude iznad svega i
+// igrac nastavlja; ako je server u medjuvremenu zavrsio sesiju, stize
+// "to_login" ili "locked" i launcher ostaje zakljucan kao i uvek.
+function otkljucajPosleVeze() {
+  bezVeze = false;
+  if (!DEV && win && !win.isDestroyed() && sesijaAktivna) win.setAlwaysOnTop(false);
+}
+
+// ---------- Provera zastite racunara ----------
+//
+// zastita-ukljuci.bat se zaboravi bas na jednoj masini, a nista se ne vidi dok
+// igrac ne otvori Task Manager. Launcher zato sam proveri sta je na snazi i,
+// jednom po pokretanju, javi osoblju u panel sta fali.
+let zastitaProverena = false;
+function proveriZastituRacunara() {
+  if (zastitaProverena) return;
+  zastitaProverena = true;
+  if (ODBIJENO_RANIJE) {
+    javiProblem("argumenti_odbijeni", `Launcher je pokrenut sa zabranjenim argumentima (${ODBIJENO_RANIJE.slice(0, 80)}) - proveri precicu u autostartu`);
+  }
+  if (zastavaOdbijena) javiProblem("zastava_odbijena", "bez-zakljucavanja.txt je napravio nalog igraca - zanemaren");
+  if (NO_LOCK || !PAKOVAN || process.platform !== "win32") return;
+  const fali = [];
+  const vrednost = (kljuc, ime, opis) => new Promise((resolve) => {
+    execFile("reg", ["query", kljuc, "/v", ime], { windowsHide: true, timeout: 5000 }, (err, izlaz) => {
+      if (err || !/REG_DWORD\s+0x0*[1-9a-f]/i.test(String(izlaz))) fali.push(opis);
+      resolve();
+    });
+  });
+  const administrator = new Promise((resolve) => {
+    execFile("whoami", ["/groups", "/fo", "csv"], { windowsHide: true, timeout: 5000 }, (err, izlaz) => {
+      if (!err && String(izlaz).includes("S-1-5-32-544")) fali.push("nalog igraca je administrator");
+      resolve();
+    });
+  });
+  Promise.all([
+    administrator,
+    vrednost(POLICY_SYS, "DisableTaskMgr", "Task Manager"),
+    vrednost("HKCU\\Software\\Policies\\Microsoft\\Windows\\System", "DisableCMD", "komandna linija"),
+    vrednost(POLICY_EXP, "DisallowRun", "zabranjeni programi"),
+    vrednost(POLICY_EXP, "NoControlPanel", "Podesavanja"),
+  ]).then(() => {
+    if (fali.length) javiProblem("zastita_nepotpuna", `Zastita racunara nije potpuna: ${fali.join(", ")}. Pokreni zastita-ukljuci.bat`);
+  });
+}
+
 // ---------- App lifecycle ----------
 app.whenReady().then(() => {
+  if (ponovoPokrecem) return;
+  // Electron-ov podrazumevani meni nosi precice za osvezavanje, razvojne alate
+  // i zum - i radi i kad se meni ne vidi.
+  if (!DEV) Menu.setApplicationMenu(null);
+  // Ekranu launchera ne treba nijedna dozvola (kamera, mikrofon, lokacija,
+  // obavestenja, citanje clipboard-a...).
+  session.defaultSession.setPermissionRequestHandler((_wc, _dozvola, odgovor) => odgovor(false));
+  session.defaultSession.setPermissionCheckHandler(() => false);
   createWindow();
   registerHotkeys();
   setPolicies(true);
   planNapajanja(true);
   startWatchdog();
+  startNadzorVeze();
   connectWs();
   app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+});
+// Pomocni procesi (GPU, mreza) koji puknu: Electron ih podigne sam, a osoblje
+// dobija zapis - ako se ista masina javlja stalno, kvar je na njoj.
+app.on("child-process-gone", (_e, d) => {
+  if (d?.reason && d.reason !== "clean-exit") javiProblem("proces_pukao", `${d.type}: ${d.reason}`);
 });
 
 // Bez admin izlaza (PIN) aplikacija se ne gasi: ni zatvaranjem prozora,
@@ -1631,6 +2017,13 @@ app.on("will-quit", () => {
 });
 
 // jedan instance
-const gotLock = app.requestSingleInstanceLock();
-if (!gotLock) app.quit();
-else app.on("second-instance", () => focusLauncher());
+//
+// Druga kopija izlazi odmah, i to app.exit, ne app.quit: quit bi zaustavio
+// sopstveni "before-quit" (gore), pa bi druga kopija nastavila - drugi prozor,
+// ista veza ka serveru. A kad bi ipak izasla kroz quit, "will-quit" bi skinuo
+// zastitu koju je postavila prva kopija.
+const gotLock = !ponovoPokrecem && app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.isQuitting = true;
+  app.exit(0);
+} else app.on("second-instance", () => focusLauncher());

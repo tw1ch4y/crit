@@ -102,6 +102,11 @@ export function zamene(staro, novo) {
 // napravi-paket.mjs NIJE ovde: on ime ČITA iz igraonica.json, pa nema šta da
 // mu se menja. Tako je i bolje - uputstvo koje pravi ide u samu igraonicu.
 export const FAJLOVI_SA_IMENOM = [
+  // Kopije u korenu projekta su iste kao u client/ (test-alati-osoblja). Bez
+  // njih na spisku bi se posle preimenovanja razisle: alat iz korena bi gasio
+  // proces koji na toj masini ne postoji - i javio da je sve proslo.
+  "DEINSTALIRAJ-LAUNCHER.bat",
+  "POPRAVI-RACUNAR.bat",
   "client/DEINSTALIRAJ-LAUNCHER.bat",
   "client/POPRAVI-RACUNAR.bat",
   "client/resetuj-launcher.bat",

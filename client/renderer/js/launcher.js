@@ -234,7 +234,7 @@ function toast(msg, type = "info", trajanje = 3000) {
     show("setupScreen");
     setTimeout(() => $(c.host ? "#cfgToken" : "#cfgHost").focus(), 120);
   });
-  window.crit.onWsStatus(({ connected }) => {
+  window.crit.onWsStatus(({ connected, zakljucano, igreUgasene, gasiIgreZa }) => {
     S.wsOk = connected;
     // Stanje veze igrac vidi u donjoj traci dok radi, i na ekranu "Povezivanje"
     // kad veza pukne. Plutajuca oznaka preko ekrana prijave je bila visak.
@@ -252,13 +252,18 @@ function toast(msg, type = "info", trajanje = 3000) {
       // Poruka o vremenu ide samo igracu kome je veza pukla USRED sesije.
       // Pri paljenju racunara nema sta da se cuva, pa bi samo zbunjivala.
       $("#connSesija").classList.toggle("hidden", !S.player);
+      tekstBezVeze({ zakljucano, igreUgasene, gasiIgreZa });
       show("connScreen");
     }
     if (connected) $("#connSesija").classList.add("hidden");
+    // Tekst se vraca na obican - sledeci prekid ne pocinje porukom o zakljucavanju.
+    if (connected) tekstBezVeze({});
   });
   window.crit.onHotkey(({ action }) => {
     if (action === "unlock") { if ($("#lockedScreen").classList.contains("active")) otkrijPinOsoblja(); }
     else if (action === "exit") openPin("Admin izlaz iz launchera", true);
+    // Ctrl+Alt+Shift+R bez veze: promena adrese servera, kroz servisni PIN.
+    else if (action === "setup") openPin("Servisni PIN - promena adrese servera", false, "setup");
   });
   window.crit.onServerMsg(handleMsg);
   if (window.crit.onBlokirano) {
@@ -266,7 +271,8 @@ function toast(msg, type = "info", trajanje = 3000) {
       toast(`Pokretanje preuzetih programa nije dozvoljeno (${ime}). Ako ti nešto treba, pitaj osoblje.`, "error"));
   }
   if (window.crit.onGameError) {
-    window.crit.onGameError(({ name, message }) => toast(`Ne mogu da pokrenem ${name}: ${message}`, "error"));
+    // "pala": igra se srusila posle pokretanja (vidi main.js igraPala) - poruka je cela.
+    window.crit.onGameError(({ name, message, pala }) => toast(pala ? message : `Ne mogu da pokrenem ${name}: ${message}`, "error"));
   }
   // tek sada je sve zakačeno - javi main procesu da može da pusti poruke
   if (window.crit.ready) window.crit.ready();
@@ -2616,6 +2622,27 @@ $("#lockPin").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#lo
 // Message overlay
 $("#msgOk").addEventListener("click", () => $("#msgOverlay").classList.remove("active"));
 
+// NADZOR VEZE: kad launcher 15 s ne cuje server, racunar se zakljucava (vidi
+// main.js, nadzor veze). Igrac mora da zna da mu se vreme ne trosi i sta sledi.
+const CONN_TEKST = { naslov: null, opis: null };
+function tekstBezVeze({ zakljucano, igreUgasene, gasiIgreZa } = {}) {
+  const b = $("#connSesija b"), sp = $("#connSesija span");
+  if (!b || !sp) return;
+  if (CONN_TEKST.naslov == null) { CONN_TEKST.naslov = b.textContent; CONN_TEKST.opis = sp.textContent; }
+  if (igreUgasene) {
+    b.textContent = "Igre su ugašene jer veze nema predugo.";
+    sp.textContent = "Vreme ti se ne troši. Sesija te čeka i nastavlja se čim se veza vrati.";
+  } else if (zakljucano) {
+    const min = Math.round((Number(gasiIgreZa) || 0) / 60);
+    b.textContent = "Računar je zaključan dok se veza ne vrati.";
+    sp.textContent = "Vreme ti se ne troši, a sesija se nastavlja čim se veza vrati." +
+      (min > 0 ? ` Ako veze ne bude ni za ${min} min, igre se gase.` : "");
+  } else {
+    b.textContent = CONN_TEKST.naslov;
+    sp.textContent = CONN_TEKST.opis;
+  }
+}
+
 // PIN OVERLAY (admin exit)
 function openPin(title, isExit, svrha = "izlaz") {
   S.pendingExit = !!isExit;
@@ -2641,7 +2668,9 @@ $("#pinOk").addEventListener("click", async () => {
   if (S.pinSvrha === "setup" || !S.wsOk) {
     const r = await window.crit.proveriServisniPin(pin);
     if (r && r.ok) return pinPrihvacen();
-    $("#pinErr").textContent = "Pogrešan servisni PIN.";
+    // r.error: kocnica posle vise promasaja ("Sacekaj N s")
+    $("#pinErr").textContent = (r && r.error) || "Pogrešan servisni PIN.";
+    $("#pinInput").value = "";
     return;
   }
   window.crit.toServer({ t: "verify_pin", pin });

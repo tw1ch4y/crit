@@ -65,8 +65,8 @@ proveri("naplata tece dok je racunar tu", k2 < k1 - 3, `${k1} -> ${k2}`);
 ws._socket.pause();
 const kPre = await kredit();
 
-// Server pinguje na 15 s i gasi vezu koja je propustila prethodni ping, pa
-// otkrivanje traje do 30 s. Ovde se ceka do 45 s.
+// Server pinguje na 5 s i gasi vezu sa koje 15 s nije stiglo nista, pa
+// otkrivanje traje do 20 s. Ovde se ceka do 45 s.
 let primetio = false;
 for (let i = 0; i < 45; i++) {
   await cekaj(1000);

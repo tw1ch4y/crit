@@ -116,9 +116,13 @@ Prečice za osoblje: `Ctrl+Alt+U` otključavanje (PIN), `Ctrl+Alt+Home` povratak
 
 1. Napravi **poseban Windows nalog za igrače** - obavezno *standardni*, ne administrator.
    Time igrač ne može da instalira, menja sistem ni da ugasi zaštitu.
-2. Prijavi se na taj nalog i pokreni **`client\zastita-ukljuci.bat`** (desni klik > *Run as administrator*).
+2. Prijavi se na taj nalog i pokreni **`zastita-ukljuci.bat`** iz paketa (`2 - LAUNCHER\ALATI OSOBLJA`,
+   u izvornom kodu `client\`) - desni klik > *Run as administrator*. Zaštita se upisuje na nalog
+   igrača (`HKEY_USERS\<SID>`), ne na administratora čiju lozinku ukucaš.
    Gasi: Task Manager, Registry Editor, promenu lozinke, zaključavanje, odjavu, Windows taster,
-   `Win+R` i gašenje iz Start menija. Usput gasi i Fast Startup (smeta Wake-on-LAN-u).
+   `Win+R`, gašenje iz Start menija, Control Panel i Podešavanja, komandnu liniju i pokretanje
+   `cmd`/`powershell`/`regedit`... iz Explorer-a. Usput gasi i Fast Startup (smeta Wake-on-LAN-u).
+   Ceo spisak, dozvole i alati osoblja: [POKRETANJE.md, Bezbednost kioska](POKRETANJE.md#bezbednost-kioska).
 3. Odjavi se i prijavi ponovo da podešavanja stupe na snagu.
 
 4. **Odloži Windows Update van radnog vremena.** Ovo launcher namerno ne dira -
@@ -130,14 +134,16 @@ Prečice za osoblje: `Ctrl+Alt+U` otključavanje (PIN), `Ctrl+Alt+Home` povratak
    ovde može da se desi.
    Ako treba potpuni mir tokom vikenda: *Pause updates* (do 5 nedelja).
 
-Za servis računara: **`client\zastita-iskljuci.bat`** (isto kao administrator) vraća sve u normalu.
+Za servis računara: **`zastita-iskljuci.bat`** (isto, kao administrator) vraća sve u normalu. Kad je
+nalog igrača već zaključan, pokreni je sa administratorskog naloga: `zastita-iskljuci.bat IME-NALOGA`.
 
 > **Plan napajanja** launcher menja sam: dok radi, računar ne ide na spavanje i
 > ekran se ne gasi (Windows to fabrički radi posle par minuta, pa bi se ekran
 > ugasio nasred filma ili striminga). Pri admin izlazu se vraća na *Balanced*.
 
-> Launcher pokušava da postavi ova podešavanja i sam pri pokretanju, ali na nekim
-> računarima Windows odbije upis bez admin prava. Zato pokreni `.bat` - to je pouzdan način.
+> Launcher pokušava da postavi deo ovih podešavanja i sam pri pokretanju, ali Windows
+> standardnom nalogu ne dozvoljava upis politika. Zato pokreni `.bat` - to je pouzdan način.
+> Ako se zaboravi, launcher to javlja u panel (`zastita_nepotpuna`).
 
 ### 3.3 Launcher dira Windows samo kad je INSTALIRAN
 

@@ -58,28 +58,42 @@ export function setHandlers(h) {
 // zna da racunara nema. Naplata JESTE napisana da se pauzira kad racunar padne,
 // ali se ta zastita nikad nije ni aktivirala - server nije imao kako da sazna.
 //
-// Zato server pinguje svaku vezu. Ko ne odgovori do sledeceg ping-a, gasi se.
-// 15 sekundi znaci da se gubitak vidi za najvise 30, pa igrac plati najvise
-// pola minuta vremena koje nije proveo. Krace bi trosilo mrezu bez potrebe,
-// duze bi se videlo na racunu.
-const PING_MS = 15000;
+// Zato server pinguje svaku vezu na PING_MS, a vezu sa koje 15 sekundi
+// (TISINA_MS) nije stiglo NISTA - ni odgovor na ping, ni poruka - gasi.
+//
+// 15 s je ugovor sa launcherom: i on gasi vezu i zakljucava racunar kad 15 s
+// ne cuje server (vidi client/main.js, nadzorVeze). Ping na 5 s znaci da jedan
+// izgubljen ping (zagrcnuta mreza) jos nije prekid - tek tri zaredom jesu. Ping
+// je par bajtova; trinaest racunara na 5 s je zanemarljivo za mrezu.
+const PING_MS = 5000;
+export const TISINA_MS = 15000;
 
 export function initWs(server, { authComputer, authAdmin }) {
   const wss = new WebSocketServer({ server, path: "/ws", maxPayload: NAJVECA_PORUKA });
 
+  // Monotoni sat: pomeranje sistemskog vremena ne sme da pogasi sve veze.
+  let prosliOtkucaj = performance.now();
   const otkucaj = setInterval(() => {
+    const sada = performance.now();
+    // Server je stajao (spor disk, velika kopija baze, uspavan racunar): tisinu
+    // je napravio on, ne racunari. Rok se svima pomera, niko se ne gasi.
+    const stajao = sada - prosliOtkucaj > 3 * PING_MS;
+    prosliOtkucaj = sada;
     for (const ws of wss.clients) {
-      if (ws.zivo === false) { try { ws.terminate(); } catch {} continue; }
-      ws.zivo = false;
+      if (stajao) ws.poslednjiZnak = sada;
+      else if (sada - (ws.poslednjiZnak || 0) > TISINA_MS) { try { ws.terminate(); } catch {} continue; }
       try { ws.ping(); } catch {}
     }
   }, PING_MS);
   wss.on("close", () => clearInterval(otkucaj));
 
   wss.on("connection", (ws, req) => {
-    // Sveza veza vazi kao ziva do prvog ping-a koji ostane bez odgovora.
-    ws.zivo = true;
-    ws.on("pong", () => { ws.zivo = true; });
+    // Svaki znak sa druge strane (odgovor na ping, njen ping ili poruka) pomera rok.
+    const ziv = () => { ws.poslednjiZnak = performance.now(); };
+    ziv();
+    ws.on("pong", ziv);
+    ws.on("ping", ziv);
+    ws.on("message", ziv);
     // Greska na uticnici (npr. poruka preko NAJVECA_PORUKA) ne sme da postane
     // neuhvacena greska procesa. ws posle nje sam zatvara vezu.
     ws.on("error", () => {});

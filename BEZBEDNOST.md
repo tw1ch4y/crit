@@ -219,10 +219,11 @@ uzimaju čim se oslobode.
 
 - **Iščupan kabl.** Dok računar nije na mreži, naplata stoji. To je postojeće
   pravilo (nestanak struje ne sme da se naplati) i test `restart` ga traži.
-  Igrač koji iščupa kabl i igra igru koja ne traži mrežu ne plaća to vreme.
-  Sada se svaki takav prekid duži od 2 minuta beleži (`sesija_dug_prekid`), pa
-  se obrazac vidi. Pravo rešenje je na launcheru: da se posle N minuta bez
-  servera usred sesije sam zaključa.
+  Svaki prekid duži od 2 minuta se beleži (`sesija_dug_prekid`). Launcher se
+  sada i sam zaključava posle 15 s bez servera, a igre gasi posle
+  `gasiIgreBezVezeSekundi` (podrazumevano 2 min). Vidi POKRETANJE.md,
+  [Nadzor veze](POKRETANJE.md#nadzor-veze-heartbeat); zaštita samog launchera i
+  alata osoblja je u [Bezbednost kioska](POKRETANJE.md#bezbednost-kioska).
 - **Stariji launcher (`p=1`) sme da završi sesiju bez potvrde.** `p` se može
   lažirati, ali time se može samo prekinuti tuđa sesija, ne i nešto dobiti.
 - **Rute kataloga** (shop, igre, alati, promo, pozadine, tekstura, brend,
